@@ -27,9 +27,9 @@ export default function Footer({ className }: { className?: string }) {
   const mainContentParts = (
     typeof config?.customFooter === 'string'
       ? config.customFooter
-      : '[LibreChat ' +
+      : '[Daily Thread ' +
         Constants.VERSION +
-        '](https://librechat.ai) - ' +
+        '](https://app.dailythread.ai) - ' +
         localize('com_ui_latest_footer')
   ).split('|');
 
