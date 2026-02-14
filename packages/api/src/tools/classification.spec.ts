@@ -292,7 +292,7 @@ describe('classification.ts', () => {
   });
 
   describe('buildToolClassification with definitionsOnly', () => {
-    const mockLoadAuthValues = jest.fn().mockResolvedValue({ CODE_API_KEY: 'test-key' });
+    const mockLoadAuthValues = jest.fn().mockResolvedValue({});
 
     const createMCPTool = (name: string, description?: string) =>
       ({
@@ -347,68 +347,6 @@ describe('classification.ts', () => {
       expect(result.toolRegistry?.has('tool_search')).toBe(true);
     });
 
-    it('should still add PTC definition when definitionsOnly=true and has programmatic tools', async () => {
-      const loadedTools: GenericTool[] = [createMCPTool('tool1')];
-
-      const agentToolOptions: AgentToolOptions = {
-        tool1: { allowed_callers: ['code_execution'] },
-      };
-
-      const result = await buildToolClassification({
-        loadedTools,
-        userId: 'user1',
-        agentId: 'agent1',
-        agentToolOptions,
-        deferredToolsEnabled: true,
-        definitionsOnly: true,
-        loadAuthValues: mockLoadAuthValues,
-      });
-
-      expect(result.toolDefinitions.some((d) => d.name === 'run_tools_with_code')).toBe(true);
-      expect(result.toolRegistry?.has('run_tools_with_code')).toBe(true);
-      expect(result.additionalTools.length).toBe(0);
-    });
-
-    it('should NOT call loadAuthValues for PTC when definitionsOnly=true', async () => {
-      const loadedTools: GenericTool[] = [createMCPTool('tool1')];
-
-      const agentToolOptions: AgentToolOptions = {
-        tool1: { allowed_callers: ['code_execution'] },
-      };
-
-      await buildToolClassification({
-        loadedTools,
-        userId: 'user1',
-        agentId: 'agent1',
-        agentToolOptions,
-        deferredToolsEnabled: true,
-        definitionsOnly: true,
-        loadAuthValues: mockLoadAuthValues,
-      });
-
-      expect(mockLoadAuthValues).not.toHaveBeenCalled();
-    });
-
-    it('should call loadAuthValues for PTC when definitionsOnly=false', async () => {
-      const loadedTools: GenericTool[] = [createMCPTool('tool1')];
-
-      const agentToolOptions: AgentToolOptions = {
-        tool1: { allowed_callers: ['code_execution'] },
-      };
-
-      await buildToolClassification({
-        loadedTools,
-        userId: 'user1',
-        agentId: 'agent1',
-        agentToolOptions,
-        deferredToolsEnabled: true,
-        definitionsOnly: false,
-        loadAuthValues: mockLoadAuthValues,
-      });
-
-      expect(mockLoadAuthValues).toHaveBeenCalled();
-    });
-
     it('should create tool instances when definitionsOnly=false (default)', async () => {
       const loadedTools: GenericTool[] = [createMCPTool('tool1')];
 
@@ -426,6 +364,28 @@ describe('classification.ts', () => {
       });
 
       expect(result.additionalTools.some((t) => t.name === 'tool_search')).toBe(true);
+    });
+
+    it('should NOT add PTC (run_tools_with_code) when agent has programmatic tools - PTC removed (was CODE_API_KEY/E2B dependent)', async () => {
+      const loadedTools: GenericTool[] = [createMCPTool('tool1')];
+
+      const agentToolOptions: AgentToolOptions = {
+        tool1: { allowed_callers: ['code_execution'] },
+      };
+
+      const result = await buildToolClassification({
+        loadedTools,
+        userId: 'user1',
+        agentId: 'agent1',
+        agentToolOptions,
+        deferredToolsEnabled: true,
+        definitionsOnly: false,
+        loadAuthValues: mockLoadAuthValues,
+      });
+
+      expect(result.additionalTools.some((t) => t.name === 'run_tools_with_code')).toBe(false);
+      expect(result.toolDefinitions.some((d) => d.name === 'run_tools_with_code')).toBe(false);
+      expect(result.toolRegistry?.has('run_tools_with_code')).toBe(false);
     });
   });
 });

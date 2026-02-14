@@ -2,7 +2,12 @@ import { EarthIcon } from 'lucide-react';
 import { ControlCombobox } from '@librechat/client';
 import { useCallback, useEffect, useRef } from 'react';
 import { useFormContext, Controller } from 'react-hook-form';
-import { AgentCapabilities, defaultAgentFormValues } from 'librechat-data-provider';
+import {
+  AgentCapabilities,
+  Tools,
+  EToolResources,
+  defaultAgentFormValues,
+} from 'librechat-data-provider';
 import type { UseMutationResult, QueryObserverResult } from '@tanstack/react-query';
 import type { Agent, AgentCreateParams } from 'librechat-data-provider';
 import type { TAgentCapabilities, AgentForm } from '~/common';
@@ -66,6 +71,17 @@ export default function AgentSelect({
       (fullAgent.tools ?? []).forEach((tool) => {
         if (capabilities[tool] !== undefined) {
           capabilities[tool] = true;
+          return;
+        }
+        if (
+          tool === Tools.read_file ||
+          tool === Tools.edit_file ||
+          tool === Tools.create_file ||
+          tool === Tools.delete_file ||
+          tool === Tools.list_files ||
+          tool === Tools.search_files
+        ) {
+          capabilities[AgentCapabilities.execute_code] = true;
           return;
         }
 

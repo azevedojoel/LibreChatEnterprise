@@ -8,11 +8,8 @@
 import { logger } from '@librechat/data-schemas';
 import { Constants } from 'librechat-data-provider';
 import {
-  EnvVar,
   createToolSearch,
   ToolSearchToolDefinition,
-  createProgrammaticToolCallingTool,
-  ProgrammaticToolCallingDefinition,
 } from '@librechat/agents';
 import type { AgentToolOptions } from 'librechat-data-provider';
 import type {
@@ -188,8 +185,8 @@ export interface BuildToolClassificationParams {
   deferredToolsEnabled?: boolean;
   /** When true, skip creating tool instances (for event-driven mode) */
   definitionsOnly?: boolean;
-  /** Function to load auth values (dependency injection) */
-  loadAuthValues: (params: {
+  /** @deprecated PTC removed - no longer used */
+  loadAuthValues?: (params: {
     userId: string;
     authFields: string[];
   }) => Promise<Record<string, string>>;
@@ -236,14 +233,13 @@ export function agentHasDeferredTools(toolRegistry: LCToolRegistry): boolean {
 }
 
 /**
- * Builds the tool registry from MCP tools and conditionally creates PTC and tool search tools.
+ * Builds the tool registry from MCP tools and conditionally creates tool search tools.
  *
  * This function:
  * 1. Filters loaded tools for MCP tools
  * 2. Extracts tool definitions and builds the registry from agent's tool_options
  * 3. Cleans up temporary mcpJsonSchema properties
- * 4. Creates PTC tool only if agent has tools configured for programmatic calling
- * 5. Creates tool search tool only if agent has deferred tools
+ * 4. Creates tool search tool only if agent has deferred tools
  *
  * @param params - Parameters including loaded tools, userId, agentId, agentToolOptions, and dependencies
  * @returns Tool registry and any additional tools created
@@ -258,7 +254,6 @@ export async function buildToolClassification(
     agentToolOptions,
     definitionsOnly = false,
     deferredToolsEnabled = true,
-    loadAuthValues,
   } = params;
   const additionalTools: GenericTool[] = [];
 
@@ -331,58 +326,6 @@ export async function buildToolClassification(
     logger.debug(`[buildToolClassification] Tool Search enabled for agent ${agentId}`);
   }
 
-  /** PTC requires CODE_API_KEY for sandbox execution */
-  if (!hasProgrammaticTools) {
-    return { toolRegistry, toolDefinitions, additionalTools, hasDeferredTools };
-  }
-
-  /** In definitions-only mode, add PTC definition without creating the tool instance */
-  if (definitionsOnly) {
-    toolDefinitions.push({
-      name: ProgrammaticToolCallingDefinition.name,
-      description: ProgrammaticToolCallingDefinition.description,
-      parameters: ProgrammaticToolCallingDefinition.schema as unknown as LCTool['parameters'],
-    });
-    toolRegistry.set(ProgrammaticToolCallingDefinition.name, {
-      name: ProgrammaticToolCallingDefinition.name,
-      allowed_callers: ['direct'],
-    });
-    logger.debug(
-      `[buildToolClassification] PTC definition added for agent ${agentId} (definitions only)`,
-    );
-    return { toolRegistry, toolDefinitions, additionalTools, hasDeferredTools };
-  }
-
-  try {
-    const authValues = await loadAuthValues({
-      userId,
-      authFields: [EnvVar.CODE_API_KEY],
-    });
-    const codeApiKey = authValues[EnvVar.CODE_API_KEY];
-
-    if (!codeApiKey) {
-      logger.warn('[buildToolClassification] PTC configured but CODE_API_KEY not available');
-      return { toolRegistry, toolDefinitions, additionalTools, hasDeferredTools };
-    }
-
-    const ptcTool = createProgrammaticToolCallingTool({ apiKey: codeApiKey });
-    additionalTools.push(ptcTool);
-
-    /** Add PTC definition for event-driven mode */
-    toolDefinitions.push({
-      name: ProgrammaticToolCallingDefinition.name,
-      description: ProgrammaticToolCallingDefinition.description,
-      parameters: ProgrammaticToolCallingDefinition.schema as unknown as LCTool['parameters'],
-    });
-    toolRegistry.set(ProgrammaticToolCallingDefinition.name, {
-      name: ProgrammaticToolCallingDefinition.name,
-      allowed_callers: ['direct'],
-    });
-
-    logger.debug(`[buildToolClassification] PTC tool enabled for agent ${agentId}`);
-  } catch (error) {
-    logger.error('[buildToolClassification] Error creating PTC tool:', error);
-  }
-
+  /** PTC removed - was dependent on CODE_API_KEY for E2B sandbox execution */
   return { toolRegistry, toolDefinitions, additionalTools, hasDeferredTools };
 }

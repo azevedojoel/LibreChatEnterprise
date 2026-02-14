@@ -1,6 +1,5 @@
 const fs = require('fs').promises;
 const express = require('express');
-const { EnvVar } = require('@librechat/agents');
 const { logger } = require('@librechat/data-schemas');
 const {
   Time,
@@ -24,7 +23,6 @@ const { fileAccess } = require('~/server/middleware/accessResources/fileAccess')
 const { getStrategyFunctions } = require('~/server/services/Files/strategies');
 const { getOpenAIClient } = require('~/server/controllers/assistants/helpers');
 const { checkPermission } = require('~/server/services/PermissionService');
-const { loadAuthValues } = require('~/server/services/Tools/credentials');
 const { refreshS3FileUrls } = require('~/server/services/Files/S3/crud');
 const { hasAccessToFilesViaAgent } = require('~/server/services/Files');
 const { getFiles, batchUpdateFiles } = require('~/models');
@@ -255,48 +253,6 @@ router.delete('/', async (req, res) => {
   } catch (error) {
     logger.error('[/files] Error deleting files:', error);
     res.status(400).json({ message: 'Error in request', error: error.message });
-  }
-});
-
-function isValidID(str) {
-  return /^[A-Za-z0-9_-]{21}$/.test(str);
-}
-
-router.get('/code/download/:session_id/:fileId', async (req, res) => {
-  try {
-    const { session_id, fileId } = req.params;
-    const logPrefix = `Session ID: ${session_id} | File ID: ${fileId} | Code output download requested by user `;
-    logger.debug(logPrefix);
-
-    if (!session_id || !fileId) {
-      return res.status(400).send('Bad request');
-    }
-
-    if (!isValidID(session_id) || !isValidID(fileId)) {
-      logger.debug(`${logPrefix} invalid session_id or fileId`);
-      return res.status(400).send('Bad request');
-    }
-
-    const { getDownloadStream } = getStrategyFunctions(FileSources.execute_code);
-    if (!getDownloadStream) {
-      logger.warn(
-        `${logPrefix} has no stream method implemented for ${FileSources.execute_code} source`,
-      );
-      return res.status(501).send('Not Implemented');
-    }
-
-    const result = await loadAuthValues({ userId: req.user.id, authFields: [EnvVar.CODE_API_KEY] });
-
-    /** @type {AxiosResponse<ReadableStream> | undefined} */
-    const response = await getDownloadStream(
-      `${session_id}/${fileId}`,
-      result[EnvVar.CODE_API_KEY],
-    );
-    res.set(response.headers);
-    response.data.pipe(res);
-  } catch (error) {
-    logger.error('Error downloading file:', error);
-    res.status(500).send('Error downloading file');
   }
 });
 

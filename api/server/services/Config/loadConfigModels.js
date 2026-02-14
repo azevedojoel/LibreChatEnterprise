@@ -1,3 +1,4 @@
+const { logger } = require('@librechat/data-schemas');
 const { isUserProvided, fetchModels } = require('@librechat/api');
 const {
   EModelEndpoint,
@@ -34,6 +35,7 @@ async function loadConfigModels(req) {
   }
 
   if (!Array.isArray(appConfig.endpoints?.[EModelEndpoint.custom])) {
+    logger.info('[loadConfigModels] no custom endpoints array, modelsConfig=', Object.keys(modelsConfig));
     return modelsConfig;
   }
 
@@ -44,6 +46,10 @@ async function loadConfigModels(req) {
       endpoint.name &&
       endpoint.models &&
       (endpoint.models.fetch || endpoint.models.default),
+  );
+
+  logger.info(
+    `[loadConfigModels] custom endpoints after filter: ${customEndpoints.map((e) => e.name).join(', ') || '(none)'}`,
   );
 
   /**
@@ -94,6 +100,9 @@ async function loadConfigModels(req) {
       modelsConfig[name] = models.default.map((model) =>
         typeof model === 'string' ? model : model.name,
       );
+      if (name.toLowerCase() !== name) {
+        modelsConfig[name.toLowerCase()] = modelsConfig[name];
+      }
     }
   }
 
@@ -108,9 +117,13 @@ async function loadConfigModels(req) {
     for (const name of associatedNames) {
       const endpoint = endpointsMap[name];
       modelsConfig[name] = !modelData?.length ? (endpoint.models.default ?? []) : modelData;
+      if (name.toLowerCase() !== name) {
+        modelsConfig[name.toLowerCase()] = modelsConfig[name];
+      }
     }
   }
 
+  logger.info(`[loadConfigModels] final modelsConfig keys: ${JSON.stringify(Object.keys(modelsConfig))}`);
   return modelsConfig;
 }
 

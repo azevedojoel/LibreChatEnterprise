@@ -19,6 +19,8 @@ const {
   GenerationJobManager,
   createStreamServices,
 } = require('@librechat/api');
+const { CacheKeys } = require('librechat-data-provider');
+const getLogStores = require('~/cache/getLogStores');
 const { connectDb, indexSync } = require('~/db');
 const initializeOAuthReconnectManager = require('./services/initializeOAuthReconnectManager');
 const createValidateImageRequest = require('./middleware/validateImageRequest');
@@ -49,6 +51,12 @@ const startServer = async () => {
   await connectDb();
 
   logger.info('Connected to MongoDB');
+
+  // Clear config caches on startup so librechat.yaml changes (e.g. new providers) take effect immediately
+  const configCache = getLogStores(CacheKeys.CONFIG_STORE);
+  await configCache.delete(CacheKeys.ENDPOINT_CONFIG);
+  await configCache.delete(CacheKeys.MODELS_CONFIG);
+  await configCache.delete(CacheKeys.STARTUP_CONFIG);
   indexSync().catch((err) => {
     logger.error('[indexSync] Background sync failed:', err);
   });

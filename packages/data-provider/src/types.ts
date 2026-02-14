@@ -99,6 +99,8 @@ export type TEphemeralAgent = {
   web_search?: boolean;
   file_search?: boolean;
   execute_code?: boolean;
+  /** Artifact mode override for per-chat toggle (ArtifactModes.DEFAULT, etc.) */
+  artifacts?: string;
 };
 
 export type TPayload = Partial<TMessage> &

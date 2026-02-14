@@ -5,11 +5,13 @@ import { useWatch, useForm, FormProvider, type FieldNamesMarkedBoolean } from 'r
 import { useGetModelsQuery } from 'librechat-data-provider/react-query';
 import {
   Tools,
+  EToolResources,
   SystemRoles,
   ResourceType,
   EModelEndpoint,
   PermissionBits,
   isAssistantsEndpoint,
+  AgentCapabilities,
 } from 'librechat-data-provider';
 import type { AgentForm, StringOption } from '~/common';
 import type { Agent } from 'librechat-data-provider';
@@ -75,6 +77,8 @@ export function composeAgentUpdatePayload(data: AgentForm, agent_id?: string | n
     support_contact,
     tool_options,
     avatar_action: avatarActionState,
+    execute_code,
+    agent,
   } = data;
 
   const shouldResetAvatar =
@@ -82,6 +86,27 @@ export function composeAgentUpdatePayload(data: AgentForm, agent_id?: string | n
   const model = _model ?? '';
   const provider =
     (typeof _provider === 'string' ? _provider : (_provider as StringOption).value) ?? '';
+
+  const existingResources = (agent && typeof agent === 'object' && 'tool_resources' in agent
+    ? (agent as Agent).tool_resources
+    : undefined) as Record<string, unknown> | undefined;
+
+  const executeCodeResource = existingResources?.[EToolResources.execute_code] as
+    | Record<string, unknown>
+    | undefined;
+  const tool_resources = existingResources
+    ? (() => {
+        const next = { ...existingResources };
+        const execCode = next[EToolResources.execute_code] as
+          | Record<string, unknown>
+          | undefined;
+        if (execCode && 'workspace_root' in execCode) {
+          const { workspace_root: _wr, ...rest } = execCode;
+          next[EToolResources.execute_code] = Object.keys(rest).length > 0 ? rest : undefined;
+        }
+        return next;
+      })()
+    : undefined;
 
   return {
     payload: {
@@ -100,6 +125,7 @@ export function composeAgentUpdatePayload(data: AgentForm, agent_id?: string | n
       category,
       support_contact,
       tool_options,
+      ...(tool_resources !== undefined ? { tool_resources } : {}),
       ...(shouldResetAvatar ? { avatar: null } : {}),
     },
     provider,
@@ -412,6 +438,17 @@ export default function AgentPanel() {
       }
       if (data.web_search === true) {
         tools.push(Tools.web_search);
+      }
+      if (data.execute_code === true) {
+        const workspaceTools = [
+          Tools.read_file,
+          Tools.edit_file,
+          Tools.create_file,
+          Tools.delete_file,
+          Tools.list_files,
+          Tools.search_files,
+        ].filter((t): t is string => t != null && t !== '');
+        tools.push(...workspaceTools);
       }
 
       const { payload: basePayload, provider, model } = composeAgentUpdatePayload(data, agent_id);

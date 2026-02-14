@@ -140,19 +140,13 @@ export default function BadgeRowProvider({
     }
   }, [key, isSubmitting, setEphemeralAgent]);
 
-  /** CodeInterpreter hooks */
+  /** CodeInterpreter hooks - execute_code runs locally, no API key needed */
   const codeApiKeyForm = useCodeApiKeyForm({});
-  const { setIsDialogOpen: setCodeDialogOpen } = codeApiKeyForm;
-
   const codeInterpreter = useToolToggle({
     conversationId,
-    setIsDialogOpen: setCodeDialogOpen,
     toolKey: Tools.execute_code,
     localStorageKey: LocalStorageKeys.LAST_CODE_TOGGLE_,
-    authConfig: {
-      toolId: Tools.execute_code,
-      queryOptions: { retry: 1 },
-    },
+    isAuthenticated: true,
   });
 
   /** WebSearch hooks */

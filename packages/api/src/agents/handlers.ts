@@ -60,6 +60,14 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
         const toolNames = [...new Set(toolCalls.map((tc: ToolCallRequest) => tc.name))];
         const { loadedTools, configurable: toolConfigurable } = await loadTools(toolNames, agentId);
         const toolMap = new Map(loadedTools.map((t) => [t.name, t]));
+
+        // Alias: some providers (e.g. DeepSeek, OpenAI Assistants) use "code_interpreter"
+        // but LibreChat registers the tool as "execute_code"
+        const executeCodeTool = toolMap.get(Constants.EXECUTE_CODE);
+        if (executeCodeTool) {
+          toolMap.set('code_interpreter', executeCodeTool);
+        }
+
         const mergedConfigurable = { ...configurable, ...toolConfigurable };
 
         const results: ToolExecuteResult[] = await Promise.all(

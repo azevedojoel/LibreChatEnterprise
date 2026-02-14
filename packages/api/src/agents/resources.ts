@@ -29,6 +29,14 @@ export type TGetFiles = (
  * @param params.tool_resources - The agent's tool resources object to update
  * @param params.processedResourceFiles - Set tracking processed files per resource type
  */
+const FILE_BEARING_RESOURCES = new Set([
+  EToolResources.execute_code,
+  EToolResources.file_search,
+  EToolResources.image_edit,
+  EToolResources.context,
+  EToolResources.ocr,
+]);
+
 const addFileToResource = ({
   file,
   resourceType,
@@ -40,7 +48,7 @@ const addFileToResource = ({
   tool_resources: AgentToolResources;
   processedResourceFiles: Set<string>;
 }): void => {
-  if (!file.file_id) {
+  if (!file.file_id || !FILE_BEARING_RESOURCES.has(resourceType)) {
     return;
   }
 
@@ -49,16 +57,22 @@ const addFileToResource = ({
     return;
   }
 
-  const resource = tool_resources[resourceType as keyof AgentToolResources] ?? {};
-  if (!resource.files) {
+  const resource = tool_resources[resourceType as keyof AgentToolResources] as
+    | AgentBaseResource
+    | undefined;
+  const baseResource = resource ?? {};
+  if (!('files' in baseResource) || !baseResource.files) {
     (tool_resources[resourceType as keyof AgentToolResources] as AgentBaseResource) = {
-      ...resource,
+      ...baseResource,
       files: [],
     };
   }
 
   // Check if already exists in the files array
-  const resourceFiles = tool_resources[resourceType as keyof AgentToolResources]?.files;
+  const currentResource = tool_resources[resourceType as keyof AgentToolResources] as
+    | AgentBaseResource
+    | undefined;
+  const resourceFiles = currentResource?.files;
   const alreadyExists = resourceFiles?.some((f: TFile) => f.file_id === file.file_id);
 
   if (!alreadyExists) {
@@ -193,17 +207,24 @@ export const primeResources = async ({
       }
 
       // Deep copy the resource to avoid mutations
-      tool_resources[resourceType as keyof AgentToolResources] = {
+      const resourceWithFiles = resource as AgentBaseResource & { vector_store_ids?: string[] };
+      const updatedResource = {
         ...resource,
-        // Deep copy arrays to prevent mutations
-        ...(resource.files && { files: [...resource.files] }),
-        ...(resource.file_ids && { file_ids: [...resource.file_ids] }),
-        ...(resource.vector_store_ids && { vector_store_ids: [...resource.vector_store_ids] }),
-      } as AgentBaseResource;
+        // Deep copy arrays to prevent mutations (only for file-bearing resources)
+        ...('files' in resourceWithFiles &&
+          resourceWithFiles.files && { files: [...resourceWithFiles.files] }),
+        ...('file_ids' in resourceWithFiles &&
+          resourceWithFiles.file_ids && { file_ids: [...resourceWithFiles.file_ids] }),
+        ...('vector_store_ids' in resourceWithFiles &&
+          resourceWithFiles.vector_store_ids && {
+            vector_store_ids: [...resourceWithFiles.vector_store_ids],
+          }),
+      };
+      (tool_resources as Record<string, unknown>)[resourceType] = updatedResource;
 
       // Now track existing files
-      if (resource.files && Array.isArray(resource.files)) {
-        for (const file of resource.files) {
+      if ('files' in resourceWithFiles && Array.isArray(resourceWithFiles.files)) {
+        for (const file of resourceWithFiles.files) {
           if (file?.file_id) {
             processedResourceFiles.add(`${resourceType}:${file.file_id}`);
             // Files from non-context resources should not be added to attachments from _attachments

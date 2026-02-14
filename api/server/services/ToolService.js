@@ -2,12 +2,10 @@ const { logger } = require('@librechat/data-schemas');
 const { tool: toolFn, DynamicStructuredTool } = require('@langchain/core/tools');
 const {
   sleep,
-  EnvVar,
   StepTypes,
   GraphEvents,
   createToolSearch,
   Constants: AgentConstants,
-  createProgrammaticToolCallingTool,
 } = require('@librechat/agents');
 const {
   sendEvent,
@@ -54,7 +52,6 @@ const {
 } = require('~/server/services/Config');
 const { processFileURL, uploadImageBuffer } = require('~/server/services/Files/process');
 const { primeFiles: primeSearchFiles } = require('~/app/clients/tools/util/fileSearch');
-const { primeFiles: primeCodeFiles } = require('~/server/services/Files/Code/process');
 const { manifestToolMap, toolkits } = require('~/app/clients/tools/manifest');
 const { createOnSearchResults } = require('~/server/services/Tools/search');
 const { loadAuthValues } = require('~/server/services/Tools/credentials');
@@ -407,7 +404,17 @@ async function processRequiredActions(client, requiredActions) {
  * }>} The agent tools and registry.
  */
 /** Native LibreChat tools that are not in the manifest */
-const nativeTools = new Set([Tools.execute_code, Tools.file_search, Tools.web_search]);
+const nativeTools = new Set([
+  Tools.execute_code,
+  Tools.file_search,
+  Tools.web_search,
+  Tools.read_file,
+  Tools.edit_file,
+  Tools.create_file,
+  Tools.delete_file,
+  Tools.list_files,
+  Tools.search_files,
+]);
 
 /** Checks if a tool name is a known built-in tool */
 const isBuiltInTool = (toolName) =>
@@ -459,7 +466,22 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
   const areToolsEnabled = checkCapability(AgentCapabilities.tools);
   const deferredToolsEnabled = checkCapability(AgentCapabilities.deferred_tools);
 
-  const filteredTools = agent.tools?.filter((tool) => {
+  /** Inject workspace tools when execute_code is enabled (backwards compat for agents saved before list_files/search_files existed) */
+  let toolsToFilter = (agent.tools ?? []).filter((t) => t != null && typeof t === 'string');
+  if (toolsToFilter.includes(Tools.execute_code)) {
+    const workspaceTools = [
+      Tools.read_file,
+      Tools.edit_file,
+      Tools.create_file,
+      Tools.delete_file,
+      Tools.list_files,
+      Tools.search_files,
+    ];
+    toolsToFilter = [...new Set([...toolsToFilter, ...workspaceTools])];
+  }
+
+  const filteredTools = toolsToFilter.filter((tool) => {
+    if (tool == null || typeof tool !== 'string') return false;
     if (tool === Tools.file_search) {
       return checkCapability(AgentCapabilities.file_search);
     }
@@ -468,6 +490,15 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
     }
     if (tool === Tools.web_search) {
       return checkCapability(AgentCapabilities.web_search);
+    }
+    if (
+      tool === Tools.read_file ||
+      tool === Tools.edit_file ||
+      tool === Tools.create_file ||
+      tool === Tools.list_files ||
+      tool === Tools.search_files
+    ) {
+      return checkCapability(AgentCapabilities.execute_code);
     }
     if (!areToolsEnabled && !tool.includes(actionDelimiter)) {
       return false;
@@ -690,31 +721,32 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
   const hasWebSearch = filteredTools.includes(Tools.web_search);
   const hasFileSearch = filteredTools.includes(Tools.file_search);
   const hasExecuteCode = filteredTools.includes(Tools.execute_code);
+  const hasWorkspaceCodeEdit =
+    filteredTools.includes(Tools.execute_code) &&
+    (filteredTools.includes(Tools.read_file) ||
+      filteredTools.includes(Tools.edit_file) ||
+      filteredTools.includes(Tools.create_file) ||
+      filteredTools.includes(Tools.delete_file) ||
+      filteredTools.includes(Tools.list_files) ||
+      filteredTools.includes(Tools.search_files));
 
   if (hasWebSearch) {
     toolContextMap[Tools.web_search] = buildWebSearchContext();
   }
 
-  if (hasExecuteCode && tool_resources) {
-    try {
-      const authValues = await loadAuthValues({
-        userId: req.user.id,
-        authFields: [EnvVar.CODE_API_KEY],
-      });
-      const codeApiKey = authValues[EnvVar.CODE_API_KEY];
+  if (hasExecuteCode) {
+    toolContextMap[Tools.execute_code] =
+      '- Code execution runs locally. Supports Python only.';
+  }
 
-      if (codeApiKey) {
-        const { toolContext } = await primeCodeFiles(
-          { req, tool_resources, agentId: agent.id },
-          codeApiKey,
-        );
-        if (toolContext) {
-          toolContextMap[Tools.execute_code] = toolContext;
-        }
-      }
-    } catch (error) {
-      logger.error('[loadToolDefinitionsWrapper] Error priming code files:', error);
-    }
+  if (hasWorkspaceCodeEdit) {
+    toolContextMap[Tools.read_file] =
+      toolContextMap[Tools.edit_file] =
+      toolContextMap[Tools.create_file] =
+      toolContextMap[Tools.delete_file] =
+      toolContextMap[Tools.list_files] =
+      toolContextMap[Tools.search_files] =
+        '- Workspace: conversation-scoped (shared with execute_code)';
   }
 
   if (hasFileSearch && tool_resources) {
@@ -834,8 +866,25 @@ async function loadAgentTools({
   };
   const areToolsEnabled = checkCapability(AgentCapabilities.tools);
 
+  /** Inject workspace tools when execute_code is enabled (backwards compat for agents saved before list_files/search_files existed) */
+  let toolsToFilter = (agent.tools ?? []).filter((t) => t != null && typeof t === 'string');
+  if (toolsToFilter.includes(Tools.execute_code)) {
+    const workspaceTools = [
+      Tools.read_file,
+      Tools.edit_file,
+      Tools.create_file,
+      Tools.delete_file,
+      Tools.list_files,
+      Tools.search_files,
+    ];
+    toolsToFilter = [
+      ...new Set([...toolsToFilter, ...workspaceTools]),
+    ];
+  }
+
   let includesWebSearch = false;
-  const _agentTools = agent.tools?.filter((tool) => {
+  const _agentTools = toolsToFilter.filter((tool) => {
+    if (tool == null || typeof tool !== 'string') return false;
     if (tool === Tools.file_search) {
       return checkCapability(AgentCapabilities.file_search);
     } else if (tool === Tools.execute_code) {
@@ -843,6 +892,15 @@ async function loadAgentTools({
     } else if (tool === Tools.web_search) {
       includesWebSearch = checkCapability(AgentCapabilities.web_search);
       return includesWebSearch;
+    } else if (
+      tool === Tools.read_file ||
+      tool === Tools.edit_file ||
+      tool === Tools.create_file ||
+      tool === Tools.delete_file ||
+      tool === Tools.list_files ||
+      tool === Tools.search_files
+    ) {
+      return checkCapability(AgentCapabilities.execute_code);
     } else if (!areToolsEnabled && !tool.includes(actionDelimiter)) {
       return false;
     }
@@ -906,7 +964,17 @@ async function loadAgentTools({
   const agentTools = [];
   for (let i = 0; i < loadedTools.length; i++) {
     const tool = loadedTools[i];
-    if (tool.name && (tool.name === Tools.execute_code || tool.name === Tools.file_search)) {
+    if (
+      tool.name &&
+      (tool.name === Tools.execute_code ||
+        tool.name === Tools.file_search ||
+        tool.name === Tools.read_file ||
+        tool.name === Tools.edit_file ||
+        tool.name === Tools.create_file ||
+        tool.name === Tools.delete_file ||
+        tool.name === Tools.list_files ||
+        tool.name === Tools.search_files)
+    ) {
       agentTools.push(tool);
       continue;
     }
@@ -1158,22 +1226,6 @@ async function loadToolsForExecution({
 
   if (isPTC && toolRegistry) {
     configurable.toolRegistry = toolRegistry;
-    try {
-      const authValues = await loadAuthValues({
-        userId: req.user.id,
-        authFields: [EnvVar.CODE_API_KEY],
-      });
-      const codeApiKey = authValues[EnvVar.CODE_API_KEY];
-
-      if (codeApiKey) {
-        const ptcTool = createProgrammaticToolCallingTool({ apiKey: codeApiKey });
-        allLoadedTools.push(ptcTool);
-      } else {
-        logger.warn('[loadToolsForExecution] PTC requested but CODE_API_KEY not available');
-      }
-    } catch (error) {
-      logger.error('[loadToolsForExecution] Error creating PTC tool:', error);
-    }
   }
 
   const specialToolNames = new Set([

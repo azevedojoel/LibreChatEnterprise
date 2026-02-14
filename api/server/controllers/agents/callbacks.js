@@ -9,7 +9,6 @@ const {
 } = require('@librechat/api');
 const { Tools, StepTypes, FileContext, ErrorTypes } = require('librechat-data-provider');
 const {
-  EnvVar,
   Providers,
   GraphEvents,
   getMessageId,
@@ -18,8 +17,7 @@ const {
   ChatModelStreamHandler,
 } = require('@librechat/agents');
 const { processFileCitations } = require('~/server/services/Files/Citations');
-const { processCodeOutput } = require('~/server/services/Files/Code/process');
-const { loadAuthValues } = require('~/server/services/Tools/credentials');
+const { processLocalCodeOutput } = require('~/server/services/Files/Code/processLocalOutput');
 const { saveBase64Image } = require('~/server/services/Files/process');
 
 class ModelEndHandler {
@@ -473,22 +471,21 @@ function createToolEndCallback({ req, res, artifactPromises, streamId = null }) 
     }
 
     for (const file of output.artifact.files) {
-      const { id, name } = file;
+      const { name, buffer } = file;
+      if (!buffer) {
+        logger.warn('[createToolEndCallback] Code artifact file missing buffer, skipping');
+        continue;
+      }
       artifactPromises.push(
         (async () => {
-          const result = await loadAuthValues({
-            userId: req.user.id,
-            authFields: [EnvVar.CODE_API_KEY],
-          });
-          const fileMetadata = await processCodeOutput({
+          const fileMetadata = await processLocalCodeOutput({
             req,
-            id,
+            buffer,
             name,
-            apiKey: result[EnvVar.CODE_API_KEY],
+            session_id: output.artifact.session_id,
             messageId: metadata.run_id,
             toolCallId: output.tool_call_id,
             conversationId: metadata.thread_id,
-            session_id: output.artifact.session_id,
           });
           if (!streamId && !res.headersSent) {
             return fileMetadata;
@@ -681,22 +678,21 @@ function createResponsesToolEndCallback({ req, res, tracker, artifactPromises })
     }
 
     for (const file of output.artifact.files) {
-      const { id, name } = file;
+      const { name, buffer } = file;
+      if (!buffer) {
+        logger.warn('[createResponsesToolEndCallback] Code artifact file missing buffer, skipping');
+        continue;
+      }
       artifactPromises.push(
         (async () => {
-          const result = await loadAuthValues({
-            userId: req.user.id,
-            authFields: [EnvVar.CODE_API_KEY],
-          });
-          const fileMetadata = await processCodeOutput({
+          const fileMetadata = await processLocalCodeOutput({
             req,
-            id,
+            buffer,
             name,
-            apiKey: result[EnvVar.CODE_API_KEY],
+            session_id: output.artifact.session_id,
             messageId: metadata.run_id,
             toolCallId: output.tool_call_id,
             conversationId: metadata.thread_id,
-            session_id: output.artifact.session_id,
           });
 
           if (!fileMetadata) {

@@ -8,6 +8,7 @@
 import { Constants, actionDelimiter } from 'librechat-data-provider';
 import type { AgentToolOptions } from 'librechat-data-provider';
 import type { LCToolRegistry, JsonSchemaType, LCTool, GenericTool } from '@librechat/agents';
+import { EnvVar } from '@librechat/agents';
 import { buildToolClassification, type ToolDefinition } from './classification';
 import { getToolDefinition } from './registry/definitions';
 import { resolveJsonSchemaRefs } from '~/mcp/zod';
@@ -50,6 +51,8 @@ export interface LoadToolDefinitionsDeps {
   loadAuthValues: (params: {
     userId: string;
     authFields: string[];
+    optional?: Set<string>;
+    throwError?: boolean;
   }) => Promise<Record<string, string>>;
   /** Loads action tool definitions (schemas) from OpenAPI specs */
   getActionToolDefinitions?: (
@@ -88,6 +91,22 @@ export async function loadToolDefinitions(
     return emptyResult;
   }
 
+  let useLocalCodeExecution: boolean | undefined;
+  if (tools.includes('execute_code')) {
+    try {
+      const authValues = await loadAuthValues({
+        userId,
+        authFields: [EnvVar.CODE_API_KEY],
+        optional: new Set([EnvVar.CODE_API_KEY]),
+        throwError: false,
+      });
+      const codeApiKey = authValues[EnvVar.CODE_API_KEY] ?? '';
+      useLocalCodeExecution = !codeApiKey || codeApiKey === 'local';
+    } catch {
+      useLocalCodeExecution = true;
+    }
+  }
+
   const mcpServerToolsCache = new Map<string, MCPServerTools>();
   const mcpToolDefs: ToolDefinition[] = [];
   const builtInToolDefs: ToolDefinition[] = [];
@@ -97,6 +116,7 @@ export async function loadToolDefinitions(
   const mcpAllPattern = `${Constants.mcp_all}${Constants.mcp_delimiter}`;
 
   for (const toolName of tools) {
+    if (!toolName || typeof toolName !== 'string') continue;
     if (toolName.includes(actionDelimiter)) {
       actionToolNames.push(toolName);
       continue;
@@ -106,7 +126,9 @@ export async function loadToolDefinitions(
       if (!isBuiltInTool(toolName)) {
         continue;
       }
-      const registryDef = getToolDefinition(toolName);
+      const registryDef = getToolDefinition(toolName, {
+        useLocalCodeExecution: toolName === 'execute_code' ? useLocalCodeExecution : undefined,
+      });
       if (!registryDef) {
         continue;
       }

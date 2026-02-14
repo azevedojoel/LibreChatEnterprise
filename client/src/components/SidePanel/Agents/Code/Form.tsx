@@ -1,9 +1,17 @@
 import { Tools } from 'librechat-data-provider';
+import { useFormContext } from 'react-hook-form';
 import type { ExtendedFile } from '~/common';
-import { useVerifyAgentToolAuth } from '~/data-provider';
 import { useLocalize } from '~/hooks';
+import { defaultTextProps, removeFocusOutlines } from '~/utils';
+import { cn } from '~/utils';
 import Action from './Action';
 import Files from './Files';
+
+const inputClass = cn(
+  defaultTextProps,
+  'flex w-full px-3 py-2 border-border-light bg-surface-secondary focus-visible:ring-2 focus-visible:ring-ring-primary',
+  removeFocusOutlines,
+);
 
 export default function CodeForm({
   agent_id,
@@ -13,7 +21,8 @@ export default function CodeForm({
   files?: [string, ExtendedFile][];
 }) {
   const localize = useLocalize();
-  const { data } = useVerifyAgentToolAuth({ toolId: Tools.execute_code });
+  const { control, watch } = useFormContext();
+  const executeCodeEnabled = watch(Tools.execute_code);
 
   return (
     <div className="w-full">
@@ -30,7 +39,7 @@ export default function CodeForm({
         </div>
       </div>
       <div className="flex flex-col items-start gap-2">
-        <Action authType={data?.message} isToolAuthenticated={data?.authenticated} />
+        <Action />
         <Files agent_id={agent_id} files={files} />
       </div>
     </div>

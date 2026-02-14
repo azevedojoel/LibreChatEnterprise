@@ -1,13 +1,10 @@
 // client/src/hooks/Plugins/useCodeApiKeyForm.ts
-import { useRef, useState, useCallback } from 'react';
+/** Code runs locally - stub for backward compatibility with BadgeRowContext, ToolsDropdown, CodeInterpreter */
+import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import type { ApiKeyFormData } from '~/common';
-import useAuthCodeTool from '~/hooks/Plugins/useAuthCodeTool';
 
-export default function useCodeApiKeyForm({
-  onSubmit,
-  onRevoke,
-}: {
+export default function useCodeApiKeyForm(_options?: {
   onSubmit?: () => void;
   onRevoke?: () => void;
 }) {
@@ -15,32 +12,13 @@ export default function useCodeApiKeyForm({
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const badgeTriggerRef = useRef<HTMLInputElement>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const { installTool, removeTool } = useAuthCodeTool({ isEntityTool: true });
-  const { reset } = methods;
-
-  const onSubmitHandler = useCallback(
-    (data: { apiKey: string }) => {
-      reset();
-      installTool(data.apiKey);
-      setIsDialogOpen(false);
-      onSubmit?.();
-    },
-    [onSubmit, reset, installTool],
-  );
-
-  const handleRevokeApiKey = useCallback(() => {
-    reset();
-    removeTool();
-    setIsDialogOpen(false);
-    onRevoke?.();
-  }, [reset, onRevoke, removeTool]);
 
   return {
     methods,
     isDialogOpen,
     setIsDialogOpen,
-    handleRevokeApiKey,
-    onSubmit: onSubmitHandler,
+    handleRevokeApiKey: () => {},
+    onSubmit: () => {},
     badgeTriggerRef,
     menuTriggerRef,
   };

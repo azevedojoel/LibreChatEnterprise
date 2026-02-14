@@ -39,6 +39,8 @@ const {
   createOpenAIImageTools,
 } = require('../');
 const { primeFiles: primeCodeFiles } = require('~/server/services/Files/Code/process');
+const { createLocalCodeExecutionTool } = require('~/server/services/LocalCodeExecution');
+const { createWorkspaceCodeEditTools } = require('~/server/services/WorkspaceCodeEdit');
 const { createFileSearchTool, primeFiles: primeSearchFiles } = require('./fileSearch');
 const { getUserPluginAuthValue } = require('~/server/services/PluginService');
 const { createMCPTool, createMCPTools } = require('~/server/services/MCP');
@@ -262,8 +264,11 @@ const loadTools = async ({
         const authValues = await loadAuthValues({
           userId: user,
           authFields: [EnvVar.CODE_API_KEY],
+          optional: new Set([EnvVar.CODE_API_KEY]),
+          throwError: false,
         });
-        const codeApiKey = authValues[EnvVar.CODE_API_KEY];
+        const codeApiKey = authValues[EnvVar.CODE_API_KEY] ?? '';
+        const useLocalExecution = !codeApiKey || codeApiKey === 'local';
         const { files, toolContext } = await primeCodeFiles(
           {
             ...options,
@@ -274,14 +279,50 @@ const loadTools = async ({
         if (toolContext) {
           toolContextMap[tool] = toolContext;
         }
-        const CodeExecutionTool = createCodeExecutionTool({
-          user_id: user,
-          files,
-          ...authValues,
-        });
-        CodeExecutionTool.apiKey = codeApiKey;
+        const CodeExecutionTool = useLocalExecution
+          ? createLocalCodeExecutionTool({ user_id: user, files })
+          : createCodeExecutionTool({
+              user_id: user,
+              files,
+              ...authValues,
+              apiKey: codeApiKey,
+            });
         return CodeExecutionTool;
       };
+      continue;
+    } else if (
+      tool === Tools.read_file ||
+      tool === Tools.edit_file ||
+      tool === Tools.create_file ||
+      tool === Tools.delete_file ||
+      tool === Tools.list_files ||
+      tool === Tools.search_files
+    ) {
+      const conversationId =
+        options.req?.body?.conversationId ?? options.conversationId;
+      if (!conversationId) {
+        continue;
+      }
+      const pathMod = require('path');
+      const { getSessionBaseDir } = require('~/server/services/LocalCodeExecution/executor');
+      const workspaceRoot = pathMod.join(getSessionBaseDir(), `conv_${conversationId}`);
+      const [
+        readFileTool,
+        editFileTool,
+        createFileTool,
+        deleteFileTool,
+        listFilesTool,
+        searchFilesTool,
+      ] = createWorkspaceCodeEditTools({ workspaceRoot });
+      const toolMap = {
+        [Tools.read_file]: readFileTool,
+        [Tools.edit_file]: editFileTool,
+        [Tools.create_file]: createFileTool,
+        [Tools.delete_file]: deleteFileTool,
+        [Tools.list_files]: listFilesTool,
+        [Tools.search_files]: searchFilesTool,
+      };
+      requestedTools[tool] = async () => toolMap[tool];
       continue;
     } else if (tool === Tools.file_search) {
       requestedTools[tool] = async () => {

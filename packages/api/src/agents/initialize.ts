@@ -386,6 +386,13 @@ export async function initializeAgent(
     });
   }
 
+  /** Per-chat override: use ephemeralAgent.artifacts when set (from Tools dropdown toggle) */
+  const ephemeralAgent = (req as { body?: { ephemeralAgent?: { artifacts?: string } } })?.body
+    ?.ephemeralAgent;
+  if (ephemeralAgent && 'artifacts' in ephemeralAgent) {
+    agent.artifacts = ephemeralAgent.artifacts ?? agent.artifacts;
+  }
+
   if (typeof agent.artifacts === 'string' && agent.artifacts !== '') {
     const artifactsPromptResult = generateArtifactsPrompt({
       endpoint: agent.provider,

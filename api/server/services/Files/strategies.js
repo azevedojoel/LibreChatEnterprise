@@ -49,7 +49,6 @@ const {
   processAzureAvatar,
 } = require('./Azure');
 const { uploadOpenAIFile, deleteOpenAIFile, getOpenAIFileStream } = require('./OpenAI');
-const { getCodeOutputDownloadStream, uploadCodeEnvFile } = require('./Code');
 const { uploadVectors, deleteVectors } = require('./VectorDB');
 
 /**
@@ -163,27 +162,19 @@ const openAIStrategy = () => ({
 });
 
 /**
- * Code Output Strategy Functions
- *
- * Note: null values mean that the strategy is not supported.
+ * Code Output Strategy - Local execution only.
+ * HTTP-based upload/download (E2B) has been removed.
  * */
 const codeOutputStrategy = () => ({
-  /** @type {typeof saveFileFromURL | null} */
   saveURL: null,
-  /** @type {typeof getLocalFileURL | null} */
   getFileURL: null,
-  /** @type {typeof saveLocalBuffer | null} */
   saveBuffer: null,
-  /** @type {typeof processLocalAvatar | null} */
   processAvatar: null,
-  /** @type {typeof uploadLocalImage | null} */
   handleImageUpload: null,
-  /** @type {typeof prepareImagesLocal | null} */
   prepareImagePayload: null,
-  /** @type {typeof deleteLocalFile | null} */
   deleteFile: null,
-  handleFileUpload: uploadCodeEnvFile,
-  getDownloadStream: getCodeOutputDownloadStream,
+  handleFileUpload: null,
+  getDownloadStream: null,
 });
 
 const mistralOCRStrategy = () => ({

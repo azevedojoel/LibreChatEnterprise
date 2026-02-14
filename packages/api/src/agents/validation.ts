@@ -20,11 +20,14 @@ export const agentFileResourceSchema = agentBaseResourceSchema.extend({
   vector_store_ids: z.array(z.string()).optional(),
 });
 
+/** Execute code resource - read_file, edit_file, create_file use conversation-scoped workspace */
+export const executeCodeResourceSchema = agentBaseResourceSchema;
+
 /** Tool resources schema matching AgentToolResources interface */
 export const agentToolResourcesSchema = z
   .object({
     image_edit: agentBaseResourceSchema.optional(),
-    execute_code: agentBaseResourceSchema.optional(),
+    execute_code: executeCodeResourceSchema.optional(),
     file_search: agentFileResourceSchema.optional(),
     context: agentBaseResourceSchema.optional(),
     /** @deprecated Use context instead */
@@ -60,6 +63,10 @@ export const toolOptionsSchema = z.object({
 /** Agent tool options - map of tool_id to tool options */
 export const agentToolOptionsSchema = z.record(z.string(), toolOptionsSchema).optional();
 
+/** Sanitizes tools array by filtering null/undefined (defensive for client/DB data) */
+const sanitizeTools = (val: unknown): string[] | undefined =>
+  Array.isArray(val) ? val.filter((t): t is string => t != null && typeof t === 'string') : undefined;
+
 /** Base agent schema with all common fields */
 export const agentBaseSchema = z.object({
   name: z.string().nullable().optional(),
@@ -67,7 +74,7 @@ export const agentBaseSchema = z.object({
   instructions: z.string().nullable().optional(),
   avatar: agentAvatarSchema.nullable().optional(),
   model_parameters: z.record(z.unknown()).optional(),
-  tools: z.array(z.string()).optional(),
+  tools: z.preprocess(sanitizeTools, z.array(z.string()).optional()),
   /** @deprecated Use edges instead */
   agent_ids: z.array(z.string()).optional(),
   edges: z.array(graphEdgeSchema).optional(),
@@ -86,7 +93,7 @@ export const agentBaseSchema = z.object({
 export const agentCreateSchema = agentBaseSchema.extend({
   provider: z.string(),
   model: z.string().nullable(),
-  tools: z.array(z.string()).optional().default([]),
+  tools: z.preprocess(sanitizeTools, z.array(z.string()).optional().default([])),
 });
 
 /** Update schema extends base with all fields optional and additional update-only fields */

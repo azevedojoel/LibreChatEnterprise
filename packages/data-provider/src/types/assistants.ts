@@ -24,6 +24,12 @@ export enum Tools {
   function = 'function',
   memory = 'memory',
   ui_resources = 'ui_resources',
+  read_file = 'read_file',
+  edit_file = 'edit_file',
+  create_file = 'create_file',
+  delete_file = 'delete_file',
+  list_files = 'list_files',
+  search_files = 'search_files',
 }
 
 export enum EToolResources {
@@ -188,11 +194,13 @@ export interface AgentToolResources {
   /** @deprecated Use context instead */
   [EToolResources.ocr]?: AgentBaseResource;
 }
+
 /**
  * A resource for the execute_code tool.
  * Contains file IDs made available to the tool (max 20 files) and already fetched files.
+ * read_file, edit_file, create_file use a conversation-scoped workspace derived at runtime.
  */
-export type ExecuteCodeResource = AgentBaseResource;
+export interface ExecuteCodeResource extends AgentBaseResource {}
 
 export interface AgentFileResource extends AgentBaseResource {
   /**

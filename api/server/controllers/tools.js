@@ -1,5 +1,4 @@
 const { nanoid } = require('nanoid');
-const { EnvVar } = require('@librechat/agents');
 const { logger } = require('@librechat/data-schemas');
 const { checkAccess, loadWebSearchAuth } = require('@librechat/api');
 const {
@@ -10,7 +9,7 @@ const {
   PermissionTypes,
 } = require('librechat-data-provider');
 const { processFileURL, uploadImageBuffer } = require('~/server/services/Files/process');
-const { processCodeOutput } = require('~/server/services/Files/Code/process');
+const { processLocalCodeOutput } = require('~/server/services/Files/Code/processLocalOutput');
 const { createToolCall, getToolCallsByConvo } = require('~/models/ToolCall');
 const { loadAuthValues } = require('~/server/services/Tools/credentials');
 const { loadTools } = require('~/app/clients/tools/util');
@@ -18,7 +17,7 @@ const { getRoleByName } = require('~/models/Role');
 const { getMessage } = require('~/models/Message');
 
 const fieldsMap = {
-  [Tools.execute_code]: [EnvVar.CODE_API_KEY],
+  [Tools.execute_code]: [],
 };
 
 const toolAccessPermType = {
@@ -68,9 +67,12 @@ const verifyToolAuth = async (req, res) => {
       return await verifyWebSearchAuth(req, res);
     }
     const authFields = fieldsMap[toolId];
-    if (!authFields) {
+    if (authFields === undefined) {
       res.status(404).json({ message: 'Tool not found' });
       return;
+    }
+    if (authFields.length === 0) {
+      return res.status(200).json({ authenticated: true });
     }
     let result;
     try {
@@ -154,6 +156,7 @@ const callTool = async (req, res) => {
       functions: true,
       options: {
         req,
+        conversationId,
         returnMetadata: true,
         processFileURL,
         uploadImageBuffer,
@@ -194,18 +197,17 @@ const callTool = async (req, res) => {
 
     const artifactPromises = [];
     for (const file of artifact.files) {
-      const { id, name } = file;
+      const { name, buffer } = file;
       artifactPromises.push(
         (async () => {
-          const fileMetadata = await processCodeOutput({
+          const fileMetadata = await processLocalCodeOutput({
             req,
-            id,
+            buffer,
             name,
-            apiKey: tool.apiKey,
+            session_id: artifact.session_id,
             messageId,
             toolCallId,
             conversationId,
-            session_id: artifact.session_id,
           });
 
           if (!fileMetadata) {

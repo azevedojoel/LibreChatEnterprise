@@ -2,7 +2,12 @@ import { memo, useRef, useMemo, useEffect, useState, useCallback } from 'react';
 import { useWatch } from 'react-hook-form';
 import { TextareaAutosize } from '@librechat/client';
 import { useRecoilState, useRecoilValue } from 'recoil';
-import { Constants, isAssistantsEndpoint, isAgentsEndpoint } from 'librechat-data-provider';
+import {
+  Constants,
+  isAssistantsEndpoint,
+  isAgentsEndpoint,
+  defaultAgentCapabilities,
+} from 'librechat-data-provider';
 import {
   useChatContext,
   useChatFormContext,
@@ -18,6 +23,8 @@ import {
   useQueryParams,
   useSubmitMessage,
   useFocusChatEffect,
+  useGetAgentsConfig,
+  useAgentCapabilities,
 } from '~/hooks';
 import { mainTextareaId, BadgeItem } from '~/common';
 import AttachFileChat from './Files/AttachFileChat';
@@ -80,6 +87,10 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
     setConversation: setAddedConvo,
   } = useAddedChatContext();
   const assistantMap = useAssistantsMapContext();
+  const { agentsConfig } = useGetAgentsConfig();
+  const { artifactsEnabled } = useAgentCapabilities(
+    agentsConfig?.capabilities ?? defaultAgentCapabilities,
+  );
 
   const endpoint = useMemo(
     () => conversation?.endpointType ?? conversation?.endpoint,
@@ -321,7 +332,12 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
               </div>
               <BadgeRow
                 showEphemeralBadges={
-                  !!endpoint && !isAgentsEndpoint(endpoint) && !isAssistantsEndpoint(endpoint)
+                  (!!endpoint &&
+                    !isAgentsEndpoint(endpoint) &&
+                    !isAssistantsEndpoint(endpoint)) ||
+                  (!!endpoint &&
+                    isAgentsEndpoint(endpoint) &&
+                    artifactsEnabled)
                 }
                 isSubmitting={isSubmitting}
                 conversationId={conversationId}

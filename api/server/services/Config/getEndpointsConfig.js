@@ -1,3 +1,4 @@
+const { logger } = require('@librechat/data-schemas');
 const { loadCustomEndpointsConfig } = require('@librechat/api');
 const {
   CacheKeys,
@@ -27,8 +28,20 @@ async function getEndpointsConfig(req) {
   }
 
   const appConfig = req.config ?? (await getAppConfig({ role: req.user?.role }));
+  const customEndpointsRaw = appConfig?.endpoints?.[EModelEndpoint.custom];
+  logger.info(
+    `[getEndpointsConfig] custom endpoints from YAML: ${JSON.stringify(
+      Array.isArray(customEndpointsRaw)
+        ? customEndpointsRaw.map((e) => ({ name: e?.name, baseURL: !!e?.baseURL, apiKey: !!e?.apiKey, models: !!e?.models }))
+        : customEndpointsRaw,
+    )}`,
+  );
+
   const defaultEndpointsConfig = await loadDefaultEndpointsConfig(appConfig);
-  const customEndpointsConfig = loadCustomEndpointsConfig(appConfig?.endpoints?.custom);
+  const customEndpointsConfig = loadCustomEndpointsConfig(customEndpointsRaw);
+  logger.info(
+    `[getEndpointsConfig] customEndpointsConfig keys: ${JSON.stringify(Object.keys(customEndpointsConfig || {}))}`,
+  );
 
   /** @type {TEndpointsConfig} */
   const mergedConfig = {
@@ -110,6 +123,7 @@ async function getEndpointsConfig(req) {
   }
 
   const endpointsConfig = orderEndpointsConfig(mergedConfig);
+  logger.info(`[getEndpointsConfig] final endpoint keys: ${JSON.stringify(Object.keys(endpointsConfig))}`);
 
   await cache.set(CacheKeys.ENDPOINT_CONFIG, endpointsConfig);
   return endpointsConfig;

@@ -4,6 +4,41 @@ import {
   CodeExecutionToolDefinition,
 } from '@librechat/agents';
 
+/** Local code execution: Python only, /mnt/data for files */
+const LOCAL_CODE_EXECUTION_DEFINITION: ToolRegistryDefinition = {
+  name: 'execute_code',
+  description: `Runs Python code locally and returns stdout/stderr output. Each execution is isolated and independent.
+- No network access available.
+- Generated files are automatically delivered; **DO NOT** provide download links.
+- Supports Python only. Use print() for outputs; matplotlib: use plt.savefig() to save plots.
+- Use \`/mnt/data/\` for file paths (e.g., open('/mnt/data/out.txt', 'w') or os.path.join('/mnt/data', 'file.csv')).`,
+  schema: {
+    type: 'object',
+    properties: {
+      lang: {
+        type: 'string',
+        enum: ['py'],
+        description: 'The programming language. Local execution supports Python only.',
+      },
+      code: {
+        type: 'string',
+        description: `The complete, self-contained Python code to execute.
+- Use print() for all outputs.
+- Matplotlib: Use plt.savefig() to save plots as files in /mnt/data/.
+- Use /mnt/data/ for file paths when reading or writing files.`,
+      },
+      args: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Additional arguments to execute the code with.',
+      },
+    },
+    required: ['lang', 'code'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+  responseFormat: 'content_and_artifact',
+};
+
 /** Extended JSON Schema type that includes standard validation keywords */
 export type ExtendedJsonSchema = {
   type?: 'string' | 'number' | 'integer' | 'float' | 'boolean' | 'array' | 'object' | 'null';
@@ -602,8 +637,140 @@ Generated image IDs will be returned in the response, so you can refer to them i
   },
 };
 
+/** Workspace code edit tools - use conversation-scoped workspace derived at runtime */
+const readFileDefinition: ToolRegistryDefinition = {
+  name: 'read_file',
+  description: 'Read the contents of a file. Path is relative to the workspace root.',
+  schema: {
+    type: 'object',
+    properties: {
+      path: {
+        type: 'string',
+        description: 'File path relative to workspace root',
+      },
+    },
+    required: ['path'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const editFileDefinition: ToolRegistryDefinition = {
+  name: 'edit_file',
+  description:
+    'Replace exact old_string with new_string in a file. old_string must match exactly once.',
+  schema: {
+    type: 'object',
+    properties: {
+      path: {
+        type: 'string',
+        description: 'File path relative to workspace root',
+      },
+      old_string: {
+        type: 'string',
+        description: 'Exact substring to replace (must appear exactly once)',
+      },
+      new_string: {
+        type: 'string',
+        description: 'Replacement string',
+      },
+    },
+    required: ['path', 'old_string', 'new_string'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const createFileDefinition: ToolRegistryDefinition = {
+  name: 'create_file',
+  description: 'Create or overwrite a file. Parent directories are created if needed.',
+  schema: {
+    type: 'object',
+    properties: {
+      path: {
+        type: 'string',
+        description: 'File path relative to workspace root',
+      },
+      content: {
+        type: 'string',
+        description: 'File content',
+      },
+    },
+    required: ['path', 'content'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const deleteFileDefinition: ToolRegistryDefinition = {
+  name: 'delete_file',
+  description: 'Delete a file. Use for cleanup. Path is relative to workspace root.',
+  schema: {
+    type: 'object',
+    properties: {
+      path: {
+        type: 'string',
+        description: 'File path relative to workspace root',
+      },
+    },
+    required: ['path'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const listFilesDefinition: ToolRegistryDefinition = {
+  name: 'list_files',
+  description:
+    'List files and directories. Use to discover files before reading or editing.',
+  schema: {
+    type: 'object',
+    properties: {
+      path: {
+        type: 'string',
+        description: 'Directory path relative to workspace root (default: ".")',
+      },
+      extension: {
+        type: 'string',
+        description: 'Filter by extension (e.g. "py" for *.py)',
+      },
+    },
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const searchFilesDefinition: ToolRegistryDefinition = {
+  name: 'search_files',
+  description: 'Search file contents for a pattern. Useful for finding definitions or usages.',
+  schema: {
+    type: 'object',
+    properties: {
+      pattern: {
+        type: 'string',
+        description: 'Search pattern (literal string)',
+      },
+      path: {
+        type: 'string',
+        description: 'Directory or file to search (default: ".")',
+      },
+      extension: {
+        type: 'string',
+        description: 'Filter by extension (e.g. "py")',
+      },
+      max_results: {
+        type: 'number',
+        description: 'Maximum matches to return (default: 50)',
+      },
+    },
+    required: ['pattern'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
 /** Tool definitions from @librechat/agents */
 const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
+  read_file: readFileDefinition,
+  edit_file: editFileDefinition,
+  create_file: createFileDefinition,
+  delete_file: deleteFileDefinition,
+  list_files: listFilesDefinition,
+  search_files: searchFilesDefinition,
   [CalculatorToolDefinition.name]: {
     name: CalculatorToolDefinition.name,
     description: CalculatorToolDefinition.description,
@@ -624,8 +791,33 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
   },
 };
 
-export function getToolDefinition(toolName: string): ToolRegistryDefinition | undefined {
+export interface GetToolDefinitionOptions {
+  /** When true, use Python-only local schema; when false, use remote 13-language schema */
+  useLocalCodeExecution?: boolean;
+}
+
+export function getToolDefinition(
+  toolName: string,
+  options?: GetToolDefinitionOptions,
+): ToolRegistryDefinition | undefined {
+  const useLocal =
+    options?.useLocalCodeExecution ??
+    (!process.env.LIBRECHAT_CODE_API_KEY || process.env.LIBRECHAT_CODE_API_KEY === 'local');
+  if (toolName === 'execute_code' && useLocal) {
+    return LOCAL_CODE_EXECUTION_DEFINITION;
+  }
   return toolDefinitions[toolName] ?? agentToolDefinitions[toolName];
+}
+
+export function getWorkspaceCodeEditToolDefinitions() {
+  return [
+    readFileDefinition,
+    editFileDefinition,
+    createFileDefinition,
+    deleteFileDefinition,
+    listFilesDefinition,
+    searchFilesDefinition,
+  ];
 }
 
 export function getAllToolDefinitions(): ToolRegistryDefinition[] {

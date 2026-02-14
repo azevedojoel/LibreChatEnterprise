@@ -27,8 +27,8 @@ jest.mock('~/server/services/Files/Citations', () => ({
   processFileCitations: jest.fn(),
 }));
 
-jest.mock('~/server/services/Files/Code/process', () => ({
-  processCodeOutput: jest.fn(),
+jest.mock('~/server/services/Files/Code/processLocalOutput', () => ({
+  processLocalCodeOutput: jest.fn(),
 }));
 
 jest.mock('~/server/services/Tools/credentials', () => ({

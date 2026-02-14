@@ -1,0 +1,295 @@
+# LibreChat Configuration - Full Reference
+# https://www.librechat.ai/docs/configuration/librechat_yaml
+
+version: 1.2.1
+cache: true
+
+# File storage - use 'local', 's3', or 'firebase' per type
+fileStrategy: local
+fileStrategies:
+  default: local
+  avatar: local
+  image: local
+  document: local
+
+# Image output format for generations
+imageOutputType: png
+
+# Interface configuration
+interface:
+  customWelcome: 'Welcome to LibreChat! Enjoy your experience.'
+  fileSearch: true
+  endpointsMenu: true
+  modelSelect: true
+  parameters: true
+  sidePanel: true
+  presets: true
+  multiConvo: true
+  bookmarks: true
+  memories: true
+  temporaryChat: true
+  runCode: false
+  webSearch: true
+  fileCitations: true
+  prompts:
+    use: true
+    create: true
+    share: false
+    public: false
+  agents:
+    use: true
+    create: true
+    share: false
+    public: false
+  peoplePicker:
+    users: true
+    groups: true
+    roles: true
+  marketplace:
+    use: false
+  remoteAgents:
+    use: false
+    create: false
+    share: false
+    public: false
+  temporaryChatRetention: 720
+  mcpServers:
+    use: true
+    create: true
+    share: false
+    public: false
+    trustCheckbox:
+      label:
+        en: 'I understand and I want to continue'
+      subLabel:
+        en: |
+          LibreChat hasn't reviewed this MCP server. Attackers may attempt to steal your data or trick the model into taking unintended actions.
+  privacyPolicy:
+    externalUrl: 'https://librechat.ai/privacy-policy'
+    openNewTab: true
+  termsOfService:
+    externalUrl: 'https://librechat.ai/tos'
+    openNewTab: true
+    modalAcceptance: true
+    modalTitle: 'Terms of Service for LibreChat'
+    modalContent: |
+      # Terms and Conditions for LibreChat
+      *Effective Date: February 18, 2024*
+      Welcome to LibreChat. By using this service, you agree to our terms and privacy policy.
+
+# Registration
+registration:
+  socialLogins: ['github', 'google', 'discord', 'openid', 'facebook', 'apple', 'saml']
+  allowedDomains: []
+
+# Balance and transactions (for usage-based billing)
+balance:
+  enabled: false
+  startBalance: 20000
+  autoRefillEnabled: false
+  refillIntervalValue: 30
+  refillIntervalUnit: days
+  refillAmount: 10000
+
+transactions:
+  enabled: true
+
+# Cloudflare Turnstile (bot protection)
+turnstile:
+  siteKey: '${TURNSTILE_SITE_KEY}'
+  options:
+    language: auto
+    size: normal
+
+# Rate limits
+rateLimits:
+  fileUploads:
+    ipMax: 100
+    ipWindowInMinutes: 60
+    userMax: 50
+    userWindowInMinutes: 60
+  conversationsImport:
+    ipMax: 100
+    ipWindowInMinutes: 60
+    userMax: 50
+    userWindowInMinutes: 60
+
+# Speech (TTS/STT)
+speech:
+  tts:
+    openai:
+      url: ''
+      apiKey: '${TTS_API_KEY}'
+      model: ''
+      voices: []
+  stt:
+    openai:
+      url: ''
+      apiKey: '${STT_API_KEY}'
+      model: ''
+
+# Agent Actions domain restrictions (SSRF protection)
+actions:
+  allowedDomains:
+    - 'swapi.dev'
+    - 'librechat.ai'
+    - 'google.com'
+
+# MCP Server domain restrictions
+mcpSettings:
+  allowedDomains:
+    - 'localhost'
+    - 'host.docker.internal'
+    - '*.example.com'
+
+# MCP Servers (example - uncomment and configure as needed)
+# mcpServers:
+#   filesystem:
+#     type: stdio
+#     command: npx
+#     args:
+#       - -y
+#       - "@modelcontextprotocol/server-filesystem"
+#       - /path/to/allowed/directory
+#     timeout: 60000
+
+# Web Search configuration
+webSearch:
+  serperApiKey: '${SERPER_API_KEY}'
+  searxngInstanceUrl: '${SEARXNG_INSTANCE_URL}'
+  searxngApiKey: '${SEARXNG_API_KEY}'
+  firecrawlApiKey: '${FIRECRAWL_API_KEY}'
+  firecrawlApiUrl: '${FIRECRAWL_API_URL}'
+  jinaApiKey: '${JINA_API_KEY}'
+  jinaApiUrl: '${JINA_API_URL}'
+  cohereApiKey: '${COHERE_API_KEY}'
+  searchProvider: serper
+  scraperProvider: firecrawl
+  rerankerType: jina
+  safeSearch: 1
+
+# Memory configuration
+memory:
+  disabled: false
+  validKeys: ['preferences', 'work_info', 'personal_info', 'skills', 'interests', 'context']
+  tokenLimit: 10000
+  charLimit: 10000
+  personalize: true
+  messageWindowSize: 5
+
+# OCR configuration (for document text extraction)
+# ocr:
+#   strategy: mistral_ocr
+#   apiKey: '${OCR_API_KEY}'
+#   baseURL: '${OCR_BASEURL}'
+#   mistralModel: 'pixtral-12b-2409'
+
+# File upload configuration
+fileConfig:
+  endpoints:
+    assistants:
+      fileLimit: 5
+      fileSizeLimit: 10
+      totalSizeLimit: 50
+      supportedMimeTypes:
+        - 'image/.*'
+        - 'application/pdf'
+    openAI:
+      fileLimit: 10
+      fileSizeLimit: 20
+      totalSizeLimit: 100
+    default:
+      fileLimit: 10
+      fileSizeLimit: 20
+      totalSizeLimit: 100
+  serverFileSizeLimit: 100
+  avatarSizeLimit: 2
+  imageGeneration:
+    percentage: 100
+    px: 1024
+  clientImageResize:
+    enabled: false
+    maxWidth: 1900
+    maxHeight: 1900
+    quality: 0.92
+
+# Model specs (preset configurations)
+# modelSpecs:
+#   list:
+#     - name: gpt-4o
+#       label: GPT-4 Optimized
+#       description: Most capable GPT-4 model
+#       group: openAI
+#       preset:
+#         endpoint: openAI
+#         model: gpt-4o
+#     - name: claude-sonnet
+#       label: Claude Sonnet
+#       description: Balanced performance
+#       group: anthropic
+#       preset:
+#         endpoint: anthropic
+#         model: claude-sonnet-4-20250514
+
+# Endpoints configuration
+endpoints:
+  custom:
+    - name: OpenRouter
+      apiKey: '${OPENROUTER_KEY}'
+      baseURL: 'https://openrouter.ai/api/v1'
+      headers:
+        x-librechat-body-parentmessageid: '{{LIBRECHAT_BODY_PARENTMESSAGEID}}'
+      models:
+        default: ['deepseek/deepseek-v3.2']
+        fetch: true
+      titleConvo: true
+      titleModel: deepseek/deepseek-v3.2
+      dropParams: ['stop']
+      modelDisplayLabel: OpenRouter
+
+  # Assistants endpoint (OpenAI Assistants API)
+  # assistants:
+  #   disableBuilder: false
+  #   pollIntervalMs: 3000
+  #   timeoutMs: 180000
+  #   retrievalModels: ['gpt-4-turbo-preview']
+  #   capabilities: ['code_interpreter', 'retrieval', 'actions', 'tools', 'image_vision']
+
+  # Agents endpoint
+  agents:
+    recursionLimit: 50
+    maxRecursionLimit: 100
+    disableBuilder: false
+    maxCitations: 30
+    maxCitationsPerFile: 7
+    minRelevanceScore: 0.45
+    capabilities:
+      - deferred_tools
+      - execute_code
+      - file_search
+      - web_search
+      - artifacts
+      - actions
+      - context
+      - tools
+      - chain
+      - ocr
+
+  # Anthropic with Vertex AI (uncomment if using)
+  # anthropic:
+  #   streamRate: 20
+  #   titleModel: claude-3-5-haiku-20241022
+  #   vertex:
+  #     region: us-east5
+  #     models:
+  #       claude-sonnet-4:
+  #         deploymentName: claude-sonnet-4-20250514
+  #       claude-3-5-haiku:
+  #         deploymentName: claude-3-5-haiku@20241022
+
+  # AWS Bedrock (uncomment if using)
+  # bedrock:
+  #   models:
+  #     - anthropic.claude-3-7-sonnet-20250219-v1:0
+  #     - anthropic.claude-3-5-sonnet-20241022-v2:0
+  #   inferenceProfiles: {}
