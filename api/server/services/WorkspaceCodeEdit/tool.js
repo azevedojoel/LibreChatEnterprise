@@ -143,7 +143,7 @@ function createWorkspaceCodeEditTools({ workspaceRoot }) {
     async (rawInput) => {
       const result = await listFiles({
         workspaceRoot: root,
-        relativePath: rawInput.path ?? '.',
+        relativePath: rawInput.path?.trim() || '.',
         extension: rawInput.extension,
       });
       if (result.error) {
@@ -179,7 +179,7 @@ function createWorkspaceCodeEditTools({ workspaceRoot }) {
       const result = await searchFiles({
         workspaceRoot: root,
         pattern: rawInput.pattern,
-        relativePath: rawInput.path ?? '.',
+        relativePath: rawInput.path?.trim() || '.',
         extension: rawInput.extension,
         maxResults: rawInput.max_results ?? 50,
       });

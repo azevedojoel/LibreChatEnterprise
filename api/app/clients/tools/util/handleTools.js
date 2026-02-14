@@ -280,7 +280,7 @@ const loadTools = async ({
           toolContextMap[tool] = toolContext;
         }
         const CodeExecutionTool = useLocalExecution
-          ? createLocalCodeExecutionTool({ user_id: user, files })
+          ? createLocalCodeExecutionTool({ user_id: user, files, req: options.req })
           : createCodeExecutionTool({
               user_id: user,
               files,

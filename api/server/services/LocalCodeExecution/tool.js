@@ -51,11 +51,13 @@ const CodeExecutionToolSchema = {
 
 /**
  * @param {object} [params] - Optional params for compatibility with createCodeExecutionTool signature
- * @param {Array<{ filepath?: string; filename: string }>} [params.files] - Agent-uploaded files to copy into workspace
+ * @param {Array<{ filepath?: string; filename: string; source?: string }>} [params.files] - Agent-uploaded files to copy into workspace
+ * @param {import('express').Request} [params.req] - Request object for resolving file paths (required for injected files)
  * @returns {import('@langchain/core/tools').DynamicStructuredTool}
  */
 function createLocalCodeExecutionTool(params = {}) {
   const agentFiles = params.files ?? [];
+  const req = params.req;
   return tool(
     async (rawInput, config) => {
       const { lang, code, args } = rawInput;
@@ -66,7 +68,7 @@ function createLocalCodeExecutionTool(params = {}) {
       const resolvedSessionId = session_id ?? `local_${Date.now().toString(36)}`;
       const sessionDir = path.join(getSessionBaseDir(), resolvedSessionId);
       const outputDir = path.join(sessionDir, 'output');
-      await injectAgentFiles(outputDir, agentFiles);
+      await injectAgentFiles(outputDir, agentFiles, req);
       try {
         const result = await runCodeLocally({
           lang,

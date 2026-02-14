@@ -16,9 +16,15 @@ jest.mock('~/hooks', () => ({
       com_assistants_attempt_info: 'Attempted to use function',
       com_ui_result: 'Result',
       com_ui_ui_resources: 'UI Resources',
+      com_ui_open_in_artifact: 'Open in Artifact',
     };
     return translations[key] || key;
   },
+}));
+
+jest.mock('~/hooks/Artifacts/useOpenInArtifact', () => ({
+  __esModule: true,
+  default: () => () => {},
 }));
 
 jest.mock('@mcp-ui/client', () => ({

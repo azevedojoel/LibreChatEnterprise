@@ -26,22 +26,38 @@ function getSessionBaseDir() {
 
 /**
  * Copies agent-uploaded files into the output dir so Python can read them via /mnt/data paths.
+ * Resolves virtual filepaths (e.g. /uploads/user/file) and supports cloud storage via streaming.
  * @param {string} outputDir - e.g. SESSION_BASE_DIR/conv_xxx/output (where /mnt/data maps to)
- * @param {Array<{ filepath?: string; filename: string }>} agentFiles - Files to copy (filepath from DB)
+ * @param {Array<{ filepath?: string; filename: string; source?: string }>} agentFiles - Files to copy
+ * @param {import('express').Request} [req] - Request object for resolving paths and streaming (required for non-local or virtual paths)
  */
-async function injectAgentFiles(outputDir, agentFiles) {
+async function injectAgentFiles(outputDir, agentFiles, req) {
   if (!agentFiles?.length) {
     return;
   }
   await fs.mkdir(outputDir, { recursive: true });
+  const { pipeline } = require('stream').promises;
+  const { createWriteStream } = require('fs');
+  const { getStrategyFunctions } = require('~/server/services/Files/strategies');
+  const { FileSources } = require('librechat-data-provider');
+
   for (const f of agentFiles) {
-    if (f.filepath && f.filename) {
-      const dest = path.join(outputDir, path.basename(f.filename));
-      try {
-        await fs.copyFile(f.filepath, dest);
-      } catch (e) {
-        logger.warn('[LocalCodeExecution] Failed to copy agent file:', f.filename, e?.message);
+    if (!f.filename || !f.filepath) continue;
+    const dest = path.join(outputDir, path.basename(f.filename));
+    try {
+      if (req) {
+        const source = f.source ?? FileSources.local;
+        const { getDownloadStream } = getStrategyFunctions(source);
+        if (getDownloadStream) {
+          const readStream = await getDownloadStream(req, f.filepath);
+          const writeStream = createWriteStream(dest);
+          await pipeline(readStream, writeStream);
+          continue;
+        }
       }
+      logger.warn('[LocalCodeExecution] Cannot copy agent file (missing req or unsupported source):', f.filename);
+    } catch (e) {
+      logger.warn('[LocalCodeExecution] Failed to copy agent file:', f.filename, e?.message);
     }
   }
 }

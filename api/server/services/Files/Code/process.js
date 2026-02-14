@@ -41,6 +41,7 @@ const primeFiles = async (options, _codeApiKey) => {
       file_id: file.file_id,
       filename: file.filename,
       filepath: file.filepath,
+      source: file.source,
     }));
 
   let toolContext = null;

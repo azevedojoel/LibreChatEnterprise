@@ -155,7 +155,15 @@ async function deleteFile({ workspaceRoot, relativePath }) {
 async function listFiles({ workspaceRoot, relativePath = '.', extension }) {
   try {
     const absPath = resolvePath(workspaceRoot, relativePath);
-    const stat = await fs.stat(absPath);
+    let stat;
+    try {
+      stat = await fs.stat(absPath);
+    } catch (err) {
+      if (err.code === 'ENOENT' && (relativePath === '.' || relativePath === '')) {
+        return { entries: [] };
+      }
+      throw err;
+    }
     if (!stat.isDirectory()) {
       return { error: `"${relativePath}" is not a directory` };
     }
