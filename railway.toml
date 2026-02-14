@@ -1,0 +1,13 @@
+# Railway deployment config - stored with your code
+# https://docs.railway.com/guides/config-as-code
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# Health check for Railway's load balancer
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 5
