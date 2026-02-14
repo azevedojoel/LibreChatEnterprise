@@ -34,8 +34,12 @@ const Registration: React.FC = () => {
   const token = queryParams.get('token');
   const validTheme = isDark(theme) ? 'dark' : 'light';
 
-  // only require captcha if we have a siteKey
-  const requireCaptcha = Boolean(startupConfig?.turnstile?.siteKey);
+  const isLocalhost =
+    typeof window !== 'undefined' &&
+    ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+  // only require captcha if we have a siteKey (skip on localhost for local dev)
+  const requireCaptcha =
+    Boolean(startupConfig?.turnstile?.siteKey) && !isLocalhost;
 
   const registerUser = useRegisterUserMutation({
     onMutate: () => {
@@ -179,7 +183,7 @@ const Registration: React.FC = () => {
                 value === password || localize('com_auth_password_not_match'),
             })}
 
-            {startupConfig?.turnstile?.siteKey && (
+            {requireCaptcha && (
               <div className="my-4 flex justify-center">
                 <Turnstile
                   siteKey={startupConfig.turnstile.siteKey}

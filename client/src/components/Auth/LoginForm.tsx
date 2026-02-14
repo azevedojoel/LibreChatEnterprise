@@ -30,7 +30,11 @@ const LoginForm: React.FC<TLoginFormProps> = ({ onSubmit, startupConfig, error, 
   const { data: config } = useGetStartupConfig();
   const useUsernameLogin = config?.ldap?.username;
   const validTheme = isDark(theme) ? 'dark' : 'light';
-  const requireCaptcha = Boolean(startupConfig.turnstile?.siteKey);
+  const isLocalhost =
+    typeof window !== 'undefined' &&
+    ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+  const requireCaptcha =
+    Boolean(startupConfig.turnstile?.siteKey) && !isLocalhost;
 
   useEffect(() => {
     if (error && error.includes('422') && !showResendLink) {
