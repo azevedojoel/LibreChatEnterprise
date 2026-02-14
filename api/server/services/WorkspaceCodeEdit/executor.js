@@ -6,6 +6,24 @@ const fs = require('fs').promises;
 const path = require('path');
 
 /**
+ * Normalizes paths that use /mnt/data convention (from execute_code) to relative paths.
+ * Models often use /mnt/data/ for file paths; workspace tools expect paths relative to root.
+ */
+function normalizePath(relativePath) {
+  if (typeof relativePath !== 'string') {
+    return relativePath;
+  }
+  const trimmed = relativePath.trim();
+  if (trimmed.startsWith('/mnt/data/')) {
+    return trimmed.slice('/mnt/data/'.length) || '.';
+  }
+  if (trimmed === '/mnt/data') {
+    return '.';
+  }
+  return relativePath;
+}
+
+/**
  * Validates that resolvedPath is inside workspaceRoot.
  * @param {string} workspaceRoot - Absolute path to workspace
  * @param {string} relativePath - User-provided relative path
@@ -13,8 +31,9 @@ const path = require('path');
  * @throws {Error} If path escapes workspace
  */
 function resolvePath(workspaceRoot, relativePath) {
+  const normalized = normalizePath(relativePath);
   const normalizedRoot = path.resolve(workspaceRoot);
-  const resolved = path.resolve(normalizedRoot, relativePath);
+  const resolved = path.resolve(normalizedRoot, normalized);
   if (!resolved.startsWith(normalizedRoot + path.sep) && resolved !== normalizedRoot) {
     throw new Error(`Path "${relativePath}" escapes workspace`);
   }

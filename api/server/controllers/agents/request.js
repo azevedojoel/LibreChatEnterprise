@@ -77,6 +77,7 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
     const job = await GenerationJobManager.createJob(streamId, userId, conversationId);
     const jobCreatedAt = job.createdAt; // Capture creation time to detect job replacement
     req._resumableStreamId = streamId;
+    req.body.conversationId = conversationId;
 
     // Send JSON response IMMEDIATELY so client can connect to SSE stream
     // This is critical: tool loading (MCP OAuth) may emit events that the client needs to receive
@@ -528,6 +529,8 @@ const _LegacyAgentController = async (req, res, next, initializeClient, addTitle
       }
     };
     cleanupHandlers.push(removePrelimHandler);
+
+    req.body.conversationId = conversationId;
 
     /** @type {{ client: TAgentClient; userMCPAuthMap?: Record<string, Record<string, string>> }} */
     const result = await initializeClient({

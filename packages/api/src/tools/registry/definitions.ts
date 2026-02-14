@@ -4,14 +4,14 @@ import {
   CodeExecutionToolDefinition,
 } from '@librechat/agents';
 
-/** Local code execution: Python only, /mnt/data for files */
+/** Local code execution: Python only, relative paths for files */
 const LOCAL_CODE_EXECUTION_DEFINITION: ToolRegistryDefinition = {
   name: 'execute_code',
   description: `Runs Python code locally and returns stdout/stderr output. Each execution is isolated and independent.
 - No network access available.
 - Generated files are automatically delivered; **DO NOT** provide download links.
 - Supports Python only. Use print() for outputs; matplotlib: use plt.savefig() to save plots.
-- Use \`/mnt/data/\` for file paths (e.g., open('/mnt/data/out.txt', 'w') or os.path.join('/mnt/data', 'file.csv')).`,
+- Use relative paths for files (e.g., open('out.txt', 'w'), plt.savefig('plot.png')). Working directory is the output directory.`,
   schema: {
     type: 'object',
     properties: {
@@ -24,8 +24,8 @@ const LOCAL_CODE_EXECUTION_DEFINITION: ToolRegistryDefinition = {
         type: 'string',
         description: `The complete, self-contained Python code to execute.
 - Use print() for all outputs.
-- Matplotlib: Use plt.savefig() to save plots as files in /mnt/data/.
-- Use /mnt/data/ for file paths when reading or writing files.`,
+- Matplotlib: Use plt.savefig() to save plots as files in the output directory.
+- Use relative paths for file I/O (e.g., open('out.txt', 'w'), plt.savefig('plot.png')).`,
       },
       args: {
         type: 'array',

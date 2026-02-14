@@ -88,7 +88,7 @@ function createLocalCodeExecutionTool(params = {}) {
           for (let i = 0; i < result.files.length; i++) {
             const f = result.files[i];
             const isImage = imageExtRegex.test(f.name);
-            formattedOutput += `- /mnt/data/${f.name} | ${isImage ? imageMessage : otherMessage}`;
+            formattedOutput += `- ${f.name} | ${isImage ? imageMessage : otherMessage}`;
             if (i < result.files.length - 1) {
               formattedOutput += result.files.length <= 3 ? ', ' : ',\n';
             }
