@@ -28,7 +28,7 @@ interface:
   bookmarks: true
   memories: true
   temporaryChat: true
-  runCode: false
+  runCode: true
   webSearch: true
   fileCitations: true
   prompts:
