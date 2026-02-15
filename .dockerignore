@@ -10,8 +10,10 @@
 data-node
 meili_data*
 librechat*
+!librechat.yaml
 Dockerfile*
 docs
 
-# Ignore all hidden files
+# Ignore all hidden files (except .git for submodule init)
 .*
+!.git

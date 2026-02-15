@@ -3,8 +3,8 @@
 # Base node image
 FROM node:20-alpine AS node
 
-# Install jemalloc
-RUN apk add --no-cache jemalloc
+# Install jemalloc and git (for submodule init)
+RUN apk add --no-cache jemalloc git
 RUN apk add --no-cache python3 py3-pip uv
 
 # Set environment variable to use jemalloc
@@ -40,6 +40,10 @@ RUN \
     npm ci --no-audit
 
 COPY --chown=node:node . .
+
+# Initialize submodules (e.g. mcp-servers/google-workspace) and build workspace server
+RUN git submodule update --init --recursive
+RUN cd mcp-servers/google-workspace && npm install && npm run build
 
 RUN \
     # React client build with configurable memory
