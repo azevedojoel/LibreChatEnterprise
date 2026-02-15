@@ -3,10 +3,42 @@ import { Button } from '@librechat/client';
 import { TriangleAlert } from 'lucide-react';
 import {
   Constants,
+  Tools,
   dataService,
   actionDelimiter,
   actionDomainSeparator,
 } from 'librechat-data-provider';
+
+/** Friendly display names for built-in tools */
+const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
+  [Tools.search_files]: 'Grepped',
+  [Tools.glob_files]: 'Globbed',
+  // Google Tasks tools (underscore: default, dot: --use-dot-names)
+  tasks_listTaskLists: 'List Task Lists',
+  'tasks.listTaskLists': 'List Task Lists',
+  tasks_getTaskList: 'Get Task List',
+  'tasks.getTaskList': 'Get Task List',
+  tasks_createTaskList: 'Create Task List',
+  'tasks.createTaskList': 'Create Task List',
+  tasks_updateTaskList: 'Update Task List',
+  'tasks.updateTaskList': 'Update Task List',
+  tasks_deleteTaskList: 'Delete Task List',
+  'tasks.deleteTaskList': 'Delete Task List',
+  tasks_listTasks: 'List Tasks',
+  'tasks.listTasks': 'List Tasks',
+  tasks_getTask: 'Get Task',
+  'tasks.getTask': 'Get Task',
+  tasks_createTask: 'Create Task',
+  'tasks.createTask': 'Create Task',
+  tasks_updateTask: 'Update Task',
+  'tasks.updateTask': 'Update Task',
+  tasks_deleteTask: 'Delete Task',
+  'tasks.deleteTask': 'Delete Task',
+  tasks_clearCompletedTasks: 'Clear Completed Tasks',
+  'tasks.clearCompletedTasks': 'Clear Completed Tasks',
+  tasks_moveTask: 'Move Task',
+  'tasks.moveTask': 'Move Task',
+};
 import type { TAttachment } from 'librechat-data-provider';
 import { useLocalize, useProgress } from '~/hooks';
 import { AttachmentGroup } from './Parts';
@@ -64,6 +96,24 @@ export default function ToolCall({
       mcpServerName: '',
     };
   }, [name]);
+
+  const displayName = useMemo(
+    () => (function_name && TOOL_DISPLAY_NAMES[function_name]) ?? function_name ?? '',
+    [function_name],
+  );
+
+  const inlinePattern = useMemo(() => {
+    if (function_name !== Tools.search_files && function_name !== Tools.glob_files) {
+      return '';
+    }
+    try {
+      const parsed = typeof _args === 'string' ? JSON.parse(_args) : _args;
+      const pattern = parsed?.pattern;
+      return typeof pattern === 'string' ? pattern : '';
+    } catch {
+      return '';
+    }
+  }, [_args, function_name]);
 
   const actionId = useMemo(() => {
     if (isMCPToolCall || !auth) {
@@ -138,17 +188,27 @@ export default function ToolCall({
   const progress = useProgress(initialProgress);
   const cancelled = (!isSubmitting && progress < 1) || error === true;
 
+  const labelWithPattern = useMemo(
+    () => (inlinePattern ? `${displayName} '${inlinePattern}'` : displayName),
+    [displayName, inlinePattern],
+  );
+
+  const isTasksTool = function_name?.startsWith('tasks_') || function_name?.startsWith('tasks.');
+
   const getFinishedText = () => {
     if (cancelled) {
       return localize('com_ui_cancelled');
     }
+    if (function_name === Tools.search_files || function_name === Tools.glob_files || isTasksTool) {
+      return labelWithPattern;
+    }
     if (isMCPToolCall === true) {
-      return localize('com_assistants_completed_function', { 0: function_name });
+      return localize('com_assistants_completed_function', { 0: labelWithPattern });
     }
     if (domain != null && domain && domain.length !== Constants.ENCODED_DOMAIN_LENGTH) {
       return localize('com_assistants_completed_action', { 0: domain });
     }
-    return localize('com_assistants_completed_function', { 0: function_name });
+    return localize('com_assistants_completed_function', { 0: labelWithPattern });
   };
 
   useLayoutEffect(() => {
@@ -205,8 +265,8 @@ export default function ToolCall({
           progress={progress}
           onClick={() => setShowInfo((prev) => !prev)}
           inProgressText={
-            function_name
-              ? localize('com_assistants_running_var', { 0: function_name })
+            labelWithPattern
+              ? localize('com_assistants_running_var', { 0: labelWithPattern })
               : localize('com_assistants_running_action')
           }
           authText={
@@ -253,6 +313,7 @@ export default function ToolCall({
                 output={output}
                 domain={authDomain || (domain ?? '')}
                 function_name={function_name}
+                displayName={labelWithPattern}
                 pendingAuth={authDomain.length > 0 && !cancelled && progress < 1}
                 attachments={attachments}
               />
