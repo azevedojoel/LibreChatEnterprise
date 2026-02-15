@@ -1,7 +1,9 @@
 const { logger } = require('@librechat/data-schemas');
 const { generateCheckAccess } = require('@librechat/api');
-const { PermissionTypes, Permissions } = require('librechat-data-provider');
+const { PermissionTypes, Permissions, ResourceType, PermissionBits } = require('librechat-data-provider');
 const { getRoleByName } = require('~/models/Role');
+const { getAgent } = require('~/models/Agent');
+const { checkPermission } = require('~/server/services/PermissionService');
 const {
   listSchedulesForUser,
   createScheduleForUser,
@@ -11,6 +13,23 @@ const {
   listRunsForUser,
   getRunForUser,
 } = require('~/server/services/ScheduledAgents/schedulingService');
+
+/**
+ * Verify user has VIEW permission on the agent before creating/updating a schedule.
+ * @returns {{ ok: boolean; status?: number; message?: string }}
+ */
+async function ensureUserCanUseAgent(userId, role, agentId) {
+  const agent = await getAgent({ id: agentId });
+  if (!agent) return { ok: false, status: 404, message: 'Agent not found' };
+  const hasAccess = await checkPermission({
+    userId,
+    role,
+    resourceType: ResourceType.AGENT,
+    resourceId: agent._id,
+    requiredPermission: PermissionBits.VIEW,
+  });
+  return hasAccess ? { ok: true } : { ok: false, status: 403, message: 'Insufficient permissions to use this agent' };
+}
 
 const checkAgentAccess = generateCheckAccess({
   permissionType: PermissionTypes.AGENTS,
@@ -53,6 +72,11 @@ async function createSchedule(req, res) {
       return res.status(400).json({ error: 'runAt required for one-off schedules' });
     }
 
+    const agentCheck = await ensureUserCanUseAgent(req.user.id, req.user.role, agentId);
+    if (!agentCheck.ok) {
+      return res.status(agentCheck.status).json({ error: agentCheck.message });
+    }
+
     const schedule = await createScheduleForUser(req.user.id, {
       name,
       agentId,
@@ -77,6 +101,13 @@ async function createSchedule(req, res) {
  */
 async function updateSchedule(req, res) {
   try {
+    if (req.body.agentId) {
+      const agentCheck = await ensureUserCanUseAgent(req.user.id, req.user.role, req.body.agentId);
+      if (!agentCheck.ok) {
+        return res.status(agentCheck.status).json({ error: agentCheck.message });
+      }
+    }
+
     const schedule = await updateScheduleForUser(req.user.id, req.params.id, req.body);
 
     if (!schedule) {

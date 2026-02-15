@@ -85,15 +85,17 @@ function getBullPrefix() {
 }
 
 /**
- * Fail startup when SCHEDULED_AGENTS_REQUIRE_REDIS=true but Redis is unavailable.
- * Call before app.listen in production deployments that rely on scheduled agents.
+ * Fail startup when scheduled agents are enabled but Redis is unavailable.
+ * Tied to interface.scheduledAgents from config; respects SCHEDULED_AGENTS_REQUIRE_REDIS=false opt-out.
+ * @param {boolean} [schedulerEnabled] - From appConfig?.interfaceConfig?.scheduledAgents. When !== false, Redis is required.
  */
-function requireRedisAtStartup() {
-  if (!isEnabled(process.env.SCHEDULED_AGENTS_REQUIRE_REDIS)) return;
+function requireRedisAtStartup(schedulerEnabled = true) {
+  if (process.env.SCHEDULED_AGENTS_REQUIRE_REDIS === 'false') return;
+  if (schedulerEnabled === false) return;
   if (getRedisConnection()) return;
   throw new Error(
-    'SCHEDULED_AGENTS_REQUIRE_REDIS is enabled but Redis is not configured (USE_REDIS/REDIS_URI). ' +
-      'Configure Redis or set SCHEDULED_AGENTS_REQUIRE_REDIS=false.',
+    'Scheduled agents are enabled but Redis is not configured (USE_REDIS/REDIS_URI). ' +
+      'Configure Redis, set interface.scheduledAgents: false in librechat.yaml, or set SCHEDULED_AGENTS_REQUIRE_REDIS=false.',
   );
 }
 

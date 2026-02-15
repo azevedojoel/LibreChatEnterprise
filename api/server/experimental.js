@@ -208,8 +208,6 @@ if (cluster.isMaster) {
     await connectDb();
     logger.info(`Worker ${process.pid}: Connected to MongoDB`);
 
-    requireRedisAtStartup();
-
     /** Background index sync (non-blocking) */
     indexSync().catch((err) => {
       logger.error(`[Worker ${process.pid}][indexSync] Background sync failed:`, err);
@@ -223,6 +221,7 @@ if (cluster.isMaster) {
 
     /** Initialize app configuration */
     const appConfig = await getAppConfig();
+    requireRedisAtStartup(appConfig?.interfaceConfig?.scheduledAgents);
     initializeFileStorage(appConfig);
     await performStartupChecks(appConfig);
     await updateInterfacePermissions(appConfig);

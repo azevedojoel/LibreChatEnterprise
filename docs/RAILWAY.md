@@ -83,7 +83,7 @@ Redis is required for reliable scheduled agent runs, sessions, stream job storag
    Replace `Redis` with your Redis service name if you named it differently. Railway provides `REDIS_URL`; LibreChat also accepts `REDIS_URL` directly if set.
 3. Sync with `node scripts/sync-railway-env.js` or add these in the Railway UI.
 
-Without Redis, scheduled agent "run now" uses fire-and-forget and jobs may be lost on restart. Set `SCHEDULED_AGENTS_REQUIRE_REDIS=true` to fail startup when Redis is unavailable (recommended for production).
+Without Redis, scheduled agent "run now" uses fire-and-forget and jobs may be lost on restart. When scheduled agents are enabled (default), the app fails startup if Redis is not configured. Set `SCHEDULED_AGENTS_REQUIRE_REDIS=false` to opt out of this check (not recommended for production).
 
 ## Google Workspace MCP (OAuth)
 

@@ -12,14 +12,51 @@ const ScheduledAgent = dbModels.ScheduledAgent ?? (mongoose.models && mongoose.m
 const ScheduledRun = dbModels.ScheduledRun ?? (mongoose.models && mongoose.models.ScheduledRun);
 
 /**
+ * Compute next run time for a schedule.
+ * @param {Object} schedule - Schedule document (recurring or one-off)
+ * @returns {{ nextRunAt: string | null }}
+ */
+function computeNextRunAt(schedule) {
+  if (!schedule || !schedule.enabled) {
+    return { nextRunAt: null };
+  }
+  const timezone = schedule.timezone || 'UTC';
+  const now = new Date();
+
+  if (schedule.scheduleType === 'one-off') {
+    const runAt = schedule.runAt ? new Date(schedule.runAt) : null;
+    if (!runAt || runAt <= now) {
+      return { nextRunAt: null };
+    }
+    return { nextRunAt: runAt.toISOString() };
+  }
+
+  if (schedule.scheduleType === 'recurring' && schedule.cronExpression) {
+    try {
+      const cronParser = require('cron-parser');
+      const interval = cronParser.parseExpression(schedule.cronExpression, {
+        currentDate: now,
+        tz: timezone,
+      });
+      const next = interval.next().toDate();
+      return { nextRunAt: next.toISOString() };
+    } catch {
+      return { nextRunAt: null };
+    }
+  }
+
+  return { nextRunAt: null };
+}
+
+/**
  * @param {string} userId - User ID (string)
- * @returns {Promise<Object[]>} List of schedules
+ * @returns {Promise<Object[]>} List of schedules with nextRunAt
  */
 async function listSchedulesForUser(userId) {
   const schedules = await ScheduledAgent.find({ userId })
     .sort({ createdAt: -1 })
     .lean();
-  return schedules;
+  return schedules.map((s) => ({ ...s, ...computeNextRunAt(s) }));
 }
 
 /**

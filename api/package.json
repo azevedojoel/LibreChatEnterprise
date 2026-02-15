@@ -54,6 +54,7 @@
     "@toon-format/toon": "^0.8.0",
     "axios": "^1.13.5",
     "bcryptjs": "^2.4.3",
+    "bullmq": "^5.69.2",
     "compression": "^1.8.1",
     "connect-redis": "^8.1.0",
     "cookie": "^0.7.2",

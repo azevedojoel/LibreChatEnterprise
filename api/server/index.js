@@ -54,8 +54,6 @@ const startServer = async () => {
 
   logger.info('Connected to MongoDB');
 
-  requireRedisAtStartup();
-
   // Clear config caches on startup so librechat.yaml changes (e.g. new providers) take effect immediately
   const configCache = getLogStores(CacheKeys.CONFIG_STORE);
   await configCache.delete(CacheKeys.ENDPOINT_CONFIG);
@@ -70,6 +68,7 @@ const startServer = async () => {
 
   await seedDatabase();
   const appConfig = await getAppConfig();
+  requireRedisAtStartup(appConfig?.interfaceConfig?.scheduledAgents);
   initializeFileStorage(appConfig);
   await performStartupChecks(appConfig);
   await updateInterfacePermissions(appConfig);
