@@ -631,6 +631,9 @@ const processAgentFileUpload = async ({ req, res, metadata }) => {
       basePath,
       entity_id,
     });
+    if (tool_resource === EToolResources.execute_code) {
+      fileInfoMetadata = { fileIdentifier: `upload/${req.user.id}/${file_id}` };
+    }
   }
 
   let { bytes, filename, filepath: _filepath, height, width } = storageResult;

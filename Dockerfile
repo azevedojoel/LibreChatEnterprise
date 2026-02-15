@@ -41,8 +41,11 @@ RUN \
 
 COPY --chown=node:node . .
 
-# Initialize submodules (e.g. mcp-servers/google-workspace) and build workspace server
-RUN git submodule update --init --recursive
+# Railway excludes .git from build context - clone submodule directly (git submodule update requires .git)
+ARG GOOGLE_WORKSPACE_REPO=https://github.com/azevedojoel/workspace.git
+RUN rm -rf mcp-servers/google-workspace && \
+    mkdir -p mcp-servers && \
+    git clone --depth 1 ${GOOGLE_WORKSPACE_REPO} mcp-servers/google-workspace
 RUN cd mcp-servers/google-workspace && npm install && npm run build
 
 RUN \

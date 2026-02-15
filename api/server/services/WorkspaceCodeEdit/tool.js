@@ -157,13 +157,14 @@ function createWorkspaceCodeEditTools({ workspaceRoot }) {
     {
       name: 'list_files',
       description:
-        'List files and directories. Use to discover files before reading or editing.',
+        'List files and directories. Use to discover files before reading or editing. For Code Interpreter: user-uploaded files and code-generated output are in the "output" directory—use path "output" to list them.',
       schema: {
         type: 'object',
         properties: {
           path: {
             type: 'string',
-            description: 'Directory path relative to workspace root (default: ".")',
+            description:
+              'Directory path relative to workspace root. Use "." for root; use "output" for Code Interpreter uploads and generated files (default: ".")',
           },
           extension: {
             type: 'string',

@@ -42,7 +42,13 @@ async function injectAgentFiles(outputDir, agentFiles, req) {
   const { FileSources } = require('librechat-data-provider');
 
   for (const f of agentFiles) {
-    if (!f.filename || !f.filepath) continue;
+    if (!f.filename || !f.filepath) {
+      logger.debug('[LocalCodeExecution] Skipping agent file (missing filename or filepath):', {
+        filename: f?.filename,
+        hasFilepath: !!f?.filepath,
+      });
+      continue;
+    }
     const dest = path.join(outputDir, path.basename(f.filename));
     try {
       if (req) {

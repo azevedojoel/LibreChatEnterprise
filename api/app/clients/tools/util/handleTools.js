@@ -304,8 +304,24 @@ const loadTools = async ({
         continue;
       }
       const pathMod = require('path');
-      const { getSessionBaseDir } = require('~/server/services/LocalCodeExecution/executor');
+      const {
+        getSessionBaseDir,
+        injectAgentFiles,
+      } = require('~/server/services/LocalCodeExecution/executor');
       const workspaceRoot = pathMod.join(getSessionBaseDir(), `conv_${conversationId}`);
+      const outputDir = pathMod.join(workspaceRoot, 'output');
+
+      let workspaceInjected = false;
+      const ensureWorkspaceInjected = async () => {
+        if (workspaceInjected) return;
+        const { files } = await primeCodeFiles(
+          { ...options, agentId: agent?.id },
+          '',
+        );
+        await injectAgentFiles(outputDir, files, options.req);
+        workspaceInjected = true;
+      };
+
       const [
         readFileTool,
         editFileTool,
@@ -322,7 +338,10 @@ const loadTools = async ({
         [Tools.list_files]: listFilesTool,
         [Tools.search_files]: searchFilesTool,
       };
-      requestedTools[tool] = async () => toolMap[tool];
+      requestedTools[tool] = async () => {
+        await ensureWorkspaceInjected();
+        return toolMap[tool];
+      };
       continue;
     } else if (tool === Tools.file_search) {
       requestedTools[tool] = async () => {
