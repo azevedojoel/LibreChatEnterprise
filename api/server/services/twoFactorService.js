@@ -1,5 +1,5 @@
 const { webcrypto } = require('node:crypto');
-const { hashBackupCode, decryptV3, decryptV2 } = require('@librechat/data-schemas');
+const { hashBackupCode, decryptUniversal } = require('@librechat/data-schemas');
 const { updateUser } = require('~/models');
 
 // Base32 alphabet for TOTP secret encoding.
@@ -180,9 +180,8 @@ const verifyBackupCode = async ({ user, backupCode }) => {
 
 /**
  * Retrieves and decrypts a stored TOTP secret.
- * - Uses decryptV3 if the secret has a "v3:" prefix.
- * - Falls back to decryptV2 for colon-delimited values.
- * - Assumes a 16-character secret is already plain.
+ * Supports envelope, v3, v2, and legacy formats via decryptUniversal.
+ * Falls back to plain value if decryption fails (legacy unencrypted storage).
  * @param {string|null} storedSecret
  * @returns {Promise<string|null>}
  */
@@ -190,16 +189,11 @@ const getTOTPSecret = async (storedSecret) => {
   if (!storedSecret) {
     return null;
   }
-  if (storedSecret.startsWith('v3:')) {
-    return decryptV3(storedSecret);
-  }
-  if (storedSecret.includes(':')) {
-    return await decryptV2(storedSecret);
-  }
-  if (storedSecret.length === 16) {
+  try {
+    return await decryptUniversal(storedSecret);
+  } catch {
     return storedSecret;
   }
-  return storedSecret;
 };
 
 /**

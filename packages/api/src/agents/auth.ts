@@ -1,4 +1,4 @@
-import { logger, decrypt } from '@librechat/data-schemas';
+import { logger, decryptUniversal } from '@librechat/data-schemas';
 import type { IPluginAuth, PluginAuthMethods } from '@librechat/data-schemas';
 
 export interface GetPluginAuthMapParams {
@@ -53,7 +53,7 @@ export async function getPluginAuthMap({
         decryptionPromises.push(
           (async () => {
             try {
-              const decryptedValue = await decrypt(auth.value);
+              const decryptedValue = await decryptUniversal(auth.value);
               authMap[pluginKey][auth.authField] = decryptedValue;
             } catch (error) {
               const message = error instanceof Error ? error.message : 'Unknown error';

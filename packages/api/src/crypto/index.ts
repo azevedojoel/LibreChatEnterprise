@@ -5,6 +5,9 @@ export {
   decryptV2,
   encryptV3,
   decryptV3,
+  encryptEnvelope,
+  decryptEnvelope,
+  decryptUniversal,
   hashBackupCode,
   getRandomValues,
 } from '@librechat/data-schemas';

@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const { nanoid } = require('nanoid');
 const { tool } = require('@langchain/core/tools');
 const { GraphEvents, sleep } = require('@librechat/agents');
-const { logger, encryptV2, decryptV2 } = require('@librechat/data-schemas');
+const { logger, encryptEnvelope, decryptUniversal } = require('@librechat/data-schemas');
 const {
   sendEvent,
   logAxiosError,
@@ -264,9 +264,9 @@ async function createActionTool({
 
             if (tokenData) {
               // Valid token exists, add it to metadata for setAuth
-              metadata.oauth_access_token = await decryptV2(tokenData.token);
+              metadata.oauth_access_token = await decryptUniversal(tokenData.token);
               if (refreshTokenData) {
-                metadata.oauth_refresh_token = await decryptV2(refreshTokenData.token);
+                metadata.oauth_refresh_token = await decryptUniversal(refreshTokenData.token);
               }
               metadata.oauth_token_expires_at = tokenData.expiresAt.toISOString();
             } else if (!refreshTokenData) {
@@ -275,7 +275,7 @@ async function createActionTool({
             } else if (refreshTokenData) {
               // Refresh token is still valid, use it to get new access token
               try {
-                const refresh_token = await decryptV2(refreshTokenData.token);
+                const refresh_token = await decryptUniversal(refreshTokenData.token);
                 const refreshTokens = async () =>
                   await refreshAccessToken(
                     {
@@ -361,7 +361,7 @@ async function createActionTool({
 async function encryptSensitiveValue(value) {
   // Encode API key to handle special characters like ":"
   const encodedValue = encodeURIComponent(value);
-  return await encryptV2(encodedValue);
+  return await encryptEnvelope(encodedValue);
 }
 
 /**
@@ -370,7 +370,7 @@ async function encryptSensitiveValue(value) {
  * @returns {Promise<string>}
  */
 async function decryptSensitiveValue(value) {
-  const decryptedValue = await decryptV2(value);
+  const decryptedValue = await decryptUniversal(value);
   return decodeURIComponent(decryptedValue);
 }
 

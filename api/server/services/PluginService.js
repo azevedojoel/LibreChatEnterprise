@@ -1,5 +1,5 @@
 const { logger } = require('@librechat/data-schemas');
-const { encrypt, decrypt } = require('@librechat/api');
+const { encryptEnvelope, decryptUniversal } = require('@librechat/data-schemas');
 const { findOnePluginAuth, updatePluginAuth, deletePluginAuth } = require('~/models');
 
 /**
@@ -45,7 +45,7 @@ const getUserPluginAuthValue = async (userId, authField, throwError = true, plug
       throw new Error(`No plugin auth ${authField} found for user ${userId}${pluginInfo}`);
     }
 
-    const decryptedValue = await decrypt(pluginAuth.value);
+    const decryptedValue = await decryptUniversal(pluginAuth.value);
     return decryptedValue;
   } catch (err) {
     if (!throwError) {
@@ -93,7 +93,7 @@ const getUserPluginAuthValue = async (userId, authField, throwError = true, plug
  */
 const updateUserPluginAuth = async (userId, authField, pluginKey, value) => {
   try {
-    const encryptedValue = await encrypt(value);
+    const encryptedValue = await encryptEnvelope(value);
     return await updatePluginAuth({
       userId,
       authField,

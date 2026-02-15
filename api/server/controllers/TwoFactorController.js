@@ -1,4 +1,4 @@
-const { encryptV3, logger } = require('@librechat/data-schemas');
+const { encryptEnvelope, logger } = require('@librechat/data-schemas');
 const {
   generateBackupCodes,
   generateTOTPSecret,
@@ -20,8 +20,8 @@ const enable2FA = async (req, res) => {
     const secret = generateTOTPSecret();
     const { plainCodes, codeObjects } = await generateBackupCodes();
 
-    // Encrypt the secret with v3 encryption before saving.
-    const encryptedSecret = encryptV3(secret);
+    // Encrypt the secret with envelope encryption before saving.
+    const encryptedSecret = await encryptEnvelope(secret);
 
     // Update the user record: store the secret & backup codes and set twoFactorEnabled to false.
     const user = await updateUser(userId, {

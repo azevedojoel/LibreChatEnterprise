@@ -1,14 +1,14 @@
 import { Types } from 'mongoose';
-import { decryptV2 } from '@librechat/data-schemas';
+import { decryptUniversal } from '@librechat/data-schemas';
 import type { TokenMethods, IToken } from '@librechat/data-schemas';
 import { MCPTokenStorage } from '~/mcp/oauth/tokens';
 
 jest.mock('@librechat/data-schemas', () => ({
   ...jest.requireActual('@librechat/data-schemas'),
-  decryptV2: jest.fn(),
+  decryptUniversal: jest.fn(),
 }));
 
-const mockDecryptV2 = decryptV2 as jest.MockedFunction<typeof decryptV2>;
+const mockDecryptUniversal = decryptUniversal as jest.MockedFunction<typeof decryptUniversal>;
 
 describe('MCPTokenStorage', () => {
   afterAll(() => {
@@ -116,7 +116,7 @@ describe('MCPTokenStorage', () => {
       } as IToken;
 
       mockFindToken.mockResolvedValue(mockToken);
-      mockDecryptV2.mockResolvedValue(JSON.stringify(clientInfo));
+      mockDecryptUniversal.mockResolvedValue(JSON.stringify(clientInfo));
 
       const result = await MCPTokenStorage.getClientInfoAndMetadata({
         userId,
@@ -130,7 +130,7 @@ describe('MCPTokenStorage', () => {
         serverUrl: 'https://test.example.com',
         state: 'test-state',
       });
-      expect(mockDecryptV2).toHaveBeenCalledWith('encrypted-token');
+      expect(mockDecryptUniversal).toHaveBeenCalledWith('encrypted-token');
     });
 
     it('should handle empty metadata', async () => {
@@ -146,7 +146,7 @@ describe('MCPTokenStorage', () => {
       } as IToken;
 
       mockFindToken.mockResolvedValue(mockToken);
-      mockDecryptV2.mockResolvedValue(JSON.stringify(clientInfo));
+      mockDecryptUniversal.mockResolvedValue(JSON.stringify(clientInfo));
 
       const result = await MCPTokenStorage.getClientInfoAndMetadata({
         userId,
@@ -178,7 +178,7 @@ describe('MCPTokenStorage', () => {
       } as IToken;
 
       mockFindToken.mockResolvedValue(mockToken);
-      mockDecryptV2.mockResolvedValue(JSON.stringify(clientInfo));
+      mockDecryptUniversal.mockResolvedValue(JSON.stringify(clientInfo));
 
       const result = await MCPTokenStorage.getClientInfoAndMetadata({
         userId,

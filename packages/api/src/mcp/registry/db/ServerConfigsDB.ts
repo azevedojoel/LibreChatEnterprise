@@ -5,7 +5,7 @@ import {
   PrincipalType,
   PermissionBits,
 } from 'librechat-data-provider';
-import { logger, encryptV2, decryptV2, createMethods } from '@librechat/data-schemas';
+import { logger, encryptEnvelope, decryptUniversal, createMethods } from '@librechat/data-schemas';
 import type { AllMethods, MCPServerDocument } from '@librechat/data-schemas';
 import type { IServerConfigsRepositoryInterface } from '~/mcp/registry/ServerConfigsRepositoryInterface';
 import type { ParsedServerConfig, AddServerResult } from '~/mcp/types';
@@ -476,7 +476,7 @@ export class ServerConfigsDB implements IServerConfigsRepositoryInterface {
       try {
         result.apiKey = {
           ...result.apiKey,
-          key: await encryptV2(result.apiKey.key),
+          key: await encryptEnvelope(result.apiKey.key),
         };
       } catch (error) {
         logger.error('[ServerConfigsDB.encryptConfig] Failed to encrypt apiKey.key', error);
@@ -490,7 +490,7 @@ export class ServerConfigsDB implements IServerConfigsRepositoryInterface {
           ...result,
           oauth: {
             ...result.oauth,
-            client_secret: await encryptV2(result.oauth.client_secret),
+            client_secret: await encryptEnvelope(result.oauth.client_secret),
           },
         };
       } catch (error) {
@@ -514,7 +514,7 @@ export class ServerConfigsDB implements IServerConfigsRepositoryInterface {
       try {
         result.apiKey = {
           ...result.apiKey,
-          key: await decryptV2(result.apiKey.key),
+          key: await decryptUniversal(result.apiKey.key),
         };
       } catch (error) {
         logger.warn(
@@ -534,7 +534,7 @@ export class ServerConfigsDB implements IServerConfigsRepositoryInterface {
           ...result,
           oauth: {
             ...oauthConfig,
-            client_secret: await decryptV2(oauthConfig.client_secret),
+            client_secret: await decryptUniversal(oauthConfig.client_secret),
           },
         };
       } catch (error) {

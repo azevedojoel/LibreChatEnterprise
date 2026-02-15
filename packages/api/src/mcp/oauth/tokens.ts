@@ -1,4 +1,4 @@
-import { logger, encryptV2, decryptV2 } from '@librechat/data-schemas';
+import { logger, encryptEnvelope, decryptUniversal } from '@librechat/data-schemas';
 import type { OAuthTokens, OAuthClientInformation } from '@modelcontextprotocol/sdk/shared/auth.js';
 import type { TokenMethods, IToken } from '@librechat/data-schemas';
 import type { MCPOAuthTokens, ExtendedOAuthTokens, OAuthMetadata } from './types';
@@ -63,7 +63,7 @@ export class MCPTokenStorage {
       const identifier = `mcp:${serverName}`;
 
       // Encrypt and store access token
-      const encryptedAccessToken = await encryptV2(tokens.access_token);
+      const encryptedAccessToken = await encryptEnvelope(tokens.access_token);
 
       logger.debug(
         `${logPrefix} Token expires_in: ${'expires_in' in tokens ? tokens.expires_in : 'N/A'}, expires_at: ${'expires_at' in tokens ? tokens.expires_at : 'N/A'}`,
@@ -137,7 +137,7 @@ export class MCPTokenStorage {
         logger.debug(
           `${logPrefix} New refresh token received from OAuth server, will store/update`,
         );
-        const encryptedRefreshToken = await encryptV2(tokens.refresh_token);
+        const encryptedRefreshToken = await encryptEnvelope(tokens.refresh_token);
         const extendedTokens = tokens as ExtendedOAuthTokens;
         const refreshTokenExpiry = extendedTokens.refresh_token_expires_in
           ? new Date(Date.now() + extendedTokens.refresh_token_expires_in * 1000)
@@ -188,7 +188,7 @@ export class MCPTokenStorage {
           client_id: clientInfo.client_id,
           has_client_secret: !!clientInfo.client_secret,
         });
-        const encryptedClientInfo = await encryptV2(JSON.stringify(clientInfo));
+        const encryptedClientInfo = await encryptEnvelope(JSON.stringify(clientInfo));
 
         const clientInfoData = {
           userId,
@@ -295,7 +295,7 @@ export class MCPTokenStorage {
 
         try {
           logger.info(`${logPrefix} Attempting to refresh token`);
-          const decryptedRefreshToken = await decryptV2(refreshTokenData.token);
+          const decryptedRefreshToken = await decryptUniversal(refreshTokenData.token);
 
           /** Client information if available */
           let clientInfo;
@@ -307,7 +307,7 @@ export class MCPTokenStorage {
               identifier: `${identifier}:client`,
             });
             if (clientInfoData) {
-              const decryptedClientInfo = await decryptV2(clientInfoData.token);
+              const decryptedClientInfo = await decryptUniversal(clientInfoData.token);
               clientInfo = JSON.parse(decryptedClientInfo);
               logger.debug(`${logPrefix} Retrieved client info:`, {
                 client_id: clientInfo.client_id,
@@ -372,7 +372,7 @@ export class MCPTokenStorage {
         return null;
       }
 
-      const decryptedAccessToken = await decryptV2(accessTokenData.token);
+      const decryptedAccessToken = await decryptUniversal(accessTokenData.token);
 
       /** Get refresh token if available */
       const refreshTokenData = await findToken({
@@ -389,7 +389,7 @@ export class MCPTokenStorage {
       };
 
       if (refreshTokenData) {
-        tokens.refresh_token = await decryptV2(refreshTokenData.token);
+        tokens.refresh_token = await decryptUniversal(refreshTokenData.token);
       }
 
       logger.debug(`${logPrefix} Loaded existing OAuth tokens from storage`);
@@ -423,7 +423,7 @@ export class MCPTokenStorage {
       return null;
     }
 
-    const tokenData = await decryptV2(clientInfoData.token);
+    const tokenData = await decryptUniversal(clientInfoData.token);
     const clientInfo = JSON.parse(tokenData);
 
     // get metadata from the token as a plain object. While it's defined as a Map in the database type, it's a plain object at runtime.

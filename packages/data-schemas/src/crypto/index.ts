@@ -147,6 +147,87 @@ export function decryptV3(encryptedValue: string): string {
   return decrypted.toString('utf8');
 }
 
+/** --- Envelope encryption: unique DEK per ciphertext, KEK from CREDS_KEY --- */
+const GCM_IV_LENGTH = 12;
+const GCM_AUTH_TAG_LENGTH = 16;
+const ENVELOPE_PREFIX = 'env:v1:';
+
+function getKek(): Buffer {
+  if (key.length !== 32) {
+    throw new Error(`CREDS_KEY must be 64 hex chars (32 bytes) for envelope encryption, got ${key.length} bytes`);
+  }
+  return key;
+}
+
+/**
+ * Encrypts a value using envelope encryption.
+ * Each ciphertext uses a unique Data Encryption Key (DEK); DEK is encrypted with KEK (CREDS_KEY).
+ * Format: env:v1:base64(iv_dek|cipher_dek|auth_tag_dek):base64(iv_data|cipher_data|auth_tag_data)
+ */
+export async function encryptEnvelope(value: string): Promise<string> {
+  const kek = getKek();
+  const dek = crypto.randomBytes(32);
+
+  const ivData = crypto.randomBytes(GCM_IV_LENGTH);
+  const cipherData = crypto.createCipheriv('aes-256-gcm', dek, ivData, { authTagLength: GCM_AUTH_TAG_LENGTH });
+  const encData = Buffer.concat([cipherData.update(value, 'utf8'), cipherData.final(), cipherData.getAuthTag()]);
+  const payloadData = Buffer.concat([ivData, encData]);
+
+  const ivDek = crypto.randomBytes(GCM_IV_LENGTH);
+  const cipherDek = crypto.createCipheriv('aes-256-gcm', kek, ivDek, { authTagLength: GCM_AUTH_TAG_LENGTH });
+  const encDek = Buffer.concat([cipherDek.update(dek), cipherDek.final(), cipherDek.getAuthTag()]);
+  const payloadDek = Buffer.concat([ivDek, encDek]);
+
+  return `${ENVELOPE_PREFIX}${payloadDek.toString('base64')}:${payloadData.toString('base64')}`;
+}
+
+/**
+ * Decrypts an envelope-encrypted value.
+ */
+export async function decryptEnvelope(encryptedValue: string): Promise<string> {
+  const kek = getKek();
+  const parts = encryptedValue.slice(ENVELOPE_PREFIX.length).split(':');
+  if (parts.length < 2) {
+    throw new Error('Invalid envelope format');
+  }
+  const payloadDek = Buffer.from(parts[0], 'base64');
+  const payloadData = Buffer.from(parts[1], 'base64');
+
+  const ivDek = payloadDek.subarray(0, GCM_IV_LENGTH);
+  const encDek = payloadDek.subarray(GCM_IV_LENGTH, payloadDek.length - GCM_AUTH_TAG_LENGTH);
+  const authTagDek = payloadDek.subarray(payloadDek.length - GCM_AUTH_TAG_LENGTH);
+  const decipherDek = crypto.createDecipheriv('aes-256-gcm', kek, ivDek, { authTagLength: GCM_AUTH_TAG_LENGTH });
+  decipherDek.setAuthTag(authTagDek);
+  const dek = Buffer.concat([decipherDek.update(encDek), decipherDek.final()]);
+
+  const ivData = payloadData.subarray(0, GCM_IV_LENGTH);
+  const encData = payloadData.subarray(GCM_IV_LENGTH, payloadData.length - GCM_AUTH_TAG_LENGTH);
+  const authTagData = payloadData.subarray(payloadData.length - GCM_AUTH_TAG_LENGTH);
+  const decipherData = crypto.createDecipheriv('aes-256-gcm', dek, ivData, { authTagLength: GCM_AUTH_TAG_LENGTH });
+  decipherData.setAuthTag(authTagData);
+  return Buffer.concat([decipherData.update(encData), decipherData.final()]).toString('utf8');
+}
+
+/**
+ * Decrypts any supported format (envelope, v2, v3, or legacy).
+ * Use for reads when the stored format may vary.
+ */
+export async function decryptUniversal(encryptedValue: string): Promise<string> {
+  if (typeof encryptedValue !== 'string' || !encryptedValue) {
+    throw new Error('Expected non-empty string to decrypt');
+  }
+  if (encryptedValue.startsWith(ENVELOPE_PREFIX)) {
+    return decryptEnvelope(encryptedValue);
+  }
+  if (encryptedValue.startsWith('v3:')) {
+    return decryptV3(encryptedValue);
+  }
+  if (encryptedValue.includes(':') && encryptedValue.split(':').length >= 2 && !encryptedValue.startsWith('v3')) {
+    return decryptV2(encryptedValue);
+  }
+  return decrypt(encryptedValue);
+}
+
 /**
  * Generates random values as a hex string
  * @param length - The number of random bytes to generate

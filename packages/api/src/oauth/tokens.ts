@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { logger, encryptV2, decryptV2 } from '@librechat/data-schemas';
+import { logger, encryptEnvelope, decryptUniversal } from '@librechat/data-schemas';
 import { TokenExchangeMethodEnum } from 'librechat-data-provider';
 import type { TokenMethods } from '@librechat/data-schemas';
 import type { AxiosError } from 'axios';
@@ -39,7 +39,7 @@ export function createHandleOAuthToken({
     metadata?: Record<string, unknown>;
     type?: string;
   }) {
-    const encrypedToken = await encryptV2(token);
+    const encrypedToken = await encryptEnvelope(token);
     let expiresInNumber = 3600;
     if (typeof expiresIn === 'number') {
       expiresInNumber = expiresIn;
@@ -168,8 +168,8 @@ export async function refreshAccessToken(
   refresh_token_expires_in?: number;
 }> {
   try {
-    const oauth_client_id = await decryptV2(encrypted_oauth_client_id);
-    const oauth_client_secret = await decryptV2(encrypted_oauth_client_secret);
+    const oauth_client_id = await decryptUniversal(encrypted_oauth_client_id);
+    const oauth_client_secret = await decryptUniversal(encrypted_oauth_client_secret);
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -267,8 +267,8 @@ export async function getAccessToken(
   refresh_token?: string;
   refresh_token_expires_in?: number;
 }> {
-  const oauth_client_id = await decryptV2(encrypted_oauth_client_id);
-  const oauth_client_secret = await decryptV2(encrypted_oauth_client_secret);
+  const oauth_client_id = await decryptUniversal(encrypted_oauth_client_id);
+  const oauth_client_secret = await decryptUniversal(encrypted_oauth_client_secret);
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/x-www-form-urlencoded',
