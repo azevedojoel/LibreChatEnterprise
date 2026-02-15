@@ -1,0 +1,22 @@
+[
+  {
+    "resourceAppId": "00000003-0000-0000-c000-000000000000",
+    "resourceAccess": [
+      {"id": "e1fe6dd8-ba31-4d61-89e7-88639da4683d", "type": "Scope"},
+      {"id": "570282fd-fa5c-430d-a7fd-fc8dc98a9dca", "type": "Scope"},
+      {"id": "024d486e-b451-40bb-833d-3e66d98c5c73", "type": "Scope"},
+      {"id": "e383f46e-2787-4529-855e-0e479a3ffac0", "type": "Scope"},
+      {"id": "465a38f9-76ea-45b9-9f34-9e8b0d4b0b42", "type": "Scope"},
+      {"id": "1ec239c2-d7c9-4623-a91a-a9775856bb36", "type": "Scope"},
+      {"id": "10465720-29dd-4523-a11a-6a75c743c9d9", "type": "Scope"},
+      {"id": "5c28f0bf-8a70-41f1-8ab2-9032436ddb65", "type": "Scope"},
+      {"id": "371361e4-b9e2-4a3f-8315-2a301a3b0a3d", "type": "Scope"},
+      {"id": "9d822255-d64d-4b7a-afdb-833b9a97ed02", "type": "Scope"},
+      {"id": "f45671fb-e0fe-4b4b-be20-3d3ce43f1bcb", "type": "Scope"},
+      {"id": "2219042f-cab5-40cc-b0d2-16b1540b4c5f", "type": "Scope"},
+      {"id": "ff74d97f-43af-4b68-9f2a-b77ee6968c5d", "type": "Scope"},
+      {"id": "d56682ec-c09e-4743-aaf4-1a3aac4caa21", "type": "Scope"},
+      {"id": "ba47897c-39ec-4d83-8086-ee8256fa737d", "type": "Scope"}
+    ]
+  }
+]

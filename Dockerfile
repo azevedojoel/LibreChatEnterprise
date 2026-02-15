@@ -48,6 +48,11 @@ RUN rm -rf mcp-servers/google-workspace && \
     git clone --depth 1 ${GOOGLE_WORKSPACE_REPO} mcp-servers/google-workspace
 RUN cd mcp-servers/google-workspace && npm install && npm run build
 
+ARG MS365_MCP_REPO=https://github.com/azevedojoel/ms-365-mcp-server
+RUN rm -rf mcp-servers/ms-365-mcp-server && \
+    git clone --depth 1 ${MS365_MCP_REPO} mcp-servers/ms-365-mcp-server
+RUN cd mcp-servers/ms-365-mcp-server && npm install && npm run generate && npm run build
+
 RUN \
     # React client build with configurable memory
     NODE_OPTIONS="--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}" npm run frontend; \

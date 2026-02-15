@@ -80,6 +80,22 @@ If you use the Google Workspace MCP server (`mcpServers.google-workspace` in `li
      ```
    - Replace `YOUR-RAILWAY-URL` with your actual domain (e.g. `your-app.up.railway.app` or your custom domain).
 
+## Microsoft 365 MCP (OAuth)
+
+If you use the Microsoft 365 MCP server (`mcpServers.ms-365` in `librechat.yaml`), you must:
+
+1. Set `MS365_MCP_CLIENT_ID` and `MS365_MCP_CLIENT_SECRET` in Railway variables.
+2. In [Azure Portal](https://portal.azure.com) → Azure Active Directory → App registrations → New registration:
+   - Create an app (e.g. "LibreChat MS 365 MCP")
+   - Under Authentication → Add a platform → Web:
+     - Add this exact URL to **Redirect URIs**:
+       ```
+       https://YOUR-RAILWAY-URL/api/mcp/ms-365/oauth/callback
+       ```
+     - Replace `YOUR-RAILWAY-URL` with your actual domain (e.g. `your-app.up.railway.app` or your custom domain).
+   - Under API permissions → Add Microsoft Graph delegated permissions for the scopes used in `librechat.yaml` (e.g. User.Read, Mail.ReadWrite, Calendars.ReadWrite, Files.ReadWrite, etc.)
+   - Create a client secret under Certificates & secrets and use it as `MS365_MCP_CLIENT_SECRET`.
+
 ## allowedDomains (librechat.yaml)
 
 If you use Actions or features that connect to external domains, update `allowedDomains` in `librechat.yaml` for production:

@@ -160,6 +160,21 @@ mcpServers:
     env:
       GOOGLE_ACCESS_TOKEN: "{{LIBRECHAT_MCP_OAUTH_ACCESS_TOKEN}}"
       WORKSPACE_CLIENT_ID: '${GOOGLE_WORKSPACE_CLIENT_ID}'
+  ms-365:
+    type: stdio
+    command: node
+    args:
+      - ./mcp-servers/ms-365-mcp-server/dist/index.js
+    startup: false
+    outputFormatter: json-to-llm
+    oauth:
+      authorization_url: https://login.microsoftonline.com/common/oauth2/v2.0/authorize
+      token_url: https://login.microsoftonline.com/common/oauth2/v2.0/token
+      client_id: '${MS365_MCP_CLIENT_ID}'
+      client_secret: '${MS365_MCP_CLIENT_SECRET}'
+      scope: "User.Read Mail.Read Mail.ReadWrite Mail.Send Calendars.Read Calendars.ReadWrite Files.Read Files.ReadWrite Notes.Read Notes.Create Tasks.Read Tasks.ReadWrite Contacts.Read Contacts.ReadWrite People.Read offline_access"
+    env:
+      MS365_MCP_OAUTH_TOKEN: "{{LIBRECHAT_MCP_OAUTH_ACCESS_TOKEN}}"
 #   filesystem:
 #     type: stdio
 #     command: npx
