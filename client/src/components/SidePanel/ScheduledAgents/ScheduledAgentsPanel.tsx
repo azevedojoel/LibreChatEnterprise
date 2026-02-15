@@ -164,7 +164,7 @@ export default function ScheduledAgentsPanel() {
         <div className="mt-2 space-y-2">
           {schedules.length === 0 ? (
             <p className="text-sm text-text-secondary">
-              {localize('com_ui_no_conversation')}
+              {localize('com_sidepanel_scheduled_agents_no_schedules')}
             </p>
           ) : (
             schedules.map((schedule) => (
@@ -230,7 +230,7 @@ export default function ScheduledAgentsPanel() {
             <Spinner className="mx-auto my-4" />
           ) : runs.length === 0 ? (
             <p className="text-sm text-text-secondary">
-              {localize('com_ui_no_conversation')}
+              {localize('com_sidepanel_scheduled_agents_no_recent_runs')}
             </p>
           ) : (
             <div className="space-y-1">

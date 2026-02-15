@@ -91,6 +91,7 @@
     "@librechat/data-schemas": "*",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@smithy/node-http-handler": "^4.4.5",
+    "@toon-format/toon": "^0.8.0",
     "axios": "^1.13.5",
     "connect-redis": "^8.1.0",
     "eventsource": "^3.0.2",
