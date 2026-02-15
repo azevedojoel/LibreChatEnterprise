@@ -208,6 +208,10 @@ actions:
 
 # Example MCP Servers Object Structure
 # mcpServers:
+#   # outputFormatter: Transform raw tool output (e.g. JSON) for better LLM comprehension.
+#   #   - passthrough: No transformation (default)
+#   #   - json-to-llm: Converts JSON to human-readable key-value/bullet format
+#   #   - { module: "./path/to/formatter.js" }: Custom formatter (exports default function)
 #   everything:
 #     # type: sse # type can optionally be omitted
 #     url: http://localhost:3001/sse
