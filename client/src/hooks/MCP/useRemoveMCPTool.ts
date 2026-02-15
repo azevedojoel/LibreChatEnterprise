@@ -4,6 +4,7 @@ import { Constants } from 'librechat-data-provider';
 import { useToastContext } from '@librechat/client';
 import type { AgentForm } from '~/common';
 import { useLocalize } from '~/hooks';
+import { extractMCPServerFromToolId } from '~/utils/mcp';
 
 /**
  * Hook for removing MCP tools/servers from an agent
@@ -24,11 +25,13 @@ export function useRemoveMCPTool(options?: { showToast?: boolean }) {
 
       const currentTools = getValues('tools');
       const remainingToolIds =
-        currentTools?.filter(
-          (currentToolId) =>
-            currentToolId !== serverName &&
-            !currentToolId.endsWith(`${Constants.mcp_delimiter}${serverName}`),
-        ) || [];
+        currentTools?.filter((currentToolId) => {
+          if (!currentToolId) return true;
+          if (currentToolId === serverName) return false; // legacy: tool ID is server name
+          if (!currentToolId.includes(Constants.mcp_delimiter)) return true;
+          const extractedServer = extractMCPServerFromToolId(currentToolId);
+          return extractedServer !== serverName;
+        }) ?? [];
       setValue('tools', remainingToolIds, { shouldDirty: true });
 
       if (shouldShowToast) {

@@ -78,7 +78,9 @@ export default function ToolCall({
       return { function_name: '', domain: null, isMCPToolCall: false, mcpServerName: '' };
     }
     if (name.includes(Constants.mcp_delimiter)) {
-      const [func, server] = name.split(Constants.mcp_delimiter);
+      const parts = name.split(Constants.mcp_delimiter);
+      const server = parts.pop();
+      const func = parts.join(Constants.mcp_delimiter);
       return {
         function_name: func || '',
         domain: server && (server.replaceAll(actionDomainSeparator, '.') || null),

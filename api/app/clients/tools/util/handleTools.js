@@ -438,7 +438,9 @@ const loadTools = async ({
       };
       continue;
     } else if (tool && mcpToolPattern.test(tool)) {
-      const [toolName, serverName] = tool.split(Constants.mcp_delimiter);
+      const toolParts = tool.split(Constants.mcp_delimiter);
+      const serverName = toolParts.pop();
+      const toolName = toolParts.join(Constants.mcp_delimiter);
       if (toolName === Constants.mcp_server) {
         /** Placeholder used for UI purposes */
         continue;

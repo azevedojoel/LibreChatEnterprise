@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
-import { Constants } from 'librechat-data-provider';
 import type { TPlugin } from 'librechat-data-provider';
 import type { MCPServerInfo } from '~/common';
+import { extractMCPServerFromToolId } from '~/utils/mcp';
 
 interface VisibleToolsResult {
   toolIds: string[];
@@ -27,12 +27,10 @@ export function useVisibleTools(
     const regularToolIds: string[] = [];
 
     for (const toolId of selectedToolIds ?? []) {
-      // MCP tools/servers
-      if (toolId.includes(Constants.mcp_delimiter)) {
-        const serverName = toolId.split(Constants.mcp_delimiter)[1];
-        if (serverName) {
-          mcpServers.add(serverName);
-        }
+      // MCP tools/servers (server name is last segment - tool names can contain delimiter)
+      const serverName = extractMCPServerFromToolId(toolId);
+      if (serverName) {
+        mcpServers.add(serverName);
       }
       // Legacy MCP server check (just server name)
       else if (mcpServersMap.has(toolId)) {
