@@ -68,6 +68,25 @@ Build and deploy behavior comes from `railway.toml`. Env vars come from Railway 
 
 **Note:** `LIBRECHAT_CODE_LOCAL` in `.env.example` is not used by the codebase. Use `LIBRECHAT_CODE_API_KEY=local` instead to enable local code execution.
 
+## Google Workspace MCP (OAuth)
+
+If you use the Google Workspace MCP server (`mcpServers.google-workspace` in `librechat.yaml`), you must:
+
+1. Set `GOOGLE_WORKSPACE_CLIENT_ID` and `GOOGLE_WORKSPACE_CLIENT_SECRET` in Railway variables.
+2. In [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials → your OAuth client:
+   - Add this exact URL to **Authorized redirect URIs**:
+     ```
+     https://YOUR-RAILWAY-URL/api/mcp/google-workspace/oauth/callback
+     ```
+   - Replace `YOUR-RAILWAY-URL` with your actual domain (e.g. `your-app.up.railway.app` or your custom domain).
+
+## allowedDomains (librechat.yaml)
+
+If you use Actions or features that connect to external domains, update `allowedDomains` in `librechat.yaml` for production:
+
+- For default Railway URLs, add: `'*.up.railway.app'`
+- For a custom domain, add: `'*.yourdomain.com'` or the specific host
+
 ## Code Executor (execute_code)
 
 The code executor can run **locally** (Python in-process) or **remotely** (E2B, Replit, etc.):
