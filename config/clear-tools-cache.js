@@ -3,6 +3,7 @@
 /**
  * Clears the tools cache (available tools, MCP tools).
  * Use when tool definitions appear stale (e.g. wrong execute_code schema).
+ * Also clears the tools/plugins list cache so the agent tool selector refreshes.
  *
  * Usage:
  *   npm run clear-tools-cache
@@ -10,15 +11,23 @@
  */
 
 const path = require('path');
+const { CacheKeys } = require('librechat-data-provider');
 
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 require('module-alias')({ base: path.resolve(__dirname, '..', 'api') });
 
 const { invalidateCachedTools } = require('~/server/services/Config/getCachedTools');
+const getLogStores = require('~/cache/getLogStores');
 
 async function main() {
   await invalidateCachedTools({ invalidateGlobal: true });
+
+  const cache = getLogStores(CacheKeys.TOOL_CACHE);
+  await cache.delete(CacheKeys.TOOLS);
+  await cache.delete(CacheKeys.PLUGINS);
+
   console.log('✅ Tools cache cleared. Restart the backend to pick up changes.');
+  process.exit(0);
 }
 
 main().catch((err) => {
