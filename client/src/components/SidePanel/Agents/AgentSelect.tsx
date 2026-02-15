@@ -79,7 +79,8 @@ export default function AgentSelect({
           tool === Tools.create_file ||
           tool === Tools.delete_file ||
           tool === Tools.list_files ||
-          tool === Tools.search_files
+          tool === Tools.search_files ||
+          tool === Tools.glob_files
         ) {
           capabilities[AgentCapabilities.execute_code] = true;
           return;

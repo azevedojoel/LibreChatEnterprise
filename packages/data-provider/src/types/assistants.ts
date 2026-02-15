@@ -30,6 +30,7 @@ export enum Tools {
   delete_file = 'delete_file',
   list_files = 'list_files',
   search_files = 'search_files',
+  glob_files = 'glob_files',
 }
 
 export enum EToolResources {

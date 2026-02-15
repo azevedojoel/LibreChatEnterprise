@@ -447,6 +447,7 @@ export default function AgentPanel() {
           Tools.delete_file,
           Tools.list_files,
           Tools.search_files,
+          Tools.glob_files,
         ].filter((t): t is string => t != null && t !== '');
         tools.push(...workspaceTools);
       }

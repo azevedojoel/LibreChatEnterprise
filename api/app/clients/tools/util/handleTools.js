@@ -296,7 +296,8 @@ const loadTools = async ({
       tool === Tools.create_file ||
       tool === Tools.delete_file ||
       tool === Tools.list_files ||
-      tool === Tools.search_files
+      tool === Tools.search_files ||
+      tool === Tools.glob_files
     ) {
       const conversationId =
         options.req?.body?.conversationId ?? options.conversationId;
@@ -328,6 +329,7 @@ const loadTools = async ({
         createFileTool,
         deleteFileTool,
         listFilesTool,
+        globFilesTool,
         searchFilesTool,
       ] = createWorkspaceCodeEditTools({ workspaceRoot });
       const toolMap = {
@@ -337,6 +339,7 @@ const loadTools = async ({
         [Tools.delete_file]: deleteFileTool,
         [Tools.list_files]: listFilesTool,
         [Tools.search_files]: searchFilesTool,
+        [Tools.glob_files]: globFilesTool,
       };
       requestedTools[tool] = async () => {
         await ensureWorkspaceInjected();

@@ -4,7 +4,15 @@
 const fs = require('fs').promises;
 const path = require('path');
 const os = require('os');
-const { readFile, editFile, createFile, deleteFile, listFiles, searchFiles } = require('../executor');
+const {
+  readFile,
+  editFile,
+  createFile,
+  deleteFile,
+  listFiles,
+  globFiles,
+  searchFiles,
+} = require('../executor');
 
 describe('WorkspaceCodeEdit', () => {
   let workspaceRoot;
@@ -39,6 +47,78 @@ describe('WorkspaceCodeEdit', () => {
       await fs.mkdir(path.join(workspaceRoot, 'dir'), { recursive: true });
       const r = await readFile({ workspaceRoot, relativePath: 'dir' });
       expect(r.error).toContain('not a file');
+    });
+
+    it('should read line range with start_line and end_line', async () => {
+      await fs.writeFile(
+        path.join(workspaceRoot, 'lines.txt'),
+        'L1\nL2\nL3\nL4\nL5',
+        'utf8',
+      );
+      const r = await readFile({
+        workspaceRoot,
+        relativePath: 'lines.txt',
+        startLine: 2,
+        endLine: 4,
+      });
+      expect(r.content).toBe('L2\nL3\nL4');
+    });
+
+    it('should return error when start_line > end_line', async () => {
+      await fs.writeFile(path.join(workspaceRoot, 'a.txt'), 'x', 'utf8');
+      const r = await readFile({
+        workspaceRoot,
+        relativePath: 'a.txt',
+        startLine: 3,
+        endLine: 1,
+      });
+      expect(r.error).toContain('start_line');
+    });
+
+    it('should read from start_line to end when only start_line provided', async () => {
+      await fs.writeFile(
+        path.join(workspaceRoot, 'lines.txt'),
+        'L1\nL2\nL3\nL4\nL5',
+        'utf8',
+      );
+      const r = await readFile({
+        workspaceRoot,
+        relativePath: 'lines.txt',
+        startLine: 4,
+      });
+      expect(r.content).toBe('L4\nL5');
+    });
+
+    it('should read from start to end_line when only end_line provided', async () => {
+      await fs.writeFile(
+        path.join(workspaceRoot, 'lines.txt'),
+        'L1\nL2\nL3\nL4\nL5',
+        'utf8',
+      );
+      const r = await readFile({
+        workspaceRoot,
+        relativePath: 'lines.txt',
+        endLine: 2,
+      });
+      expect(r.content).toBe('L1\nL2');
+    });
+
+    it('should return error for invalid start_line or end_line', async () => {
+      await fs.writeFile(path.join(workspaceRoot, 'a.txt'), 'x', 'utf8');
+      const r1 = await readFile({
+        workspaceRoot,
+        relativePath: 'a.txt',
+        startLine: 0,
+        endLine: 1,
+      });
+      expect(r1.error).toContain('positive integers');
+      const r2 = await readFile({
+        workspaceRoot,
+        relativePath: 'a.txt',
+        startLine: 2.5,
+        endLine: 3,
+      });
+      expect(r2.error).toContain('positive integers');
     });
   });
 
@@ -187,6 +267,46 @@ describe('WorkspaceCodeEdit', () => {
     });
   });
 
+  describe('globFiles', () => {
+    it('should find files matching glob pattern', async () => {
+      await fs.writeFile(path.join(workspaceRoot, 'a.py'), 'x', 'utf8');
+      await fs.writeFile(path.join(workspaceRoot, 'b.py'), 'y', 'utf8');
+      await fs.writeFile(path.join(workspaceRoot, 'c.txt'), 'z', 'utf8');
+      const r = await globFiles({ workspaceRoot, pattern: '*.py', relativePath: '.' });
+      expect(r.paths).toBeDefined();
+      expect(r.paths.length).toBe(2);
+      expect(r.paths.sort()).toEqual(['a.py', 'b.py']);
+    });
+
+    it('should find files in subdirectory with **', async () => {
+      await fs.mkdir(path.join(workspaceRoot, 'src'), { recursive: true });
+      await fs.writeFile(path.join(workspaceRoot, 'src', 'index.ts'), 'x', 'utf8');
+      const r = await globFiles({ workspaceRoot, pattern: '**/*.ts', relativePath: '.' });
+      expect(r.paths.length).toBe(1);
+      expect(r.paths[0]).toBe('src/index.ts');
+    });
+
+    it('should return error for non-directory', async () => {
+      await fs.writeFile(path.join(workspaceRoot, 'f.txt'), 'x', 'utf8');
+      const r = await globFiles({ workspaceRoot, pattern: '*', relativePath: 'f.txt' });
+      expect(r.error).toContain('not a directory');
+    });
+
+    it('should respect maxResults', async () => {
+      for (let i = 0; i < 10; i++) {
+        await fs.writeFile(path.join(workspaceRoot, `f${i}.txt`), 'x', 'utf8');
+      }
+      const r = await globFiles({ workspaceRoot, pattern: '*.txt', relativePath: '.', maxResults: 3 });
+      expect(r.paths.length).toBe(3);
+    });
+
+    it('should return empty paths for pattern with no matches', async () => {
+      await fs.writeFile(path.join(workspaceRoot, 'a.py'), 'x', 'utf8');
+      const r = await globFiles({ workspaceRoot, pattern: '*.nonexistent', relativePath: '.' });
+      expect(r.paths).toEqual([]);
+    });
+  });
+
   describe('searchFiles', () => {
     it('should find pattern in files', async () => {
       await fs.writeFile(path.join(workspaceRoot, 'a.py'), 'def foo():\n  pass', 'utf8');
@@ -206,6 +326,81 @@ describe('WorkspaceCodeEdit', () => {
       });
       expect(r.matches.length).toBe(1);
       expect(r.matches[0].path).toBe('a.py');
+    });
+
+    it('should support regex with useRegex', async () => {
+      await fs.writeFile(path.join(workspaceRoot, 'a.txt'), 'foo123\nbar456\nbaz', 'utf8');
+      const r = await searchFiles({
+        workspaceRoot,
+        pattern: '\\d{3}',
+        relativePath: '.',
+        useRegex: true,
+      });
+      expect(r.matches.length).toBe(2);
+    });
+
+    it('should support case-insensitive search', async () => {
+      await fs.writeFile(path.join(workspaceRoot, 'a.txt'), 'FOO\nbar\nBar', 'utf8');
+      const r = await searchFiles({
+        workspaceRoot,
+        pattern: 'bar',
+        relativePath: '.',
+        caseSensitive: false,
+      });
+      expect(r.matches.length).toBe(2);
+    });
+
+    it('should include context lines when contextLines > 0', async () => {
+      await fs.writeFile(
+        path.join(workspaceRoot, 'a.txt'),
+        'line1\nline2\nline3 MATCH\nline4\nline5',
+        'utf8',
+      );
+      const r = await searchFiles({
+        workspaceRoot,
+        pattern: 'MATCH',
+        relativePath: '.',
+        contextLines: 1,
+      });
+      expect(r.matches.length).toBe(1);
+      expect(r.matches[0].contextBefore).toEqual(['line2']);
+      expect(r.matches[0].contextAfter).toEqual(['line4']);
+    });
+
+    it('should return error for invalid regex', async () => {
+      const r = await searchFiles({
+        workspaceRoot,
+        pattern: '[invalid',
+        relativePath: '.',
+        useRegex: true,
+      });
+      expect(r.error).toContain('Invalid regex');
+    });
+
+    it('should omit contextBefore when match at first line', async () => {
+      await fs.writeFile(path.join(workspaceRoot, 'a.txt'), 'MATCH first\nline2\nline3', 'utf8');
+      const r = await searchFiles({
+        workspaceRoot,
+        pattern: 'MATCH',
+        relativePath: '.',
+        contextLines: 1,
+      });
+      expect(r.matches.length).toBe(1);
+      expect(r.matches[0].contextBefore).toBeUndefined();
+      expect(r.matches[0].contextAfter).toEqual(['line2']);
+    });
+
+    it('should omit contextAfter when match at last line', async () => {
+      await fs.writeFile(path.join(workspaceRoot, 'a.txt'), 'line1\nline2\nMATCH last', 'utf8');
+      const r = await searchFiles({
+        workspaceRoot,
+        pattern: 'MATCH',
+        relativePath: '.',
+        contextLines: 1,
+      });
+      expect(r.matches.length).toBe(1);
+      expect(r.matches[0].contextBefore).toEqual(['line2']);
+      expect(r.matches[0].contextAfter).toBeUndefined();
     });
   });
 });

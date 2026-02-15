@@ -640,13 +640,22 @@ Generated image IDs will be returned in the response, so you can refer to them i
 /** Workspace code edit tools - use conversation-scoped workspace derived at runtime */
 const readFileDefinition: ToolRegistryDefinition = {
   name: 'read_file',
-  description: 'Read the contents of a file. Path is relative to the workspace root.',
+  description:
+    'Read file contents. Path is relative to workspace root. Use when: inspecting a file, verifying edits, or reading a specific section. Optionally use start_line and end_line (1-based, inclusive) to read a range—helps with large files.',
   schema: {
     type: 'object',
     properties: {
       path: {
         type: 'string',
         description: 'File path relative to workspace root',
+      },
+      start_line: {
+        type: 'number',
+        description: '1-based start line (inclusive). Both inclusive. Omit both for full file. Provide both together for a range, or omit both.',
+      },
+      end_line: {
+        type: 'number',
+        description: '1-based end line (inclusive). Provide both with start_line for a range; for single line use start_line = end_line.',
       },
     },
     required: ['path'],
@@ -657,7 +666,7 @@ const readFileDefinition: ToolRegistryDefinition = {
 const editFileDefinition: ToolRegistryDefinition = {
   name: 'edit_file',
   description:
-    'Replace exact old_string with new_string in a file. old_string must match exactly once.',
+    'Replace exact old_string with new_string in a file. old_string must match exactly once. Fails if old_string appears 0 or 2+ times; use search_files first to verify. Whitespace must match exactly.',
   schema: {
     type: 'object',
     properties: {
@@ -681,7 +690,8 @@ const editFileDefinition: ToolRegistryDefinition = {
 
 const createFileDefinition: ToolRegistryDefinition = {
   name: 'create_file',
-  description: 'Create or overwrite a file. Parent directories are created if needed.',
+  description:
+    'Create or overwrite a file. Overwrites if file exists. Parent directories created if needed.',
   schema: {
     type: 'object',
     properties: {
@@ -701,7 +711,8 @@ const createFileDefinition: ToolRegistryDefinition = {
 
 const deleteFileDefinition: ToolRegistryDefinition = {
   name: 'delete_file',
-  description: 'Delete a file. Use for cleanup. Path is relative to workspace root.',
+  description:
+    'Delete a file. Permanent. Prefer for temporary/scratch files; confirm path before deleting. Path is relative to workspace root.',
   schema: {
     type: 'object',
     properties: {
@@ -718,17 +729,18 @@ const deleteFileDefinition: ToolRegistryDefinition = {
 const listFilesDefinition: ToolRegistryDefinition = {
   name: 'list_files',
   description:
-    'List files and directories. Use to discover files before reading or editing.',
+    'List files and subdirectories in one directory. Use when: exploring a known path; use glob_files when you need pattern-based discovery (e.g. *.py). For Code Interpreter: use path "output" for uploads and generated files.',
   schema: {
     type: 'object',
     properties: {
       path: {
         type: 'string',
-        description: 'Directory path relative to workspace root (default: ".")',
+        description:
+          'Directory path relative to workspace root. Use "." for root; use "output" for Code Interpreter uploads and generated files (default: ".")',
       },
       extension: {
         type: 'string',
-        description: 'Filter by extension (e.g. "py" for *.py)',
+        description: 'Extension without leading dot (e.g. "py" means *.py)',
       },
     },
   } as ExtendedJsonSchema,
@@ -737,13 +749,14 @@ const listFilesDefinition: ToolRegistryDefinition = {
 
 const searchFilesDefinition: ToolRegistryDefinition = {
   name: 'search_files',
-  description: 'Search file contents for a pattern. Useful for finding definitions or usages.',
+  description:
+    'Search file contents for a pattern. Returns path:line: content per match. Use when: finding definitions, usages, references, or debugging. Supports literal (default) or regex (use_regex=true), context_lines for surrounding lines, case_sensitive. With context_lines > 0, output includes path:line blocks separated by ---.',
   schema: {
     type: 'object',
     properties: {
       pattern: {
         type: 'string',
-        description: 'Search pattern (literal string)',
+        description: 'Search pattern (literal or regex when use_regex=true)',
       },
       path: {
         type: 'string',
@@ -751,11 +764,49 @@ const searchFilesDefinition: ToolRegistryDefinition = {
       },
       extension: {
         type: 'string',
-        description: 'Filter by extension (e.g. "py")',
+        description: 'Extension without leading dot (e.g. "py" means *.py)',
       },
       max_results: {
         type: 'number',
         description: 'Maximum matches to return (default: 50)',
+      },
+      use_regex: {
+        type: 'boolean',
+        description: 'Treat pattern as regex (default: false)',
+      },
+      context_lines: {
+        type: 'number',
+        description:
+          'Lines before/after each match. Output format: path:line: content per line, with --- between match blocks (default: 0)',
+      },
+      case_sensitive: {
+        type: 'boolean',
+        description: 'Case-sensitive match (default: true)',
+      },
+    },
+    required: ['pattern'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const globFilesDefinition: ToolRegistryDefinition = {
+  name: 'glob_files',
+  description:
+    'Find files matching a glob pattern (e.g. *.py, src/**/*.ts). Use when: discovering files by pattern (all tests, configs, etc.). Prefer over list_files when you need pattern matching across subdirectories. Path: directory to search (default "."). Results limited to max_results (default 200).',
+  schema: {
+    type: 'object',
+    properties: {
+      pattern: {
+        type: 'string',
+        description: 'Glob pattern (e.g. "*.py", "src/**/*.ts")',
+      },
+      path: {
+        type: 'string',
+        description: 'Directory to search (default: ".")',
+      },
+      max_results: {
+        type: 'number',
+        description: 'Maximum files to return (default: 200)',
       },
     },
     required: ['pattern'],
@@ -771,6 +822,7 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
   delete_file: deleteFileDefinition,
   list_files: listFilesDefinition,
   search_files: searchFilesDefinition,
+  glob_files: globFilesDefinition,
   [CalculatorToolDefinition.name]: {
     name: CalculatorToolDefinition.name,
     description: CalculatorToolDefinition.description,
@@ -816,6 +868,7 @@ export function getWorkspaceCodeEditToolDefinitions() {
     createFileDefinition,
     deleteFileDefinition,
     listFilesDefinition,
+    globFilesDefinition,
     searchFilesDefinition,
   ];
 }

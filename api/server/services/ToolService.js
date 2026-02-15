@@ -414,6 +414,7 @@ const nativeTools = new Set([
   Tools.delete_file,
   Tools.list_files,
   Tools.search_files,
+  Tools.glob_files,
 ]);
 
 /** Checks if a tool name is a known built-in tool */
@@ -476,19 +477,41 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
       Tools.delete_file,
       Tools.list_files,
       Tools.search_files,
+      Tools.glob_files,
     ];
     toolsToFilter = [...new Set([...toolsToFilter, ...workspaceTools])];
+  }
+
+  /** Filter by ephemeralAgent (chat badge overrides) */
+  const ephemeralAgent = req?.body?.ephemeralAgent;
+  if (Array.isArray(ephemeralAgent?.mcp)) {
+    toolsToFilter = toolsToFilter.filter((tool) => {
+      if (typeof tool !== 'string' || !tool.includes(Constants.mcp_delimiter)) {
+        return true;
+      }
+      const serverName = tool.split(Constants.mcp_delimiter).pop();
+      return ephemeralAgent.mcp.includes(serverName);
+    });
   }
 
   const filteredTools = toolsToFilter.filter((tool) => {
     if (tool == null || typeof tool !== 'string') return false;
     if (tool === Tools.file_search) {
+      if (ephemeralAgent != null && 'file_search' in ephemeralAgent) {
+        return ephemeralAgent.file_search === true;
+      }
       return checkCapability(AgentCapabilities.file_search);
     }
     if (tool === Tools.execute_code) {
+      if (ephemeralAgent != null && 'execute_code' in ephemeralAgent) {
+        return ephemeralAgent.execute_code === true;
+      }
       return checkCapability(AgentCapabilities.execute_code);
     }
     if (tool === Tools.web_search) {
+      if (ephemeralAgent != null && 'web_search' in ephemeralAgent) {
+        return ephemeralAgent.web_search === true;
+      }
       return checkCapability(AgentCapabilities.web_search);
     }
     if (
@@ -496,8 +519,12 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
       tool === Tools.edit_file ||
       tool === Tools.create_file ||
       tool === Tools.list_files ||
-      tool === Tools.search_files
+      tool === Tools.search_files ||
+      tool === Tools.glob_files
     ) {
+      if (ephemeralAgent != null && 'execute_code' in ephemeralAgent) {
+        return ephemeralAgent.execute_code === true;
+      }
       return checkCapability(AgentCapabilities.execute_code);
     }
     if (!areToolsEnabled && !tool.includes(actionDelimiter)) {
@@ -728,7 +755,8 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
       filteredTools.includes(Tools.create_file) ||
       filteredTools.includes(Tools.delete_file) ||
       filteredTools.includes(Tools.list_files) ||
-      filteredTools.includes(Tools.search_files));
+      filteredTools.includes(Tools.search_files) ||
+      filteredTools.includes(Tools.glob_files));
 
   if (hasWebSearch) {
     toolContextMap[Tools.web_search] = buildWebSearchContext();
@@ -746,6 +774,7 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
       toolContextMap[Tools.delete_file] =
       toolContextMap[Tools.list_files] =
       toolContextMap[Tools.search_files] =
+      toolContextMap[Tools.glob_files] =
         '- Workspace: conversation-scoped (shared with execute_code)';
   }
 
@@ -876,20 +905,43 @@ async function loadAgentTools({
       Tools.delete_file,
       Tools.list_files,
       Tools.search_files,
+      Tools.glob_files,
     ];
     toolsToFilter = [
       ...new Set([...toolsToFilter, ...workspaceTools]),
     ];
   }
 
+  /** Filter by ephemeralAgent (chat badge overrides) */
+  const ephemeralAgent = req?.body?.ephemeralAgent;
+  if (Array.isArray(ephemeralAgent?.mcp)) {
+    toolsToFilter = toolsToFilter.filter((tool) => {
+      if (typeof tool !== 'string' || !tool.includes(Constants.mcp_delimiter)) {
+        return true;
+      }
+      const serverName = tool.split(Constants.mcp_delimiter).pop();
+      return ephemeralAgent.mcp.includes(serverName);
+    });
+  }
+
   let includesWebSearch = false;
   const _agentTools = toolsToFilter.filter((tool) => {
     if (tool == null || typeof tool !== 'string') return false;
     if (tool === Tools.file_search) {
+      if (ephemeralAgent != null && 'file_search' in ephemeralAgent) {
+        return ephemeralAgent.file_search === true;
+      }
       return checkCapability(AgentCapabilities.file_search);
     } else if (tool === Tools.execute_code) {
+      if (ephemeralAgent != null && 'execute_code' in ephemeralAgent) {
+        return ephemeralAgent.execute_code === true;
+      }
       return checkCapability(AgentCapabilities.execute_code);
     } else if (tool === Tools.web_search) {
+      if (ephemeralAgent != null && 'web_search' in ephemeralAgent) {
+        includesWebSearch = ephemeralAgent.web_search === true;
+        return includesWebSearch;
+      }
       includesWebSearch = checkCapability(AgentCapabilities.web_search);
       return includesWebSearch;
     } else if (
@@ -898,8 +950,12 @@ async function loadAgentTools({
       tool === Tools.create_file ||
       tool === Tools.delete_file ||
       tool === Tools.list_files ||
-      tool === Tools.search_files
+      tool === Tools.search_files ||
+      tool === Tools.glob_files
     ) {
+      if (ephemeralAgent != null && 'execute_code' in ephemeralAgent) {
+        return ephemeralAgent.execute_code === true;
+      }
       return checkCapability(AgentCapabilities.execute_code);
     } else if (!areToolsEnabled && !tool.includes(actionDelimiter)) {
       return false;
@@ -973,7 +1029,8 @@ async function loadAgentTools({
         tool.name === Tools.create_file ||
         tool.name === Tools.delete_file ||
         tool.name === Tools.list_files ||
-        tool.name === Tools.search_files)
+        tool.name === Tools.search_files ||
+        tool.name === Tools.glob_files)
     ) {
       agentTools.push(tool);
       continue;
