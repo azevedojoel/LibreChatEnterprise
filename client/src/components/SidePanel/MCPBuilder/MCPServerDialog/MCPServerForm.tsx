@@ -11,14 +11,34 @@ interface MCPServerFormProps {
 }
 
 export default function MCPServerForm({ formHook }: MCPServerFormProps) {
-  const { methods, isEditMode, server } = formHook;
+  const {
+    methods,
+    isEditMode,
+    server,
+    discoveryResult,
+    discoveryError,
+    clearDiscoveryError,
+    isDiscovering,
+    isConnecting,
+    handleDiscover,
+    handleConnectFromDiscovery,
+  } = formHook;
 
   return (
     <FormProvider {...methods}>
       <div className="space-y-4 px-1 py-1">
         <BasicInfoSection />
 
-        <ConnectionSection />
+        <ConnectionSection
+          isEditMode={isEditMode}
+          discoveryResult={discoveryResult}
+          discoveryError={discoveryError}
+          clearDiscoveryError={clearDiscoveryError}
+          isDiscovering={isDiscovering}
+          isConnecting={isConnecting}
+          onDiscover={handleDiscover}
+          onConnect={handleConnectFromDiscovery}
+        />
 
         <TransportSection />
 

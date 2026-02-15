@@ -66,7 +66,8 @@ export function buildToolRegistryFromAgentOptions(
         ? agentOptions.allowed_callers
         : ['direct'];
 
-    const defer_loading = agentOptions?.defer_loading === true;
+    /** Default true for MCP tools; only explicit false opts out */
+    const defer_loading = agentOptions?.defer_loading === false ? false : true;
 
     const toolDef: LCTool = {
       name,
@@ -166,6 +167,7 @@ function buildToolRegistry(
       parameters: toolDef.parameters,
       serverName: toolDef.serverName,
       toolType: 'mcp',
+      defer_loading: true,
     });
   }
   return registry;

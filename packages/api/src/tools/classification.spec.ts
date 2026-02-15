@@ -45,14 +45,14 @@ describe('classification.ts', () => {
       expect(registry.get('tool2')?.defer_loading).toBe(false);
     });
 
-    it('should default defer_loading to false when not specified', () => {
+    it('should default defer_loading to true for MCP tools when not specified', () => {
       const tools = [{ name: 'tool1', description: 'Tool 1' }];
 
       const agentToolOptions: AgentToolOptions = {};
 
       const registry = buildToolRegistryFromAgentOptions(tools, agentToolOptions);
 
-      expect(registry.get('tool1')?.defer_loading).toBe(false);
+      expect(registry.get('tool1')?.defer_loading).toBe(true);
     });
 
     it('should use agent allowed_callers when specified', () => {
@@ -270,6 +270,23 @@ describe('classification.ts', () => {
       });
 
       expect(result.hasDeferredTools).toBe(true);
+    });
+
+    it('should default MCP tools to deferred when no agentToolOptions provided', async () => {
+      const loadedTools: GenericTool[] = [createMCPTool('tool1'), createMCPTool('tool2')];
+
+      const result = await buildToolClassification({
+        loadedTools,
+        userId: 'user1',
+        agentId: 'agent1',
+        deferredToolsEnabled: true,
+        loadAuthValues: mockLoadAuthValues,
+      });
+
+      expect(result.hasDeferredTools).toBe(true);
+      expect(result.toolRegistry?.get('tool1')?.defer_loading).toBe(true);
+      expect(result.toolRegistry?.get('tool2')?.defer_loading).toBe(true);
+      expect(result.additionalTools.some((t) => t.name === 'tool_search')).toBe(true);
     });
 
     it('should return early when no MCP tools are present', async () => {

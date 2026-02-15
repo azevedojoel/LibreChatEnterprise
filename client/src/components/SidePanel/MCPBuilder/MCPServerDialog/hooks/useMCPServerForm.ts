@@ -3,9 +3,13 @@ import { useForm } from 'react-hook-form';
 import type { MCPServerCreateParams } from 'librechat-data-provider';
 import {
   useCreateMCPServerMutation,
+  useDiscoverMCPServerMutation,
   useUpdateMCPServerMutation,
   useDeleteMCPServerMutation,
+  DISCOVERY_TIMEOUT_CODE,
 } from '~/data-provider/MCP';
+import { useReinitializeMCPServerMutation } from 'librechat-data-provider/react-query';
+import type { MCPServerDiscoverResponse } from 'librechat-data-provider';
 import { useToastContext } from '@librechat/client';
 import { useLocalize } from '~/hooks';
 import { extractServerNameFromUrl, isValidUrl, normalizeUrl } from '../utils/urlUtils';
@@ -53,7 +57,11 @@ export interface MCPServerFormData {
 
 interface UseMCPServerFormProps {
   server?: MCPServerDefinition | null;
-  onSuccess?: (serverName: string, isOAuth: boolean) => void;
+  onSuccess?: (
+    serverName: string,
+    isOAuth: boolean,
+    options?: { connectFromDiscovery?: boolean },
+  ) => void;
   onClose?: () => void;
 }
 
@@ -63,12 +71,17 @@ export function useMCPServerForm({ server, onSuccess, onClose }: UseMCPServerFor
 
   // Mutations
   const createMutation = useCreateMCPServerMutation();
+  const discoverMutation = useDiscoverMCPServerMutation();
   const updateMutation = useUpdateMCPServerMutation();
   const deleteMutation = useDeleteMCPServerMutation();
+  const reinitializeMutation = useReinitializeMCPServerMutation();
 
   // State
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [discoveryResult, setDiscoveryResult] = useState<MCPServerDiscoverResponse | null>(null);
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
 
   // Check if editing existing server
   const isEditMode = !!server;
@@ -77,7 +90,7 @@ export function useMCPServerForm({ server, onSuccess, onClose }: UseMCPServerFor
   const defaultValues = useMemo<MCPServerFormData>(() => {
     if (server) {
       let authType = AuthTypeEnum.None;
-      if (server.config.oauth) {
+      if (server.config.oauth || server.config.requiresOAuth) {
         authType = AuthTypeEnum.OAuth;
       } else if ('apiKey' in server.config && server.config.apiKey) {
         authType = AuthTypeEnum.ServiceHttp;
@@ -168,8 +181,77 @@ export function useMCPServerForm({ server, onSuccess, onClose }: UseMCPServerFor
 
   // Reset form when dialog opens
   const resetForm = useCallback(() => {
+    setDiscoveryResult(null);
+    setDiscoveryError(null);
     reset(defaultValues);
   }, [reset, defaultValues]);
+
+  // Clear discovery error when URL changes
+  useEffect(() => {
+    setDiscoveryError(null);
+  }, [watchedUrl]);
+
+  // Handle URL discovery (create mode only)
+  const handleDiscover = useCallback(async () => {
+    const url = getValues('url');
+    const normalizedUrl = normalizeUrl(url);
+    if (!isValidUrl(normalizedUrl)) {
+      showToast({
+        message: localize('com_ui_mcp_invalid_url'),
+        status: 'error',
+      });
+      return;
+    }
+
+    setDiscoveryError(null);
+
+    try {
+      const result = await discoverMutation.mutateAsync(normalizedUrl);
+      setDiscoveryResult(result);
+      setDiscoveryError(null);
+      setValue('title', result.suggestedTitle || extractServerNameFromUrl(normalizedUrl), {
+        shouldValidate: true,
+      });
+      setValue('type', result.transport);
+      if (result.requiresOAuth) {
+        setValue('auth.auth_type', AuthTypeEnum.OAuth);
+      }
+      showToast({
+        message:
+          result.tools.length === 0 && result.requiresOAuth
+            ? localize('com_ui_mcp_auth_required_discovery')
+            : localize('com_ui_mcp_discovery_success', { 0: result.tools.length }),
+        status: 'success',
+      });
+    } catch (error: unknown) {
+      discoverMutation.reset();
+      let errorMessage = localize('com_ui_mcp_server_connection_failed');
+      if (error instanceof Error && error.message === DISCOVERY_TIMEOUT_CODE) {
+        errorMessage = localize('com_ui_mcp_discovery_timeout');
+      } else if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as {
+          response?: { data?: { error?: string; message?: string } };
+        };
+        if (axiosError.response?.data?.error === 'MCP_DOMAIN_NOT_ALLOWED') {
+          errorMessage = localize('com_ui_mcp_domain_not_allowed');
+        } else if (axiosError.response?.data?.message) {
+          errorMessage = axiosError.response.data.message;
+        } else if (axiosError.response?.data?.error) {
+          errorMessage = axiosError.response.data.error;
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      setDiscoveryError(errorMessage);
+      showToast({ message: errorMessage, status: 'error' });
+    }
+  }, [
+    getValues,
+    setValue,
+    discoverMutation,
+    showToast,
+    localize,
+  ]);
 
   // Handle form submission
   const onSubmit = methods.handleSubmit(async (formData: MCPServerFormData) => {
@@ -298,11 +380,76 @@ export function useMCPServerForm({ server, onSuccess, onClose }: UseMCPServerFor
     }
   }, [server, deleteMutation, showToast, localize, onClose]);
 
+  // Create server + start OAuth in one flow (Connect from discovery)
+  const handleConnectFromDiscovery = useCallback(async () => {
+    const formData = getValues();
+    const normalizedUrl = normalizeUrl(formData.url);
+    if (!formData.url || !isValidUrl(normalizedUrl)) {
+      showToast({ message: localize('com_ui_mcp_invalid_url'), status: 'error' });
+      return;
+    }
+    if (!formData.title?.trim()) {
+      showToast({ message: localize('com_ui_field_required'), status: 'error' });
+      return;
+    }
+
+    setIsConnecting(true);
+    try {
+      const config: Record<string, unknown> = {
+        type: formData.type,
+        url: normalizedUrl,
+        title: formData.title.trim(),
+        oauth: {}, // Empty oauth triggers backend OAuth discovery on 401
+        ...(formData.description && { description: formData.description }),
+        ...(formData.icon && { iconPath: formData.icon }),
+      };
+      const result = await createMutation.mutateAsync({ config });
+
+      const reinitResponse = await reinitializeMutation.mutateAsync(result.serverName);
+      if (reinitResponse.oauthRequired && reinitResponse.oauthUrl) {
+        window.open(reinitResponse.oauthUrl, '_blank', 'noopener,noreferrer');
+      }
+      showToast({ message: localize('com_ui_mcp_server_created'), status: 'success' });
+      onSuccess?.(result.serverName, true, { connectFromDiscovery: true });
+    } catch (error: unknown) {
+      let errorMessage = localize('com_ui_error');
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as { response?: { data?: { error?: string } } };
+        if (axiosError.response?.data?.error === 'MCP_INSPECTION_FAILED') {
+          errorMessage = localize('com_ui_mcp_server_connection_failed');
+        } else if (axiosError.response?.data?.error === 'MCP_DOMAIN_NOT_ALLOWED') {
+          errorMessage = localize('com_ui_mcp_domain_not_allowed');
+        } else if (axiosError.response?.data?.error) {
+          errorMessage = axiosError.response.data.error;
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      showToast({ message: errorMessage, status: 'error' });
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [
+    getValues,
+    createMutation,
+    reinitializeMutation,
+    showToast,
+    localize,
+    onSuccess,
+  ]);
+
   return {
     methods,
     isEditMode,
     isSubmitting,
     isDeleting,
+    isConnecting,
+    discoveryResult,
+    discoveryError,
+    clearDiscoveryError: () => setDiscoveryError(null),
+    isDiscovering: discoverMutation.isLoading && !discoverMutation.isError,
+    handleDiscover,
+    handleConnectFromDiscovery,
     onSubmit,
     handleDelete,
     resetForm,

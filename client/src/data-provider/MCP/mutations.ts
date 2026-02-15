@@ -2,6 +2,41 @@ import { useMutation, useQueryClient, UseMutationResult } from '@tanstack/react-
 import { dataService, QueryKeys, ResourceType } from 'librechat-data-provider';
 import type * as t from 'librechat-data-provider';
 
+/** Error code for discovery timeout (use i18n key com_ui_mcp_discovery_timeout for display) */
+export const DISCOVERY_TIMEOUT_CODE = 'MCP_DISCOVERY_TIMEOUT';
+
+const DISCOVERY_TIMEOUT_MS = 25000;
+
+/**
+ * Hook for discovering an MCP server from URL (read-only, does not create)
+ */
+export const useDiscoverMCPServerMutation = (options?: {
+  onMutate?: (variables: string) => void;
+  onSuccess?: (
+    data: t.MCPServerDiscoverResponse,
+    variables: string,
+    context: unknown,
+  ) => void;
+  onError?: (error: Error, variables: string, context: unknown) => void;
+}): UseMutationResult<t.MCPServerDiscoverResponse, Error, string> => {
+  return useMutation(
+    (url: string) => {
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(
+          () => reject(new Error(DISCOVERY_TIMEOUT_CODE)),
+          DISCOVERY_TIMEOUT_MS,
+        );
+      });
+      return Promise.race([dataService.discoverMCPServer(url), timeoutPromise]);
+    },
+    {
+    onMutate: (variables) => options?.onMutate?.(variables),
+    onError: (error, variables, context) => options?.onError?.(error, variables, context),
+    onSuccess: (data, variables, context) => options?.onSuccess?.(data, variables, context),
+  },
+  );
+};
+
 /**
  * Hook for creating a new MCP server
  */

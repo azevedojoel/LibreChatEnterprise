@@ -382,7 +382,9 @@ async function createMCPTool({
   config,
   streamId = null,
 }) {
-  const [toolName, serverName] = toolKey.split(Constants.mcp_delimiter);
+  const parts = toolKey.split(Constants.mcp_delimiter);
+  const serverName = parts.pop();
+  const toolName = parts.join(Constants.mcp_delimiter);
 
   // Runtime domain validation: check if the server's domain is still allowed
   // Use getAppConfig() to support per-user/role domain restrictions

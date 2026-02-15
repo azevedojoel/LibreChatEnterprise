@@ -55,8 +55,13 @@ export default function MCPServerDialog({
   // Form hook
   const formHook = useMCPServerForm({
     server,
-    onSuccess: (serverName, isOAuth) => {
-      if (isOAuth) {
+    onSuccess: (serverName, isOAuth, options) => {
+      if (options?.connectFromDiscovery) {
+        onOpenChange(false);
+        setTimeout(() => {
+          triggerRef?.current?.focus();
+        }, 0);
+      } else if (isOAuth) {
         setCreatedServerId(serverName);
         setShowRedirectUriDialog(true);
       } else {
@@ -74,7 +79,8 @@ export default function MCPServerDialog({
     },
   });
 
-  const { isEditMode, isSubmitting, isDeleting, onSubmit, handleDelete, resetForm } = formHook;
+  const { isEditMode, isSubmitting, isDeleting, isConnecting, onSubmit, handleDelete, resetForm } =
+    formHook;
 
   // Reset form when dialog opens
   useEffect(() => {
@@ -238,7 +244,7 @@ export default function MCPServerDialog({
               type="button"
               variant={isEditMode ? 'default' : 'submit'}
               onClick={onSubmit}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isConnecting}
               aria-live="polite"
               aria-label={
                 isSubmitting

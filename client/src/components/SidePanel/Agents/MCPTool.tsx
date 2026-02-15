@@ -69,7 +69,18 @@ export default function MCPTool({ serverInfo }: { serverInfo?: MCPServerInfo }) 
   const updateFormTools = (newSelectedTools: string[]) => {
     const currentTools = getValues('tools') || [];
     const otherTools = currentTools.filter((t: string) => !tools.some((st) => st.tool_id === t));
+    const newlyAddedTools = newSelectedTools.filter(
+      (t) => !currentTools.includes(t) && t.includes(Constants.mcp_delimiter),
+    );
     setValue('tools', [...otherTools, ...newSelectedTools]);
+    if (newlyAddedTools.length > 0) {
+      const currentToolOptions = getValues('tool_options') || {};
+      const mergedToolOptions = { ...currentToolOptions };
+      for (const tool of newlyAddedTools) {
+        mergedToolOptions[tool] = { ...mergedToolOptions[tool], defer_loading: true };
+      }
+      setValue('tool_options', mergedToolOptions);
+    }
   };
 
   const toggleToolSelect = (toolId: string) => {

@@ -132,6 +132,14 @@ function MCPToolSelectDialog({
     const newTools = toolsToAdd.filter((tool) => !currentTools.includes(tool));
     if (newTools.length > 0) {
       setValue('tools', [...currentTools, ...newTools]);
+      const currentToolOptions = getValues('tool_options') || {};
+      const mergedToolOptions = { ...currentToolOptions };
+      for (const tool of newTools) {
+        if (tool.includes(Constants.mcp_delimiter)) {
+          mergedToolOptions[tool] = { ...mergedToolOptions[tool], defer_loading: true };
+        }
+      }
+      setValue('tool_options', mergedToolOptions);
     }
   };
 
