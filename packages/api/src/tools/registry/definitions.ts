@@ -374,6 +374,45 @@ export const tavilySearchSchema: ExtendedJsonSchema = {
   required: ['query'],
 };
 
+/** Postmark Send Email tool JSON schema */
+export const sendEmailSchema: ExtendedJsonSchema = {
+  type: 'object',
+  properties: {
+    to: {
+      type: 'string',
+      description:
+        'Recipient email address(es). For multiple recipients, use comma-separated values.',
+    },
+    subject: {
+      type: 'string',
+      description: 'Email subject line.',
+    },
+    body: {
+      type: 'string',
+      description: 'Plain text body of the email.',
+    },
+    html_body: {
+      type: 'string',
+      description:
+        'Optional HTML body. If provided, the email will be sent as multipart with both plain text and HTML.',
+    },
+    from: {
+      type: 'string',
+      description:
+        'Optional sender address override. Must be a registered Postmark sender. Defaults to env.',
+    },
+    cc: {
+      type: 'string',
+      description: 'Optional CC recipient(s), comma-separated.',
+    },
+    bcc: {
+      type: 'string',
+      description: 'Optional BCC recipient(s), comma-separated.',
+    },
+  },
+  required: ['to', 'subject', 'body'],
+};
+
 /** File Search tool JSON schema */
 export const fileSearchSchema: ExtendedJsonSchema = {
   type: 'object',
