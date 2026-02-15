@@ -614,6 +614,13 @@ export const toolDefinitions: Record<string, ToolRegistryDefinition> = {
     schema: tavilySearchSchema,
     toolType: 'builtin',
   },
+  send_email: {
+    name: 'send_email',
+    description:
+      'Send an email via Postmark. Use when the user wants to send or compose an email. Provide recipient(s), subject, and body. Supports CC, BCC, and optional HTML body.',
+    schema: sendEmailSchema,
+    toolType: 'builtin',
+  },
   file_search: {
     name: 'file_search',
     description:
@@ -1017,9 +1024,13 @@ export function getToolDefinition(
   toolName: string,
   options?: GetToolDefinitionOptions,
 ): ToolRegistryDefinition | undefined {
+  const disableLocal =
+    process.env.DISABLE_LOCAL_CODE_EXECUTION === 'true' ||
+    process.env.DISABLE_LOCAL_CODE_EXECUTION === '1';
   const useLocal =
-    options?.useLocalCodeExecution ??
-    (!process.env.LIBRECHAT_CODE_API_KEY || process.env.LIBRECHAT_CODE_API_KEY === 'local');
+    !disableLocal &&
+    (options?.useLocalCodeExecution ??
+      (!process.env.LIBRECHAT_CODE_API_KEY || process.env.LIBRECHAT_CODE_API_KEY === 'local'));
   if (toolName === 'execute_code' && useLocal) {
     return LOCAL_CODE_EXECUTION_DEFINITION;
   }

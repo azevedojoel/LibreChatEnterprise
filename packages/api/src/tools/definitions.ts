@@ -92,6 +92,10 @@ export async function loadToolDefinitions(
   }
 
   let useLocalCodeExecution: boolean | undefined;
+  let hasRemoteCodeKeyForExecuteCode = false;
+  const disableLocalCodeExecution =
+    process.env.DISABLE_LOCAL_CODE_EXECUTION === 'true' ||
+    process.env.DISABLE_LOCAL_CODE_EXECUTION === '1';
   if (tools.includes('execute_code')) {
     try {
       const authValues = await loadAuthValues({
@@ -101,9 +105,12 @@ export async function loadToolDefinitions(
         throwError: false,
       });
       const codeApiKey = authValues[EnvVar.CODE_API_KEY] ?? '';
-      useLocalCodeExecution = !codeApiKey || codeApiKey === 'local';
+      hasRemoteCodeKeyForExecuteCode = !!codeApiKey && codeApiKey !== 'local';
+      useLocalCodeExecution = disableLocalCodeExecution
+        ? false
+        : !codeApiKey || codeApiKey === 'local';
     } catch {
-      useLocalCodeExecution = true;
+      useLocalCodeExecution = disableLocalCodeExecution ? false : true;
     }
   }
 
@@ -124,6 +131,13 @@ export async function loadToolDefinitions(
 
     if (!mcpToolPattern.test(toolName)) {
       if (!isBuiltInTool(toolName)) {
+        continue;
+      }
+      if (
+        toolName === 'execute_code' &&
+        disableLocalCodeExecution &&
+        !hasRemoteCodeKeyForExecuteCode
+      ) {
         continue;
       }
       const registryDef = getToolDefinition(toolName, {

@@ -266,6 +266,9 @@ const loadTools = async ({
 
   for (const tool of tools) {
     if (tool === Tools.execute_code) {
+      const disableLocal =
+        process.env.DISABLE_LOCAL_CODE_EXECUTION === 'true' ||
+        process.env.DISABLE_LOCAL_CODE_EXECUTION === '1';
       requestedTools[tool] = async () => {
         const authValues = await loadAuthValues({
           userId: user,
@@ -274,7 +277,13 @@ const loadTools = async ({
           throwError: false,
         });
         const codeApiKey = authValues[EnvVar.CODE_API_KEY] ?? '';
-        const useLocalExecution = !codeApiKey || codeApiKey === 'local';
+        const useLocalExecution =
+          !disableLocal && (!codeApiKey || codeApiKey === 'local');
+        if (disableLocal && (!codeApiKey || codeApiKey === 'local')) {
+          throw new Error(
+            'Local code execution is disabled. Configure a remote code execution API key (E2B/Replit) or set DISABLE_LOCAL_CODE_EXECUTION=false.',
+          );
+        }
         const { files, toolContext } = await primeCodeFiles(
           {
             ...options,
