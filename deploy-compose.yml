@@ -1,3 +1,5 @@
+# Redis is required for reliable scheduled agent runs and multi-instance deployments.
+# Set USE_REDIS=true and REDIS_URI in api environment (or .env) to enable.
 services:
   api:
     # build:
@@ -11,6 +13,7 @@ services:
     depends_on:
       - mongodb
       - rag_api
+      - redis
     restart: always
     extra_hosts:
     - "host.docker.internal:host-gateway"
@@ -23,6 +26,8 @@ services:
       - MEILI_HOST=http://meilisearch:7700
       - RAG_PORT=${RAG_PORT:-8000}
       - RAG_API_URL=http://rag_api:${RAG_PORT:-8000}
+      - USE_REDIS=${USE_REDIS:-true}
+      - REDIS_URI=${REDIS_URI:-redis://redis:6379}
     volumes:
       - type: bind
         source: ./librechat.yaml
@@ -84,5 +89,13 @@ services:
     env_file:
       - .env
 
+  redis:
+    container_name: chat-redis
+    image: redis:7-alpine
+    restart: always
+    volumes:
+      - redis_data:/data
+
 volumes:
   pgdata2:
+  redis_data:
