@@ -44,4 +44,6 @@ export interface IAgent extends Omit<Document, 'model'> {
   mcpServerNames?: string[];
   /** Per-tool configuration (defer_loading, allowed_callers) */
   tool_options?: AgentToolOptions;
+  /** Agent IDs this Schedule Manager can schedule (when manage_scheduling is enabled) */
+  schedulerTargetAgentIds?: string[];
 }

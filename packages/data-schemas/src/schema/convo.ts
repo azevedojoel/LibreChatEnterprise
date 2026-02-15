@@ -37,6 +37,11 @@ const convoSchema: Schema<IConversation> = new Schema(
     expiredAt: {
       type: Date,
     },
+    scheduledRunId: {
+      type: Schema.Types.ObjectId,
+      ref: 'ScheduledRun',
+      default: null,
+    },
   },
   { timestamps: true },
 );

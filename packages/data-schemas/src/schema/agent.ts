@@ -123,6 +123,11 @@ const agentSchema = new Schema<IAgent>(
       type: Schema.Types.Mixed,
       default: undefined,
     },
+    /** Agent IDs this Schedule Manager can schedule (when manage_scheduling is enabled) */
+    schedulerTargetAgentIds: {
+      type: [String],
+      default: undefined,
+    },
   },
   {
     timestamps: true,

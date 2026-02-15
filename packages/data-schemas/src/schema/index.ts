@@ -24,4 +24,6 @@ export { default as toolCallSchema } from './toolCall';
 export { default as transactionSchema } from './transaction';
 export { default as userSchema } from './user';
 export { default as memorySchema } from './memory';
+export { default as scheduledAgentSchema } from './scheduledAgent';
+export { default as scheduledRunSchema } from './scheduledRun';
 export { default as groupSchema } from './group';

@@ -1,0 +1,45 @@
+import { Schema } from 'mongoose';
+import type { IScheduledRun } from '~/types/scheduledAgent';
+
+const scheduledRunSchema = new Schema<IScheduledRun>(
+  {
+    scheduleId: {
+      type: Schema.Types.ObjectId,
+      ref: 'ScheduledAgent',
+      index: true,
+      required: true,
+    },
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      index: true,
+      required: true,
+    },
+    conversationId: {
+      type: String,
+      required: true,
+      index: true,
+    },
+    runAt: {
+      type: Date,
+      required: true,
+      index: true,
+    },
+    status: {
+      type: String,
+      enum: ['success', 'failed', 'running', 'pending'],
+      required: true,
+      default: 'pending',
+    },
+    error: {
+      type: String,
+      default: null,
+    },
+  },
+  { timestamps: true },
+);
+
+scheduledRunSchema.index({ userId: 1, runAt: -1 });
+scheduledRunSchema.index({ scheduleId: 1, runAt: -1 });
+
+export default scheduledRunSchema;
