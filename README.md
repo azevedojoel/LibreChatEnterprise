@@ -1,14 +1,14 @@
 <p align="center">
-  <a href="https://librechat.ai">
+  <a href="https://dailythread.ai">
     <img src="client/public/assets/logo.svg" height="256">
   </a>
   <h1 align="center">
-    <a href="https://librechat.ai">LibreChat</a>
+    <a href="https://dailythread.ai">Daily Thread</a>
   </h1>
 </p>
 
 <p align="center">
-  <a href="https://discord.librechat.ai"> 
+  <a href="https://dailythread.ai"> 
     <img
       src="https://img.shields.io/discord/1086345563026489514?label=&logo=discord&style=for-the-badge&logoWidth=20&logoColor=white&labelColor=000000&color=blueviolet">
   </a>
@@ -16,7 +16,7 @@
     <img
       src="https://img.shields.io/badge/YOUTUBE-red.svg?style=for-the-badge&logo=youtube&logoColor=white&labelColor=000000&logoWidth=20">
   </a>
-  <a href="https://docs.librechat.ai"> 
+  <a href="https://dailythread.ai"> 
     <img
       src="https://img.shields.io/badge/DOCS-blue.svg?style=for-the-badge&logo=read-the-docs&logoColor=white&labelColor=000000&logoWidth=20">
   </a>
@@ -39,7 +39,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.librechat.ai/docs/translation">
+  <a href="https://dailythread.ai">
     <img 
       src="https://img.shields.io/badge/dynamic/json.svg?style=for-the-badge&color=2096F3&label=locize&query=%24.translatedPercentage&url=https://api.locize.app/badgedata/4cb2598b-ed4d-469c-9b04-2ed531a8cb45&suffix=%+translated" 
       alt="Translation Progress">
@@ -53,18 +53,18 @@
 
 - 🤖 **AI Model Selection**:  
   - Anthropic (Claude), AWS Bedrock, OpenAI, Azure OpenAI, Google, Vertex AI, OpenAI Responses API (incl. Azure)
-  - [Custom Endpoints](https://www.librechat.ai/docs/quick_start/custom_endpoints): Use any OpenAI-compatible API with LibreChat, no proxy required
-  - Compatible with [Local & Remote AI Providers](https://www.librechat.ai/docs/configuration/librechat_yaml/ai_endpoints):
+  - Custom Endpoints: Use any OpenAI-compatible API with LibreChat, no proxy required
+  - Compatible with Local & Remote AI Providers:
     - Ollama, groq, Cohere, Mistral AI, Apple MLX, koboldcpp, together.ai,
     - OpenRouter, Helicone, Perplexity, ShuttleAI, Deepseek, Qwen, and more
 
-- 🔧 **[Code Interpreter API](https://www.librechat.ai/docs/features/code_interpreter)**: 
+- 🔧 **Code Interpreter API**: 
   - Secure, Sandboxed Execution in Python, Node.js (JS/TS), Go, C/C++, Java, PHP, Rust, and Fortran
   - Seamless File Handling: Upload, process, and download files directly
   - No Privacy Concerns: Fully isolated and secure execution
 
 - 🔦 **Agents & Tools Integration**:  
-  - **[LibreChat Agents](https://www.librechat.ai/docs/features/agents)**:
+  - **LibreChat Agents**:
     - No-Code Custom Assistants: Build specialized, AI-driven helpers
     - Agent Marketplace: Discover and deploy community-built agents
     - Collaborative Sharing: Share agents with specific users and groups
@@ -76,14 +76,13 @@
   - Search the internet and retrieve relevant information to enhance your AI context
   - Combines search providers, content scrapers, and result rerankers for optimal results
   - **Customizable Jina Reranking**: Configure custom Jina API URLs for reranking services
-  - **[Learn More →](https://www.librechat.ai/docs/features/web_search)**
+  - **Web Search**: Configurable via librechat.yaml
 
 - 🪄 **Generative UI with Code Artifacts**:  
   - [Code Artifacts](https://youtu.be/GfTj7O4gmd0?si=WJbdnemZpJzBrJo3) allow creation of React, HTML, and Mermaid diagrams directly in chat
 
 - 🎨 **Image Generation & Editing**
-  - Text-to-image and image-to-image with [GPT-Image-1](https://www.librechat.ai/docs/features/image_gen#1--openai-image-tools-recommended)
-  - Text-to-image with [DALL-E (3/2)](https://www.librechat.ai/docs/features/image_gen#2--dalle-legacy), [Stable Diffusion](https://www.librechat.ai/docs/features/image_gen#3--stable-diffusion-local), [Flux](https://www.librechat.ai/docs/features/image_gen#4--flux), or any [MCP server](https://www.librechat.ai/docs/features/image_gen#5--model-context-protocol-mcp)
+  - Text-to-image and image-to-image with GPT-Image-1, DALL-E (3/2), Stable Diffusion, Flux, or any MCP server
   - Produce stunning visuals from prompts or refine existing images with a single instruction
 
 - 💾 **Presets & Context Management**:  
@@ -91,7 +90,7 @@
   - Switch between AI Endpoints and Presets mid-chat
   - Edit, Resubmit, and Continue Messages with Conversation branching  
   - Create and share prompts with specific users and groups
-  - [Fork Messages & Conversations](https://www.librechat.ai/docs/features/fork) for Advanced Context control
+  - Fork Messages & Conversations for Advanced Context control
 
 - 💬 **Multimodal & File Interactions**:  
   - Upload and analyze images with Claude 3, GPT-4.5, GPT-4o, o1, Llama-Vision, and Gemini 📸  
@@ -109,7 +108,7 @@
 - 🎨 **Customizable Interface**:  
   - Customizable Dropdown & Interface that adapts to both power users and newcomers
 
-- 🌊 **[Resumable Streams](https://www.librechat.ai/docs/features/resumable_streams)**:  
+- 🌊 **Resumable Streams**:  
   - Never lose a response: AI responses automatically reconnect and resume if your connection drops
   - Multi-Tab & Multi-Device Sync: Open the same chat in multiple tabs or pick up on another device
   - Production-Ready: Works from single-server setups to horizontally scaled deployments with Redis
@@ -138,7 +137,7 @@
   - Completely Open-Source & Built in Public  
   - Community-driven development, support, and feedback
 
-[For a thorough review of our features, see our docs here](https://docs.librechat.ai/) 📚
+[For a thorough review of our features, see our docs here](https://dailythread.ai) 📚
 
 ## 🪶 All-In-One AI Conversations with LibreChat
 
@@ -154,12 +153,11 @@ Open source, actively developed, and built for anyone who values control over th
 
 **GitHub Repo:**
   - **RAG API:** [github.com/danny-avila/rag_api](https://github.com/danny-avila/rag_api)
-  - **Website:** [github.com/LibreChat-AI/librechat.ai](https://github.com/LibreChat-AI/librechat.ai)
+  - **Website:** [dailythread.ai](https://dailythread.ai)
 
 **Other:**
-  - **Website:** [librechat.ai](https://librechat.ai)
-  - **Documentation:** [librechat.ai/docs](https://librechat.ai/docs)
-  - **Blog:** [librechat.ai/blog](https://librechat.ai/blog)
+  - **Website:** [dailythread.ai](https://dailythread.ai)
+  - **Documentation:** [dailythread.ai](https://dailythread.ai)
 
 ---
 
@@ -167,9 +165,9 @@ Open source, actively developed, and built for anyone who values control over th
 
 Keep up with the latest updates by visiting the releases page and notes:
 - [Releases](https://github.com/danny-avila/LibreChat/releases)
-- [Changelog](https://www.librechat.ai/changelog) 
+- [Changelog](https://dailythread.ai/changelog)
 
-**⚠️ Please consult the [changelog](https://www.librechat.ai/changelog) for breaking changes before updating.**
+**⚠️ Please consult the changelog for breaking changes before updating.**
 
 ---
 
@@ -197,7 +195,7 @@ Contributions, suggestions, bug reports and fixes are welcome!
 
 For new features, components, or extensions, please open an issue and discuss before sending a PR.
 
-If you'd like to help translate LibreChat into your language, we'd love your contribution! Improving our translations not only makes LibreChat more accessible to users around the world but also enhances the overall user experience. Please check out our [Translation Guide](https://www.librechat.ai/docs/translation).
+If you'd like to help translate LibreChat into your language, we'd love your contribution! Improving our translations not only makes LibreChat more accessible to users around the world but also enhances the overall user experience. Please check out our Translation Guide for contributing translations.
 
 ---
 

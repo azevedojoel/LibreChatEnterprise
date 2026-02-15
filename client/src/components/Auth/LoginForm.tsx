@@ -33,8 +33,12 @@ const LoginForm: React.FC<TLoginFormProps> = ({ onSubmit, startupConfig, error, 
   const isLocalhost =
     typeof window !== 'undefined' &&
     ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+  const isValidSiteKey = (key: unknown) =>
+    key && typeof key === 'string' && !key.includes('${');
   const requireCaptcha =
-    Boolean(startupConfig.turnstile?.siteKey) && !isLocalhost;
+    Boolean(startupConfig.turnstile?.siteKey) &&
+    !isLocalhost &&
+    isValidSiteKey(startupConfig.turnstile?.siteKey);
 
   useEffect(() => {
     if (error && error.includes('422') && !showResendLink) {

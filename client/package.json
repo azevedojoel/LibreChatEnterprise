@@ -1,6 +1,6 @@
 {
   "name": "@librechat/frontend",
-  "version": "v0.8.3",
+  "version": "v1.0.0",
   "description": "",
   "type": "module",
   "scripts": {
@@ -27,7 +27,7 @@
   "bugs": {
     "url": "https://github.com/danny-avila/LibreChat/issues"
   },
-  "homepage": "https://librechat.ai",
+  "homepage": "https://dailythread.ai",
   "dependencies": {
     "@ariakit/react": "^0.4.15",
     "@ariakit/react-core": "^0.4.17",

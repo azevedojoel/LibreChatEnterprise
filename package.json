@@ -1,6 +1,6 @@
 {
   "name": "LibreChat",
-  "version": "v0.8.3",
+  "version": "v1.0.0",
   "description": "",
   "workspaces": [
     "api",
@@ -102,7 +102,7 @@
   "bugs": {
     "url": "https://github.com/danny-avila/LibreChat/issues"
   },
-  "homepage": "https://librechat.ai/",
+  "homepage": "https://dailythread.ai/",
   "devDependencies": {
     "@axe-core/playwright": "^4.10.1",
     "@eslint/compat": "^1.2.6",

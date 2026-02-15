@@ -1,6 +1,6 @@
 {
   "name": "@librechat/backend",
-  "version": "v0.8.3",
+  "version": "v1.0.0",
   "description": "",
   "scripts": {
     "start": "echo 'please run this from the root directory'",
@@ -32,7 +32,7 @@
   "bugs": {
     "url": "https://github.com/danny-avila/LibreChat/issues"
   },
-  "homepage": "https://librechat.ai",
+  "homepage": "https://dailythread.ai",
   "dependencies": {
     "@anthropic-ai/vertex-sdk": "^0.14.3",
     "@aws-sdk/client-bedrock-runtime": "^3.980.0",

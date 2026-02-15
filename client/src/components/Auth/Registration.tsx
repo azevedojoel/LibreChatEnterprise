@@ -37,9 +37,13 @@ const Registration: React.FC = () => {
   const isLocalhost =
     typeof window !== 'undefined' &&
     ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+  const isValidSiteKey = (key: unknown) =>
+    key && typeof key === 'string' && !key.includes('${');
   // only require captcha if we have a siteKey (skip on localhost for local dev)
   const requireCaptcha =
-    Boolean(startupConfig?.turnstile?.siteKey) && !isLocalhost;
+    Boolean(startupConfig?.turnstile?.siteKey) &&
+    !isLocalhost &&
+    isValidSiteKey(startupConfig?.turnstile?.siteKey);
 
   const registerUser = useRegisterUserMutation({
     onMutate: () => {

@@ -195,8 +195,8 @@ describe('getOpenAIConfig', () => {
 
     expect(result.configOptions?.baseURL).toBe(reverseProxyUrl);
     expect(result.configOptions?.defaultHeaders).toMatchObject({
-      'HTTP-Referer': 'https://librechat.ai',
-      'X-Title': 'LibreChat',
+      'HTTP-Referer': 'https://dailythread.ai',
+      'X-Title': 'Daily Thread',
     });
     expect(result.llmConfig.include_reasoning).toBe(true);
     expect(result.provider).toBe('openrouter');
@@ -891,8 +891,8 @@ describe('getOpenAIConfig', () => {
       });
 
       expect(result.configOptions?.defaultHeaders).toEqual({
-        'HTTP-Referer': 'https://librechat.ai',
-        'X-Title': 'LibreChat',
+        'HTTP-Referer': 'https://dailythread.ai',
+        'X-Title': 'Daily Thread',
         'X-Custom-Header': 'custom-value',
         Authorization: 'Bearer custom-token',
       });
@@ -1455,8 +1455,8 @@ describe('getOpenAIConfig', () => {
         const clientOptions = {
           reverseProxyUrl: baseURL,
           headers: {
-            'HTTP-Referer': 'https://librechat.ai',
-            'X-Title': 'LibreChat',
+            'HTTP-Referer': 'https://dailythread.ai',
+            'X-Title': 'Daily Thread',
             Authorization: `Bearer ${apiKey}`,
           },
           addParams: {
@@ -1492,8 +1492,8 @@ describe('getOpenAIConfig', () => {
           repetition_penalty: 1.1,
         });
         expect(result.configOptions?.defaultHeaders).toMatchObject({
-          'HTTP-Referer': 'https://librechat.ai',
-          'X-Title': 'LibreChat',
+          'HTTP-Referer': 'https://dailythread.ai',
+          'X-Title': 'Daily Thread',
           Authorization: `Bearer ${apiKey}`,
         });
         expect(result.provider).toBe('openrouter');

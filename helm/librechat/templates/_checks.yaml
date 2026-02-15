@@ -1,4 +1,4 @@
 
 {{ if hasKey .Values.env }}
-  {{ fail "The Value env has been renamed and moved to librechat.configEnv. Refer to https://www.librechat.ai/docs/local/helm_chart#migrate for more information" }}
+  {{ fail "The Value env has been renamed and moved to librechat.configEnv. See the Helm chart migration guide for more information." }}
 {{ end }}

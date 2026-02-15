@@ -28,7 +28,7 @@ export default function Footer({ className }: { className?: string }) {
     typeof config?.customFooter === 'string'
       ? config.customFooter
       : '[Daily Thread ' +
-        Constants.VERSION +
+        (config?.appVersion ?? Constants.VERSION) +
         '](https://app.dailythread.ai) - ' +
         localize('com_ui_latest_footer')
   ).split('|');

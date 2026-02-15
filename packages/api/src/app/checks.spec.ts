@@ -146,9 +146,7 @@ describe('checkWebSearchConfig', () => {
       checkWebSearchConfig(config);
 
       expect(logger.warn).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'More info: https://www.librechat.ai/docs/configuration/librechat_yaml/web_search',
-        ),
+        expect.stringContaining('environment variable reference'),
       );
     });
   });

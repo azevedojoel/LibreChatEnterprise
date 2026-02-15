@@ -1,5 +1,4 @@
 # LibreChat Configuration - Full Reference
-# https://www.librechat.ai/docs/configuration/librechat_yaml
 
 version: 1.2.1
 cache: true
@@ -65,10 +64,10 @@ interface:
         en: |
           LibreChat hasn't reviewed this MCP server. Attackers may attempt to steal your data or trick the model into taking unintended actions.
   privacyPolicy:
-    externalUrl: 'https://librechat.ai/privacy-policy'
+    externalUrl: 'https://dailythread.ai/privacy-policy'
     openNewTab: true
   termsOfService:
-    externalUrl: 'https://librechat.ai/tos'
+    externalUrl: 'https://dailythread.ai/tos'
     openNewTab: true
     modalAcceptance: true
     modalTitle: 'Terms of Service for LibreChat'
@@ -132,7 +131,7 @@ speech:
 actions:
   allowedDomains:
     - 'swapi.dev'
-    - 'librechat.ai'
+    - 'dailythread.ai'
     - 'google.com'
 
 # MCP Server domain restrictions

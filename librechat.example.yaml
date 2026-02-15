@@ -1,5 +1,4 @@
-# For more information, see the Configuration Guide:
-# https://www.librechat.ai/docs/configuration/librechat_yaml
+# LibreChat Configuration
 
 # Configuration version (required)
 version: 1.2.1
@@ -34,12 +33,12 @@ interface:
   fileSearch: true
   # Privacy policy settings
   privacyPolicy:
-    externalUrl: 'https://librechat.ai/privacy-policy'
+    externalUrl: 'https://dailythread.ai/privacy-policy'
     openNewTab: true
 
   # Terms of service
   termsOfService:
-    externalUrl: 'https://librechat.ai/tos'
+    externalUrl: 'https://dailythread.ai/tos'
     openNewTab: true
     modalAcceptance: true
     modalTitle: 'Terms of Service for LibreChat'
@@ -48,7 +47,7 @@ interface:
 
       *Effective Date: February 18, 2024*
 
-      Welcome to LibreChat, the informational website for the open-source AI chat platform, available at https://librechat.ai. These Terms of Service ("Terms") govern your use of our website and the services we offer. By accessing or using the Website, you agree to be bound by these Terms and our Privacy Policy, accessible at https://librechat.ai//privacy.
+      Welcome to Daily Thread, the informational website for the open-source AI chat platform, available at https://dailythread.ai. These Terms of Service ("Terms") govern your use of our website and the services we offer. By accessing or using the Website, you agree to be bound by these Terms and our Privacy Policy, accessible at https://dailythread.ai/privacy.
 
       ## 1. Ownership
 
@@ -76,7 +75,7 @@ interface:
 
       ## 7. Contact Information
 
-      If you have any questions about these Terms, please contact us at contact@librechat.ai.
+      If you have any questions about these Terms, please contact us at contact@dailythread.ai.
 
       By using the Website, you acknowledge that you have read these Terms of Service and agree to be bound by them.
 
@@ -189,7 +188,7 @@ registration:
 actions:
   allowedDomains:
     - 'swapi.dev'
-    - 'librechat.ai'
+    - 'dailythread.ai'
     - 'google.com'
     # - 'http://10.225.26.25:7894'  # Internal IP with protocol/port (uncomment if needed)
 
@@ -568,7 +567,6 @@ endpoints:
 #     maxHeight: 1900  # Maximum height for resized images (default: 1900)
 #     quality: 0.92  # JPEG quality for compression (0.0-1.0, default: 0.92)
 # # See the Custom Configuration Guide for more information on Assistants Config:
-# # https://www.librechat.ai/docs/configuration/librechat_yaml/object_structure/assistants_endpoint
 
 # Web Search Configuration (optional)
 # webSearch:

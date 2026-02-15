@@ -1,5 +1,5 @@
 import logger from '~/config/winston';
-import { removeNullishValues } from 'librechat-data-provider';
+import { removeNullishValues, extractEnvVariable, envVarRegex } from 'librechat-data-provider';
 import type { TCustomConfig, TConfigDefaults } from 'librechat-data-provider';
 
 /**
@@ -24,9 +24,18 @@ export function loadTurnstileConfig(
   const { turnstile: customTurnstile } = config ?? {};
   const { turnstile: defaults } = configDefaults;
 
+  const rawSiteKey =
+    customTurnstile?.siteKey ?? (defaults as TCustomConfig['turnstile'] | undefined)?.siteKey;
+  const resolvedSiteKey = rawSiteKey ? extractEnvVariable(rawSiteKey) : undefined;
+
+  // Treat unresolved placeholders (e.g. ${TURNSTILE_SITE_KEY}) or empty values as disabled
+  const siteKey =
+    resolvedSiteKey && resolvedSiteKey.trim() && !envVarRegex.test(resolvedSiteKey)
+      ? resolvedSiteKey.trim()
+      : undefined;
+
   const loadedTurnstile = removeNullishValues({
-    siteKey:
-      customTurnstile?.siteKey ?? (defaults as TCustomConfig['turnstile'] | undefined)?.siteKey,
+    siteKey,
     options:
       customTurnstile?.options ?? (defaults as TCustomConfig['turnstile'] | undefined)?.options,
   });

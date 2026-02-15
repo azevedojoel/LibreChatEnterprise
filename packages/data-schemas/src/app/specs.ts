@@ -66,7 +66,7 @@ export function processModelSpecs(
     if (!endpoint) {
       logger.warn(`Model spec with endpoint "${currentEndpoint}" was skipped: Endpoint not found in configuration. The \`endpoint\` value must exactly match either a system-defined endpoint or a custom endpoint defined by the user.
 
-For more information, see the documentation at https://www.librechat.ai/docs/configuration/librechat_yaml/object_structure/model_specs#endpoint`);
+Check that the endpoint value matches a system-defined or custom endpoint.`);
       continue;
     }
 

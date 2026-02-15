@@ -6,6 +6,7 @@ const { getLdapConfig } = require('~/server/services/Config/ldap');
 const { getAppConfig } = require('~/server/services/Config/app');
 const { getProjectByName } = require('~/models/Project');
 const { getLogStores } = require('~/cache');
+const rootPackageJson = require('../../../package.json');
 
 const router = express.Router();
 const emailLoginEnabled =
@@ -60,6 +61,7 @@ router.get('/', async function (req, res) {
 
     /** @type {TStartupConfig} */
     const payload = {
+      appVersion: process.env.APP_VERSION || rootPackageJson.version,
       appTitle: process.env.APP_TITLE || 'LibreChat',
       socialLogins: appConfig?.registration?.socialLogins ?? defaultSocialLogins,
       discordLoginEnabled: !!process.env.DISCORD_CLIENT_ID && !!process.env.DISCORD_CLIENT_SECRET,
@@ -93,7 +95,7 @@ router.get('/', async function (req, res) {
         isBirthday() ||
         isEnabled(process.env.SHOW_BIRTHDAY_ICON) ||
         process.env.SHOW_BIRTHDAY_ICON === '',
-      helpAndFaqURL: process.env.HELP_AND_FAQ_URL || 'https://librechat.ai',
+      helpAndFaqURL: process.env.HELP_AND_FAQ_URL || 'https://dailythread.ai',
       interface: appConfig?.interfaceConfig,
       turnstile: appConfig?.turnstileConfig,
       modelSpecs: appConfig?.modelSpecs,

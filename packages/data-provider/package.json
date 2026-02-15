@@ -37,7 +37,7 @@
   "bugs": {
     "url": "https://github.com/danny-avila/LibreChat/issues"
   },
-  "homepage": "https://librechat.ai",
+  "homepage": "https://dailythread.ai",
   "dependencies": {
     "axios": "^1.13.5",
     "dayjs": "^1.11.13",

@@ -34,12 +34,17 @@ function Footer({ startupConfig }: { startupConfig: TStartupConfig | null | unde
   );
 
   return (
-    <div className="align-end m-4 flex justify-center gap-2" role="contentinfo">
-      {privacyPolicyRender}
-      {privacyPolicyRender && termsOfServiceRender && (
-        <div className="border-r-[1px] border-gray-300 dark:border-gray-600" />
+    <div className="align-end m-4 flex flex-col items-center gap-2" role="contentinfo">
+      <div className="flex gap-2">
+        {privacyPolicyRender}
+        {privacyPolicyRender && termsOfServiceRender && (
+          <div className="border-r-[1px] border-gray-300 dark:border-gray-600" />
+        )}
+        {termsOfServiceRender}
+      </div>
+      {startupConfig.appVersion && (
+        <span className="text-xs text-gray-500 dark:text-gray-400">{startupConfig.appVersion}</span>
       )}
-      {termsOfServiceRender}
     </div>
   );
 }
