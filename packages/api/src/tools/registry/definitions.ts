@@ -814,6 +814,125 @@ const globFilesDefinition: ToolRegistryDefinition = {
   toolType: 'builtin',
 };
 
+/** Scheduling tools - used when agent has manage_scheduling capability */
+const listSchedulesDefinition: ToolRegistryDefinition = {
+  name: 'list_schedules',
+  description:
+    "List the user's scheduled agent runs. Returns schedules with id, name, agentId, prompt, scheduleType, cronExpression, runAt, enabled, timezone.",
+  schema: { type: 'object', properties: {}, required: [] } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const createScheduleDefinition: ToolRegistryDefinition = {
+  name: 'create_schedule',
+  description:
+    'Create a scheduled agent run. Infer agentId from the user request by matching to the injected target agents (e.g. "marketing report" → Marketing Bot). NEVER ask which agent. Required: name, agentId (from injected list), prompt, scheduleType. For recurring: cronExpression. For one-off: runAt (ISO date). Optional: timezone, selectedTools.',
+  schema: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'Schedule name' },
+      agentId: {
+        type: 'string',
+        description:
+          'Agent ID from the injected target list. Infer from user request - NEVER ask the user. Match by name or purpose.',
+      },
+      prompt: { type: 'string', description: 'Prompt to send' },
+      scheduleType: {
+        type: 'string',
+        enum: ['recurring', 'one-off'],
+        description: 'recurring uses cron; one-off uses runAt',
+      },
+      cronExpression: {
+        type: 'string',
+        description: 'Cron expression (e.g. 0 9 * * * for 9am daily)',
+      },
+      runAt: { type: 'string', description: 'ISO date for one-off run' },
+      timezone: { type: 'string', description: 'Timezone e.g. UTC', default: 'UTC' },
+      selectedTools: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Optional tool IDs to limit the scheduled run to',
+      },
+    },
+    required: ['name', 'agentId', 'prompt', 'scheduleType'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const updateScheduleDefinition: ToolRegistryDefinition = {
+  name: 'update_schedule',
+  description:
+    'Update an existing schedule. Provide scheduleId and any fields to update: name, agentId, prompt, scheduleType, cronExpression, runAt, enabled, timezone, selectedTools.',
+  schema: {
+    type: 'object',
+    properties: {
+      scheduleId: { type: 'string', description: 'Schedule ID' },
+      name: { type: 'string', description: 'Schedule name' },
+      agentId: {
+        type: 'string',
+        description:
+          'Agent ID from the injected target list. Infer from user request when changing agent - NEVER ask. Match by name or purpose.',
+      },
+      prompt: { type: 'string', description: 'Prompt' },
+      scheduleType: { type: 'string', enum: ['recurring', 'one-off'] },
+      cronExpression: { type: 'string' },
+      runAt: { type: 'string' },
+      enabled: { type: 'boolean' },
+      timezone: { type: 'string' },
+      selectedTools: { type: 'array', items: { type: 'string' } },
+    },
+    required: ['scheduleId'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const deleteScheduleDefinition: ToolRegistryDefinition = {
+  name: 'delete_schedule',
+  description: 'Delete a schedule by ID.',
+  schema: {
+    type: 'object',
+    properties: { scheduleId: { type: 'string', description: 'Schedule ID' } },
+    required: ['scheduleId'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const runScheduleDefinition: ToolRegistryDefinition = {
+  name: 'run_schedule',
+  description: 'Trigger a schedule run immediately by schedule ID.',
+  schema: {
+    type: 'object',
+    properties: { scheduleId: { type: 'string', description: 'Schedule ID' } },
+    required: ['scheduleId'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const listRunsDefinition: ToolRegistryDefinition = {
+  name: 'list_runs',
+  description:
+    "List the user's scheduled run history. Optional limit (default 25, max 100).",
+  schema: {
+    type: 'object',
+    properties: {
+      limit: { type: 'number', description: 'Max number of runs to return' },
+    },
+    required: [],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const getRunDefinition: ToolRegistryDefinition = {
+  name: 'get_run',
+  description: 'Get a single run by ID, including conversation and messages.',
+  schema: {
+    type: 'object',
+    properties: { runId: { type: 'string', description: 'Run ID' } },
+    required: ['runId'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
 /** Tool definitions from @librechat/agents */
 const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
   read_file: readFileDefinition,
@@ -823,6 +942,13 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
   list_files: listFilesDefinition,
   search_files: searchFilesDefinition,
   glob_files: globFilesDefinition,
+  list_schedules: listSchedulesDefinition,
+  create_schedule: createScheduleDefinition,
+  update_schedule: updateScheduleDefinition,
+  delete_schedule: deleteScheduleDefinition,
+  run_schedule: runScheduleDefinition,
+  list_runs: listRunsDefinition,
+  get_run: getRunDefinition,
   [CalculatorToolDefinition.name]: {
     name: CalculatorToolDefinition.name,
     description: CalculatorToolDefinition.description,

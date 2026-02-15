@@ -237,6 +237,51 @@ describe('definitions.ts', () => {
         expect(fileSearchDef?.parameters?.required).toContain('query');
       });
 
+      it('should include scheduling tools when manage_scheduling capability is enabled', async () => {
+        const schedulingTools = [
+          'list_schedules',
+          'create_schedule',
+          'update_schedule',
+          'delete_schedule',
+          'run_schedule',
+          'list_runs',
+          'get_run',
+        ];
+        mockIsBuiltInTool.mockImplementation((name) =>
+          schedulingTools.includes(name),
+        );
+
+        const params: LoadToolDefinitionsParams = {
+          userId: 'user-123',
+          agentId: 'agent-123',
+          tools: schedulingTools,
+        };
+
+        const deps: LoadToolDefinitionsDeps = {
+          getOrFetchMCPServerTools: mockGetOrFetchMCPServerTools,
+          isBuiltInTool: mockIsBuiltInTool,
+          loadAuthValues: mockLoadAuthValues,
+        };
+
+        const result = await loadToolDefinitions(params, deps);
+
+        expect(result.toolDefinitions).toHaveLength(7);
+        const createScheduleDef = result.toolDefinitions.find(
+          (d) => d.name === 'create_schedule',
+        );
+        expect(createScheduleDef).toBeDefined();
+        expect(createScheduleDef?.parameters?.required).toContain('name');
+        expect(createScheduleDef?.parameters?.required).toContain('agentId');
+        expect(createScheduleDef?.parameters?.required).toContain('prompt');
+        expect(createScheduleDef?.parameters?.required).toContain('scheduleType');
+
+        const listSchedulesDef = result.toolDefinitions.find(
+          (d) => d.name === 'list_schedules',
+        );
+        expect(listSchedulesDef).toBeDefined();
+        expect(result.toolRegistry.get('create_schedule')).toBeDefined();
+      });
+
       it('should skip built-in tools without registry definitions', async () => {
         mockIsBuiltInTool.mockImplementation((name) => name === 'unknown_tool');
 

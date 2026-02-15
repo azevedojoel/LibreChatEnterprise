@@ -275,6 +275,7 @@ export const defaultAgentCapabilities = [
   AgentCapabilities.tools,
   AgentCapabilities.chain,
   AgentCapabilities.ocr,
+  AgentCapabilities.manage_scheduling,
 ];
 
 export const agentsEndpointSchema = baseEndpointSchema
