@@ -7,6 +7,7 @@
  */
 const { logger } = require('@librechat/data-schemas');
 const {
+  discoverFromUrl,
   isMCPDomainNotAllowedError,
   isMCPInspectionFailedError,
   MCPErrorCodes,
@@ -192,6 +193,32 @@ const getMCPServersList = async (req, res) => {
 };
 
 /**
+ * Discover MCP server from URL
+ * @route POST /api/mcp/discover
+ */
+const discoverMCPServerController = async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url || typeof url !== 'string' || !url.trim()) {
+      return res.status(400).json({ message: 'URL is required' });
+    }
+
+    const registry = getMCPServersRegistry();
+    const allowedDomains = registry.getAllowedDomains();
+
+    const result = await discoverFromUrl(url.trim(), allowedDomains);
+    return res.status(200).json(result);
+  } catch (error) {
+    logger.error('[discoverMCPServer]', error);
+    const mcpErrorResponse = handleMCPError(error, res);
+    if (mcpErrorResponse) {
+      return mcpErrorResponse;
+    }
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/**
  * Create MCP server
  * @route POST /api/mcp/servers
  */
@@ -304,6 +331,7 @@ const deleteMCPServerController = async (req, res) => {
 module.exports = {
   getMCPTools,
   getMCPServersList,
+  discoverMCPServerController,
   createMCPServerController,
   getMCPServerById,
   updateMCPServerController,

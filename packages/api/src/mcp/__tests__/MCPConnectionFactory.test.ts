@@ -586,5 +586,32 @@ describe('MCPConnectionFactory', () => {
       expect(result.tools).toBeNull();
       expect(mockLogger.debug).toHaveBeenCalled();
     });
+
+    it('should return oauthRequired when unauthenticated connect fails with OAuth required', async () => {
+      const basicOptions = {
+        serverName: 'test-server',
+        serverConfig: mockServerConfig,
+      };
+
+      let connectCallCount = 0;
+      mockConnectionInstance.connect.mockImplementation(() => {
+        connectCallCount++;
+        if (connectCallCount === 1) {
+          return Promise.reject(new Error('Connection failed'));
+        }
+        return Promise.reject(
+          new Error('OAuth not supported in unauthenticated discovery'),
+        );
+      });
+      mockConnectionInstance.isConnected.mockResolvedValue(false);
+      mockConnectionInstance.disconnect = jest.fn().mockResolvedValue(undefined);
+
+      const result = await MCPConnectionFactory.discoverTools(basicOptions);
+
+      expect(result.tools).toBeNull();
+      expect(result.connection).toBeNull();
+      expect(result.oauthRequired).toBe(true);
+      expect(result.oauthUrl).toBeNull();
+    });
   });
 });

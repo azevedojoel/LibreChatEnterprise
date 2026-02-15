@@ -595,6 +595,13 @@ export const getMCPServer = async (serverName: string): Promise<mcp.MCPServerDBO
 };
 
 /**
+ * Discover MCP server from URL (read-only, does not create)
+ */
+export const discoverMCPServer = async (url: string): Promise<mcp.MCPServerDiscoverResponse> => {
+  return request.post(endpoints.mcp.discover, { url });
+};
+
+/**
  * Create a new MCP server
  */
 export const createMCPServer = async (

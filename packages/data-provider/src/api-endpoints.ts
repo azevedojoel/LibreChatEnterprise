@@ -247,6 +247,7 @@ export const activeJobs = () => `${BASE_URL}/api/agents/chat/active`;
 export const mcp = {
   tools: `${BASE_URL}/api/mcp/tools`,
   servers: `${BASE_URL}/api/mcp/servers`,
+  discover: `${BASE_URL}/api/mcp/discover`,
 };
 
 export const mcpServer = (serverName: string) => `${BASE_URL}/api/mcp/servers/${serverName}`;

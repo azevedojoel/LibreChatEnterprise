@@ -47,3 +47,15 @@ export type MCPServerDBObjectResponse = {
 } & MCPOptions;
 
 export type MCPServersListResponse = Record<string, MCPServerDBObjectResponse>;
+
+/**
+ * Response from MCP discover endpoint (read-only, does not create server)
+ */
+export type MCPServerDiscoverResponse = {
+  transport: 'streamable-http' | 'sse';
+  tools: Array<{ name: string; description?: string }>;
+  requiresOAuth: boolean;
+  oauthMetadata?: Record<string, unknown> | null;
+  suggestedTitle: string;
+  capabilities?: string;
+};

@@ -72,3 +72,37 @@ export function generateServerNameFromTitle(title: string): string {
 
   return slug || 'mcp-server'; // Fallback if empty
 }
+
+/**
+ * Extracts a readable server name from a URL for display/suggested title.
+ * Examples: "https://api.example.com/mcp" → "Example API", "https://mcp.github.com" → "Github"
+ */
+export function extractServerNameFromUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname;
+
+    let name = hostname
+      .replace(/^(www\.|api\.|mcp\.|tools\.)/, '')
+      .replace(/\.(com|org|io|net|dev|ai|app)$/, '');
+
+    const parts = name.split('.');
+    name = parts[0] || name;
+
+    const titleCase = name
+      .split(/[-_]/)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+
+    if (hostname.startsWith('api.')) {
+      return `${titleCase} API`;
+    }
+    if (hostname.startsWith('tools.')) {
+      return `${titleCase} Tools`;
+    }
+
+    return titleCase;
+  } catch {
+    return '';
+  }
+}

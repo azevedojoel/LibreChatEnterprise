@@ -130,7 +130,8 @@ export class MCPConnectionFactory {
     }
 
     try {
-      const tools = await this.attemptUnauthenticatedToolListing();
+      const { tools, oauthRequired: unauthOAuthRequired } =
+        await this.attemptUnauthenticatedToolListing();
       if (this.useOAuth) {
         connection.removeListener('oauthRequired', oauthHandler);
       }
@@ -145,6 +146,7 @@ export class MCPConnectionFactory {
         }
         return { tools, connection: null, oauthRequired, oauthUrl };
       }
+      oauthRequired = oauthRequired || unauthOAuthRequired;
     } catch (listError) {
       logger.debug(`${this.logPrefix} [Discovery] Unauthenticated tool listing failed:`, listError);
     }
@@ -162,7 +164,12 @@ export class MCPConnectionFactory {
     return { tools: null, connection: null, oauthRequired, oauthUrl };
   }
 
-  protected async attemptUnauthenticatedToolListing(): Promise<Tool[] | null> {
+  protected async attemptUnauthenticatedToolListing(): Promise<{
+    tools: Tool[] | null;
+    oauthRequired: boolean;
+  }> {
+    const OAUTH_UNSUPPORTED_MSG = 'OAuth not supported in unauthenticated discovery';
+
     const unauthConnection = new MCPConnection({
       serverName: this.serverName,
       serverConfig: this.serverConfig,
@@ -175,10 +182,7 @@ export class MCPConnectionFactory {
       logger.debug(
         `${this.logPrefix} [Discovery] Unauthenticated connection requires OAuth, failing fast`,
       );
-      unauthConnection.emit(
-        'oauthFailed',
-        new Error('OAuth not supported in unauthenticated discovery'),
-      );
+      unauthConnection.emit('oauthFailed', new Error(OAUTH_UNSUPPORTED_MSG));
     });
 
     try {
@@ -188,9 +192,21 @@ export class MCPConnectionFactory {
       if (await unauthConnection.isConnected()) {
         const tools = await unauthConnection.fetchTools();
         await unauthConnection.disconnect();
-        return tools;
+        return { tools, oauthRequired: false };
       }
-    } catch {
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (errMsg.includes(OAUTH_UNSUPPORTED_MSG)) {
+        logger.debug(
+          `${this.logPrefix} [Discovery] Unauthenticated connection requires OAuth, returning partial result`,
+        );
+        try {
+          await unauthConnection.disconnect();
+        } catch {
+          // Ignore cleanup errors
+        }
+        return { tools: null, oauthRequired: true };
+      }
       logger.debug(`${this.logPrefix} [Discovery] Unauthenticated connection attempt failed`);
     }
 
@@ -200,7 +216,7 @@ export class MCPConnectionFactory {
       // Ignore cleanup errors
     }
 
-    return null;
+    return { tools: null, oauthRequired: false };
   }
 
   protected constructor(basic: t.BasicConnectionOptions, oauth?: t.OAuthConnectionOptions) {

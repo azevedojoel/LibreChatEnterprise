@@ -23,6 +23,7 @@ const {
 } = require('@librechat/api');
 const {
   createMCPServerController,
+  discoverMCPServerController,
   updateMCPServerController,
   deleteMCPServerController,
   getMCPServersList,
@@ -677,6 +678,14 @@ const checkMCPCreate = generateCheckAccess({
   permissions: [Permissions.USE, Permissions.CREATE],
   getRoleByName,
 });
+
+/**
+ * Discover MCP server from URL (read-only, does not create)
+ * @route POST /api/mcp/discover
+ * @param {Object} req.body - The discovery parameters.
+ * @param {string} req.body.url - The MCP server URL to discover.
+ */
+router.post('/discover', requireJwtAuth, checkMCPCreate, discoverMCPServerController);
 
 /**
  * Get list of accessible MCP servers
