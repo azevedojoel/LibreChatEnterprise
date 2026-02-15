@@ -587,8 +587,8 @@ export const useGetScheduledAgentRunsQuery = (
     () => dataService.listScheduledAgentRuns(limit),
     {
       refetchOnWindowFocus: false,
-      refetchInterval: (query) => {
-        const runs = query.state.data as q.ScheduledRun[] | undefined;
+      refetchInterval: (data) => {
+        const runs = data as q.ScheduledRun[] | undefined;
         const hasActive = runs?.some((r) =>
           ACTIVE_RUN_STATUSES.includes(r.status as (typeof ACTIVE_RUN_STATUSES)[number]),
         );
@@ -609,9 +609,10 @@ export const useGetScheduledAgentRunQuery = (
     {
       enabled: !!id,
       refetchOnWindowFocus: false,
-      refetchInterval: (query) => {
-        const run = query.state.data as q.ScheduledRunDetail | undefined;
-        const isActive = run && ACTIVE_RUN_STATUSES.includes(run.status as (typeof ACTIVE_RUN_STATUSES)[number]);
+      refetchInterval: (data) => {
+        const run = data as q.ScheduledRunDetail | undefined;
+        const isActive =
+          run && ACTIVE_RUN_STATUSES.includes(run.status as (typeof ACTIVE_RUN_STATUSES)[number]);
         return isActive ? 2000 : false;
       },
       ...config,
@@ -639,15 +640,12 @@ export const useUpdateScheduledAgentMutation = (): UseMutationResult<
   { id: string; data: Parameters<typeof dataService.updateScheduledAgent>[1] }
 > => {
   const queryClient = useQueryClient();
-  return useMutation(
-    ({ id, data }) => dataService.updateScheduledAgent(id, data),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries([QueryKeys.scheduledAgents]);
-        queryClient.invalidateQueries([QueryKeys.scheduledAgentRuns]);
-      },
+  return useMutation(({ id, data }) => dataService.updateScheduledAgent(id, data), {
+    onSuccess: () => {
+      queryClient.invalidateQueries([QueryKeys.scheduledAgents]);
+      queryClient.invalidateQueries([QueryKeys.scheduledAgentRuns]);
     },
-  );
+  });
 };
 
 export const useDeleteScheduledAgentMutation = (): UseMutationResult<void, unknown, string> => {

@@ -1,9 +1,18 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQueries } from '@tanstack/react-query';
+import { useQueries, useQueryClient } from '@tanstack/react-query';
+import { Trans } from 'react-i18next';
 import { Plus, Play, Trash2, ExternalLink, Loader2 } from 'lucide-react';
 import cronstrue from 'cronstrue';
-import { Button, Spinner, Switch, useToastContext } from '@librechat/client';
+import {
+  Button,
+  Spinner,
+  Switch,
+  OGDialog,
+  OGDialogTemplate,
+  Label,
+  useToastContext,
+} from '@librechat/client';
 import { PermissionBits, QueryKeys, dataService } from 'librechat-data-provider';
 import type { ScheduledAgentSchedule, ScheduledRun } from 'librechat-data-provider';
 import {
@@ -87,12 +96,19 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+const UNDO_DELAY_MS = 5000;
+
 export default function ScheduledAgentsPanel() {
   const localize = useLocalize();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { showToast } = useToastContext();
   const [formOpen, setFormOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<ScheduledAgentSchedule | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [scheduleToDelete, setScheduleToDelete] = useState<ScheduledAgentSchedule | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const deleteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: schedules = [], isLoading: schedulesLoading } = useGetScheduledAgentsQuery();
   const { data: runs = [], isLoading: runsLoading } = useGetScheduledAgentRunsQuery(RUNS_LIMIT);
@@ -118,14 +134,52 @@ export default function ScheduledAgentsPanel() {
   const deleteMutation = useDeleteScheduledAgentMutation();
   const runMutation = useRunScheduledAgentMutation();
 
-  const handleDeleteSuccess = () => {
+  const handleDeleteSuccess = useCallback(() => {
+    setPendingDeleteId(null);
     showToast({ message: localize('com_ui_success'), status: 'success' });
-  };
+  }, [localize, showToast]);
 
-  const handleDeleteError = (err: unknown) => {
-    const msg = err instanceof Error ? err.message : localize('com_ui_error');
-    showToast({ message: msg, status: 'error' });
-  };
+  const handleDeleteError = useCallback(
+    (err: unknown) => {
+      setPendingDeleteId(null);
+      const msg = err instanceof Error ? err.message : localize('com_ui_error');
+      showToast({ message: msg, status: 'error' });
+    },
+    [localize, showToast],
+  );
+
+  const confirmDeleteSchedule = useCallback(() => {
+    if (!scheduleToDelete) return;
+    const id = scheduleToDelete._id;
+    setPendingDeleteId(id);
+    setDeleteDialogOpen(false);
+    setScheduleToDelete(null);
+    deleteTimeoutRef.current = setTimeout(() => {
+      deleteTimeoutRef.current = null;
+      deleteMutation.mutate(id, {
+        onSuccess: handleDeleteSuccess,
+        onError: handleDeleteError,
+      });
+    }, UNDO_DELAY_MS);
+  }, [scheduleToDelete, deleteMutation, handleDeleteSuccess, handleDeleteError]);
+
+  const handleUndoDelete = useCallback(() => {
+    if (deleteTimeoutRef.current) {
+      clearTimeout(deleteTimeoutRef.current);
+      deleteTimeoutRef.current = null;
+    }
+    setPendingDeleteId(null);
+    queryClient.invalidateQueries([QueryKeys.scheduledAgents]);
+    queryClient.invalidateQueries([QueryKeys.scheduledAgentRuns]);
+  }, [queryClient]);
+
+  useEffect(() => {
+    return () => {
+      if (deleteTimeoutRef.current) {
+        clearTimeout(deleteTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleRunSuccess = (res: {
     success: boolean;
@@ -168,7 +222,7 @@ export default function ScheduledAgentsPanel() {
   });
 
   const resolvedAgentsMap = useMemo(() => {
-    const resolved: Record<string, string> = { ...agentsMap };
+    const resolved = { ...agentsMap } as Record<string, string>;
     missingAgentQueries.forEach((query) => {
       const agent = query.data;
       if (agent?.id && agent?.name) {
@@ -195,6 +249,16 @@ export default function ScheduledAgentsPanel() {
     setFormOpen(false);
     setEditingSchedule(null);
   };
+
+  const handleDeleteClick = (schedule: ScheduledAgentSchedule) => {
+    setScheduleToDelete(schedule);
+    setDeleteDialogOpen(true);
+  };
+
+  const displayedSchedules = useMemo(
+    () => schedules.filter((s) => s._id !== pendingDeleteId),
+    [schedules, pendingDeleteId],
+  );
 
   if (schedulesLoading) {
     return (
@@ -227,14 +291,31 @@ export default function ScheduledAgentsPanel() {
           </Button>
         </div>
 
+        {/* Undo bar */}
+        {pendingDeleteId && (
+          <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-[#02855E] bg-[#02855E]/20 px-3 py-2 text-sm">
+            <span className="text-text-primary">
+              {localize('com_sidepanel_scheduled_agents_deleted')}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 shrink-0 font-semibold underline"
+              onClick={handleUndoDelete}
+            >
+              {localize('com_ui_undo')}
+            </Button>
+          </div>
+        )}
+
         {/* Schedule list */}
         <div className="mt-2 space-y-2">
-          {schedules.length === 0 ? (
+          {displayedSchedules.length === 0 ? (
             <p className="text-sm text-text-secondary">
               {localize('com_sidepanel_scheduled_agents_no_schedules')}
             </p>
           ) : (
-            schedules.map((schedule) => (
+            displayedSchedules.map((schedule) => (
               <div
                 key={schedule._id}
                 className="flex flex-col gap-1 rounded-lg border border-border-medium bg-surface-primary p-2"
@@ -293,12 +374,7 @@ export default function ScheduledAgentsPanel() {
                     variant="ghost"
                     size="sm"
                     className="h-7 text-red-600 hover:text-red-700 dark:text-red-400"
-                    onClick={() =>
-                      deleteMutation.mutate(schedule._id, {
-                        onSuccess: handleDeleteSuccess,
-                        onError: handleDeleteError,
-                      })
-                    }
+                    onClick={() => handleDeleteClick(schedule)}
                     disabled={deleteMutation.isLoading}
                   >
                     <Trash2 className="h-3 w-3" aria-hidden="true" />
@@ -355,6 +431,38 @@ export default function ScheduledAgentsPanel() {
           )}
         </div>
       </div>
+
+      {/* Delete confirmation dialog */}
+      <OGDialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open);
+          if (!open) setScheduleToDelete(null);
+        }}
+      >
+        <OGDialogTemplate
+          showCloseButton={false}
+          title={localize('com_ui_delete')}
+          className="w-11/12 max-w-lg"
+          main={
+            scheduleToDelete && (
+              <Label className="text-left text-sm font-medium">
+                <Trans
+                  i18nKey="com_sidepanel_scheduled_agents_delete_confirm"
+                  values={{ name: scheduleToDelete.name }}
+                  components={{ strong: <strong /> }}
+                />
+              </Label>
+            )
+          }
+          selection={{
+            selectHandler: confirmDeleteSchedule,
+            selectClasses:
+              'bg-red-700 dark:bg-red-600 hover:bg-red-800 dark:hover:bg-red-800 text-white',
+            selectText: localize('com_ui_delete'),
+          }}
+        />
+      </OGDialog>
 
       {formOpen && (
         <ScheduleForm
