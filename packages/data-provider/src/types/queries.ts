@@ -223,6 +223,7 @@ export type ScheduledAgentSchedule = {
   enabled: boolean;
   timezone?: string;
   selectedTools?: string[] | null;
+  nextRunAt?: string | null;
   lastRunAt?: string | null;
   lastRunStatus?: ScheduledRunStatus | null;
   conversationId?: string | null;

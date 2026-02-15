@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Constants } from 'librechat-data-provider';
 import { EModelEndpoint } from 'librechat-data-provider';
-import { Checkbox, FilterInput, Label } from '@librechat/client';
+import { FilterInput, Label } from '@librechat/client';
 import {
   useGetAgentByIdQuery,
   useAvailableToolsQuery,
@@ -26,6 +26,7 @@ type Props = {
 export default function ToolPicker({ agentId, selectedTools, onChange }: Props) {
   const localize = useLocalize();
   const [search, setSearch] = useState('');
+  const [customModeActive, setCustomModeActive] = useState(false);
 
   const { data: agent } = useGetAgentByIdQuery(agentId, { enabled: !!agentId });
   const { data: regularTools = [] } = useAvailableToolsQuery(EModelEndpoint.agents, {
@@ -110,24 +111,48 @@ export default function ToolPicker({ agentId, selectedTools, onChange }: Props) 
     return new Set(selectedTools);
   }, [selectedTools]);
 
+  useEffect(() => {
+    if (selectedTools === null && customModeActive) {
+      setCustomModeActive(false);
+    }
+  }, [selectedTools, customModeActive]);
+
   const isAll = selectedTools === null;
-  const isNone = Array.isArray(selectedTools) && selectedTools.length === 0;
-  const isCustom = Array.isArray(selectedTools) && selectedTools.length > 0;
+  const isNone =
+    Array.isArray(selectedTools) &&
+    selectedTools.length === 0 &&
+    !customModeActive;
+  const isCustom =
+    customModeActive || (Array.isArray(selectedTools) && selectedTools.length > 0);
 
   const handleModeChange = (mode: 'all' | 'none' | 'custom') => {
-    if (mode === 'all') onChange(null);
-    else if (mode === 'none') onChange([]);
-    else onChange(toolOptions.map((t) => t.id));
+    if (mode === 'all') {
+      setCustomModeActive(false);
+      onChange(null);
+    } else if (mode === 'none') {
+      setCustomModeActive(false);
+      onChange([]);
+    } else {
+      setCustomModeActive(true);
+      onChange(toolOptions.map((t) => t.id));
+    }
   };
 
   const handleToolToggle = (id: string) => {
+    setCustomModeActive(true);
     const current = selectedTools === null ? toolOptions.map((t) => t.id) : selectedTools;
     const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
     onChange(next.length === toolOptions.length ? null : next);
   };
 
-  const handleSelectAll = () => onChange(null);
-  const handleSelectNone = () => onChange([]);
+  const handleSelectAll = () => {
+    setCustomModeActive(false);
+    onChange(null);
+  };
+  const handleSelectNone = () => {
+    setCustomModeActive(true);
+    onChange([]);
+  };
 
   if (!agentId || toolOptions.length === 0) {
     return null;
@@ -195,6 +220,8 @@ export default function ToolPicker({ agentId, selectedTools, onChange }: Props) 
             </button>
           </div>
           <div
+            role="listbox"
+            aria-multiselectable="true"
             className={cn(
               'max-h-48 space-y-1 overflow-y-auto',
               filteredOptions.length > 5 && 'pr-1',
@@ -215,20 +242,22 @@ export default function ToolPicker({ agentId, selectedTools, onChange }: Props) 
                     )}
                     onClick={() => handleToolToggle(tool.id)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
+                      if (e.key === ' ') {
                         e.preventDefault();
                         handleToolToggle(tool.id);
                       }
                     }}
-                    role="button"
+                    role="option"
                     tabIndex={0}
+                    aria-selected={checked}
                   >
-                    <Checkbox
+                    <input
+                      type="checkbox"
                       id={`tool-${tool.id}`}
                       checked={checked}
-                      onCheckedChange={() => handleToolToggle(tool.id)}
+                      onChange={() => handleToolToggle(tool.id)}
                       onClick={(e) => e.stopPropagation()}
-                      className="h-4 w-4 shrink-0"
+                      className="h-4 w-4 shrink-0 rounded border-border-xheavy"
                       aria-label={tool.name}
                     />
                     <div className="min-w-0 flex-1">

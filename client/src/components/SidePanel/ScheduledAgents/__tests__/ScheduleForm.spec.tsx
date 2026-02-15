@@ -8,6 +8,19 @@ jest.mock('../ToolPicker', () => ({
   default: jest.fn(() => <div data-testid="tool-picker" />),
 }));
 
+jest.mock('../SimpleRecurrencePicker', () => ({
+  __esModule: true,
+  default: ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
+    <div data-testid="cron-picker">
+      <input
+        data-testid="cron-input"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  ),
+}));
+
 jest.mock('~/hooks', () => ({
   useLocalize: jest.fn().mockReturnValue((key: string) => key),
 }));

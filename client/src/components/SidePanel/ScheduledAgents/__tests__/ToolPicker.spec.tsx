@@ -99,4 +99,22 @@ describe('ToolPicker', () => {
     fireEvent.click(screen.getByText('Tool B'));
     expect(onChange).toHaveBeenLastCalledWith(null);
   });
+
+  it('keeps custom panel open when Deselect All is clicked so user can pick specific tools', () => {
+    const { rerender } = render(
+      <ToolPicker agentId="agent-1" selectedTools={['file_search', 'tool_b']} onChange={onChange} />,
+    );
+    fireEvent.click(screen.getByText('Custom selection'));
+    expect(screen.getByText('File Search')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('com_ui_deselect_all'));
+    expect(onChange).toHaveBeenCalledWith([]);
+
+    rerender(
+      <ToolPicker agentId="agent-1" selectedTools={[]} onChange={onChange} />,
+    );
+    expect(screen.getByRole('radio', { name: /Custom selection/i })).toBeChecked();
+    expect(screen.getByText('File Search')).toBeInTheDocument();
+    expect(screen.getByText('Tool B')).toBeInTheDocument();
+  });
 });

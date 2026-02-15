@@ -576,6 +576,8 @@ export const useGetScheduledAgentsQuery = (
   );
 };
 
+const ACTIVE_RUN_STATUSES = ['queued', 'running'] as const;
+
 export const useGetScheduledAgentRunsQuery = (
   limit = 25,
   config?: UseQueryOptions<q.ScheduledRun[]>,
@@ -583,7 +585,17 @@ export const useGetScheduledAgentRunsQuery = (
   return useQuery<q.ScheduledRun[]>(
     [QueryKeys.scheduledAgentRuns, limit],
     () => dataService.listScheduledAgentRuns(limit),
-    { refetchOnWindowFocus: false, ...config },
+    {
+      refetchOnWindowFocus: false,
+      refetchInterval: (query) => {
+        const runs = query.state.data as q.ScheduledRun[] | undefined;
+        const hasActive = runs?.some((r) =>
+          ACTIVE_RUN_STATUSES.includes(r.status as (typeof ACTIVE_RUN_STATUSES)[number]),
+        );
+        return hasActive ? 2000 : false;
+      },
+      ...config,
+    },
   );
 };
 
@@ -594,7 +606,16 @@ export const useGetScheduledAgentRunQuery = (
   return useQuery<q.ScheduledRunDetail>(
     [QueryKeys.scheduledAgentRuns, id],
     () => dataService.getScheduledAgentRun(id),
-    { enabled: !!id, refetchOnWindowFocus: false, ...config },
+    {
+      enabled: !!id,
+      refetchOnWindowFocus: false,
+      refetchInterval: (query) => {
+        const run = query.state.data as q.ScheduledRunDetail | undefined;
+        const isActive = run && ACTIVE_RUN_STATUSES.includes(run.status as (typeof ACTIVE_RUN_STATUSES)[number]);
+        return isActive ? 2000 : false;
+      },
+      ...config,
+    },
   );
 };
 
