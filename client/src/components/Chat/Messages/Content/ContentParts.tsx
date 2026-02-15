@@ -8,6 +8,8 @@ import type {
 } from 'librechat-data-provider';
 import { MessageContext, SearchContext } from '~/Providers';
 import { ParallelContentRenderer, type PartWithIndex } from './ParallelContent';
+import { groupConsecutiveToolCalls } from './utils/groupToolCalls';
+import ToolCallGroup from './ToolCallGroup';
 import { mapAttachments } from '~/utils';
 import { EditTextPart, EmptyText } from './Parts';
 import MemoryArtifacts from './MemoryArtifacts';
@@ -168,12 +170,15 @@ const ContentParts = memo(function ContentParts({
   }
 
   // Sequential content: render parts in order (90% of cases)
-  const sequentialParts: PartWithIndex[] = [];
-  content.forEach((part, idx) => {
-    if (part) {
-      sequentialParts.push({ part, idx });
-    }
-  });
+  const renderItems = useMemo(() => {
+    const sequentialParts: PartWithIndex[] = [];
+    content?.forEach((part, idx) => {
+      if (part) {
+        sequentialParts.push({ part, idx });
+      }
+    });
+    return groupConsecutiveToolCalls(sequentialParts);
+  }, [content]);
 
   return (
     <SearchContext.Provider value={{ searchResults }}>
@@ -184,7 +189,28 @@ const ContentParts = memo(function ContentParts({
           <EmptyText />
         </Container>
       )}
-      {sequentialParts.map(({ part, idx }) => renderPart(part, idx, idx === lastContentIdx))}
+      {renderItems.map((item, i) => {
+        if (item.type === 'single') {
+          return renderPart(
+            item.part,
+            item.idx,
+            i === renderItems.length - 1 && item.idx === lastContentIdx,
+          );
+        }
+        const isLastItem = i === renderItems.length - 1;
+        const lastPartInGroup = item.parts[item.parts.length - 1];
+        const isLast =
+          isLastItem && lastPartInGroup && lastPartInGroup.idx === lastContentIdx;
+        return (
+          <ToolCallGroup
+            key={`tool-call-group-${messageId}-${item.parts[0].idx}`}
+            parts={item.parts}
+            messageId={messageId}
+            renderPart={renderPart}
+            isLast={!!isLast}
+          />
+        );
+      })}
     </SearchContext.Provider>
   );
 });

@@ -8,10 +8,21 @@ import { cn } from '~/utils';
 const wrapperClass =
   'progress-text-wrapper text-token-text-secondary relative -mt-[0.75px] h-5 w-full leading-5';
 
-const Wrapper = ({ popover, children }: { popover: boolean; children: React.ReactNode }) => {
+const mutedWrapperClass =
+  'progress-text-wrapper text-text-tertiary relative -mt-[0.75px] h-5 w-full leading-5';
+
+const Wrapper = ({
+  popover,
+  muted,
+  children,
+}: {
+  popover: boolean;
+  muted?: boolean;
+  children: React.ReactNode;
+}) => {
   if (popover) {
     return (
-      <div className={wrapperClass}>
+      <div className={muted ? mutedWrapperClass : wrapperClass}>
         <Popover.Trigger asChild>
           <div
             className="progress-text-content absolute left-0 top-0 overflow-visible whitespace-nowrap"
@@ -26,7 +37,7 @@ const Wrapper = ({ popover, children }: { popover: boolean; children: React.Reac
   }
 
   return (
-    <div className={wrapperClass}>
+    <div className={muted ? mutedWrapperClass : wrapperClass}>
       <div
         className="progress-text-content absolute left-0 top-0 overflow-visible whitespace-nowrap"
         style={{ opacity: 1, transform: 'none' }}
@@ -48,6 +59,7 @@ export default function ProgressText({
   popover = false,
   isExpanded = false,
   error = false,
+  muted = false,
 }: {
   progress: number;
   onClick?: () => void;
@@ -58,6 +70,7 @@ export default function ProgressText({
   popover?: boolean;
   isExpanded?: boolean;
   error?: boolean;
+  muted?: boolean;
 }) {
   const getText = () => {
     if (error) {
@@ -84,7 +97,7 @@ export default function ProgressText({
   const showShimmer = progress < 1 && !error;
 
   return (
-    <Wrapper popover={popover}>
+    <Wrapper popover={popover} muted={muted}>
       <button
         type="button"
         className={cn(

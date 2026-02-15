@@ -262,6 +262,7 @@ export default function ToolCall({
     <>
       <div className="relative my-2.5 flex h-5 shrink-0 items-center gap-2.5">
         <ProgressText
+          muted
           progress={progress}
           onClick={() => setShowInfo((prev) => !prev)}
           inProgressText={
@@ -279,7 +280,7 @@ export default function ToolCall({
         />
       </div>
       <div
-        className="relative"
+        className="relative pl-4"
         style={{
           height: showInfo ? contentHeight : 0,
           overflow: 'hidden',
