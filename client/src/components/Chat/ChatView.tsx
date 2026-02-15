@@ -7,7 +7,7 @@ import { Constants, buildTree } from 'librechat-data-provider';
 import type { TMessage } from 'librechat-data-provider';
 import type { ChatFormValues } from '~/common';
 import { ChatContext, AddedChatContext, useFileMapContext, ChatFormProvider } from '~/Providers';
-import { useAddedResponse, useResumeOnLoad, useAdaptiveSSE, useChatHelpers, useLocalize } from '~/hooks';
+import { useAddedResponse, useResumeOnLoad, useAdaptiveSSE, useChatHelpers } from '~/hooks';
 import ConversationStarters from './Input/ConversationStarters';
 import { useGetMessagesByConvoId } from '~/data-provider';
 import MessagesView from './Messages/MessagesView';
@@ -30,12 +30,12 @@ function LoadingSpinner() {
 }
 
 function ChatView({ index = 0 }: { index?: number }) {
-  const localize = useLocalize();
   const { conversationId } = useParams();
   const rootSubmission = useRecoilValue(store.submissionByIndex(index));
   const centerFormOnLanding = useRecoilValue(store.centerFormOnLanding);
 
   const fileMap = useFileMapContext();
+  const chatHelpers = useChatHelpers(index, conversationId);
 
   const { data: messagesTree = null, isLoading } = useGetMessagesByConvoId(conversationId ?? '', {
     select: useCallback(
@@ -48,9 +48,7 @@ function ChatView({ index = 0 }: { index?: number }) {
     enabled: !!fileMap,
   });
 
-  const chatHelpers = useChatHelpers(index, conversationId);
   const addedChatHelpers = useAddedResponse();
-  const isScheduledRun = !!chatHelpers.conversation?.scheduledRunId;
 
   useAdaptiveSSE(rootSubmission, chatHelpers, false, index);
 
@@ -101,12 +99,7 @@ function ChatView({ index = 0 }: { index?: number }) {
                       isLandingPage && 'max-w-3xl transition-all duration-200 xl:max-w-4xl',
                     )}
                   >
-                    {!isScheduledRun && <ChatForm index={index} />}
-                    {isScheduledRun && (
-                      <div className="border-token-border-medium flex items-center justify-center border-t py-3 text-sm text-text-secondary">
-                        {localize('com_ui_read_only')} — {localize('com_sidepanel_scheduled_agents')}
-                      </div>
-                    )}
+                    <ChatForm index={index} />
                     {isLandingPage ? <ConversationStarters /> : <Footer />}
                   </div>
                 </div>

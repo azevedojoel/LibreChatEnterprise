@@ -13,7 +13,14 @@ jest.mock('~/db/models', () => ({
     }),
   },
   Conversation: { findOneAndUpdate: jest.fn().mockResolvedValue({}) },
-  ScheduledAgent: { findByIdAndUpdate: jest.fn().mockResolvedValue({}) },
+  ScheduledAgent: {
+    findByIdAndUpdate: jest.fn().mockResolvedValue({}),
+    findById: jest.fn().mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue({ name: 'Test Schedule' }),
+      }),
+    }),
+  },
   ScheduledRun: { create: jest.fn() },
 }));
 

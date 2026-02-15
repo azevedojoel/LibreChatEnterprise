@@ -180,11 +180,6 @@ module.exports = {
 
     filters.push({ $or: [{ expiredAt: null }, { expiredAt: { $exists: false } }] });
 
-    // Exclude scheduled run conversations from main list (read-only run views)
-    filters.push({
-      $or: [{ scheduledRunId: null }, { scheduledRunId: { $exists: false } }],
-    });
-
     if (search) {
       try {
         const meiliResults = await Conversation.meiliSearch(search, { filter: `user = "${user}"` });

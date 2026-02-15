@@ -1,8 +1,10 @@
 const crypto = require('crypto');
 const { logger } = require('@librechat/data-schemas');
-const { EModelEndpoint } = require('librechat-data-provider');
+const { EModelEndpoint, ResourceType, PermissionBits } = require('librechat-data-provider');
 const { getAppConfig } = require('~/server/services/Config');
 const { initializeClient } = require('~/server/services/Endpoints/agents');
+const { getAgent } = require('~/models/Agent');
+const { checkPermission } = require('~/server/services/PermissionService');
 const { buildOptions } = require('~/server/services/Endpoints/agents/build');
 const { Conversation, ScheduledAgent, ScheduledRun, User } = require('~/db/models');
 const { disposeClient } = require('~/server/cleanup');
@@ -51,6 +53,21 @@ async function executeScheduledAgent({
     const user = await User.findById(userId).lean();
     if (!user) {
       throw new Error(`User not found: ${userId}`);
+    }
+
+    const agent = await getAgent({ id: agentId });
+    if (!agent) {
+      throw new Error(`Agent not found: ${agentId}`);
+    }
+    const hasAccess = await checkPermission({
+      userId,
+      role: user.role,
+      resourceType: ResourceType.AGENT,
+      resourceId: agent._id,
+      requiredPermission: PermissionBits.VIEW,
+    });
+    if (!hasAccess) {
+      throw new Error(`User ${userId} does not have permission to use agent ${agentId}`);
     }
 
     const appConfig = await getAppConfig({ role: user.role });
@@ -163,9 +180,12 @@ async function executeScheduledAgent({
     }
 
     const runDocId = scheduledRunDoc?._id ?? existingRunId;
+    const schedule = await ScheduledAgent.findById(scheduleId).select('name').lean();
+    const runTitle = `${schedule?.name ?? 'Scheduled run'} — ${runAt.toLocaleString()}`;
+
     await Conversation.findOneAndUpdate(
       { conversationId, user: userId },
-      { $set: { scheduledRunId: runDocId } },
+      { $set: { scheduledRunId: runDocId, title: runTitle } },
     );
 
     await ScheduledAgent.findByIdAndUpdate(scheduleId, {
