@@ -332,7 +332,7 @@ describe('formatToolContent', () => {
   });
 
   describe('unknown content types', () => {
-    it('should stringify unknown content types', () => {
+    it('should handle unknown content types without JSON wrapping', () => {
       const result: t.MCPToolCallResponse = {
         content: [
           { type: 'text', text: 'Normal text' },
@@ -344,7 +344,7 @@ describe('formatToolContent', () => {
       expect(content).toEqual([
         {
           type: 'text',
-          text: 'Normal text\n\n' + JSON.stringify({ type: 'unknown', data: 'some data' }, null, 2),
+          text: 'Normal text\n\n(Unknown content type: unknown)',
         },
       ]);
       expect(artifacts).toBeUndefined();

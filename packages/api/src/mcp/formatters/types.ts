@@ -13,4 +13,5 @@ export type OutputFormatterFn = (
 export type OutputFormatterConfig =
   | 'passthrough'
   | 'json-to-llm'
+  | 'json-to-toon'
   | { module: string };

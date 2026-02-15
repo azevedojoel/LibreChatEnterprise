@@ -208,9 +208,10 @@ actions:
 
 # Example MCP Servers Object Structure
 # mcpServers:
-#   # outputFormatter: Transform raw tool output (e.g. JSON) for better LLM comprehension.
-#   #   - passthrough: No transformation (default)
+#   # outputFormatter: Transform raw tool output for better LLM token efficiency.
+#   #   - json-to-toon: Converts JSON to TOON format (default when omitted)
 #   #   - json-to-llm: Converts JSON to human-readable key-value/bullet format
+#   #   - passthrough: No transformation
 #   #   - { module: "./path/to/formatter.js" }: Custom formatter (exports default function)
 #   everything:
 #     # type: sse # type can optionally be omitted

@@ -77,7 +77,11 @@ function parseAsString(
         }
         segment = resourceText.join('\n');
       } else {
-        segment = JSON.stringify(item, null, 2);
+        const unknownItem = item as { text?: string; type?: string };
+        segment =
+          typeof unknownItem.text === 'string'
+            ? unknownItem.text
+            : `(Unknown content type${unknownItem.type ? `: ${unknownItem.type}` : ''})`;
       }
       return formatter ? formatter(segment, ctx) : segment;
     })
@@ -187,8 +191,12 @@ export function formatToolContent(
     if (handler) {
       handler(item as never);
     } else {
-      const stringified = JSON.stringify(item, null, 2);
-      const segment = formatter ? formatter(stringified, ctx) : stringified;
+      const unknownItem = item as { text?: string; type?: string };
+      const segmentText =
+        typeof unknownItem.text === 'string'
+          ? unknownItem.text
+          : `(Unknown content type${unknownItem.type ? `: ${unknownItem.type}` : ''})`;
+      const segment = formatter ? formatter(segmentText, ctx) : segmentText;
       currentTextBlock += (currentTextBlock ? '\n\n' : '') + segment;
     }
   }

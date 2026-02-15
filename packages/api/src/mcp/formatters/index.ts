@@ -1,10 +1,12 @@
 import type { OutputFormatterConfig, OutputFormatterFn } from './types';
 import { passthroughFormatter } from './passthrough';
 import { jsonToLlmFormatter } from './json-to-llm';
+import { jsonToToonFormatter } from './json-to-toon';
 
 const BUILT_IN_FORMATTERS: Record<string, OutputFormatterFn> = {
   passthrough: passthroughFormatter,
   'json-to-llm': jsonToLlmFormatter,
+  'json-to-toon': jsonToToonFormatter,
 };
 
 const formatterCache = new Map<string, OutputFormatterFn>();
@@ -12,26 +14,27 @@ const formatterCache = new Map<string, OutputFormatterFn>();
 /**
  * Resolves the output formatter from MCP server config.
  * @param config - outputFormatter from server options (optional)
- * @returns Formatter function, or undefined for no transformation
+ * @returns Formatter function; defaults to json-to-toon when not specified
  */
 export function getFormatter(config?: OutputFormatterConfig): OutputFormatterFn | undefined {
-  if (!config) return undefined;
+  // Default to json-to-toon when not specified (TOON: token-efficient, LLM-friendly)
+  const effectiveConfig = config ?? 'json-to-toon';
 
-  if (typeof config === 'string') {
-    const builtIn = BUILT_IN_FORMATTERS[config];
+  if (typeof effectiveConfig === 'string') {
+    const builtIn = BUILT_IN_FORMATTERS[effectiveConfig];
     if (builtIn) return builtIn;
     return undefined;
   }
 
-  if (config.module) {
-    let formatter = formatterCache.get(config.module);
+  if (effectiveConfig.module) {
+    let formatter = formatterCache.get(effectiveConfig.module);
     if (!formatter) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const mod = require(config.module);
+        const mod = require(effectiveConfig.module);
         formatter = (mod.default ?? mod) as OutputFormatterFn;
         if (typeof formatter === 'function') {
-          formatterCache.set(config.module, formatter);
+          formatterCache.set(effectiveConfig.module, formatter);
         }
       } catch {
         return undefined;
@@ -46,3 +49,4 @@ export function getFormatter(config?: OutputFormatterConfig): OutputFormatterFn 
 export type { OutputFormatterFn, OutputFormatterConfig } from './types';
 export { passthroughFormatter } from './passthrough';
 export { jsonToLlmFormatter } from './json-to-llm';
+export { jsonToToonFormatter } from './json-to-toon';

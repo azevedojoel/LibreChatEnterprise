@@ -141,16 +141,18 @@ mcpSettings:
     - 'localhost'
     - 'host.docker.internal'
     - '*.example.com'
+    - 'mcp.stripe.com'
+    - '*.plaid.com'
 
 # MCP Servers (example - uncomment and configure as needed)
 mcpServers:
-  google-workspace:
+  Google:
     type: stdio
     command: node
     args:
       - ./mcp-servers/google-workspace/workspace-server/dist/index.js
     startup: false
-    outputFormatter: json-to-llm
+    outputFormatter: json-to-toon
     oauth:
       authorization_url: https://accounts.google.com/o/oauth2/v2/auth
       token_url: https://oauth2.googleapis.com/token
@@ -160,13 +162,14 @@ mcpServers:
     env:
       GOOGLE_ACCESS_TOKEN: "{{LIBRECHAT_MCP_OAUTH_ACCESS_TOKEN}}"
       WORKSPACE_CLIENT_ID: '${GOOGLE_WORKSPACE_CLIENT_ID}'
-  ms-365:
+  Microsoft:
     type: stdio
     command: node
     args:
       - ./mcp-servers/ms-365-mcp-server/dist/index.js
+      - --toon
     startup: false
-    outputFormatter: json-to-llm
+    outputFormatter: json-to-toon
     oauth:
       authorization_url: https://login.microsoftonline.com/common/oauth2/v2.0/authorize
       token_url: https://login.microsoftonline.com/common/oauth2/v2.0/token
