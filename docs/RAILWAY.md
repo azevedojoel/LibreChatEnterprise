@@ -68,6 +68,23 @@ Build and deploy behavior comes from `railway.toml`. Env vars come from Railway 
 
 **Note:** `LIBRECHAT_CODE_LOCAL` in `.env.example` is not used by the codebase. Use `LIBRECHAT_CODE_API_KEY=local` instead to enable local code execution.
 
+## Redis (Required for Scheduled Agents)
+
+Redis is required for reliable scheduled agent runs, sessions, stream job storage, and multi-instance deployments.
+
+### Setup
+
+1. Add Redis to your project: Railway dashboard -> your project -> Ctrl/Cmd+K -> **New** -> **Database** -> **Redis** (or deploy from [Redis template](https://railway.com/template/redis)).
+2. In your LibreChat service variables, set:
+   ```
+   USE_REDIS=true
+   REDIS_URI=${{Redis.REDIS_URL}}
+   ```
+   Replace `Redis` with your Redis service name if you named it differently. Railway provides `REDIS_URL`; LibreChat also accepts `REDIS_URL` directly if set.
+3. Sync with `node scripts/sync-railway-env.js` or add these in the Railway UI.
+
+Without Redis, scheduled agent "run now" uses fire-and-forget and jobs may be lost on restart. Set `SCHEDULED_AGENTS_REQUIRE_REDIS=true` to fail startup when Redis is unavailable (recommended for production).
+
 ## Google Workspace MCP (OAuth)
 
 If you use the Google Workspace MCP server (`mcpServers.google-workspace` in `librechat.yaml`), you must:
@@ -130,3 +147,5 @@ Secrets must be identical across all instances that share the same user sessions
 | "Invalid refresh token: invalid signature" | JWT secret mismatch | Users: log out and log in again |
 | Auth works locally, 401 on Railway | Different `JWT_SECRET` between envs | Use same secrets or have users re-login on Railway |
 | Cookies not sent / auth fails after token expiry | `TRUST_PROXY` or domain misconfiguration | Set `TRUST_PROXY=1`, correct `DOMAIN_*` |
+| "USE_REDIS is enabled but REDIS_URI is not set" | Redis not configured | Add Redis service, set `USE_REDIS=true` and `REDIS_URI=${{Redis.REDIS_URL}}` |
+| Scheduled agent runs not persisting / lost on restart | Redis not configured | Add Redis service and configure as above |

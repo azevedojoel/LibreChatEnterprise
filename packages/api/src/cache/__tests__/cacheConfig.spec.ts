@@ -6,6 +6,7 @@ describe('cacheConfig', () => {
 
     // Clear all related env vars first
     delete process.env.REDIS_URI;
+    delete process.env.REDIS_URL;
     delete process.env.REDIS_CA;
     delete process.env.REDIS_KEY_PREFIX_VAR;
     delete process.env.REDIS_KEY_PREFIX;
@@ -76,7 +77,15 @@ describe('cacheConfig', () => {
 
       await expect(async () => {
         await import('../cacheConfig');
-      }).rejects.toThrow('USE_REDIS is enabled but REDIS_URI is not set.');
+      }).rejects.toThrow('USE_REDIS is enabled but REDIS_URI (or REDIS_URL) is not set.');
+    });
+
+    test('should not throw error when USE_REDIS is enabled and REDIS_URL is set (Railway compatibility)', async () => {
+      process.env.USE_REDIS = 'true';
+      process.env.REDIS_URL = 'redis://localhost:6379';
+
+      const { cacheConfig } = await import('../cacheConfig');
+      expect(cacheConfig.REDIS_URI).toBe('redis://localhost:6379');
     });
 
     test('should not throw error when USE_REDIS is enabled and REDIS_URI is set', async () => {
@@ -95,7 +104,7 @@ describe('cacheConfig', () => {
 
       await expect(async () => {
         await import('../cacheConfig');
-      }).rejects.toThrow('USE_REDIS is enabled but REDIS_URI is not set.');
+      }).rejects.toThrow('USE_REDIS is enabled but REDIS_URI (or REDIS_URL) is not set.');
     });
   });
 
