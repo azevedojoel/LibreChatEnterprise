@@ -209,7 +209,7 @@ export type GraphTokenResponse = {
 
 /* Scheduled Agents */
 export type ScheduleType = 'recurring' | 'one-off';
-export type ScheduledRunStatus = 'success' | 'failed' | 'running' | 'pending';
+export type ScheduledRunStatus = 'queued' | 'success' | 'failed' | 'running' | 'pending';
 
 export type ScheduledAgentSchedule = {
   _id: string;

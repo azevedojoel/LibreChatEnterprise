@@ -122,7 +122,12 @@ async function runSchedule(req, res) {
     }
 
     if (result.success) {
-      res.json({ success: true, conversationId: result.conversationId });
+      res.json({
+        success: true,
+        runId: result.runId,
+        status: result.status,
+        conversationId: result.conversationId,
+      });
     } else {
       res.status(500).json({ success: false, error: result.error });
     }

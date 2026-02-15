@@ -27,7 +27,7 @@ const scheduledRunSchema = new Schema<IScheduledRun>(
     },
     status: {
       type: String,
-      enum: ['success', 'failed', 'running', 'pending'],
+      enum: ['queued', 'success', 'failed', 'running', 'pending'],
       required: true,
       default: 'pending',
     },

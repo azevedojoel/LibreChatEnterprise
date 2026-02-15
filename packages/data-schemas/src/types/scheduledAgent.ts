@@ -1,7 +1,7 @@
 import type { Document, Types } from 'mongoose';
 
 export type ScheduleType = 'recurring' | 'one-off';
-export type ScheduledRunStatus = 'success' | 'failed' | 'running' | 'pending';
+export type ScheduledRunStatus = 'queued' | 'success' | 'failed' | 'running' | 'pending';
 
 export interface IScheduledAgent extends Document {
   userId: Types.ObjectId;

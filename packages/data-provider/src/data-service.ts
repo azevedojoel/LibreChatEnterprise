@@ -1054,7 +1054,7 @@ export const deleteScheduledAgent = (id: string): Promise<void> =>
 
 export const runScheduledAgent = (
   id: string,
-): Promise<{ success: boolean; conversationId?: string; error?: string }> =>
+): Promise<{ success: boolean; runId?: string; status?: string; conversationId?: string; error?: string }> =>
   request.post(`${endpoints.scheduledAgents()}/${id}/run`);
 
 export const listScheduledAgentRuns = (limit?: number): Promise<q.ScheduledRun[]> =>
