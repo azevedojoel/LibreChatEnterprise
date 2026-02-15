@@ -99,6 +99,20 @@ const BaseOptionsSchema = z.object({
       }),
     )
     .optional(),
+  /**
+   * Output formatter for tool results - transforms raw MCP output before sending to the LLM.
+   * - passthrough: No transformation (default when omitted)
+   * - json-to-llm: Converts JSON to human-readable key-value/bullet format
+   * - { module: "path" }: Custom formatter module (exports default function)
+   */
+  outputFormatter: z
+    .union([
+      z.enum(['passthrough', 'json-to-llm']),
+      z.object({
+        module: z.string().describe('Path to formatter module (exports default function)'),
+      }),
+    ])
+    .optional(),
 });
 
 export const StdioOptionsSchema = BaseOptionsSchema.extend({

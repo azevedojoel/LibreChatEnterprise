@@ -16,6 +16,7 @@ import { ConnectionsRepository } from './ConnectionsRepository';
 import { MCPConnectionFactory } from './MCPConnectionFactory';
 import { preProcessGraphTokens } from '~/utils/graph';
 import { formatToolContent } from './parsers';
+import { getFormatter } from './formatters';
 import { MCPConnection } from './connection';
 import { processMCPEnv } from '~/utils/env';
 
@@ -270,6 +271,18 @@ Please follow these instructions when using tools from the respective MCP server
     try {
       if (userId && user) this.updateUserLastActivity(userId);
 
+      // For stdio OAuth servers, always use a fresh connection so the token is injected
+      // into the spawned process. Cached connections can have stale/missing env.
+      const rawConfig = (await MCPServersRegistry.getInstance().getServerConfig(
+        serverName,
+        userId,
+      )) as t.MCPOptions | null;
+      const isStdioOAuth =
+        rawConfig &&
+        'command' in rawConfig &&
+        (rawConfig.requiresOAuth || (rawConfig as t.ParsedServerConfig).oauthMetadata);
+      const forceNew = !!(userId && isStdioOAuth);
+
       connection = await this.getConnection({
         serverName,
         user,
@@ -280,6 +293,7 @@ Please follow these instructions when using tools from the respective MCP server
         signal: options?.signal,
         customUserVars,
         requestBody,
+        forceNew,
       });
 
       if (!(await connection.isConnected())) {
@@ -290,10 +304,12 @@ Please follow these instructions when using tools from the respective MCP server
         );
       }
 
-      const rawConfig = (await MCPServersRegistry.getInstance().getServerConfig(
-        serverName,
-        userId,
-      )) as t.MCPOptions;
+      if (!rawConfig) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `${logPrefix} Server config not found for ${serverName}.`,
+        );
+      }
 
       // Pre-process Graph token placeholders (async) before sync processMCPEnv
       const graphProcessedConfig = await preProcessGraphTokens(rawConfig, {
@@ -330,7 +346,11 @@ Please follow these instructions when using tools from the respective MCP server
         this.updateUserLastActivity(userId);
       }
       this.checkIdleConnections();
-      return formatToolContent(result as t.MCPToolCallResponse, provider);
+      const formatter = getFormatter(currentOptions.outputFormatter);
+      return formatToolContent(result as t.MCPToolCallResponse, provider, formatter, {
+        serverName,
+        toolName,
+      });
     } catch (error) {
       // Log with context and re-throw or handle as needed
       logger.error(`${logPrefix}[${toolName}] Tool call failed`, error);

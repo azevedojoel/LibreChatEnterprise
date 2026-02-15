@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { Tools } from 'librechat-data-provider';
 import type { UIResource } from 'librechat-data-provider';
 import type * as t from './types';
+import type { OutputFormatterFn } from './formatters/types';
 
 function generateResourceId(text: string): string {
   return crypto.createHash('sha256').update(text).digest('hex').substring(0, 10);
@@ -48,7 +49,11 @@ function isImageContent(item: t.ToolContentPart): item is t.ImageContent {
   return item.type === 'image';
 }
 
-function parseAsString(result: t.MCPToolCallResponse): string {
+function parseAsString(
+  result: t.MCPToolCallResponse,
+  formatter?: OutputFormatterFn,
+  ctx?: { serverName?: string; toolName?: string },
+): string {
   const content = result?.content ?? [];
   if (!content.length) {
     return '(No response)';
@@ -56,10 +61,10 @@ function parseAsString(result: t.MCPToolCallResponse): string {
 
   const text = content
     .map((item) => {
+      let segment: string;
       if (item.type === 'text') {
-        return item.text;
-      }
-      if (item.type === 'resource') {
+        segment = item.text;
+      } else if (item.type === 'resource') {
         const resourceText = [];
         if ('text' in item.resource && item.resource.text != null && item.resource.text) {
           resourceText.push(item.resource.text);
@@ -70,9 +75,11 @@ function parseAsString(result: t.MCPToolCallResponse): string {
         if (item.resource.mimeType != null && item.resource.mimeType) {
           resourceText.push(`Type: ${item.resource.mimeType}`);
         }
-        return resourceText.join('\n');
+        segment = resourceText.join('\n');
+      } else {
+        segment = JSON.stringify(item, null, 2);
       }
-      return JSON.stringify(item, null, 2);
+      return formatter ? formatter(segment, ctx) : segment;
     })
     .filter(Boolean)
     .join('\n\n');
@@ -85,16 +92,20 @@ function parseAsString(result: t.MCPToolCallResponse): string {
  * First element: string or formatted content (excluding image_url)
  * Second element: Recognized types - "image", "image_url", "text", "json"
  *
- * @param  result - The MCPToolCallResponse object
+ * @param result - The MCPToolCallResponse object
  * @param provider - The provider name (google, anthropic, openai)
+ * @param formatter - Optional output formatter (e.g. json-to-llm)
+ * @param ctx - Optional context (serverName, toolName) for formatter
  * @returns Tuple of content and image_urls
  */
 export function formatToolContent(
   result: t.MCPToolCallResponse,
   provider: t.Provider,
+  formatter?: OutputFormatterFn,
+  ctx?: { serverName?: string; toolName?: string },
 ): t.FormattedContentResult {
   if (!RECOGNIZED_PROVIDERS.has(provider)) {
-    return [parseAsString(result), undefined];
+    return [parseAsString(result, formatter, ctx), undefined];
   }
 
   const content = result?.content ?? [];
@@ -115,7 +126,8 @@ export function formatToolContent(
     resource: (item: Extract<t.ToolContentPart, { type: 'resource' }>) => void;
   } = {
     text: (item) => {
-      currentTextBlock += (currentTextBlock ? '\n\n' : '') + item.text;
+      const segment = formatter ? formatter(item.text, ctx) : item.text;
+      currentTextBlock += (currentTextBlock ? '\n\n' : '') + segment;
     },
 
     image: (item) => {
@@ -176,7 +188,8 @@ export function formatToolContent(
       handler(item as never);
     } else {
       const stringified = JSON.stringify(item, null, 2);
-      currentTextBlock += (currentTextBlock ? '\n\n' : '') + stringified;
+      const segment = formatter ? formatter(stringified, ctx) : stringified;
+      currentTextBlock += (currentTextBlock ? '\n\n' : '') + segment;
     }
   }
 
