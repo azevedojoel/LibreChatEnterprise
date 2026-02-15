@@ -172,7 +172,10 @@ router.get('/:serverName/oauth/callback', async (req, res) => {
     const flowState = await MCPOAuthHandler.getFlowState(flowId, flowManager);
 
     if (!flowState) {
-      logger.error('[MCP OAuth] Flow state not found for flowId:', flowId);
+      logger.error('[MCP OAuth] Flow state not found - flow may have expired or was never stored', {
+        flowId,
+        serverName,
+      });
       return res.redirect(`${basePath}/oauth/error?error=invalid_state`);
     }
 

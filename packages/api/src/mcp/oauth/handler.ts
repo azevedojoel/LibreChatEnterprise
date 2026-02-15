@@ -375,7 +375,25 @@ export class MCPOAuthHandler {
     try {
       // Check if we have pre-configured OAuth settings
       if (config?.authorization_url && config?.token_url && config?.client_id) {
-        logger.debug(`[MCPOAuth] Using pre-configured OAuth settings for ${serverName}`);
+        const redirectUri = config.redirect_uri || this.getDefaultRedirectUri(serverName);
+        const clientIdRaw = config.client_id;
+        const clientIdMasked =
+          clientIdRaw && clientIdRaw.length > 12
+            ? `${clientIdRaw.slice(0, 8)}...${clientIdRaw.slice(-4)}`
+            : '(empty or too short)';
+        const looksLikePlaceholder = !!(clientIdRaw && clientIdRaw.includes('${'));
+
+        logger.info(
+          `[MCPOAuth][${serverName}] Pre-configured OAuth: client_id=${clientIdMasked} ` +
+            `(length=${clientIdRaw?.length ?? 0}, placeholder=${looksLikePlaceholder}), ` +
+            `redirect_uri=${redirectUri}, DOMAIN_SERVER=${process.env.DOMAIN_SERVER || '(default localhost:3080)'}`,
+        );
+        if (looksLikePlaceholder) {
+          logger.warn(
+            `[MCPOAuth][${serverName}] client_id appears to be an unresolved env placeholder (contains \$\{). ` +
+              `Check GOOGLE_WORKSPACE_CLIENT_ID is set in .env and librechat.yaml uses \${GOOGLE_WORKSPACE_CLIENT_ID}`,
+          );
+        }
 
         const skipCodeChallengeCheck =
           config?.skip_code_challenge_check === true ||
@@ -616,8 +634,17 @@ export class MCPOAuthHandler {
         resource = undefined;
       }
 
+      const redirectUri =
+        metadata.clientInfo.redirect_uris?.[0] || this.getDefaultRedirectUri();
+      const cid = metadata.clientInfo.client_id;
+      const cidMasked = cid && cid.length > 12 ? `${cid.slice(0, 8)}...${cid.slice(-4)}` : '(short)';
+
+      logger.info(
+        `[MCPOAuth][complete] Exchanging code for tokens: flowId=${flowId}, redirect_uri=${redirectUri}, client_id=${cidMasked}`,
+      );
+
       const tokens = await exchangeAuthorization(metadata.serverUrl, {
-        redirectUri: metadata.clientInfo.redirect_uris?.[0] || this.getDefaultRedirectUri(),
+        redirectUri,
         metadata: metadata.metadata as unknown as SDKOAuthMetadata,
         clientInformation: metadata.clientInfo,
         codeVerifier: metadata.codeVerifier,
@@ -646,7 +673,11 @@ export class MCPOAuthHandler {
 
       return mcpTokens;
     } catch (error) {
-      logger.error('[MCPOAuth] Failed to complete OAuth flow', { error, flowId });
+      const errMsg = error instanceof Error ? error.message : String(error);
+      logger.error(
+        `[MCPOAuth][complete] Token exchange failed: flowId=${flowId}, error=${errMsg}`,
+        { flowId, error },
+      );
       await flowManager.failFlow(flowId, this.FLOW_TYPE, error as Error);
       throw error;
     }

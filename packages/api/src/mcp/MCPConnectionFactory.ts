@@ -12,6 +12,26 @@ import { withTimeout } from '~/utils/promise';
 import { MCPConnection } from './connection';
 import { processMCPEnv } from '~/utils';
 
+const MCP_OAUTH_TOKEN_PLACEHOLDER = '{{LIBRECHAT_MCP_OAUTH_ACCESS_TOKEN}}';
+
+function injectMCPOAuthTokenIntoConfig(
+  config: t.MCPOptions,
+  accessToken: string,
+): void {
+  if ('env' in config && config.env) {
+    for (const [key, value] of Object.entries(config.env)) {
+      if (value === MCP_OAUTH_TOKEN_PLACEHOLDER) {
+        config.env[key] = accessToken;
+      }
+    }
+  }
+  if ('args' in config && config.args) {
+    config.args = config.args.map((arg) =>
+      arg === MCP_OAUTH_TOKEN_PLACEHOLDER ? accessToken : arg,
+    );
+  }
+}
+
 export interface ToolDiscoveryResult {
   tools: Tool[] | null;
   connection: MCPConnection | null;
@@ -209,9 +229,69 @@ export class MCPConnectionFactory {
     }
   }
 
+  private isStdioConfig(): boolean {
+    return 'command' in this.serverConfig && 'args' in this.serverConfig;
+  }
+
+  private hasPreConfiguredOAuth(): boolean {
+    const o = this.serverConfig.oauth;
+    return !!(o?.authorization_url && o?.token_url && o?.client_id);
+  }
+
+  private getServerUrlForOAuth(): string {
+    const urlFromConfig = (this.serverConfig as t.SSEOptions | t.StreamableHTTPOptions).url;
+    return (
+      urlFromConfig ??
+      this.serverConfig.oauth?.token_url ??
+      this.serverConfig.oauth?.authorization_url ??
+      ''
+    );
+  }
+
   /** Creates the base MCP connection with OAuth tokens */
   protected async createConnection(): Promise<MCPConnection> {
-    const oauthTokens = this.useOAuth ? await this.getOAuthTokens() : null;
+    let oauthTokens = this.useOAuth ? await this.getOAuthTokens() : null;
+
+    // Stdio: no 401 trigger - run OAuth proactively when tokens missing
+    if (
+      this.useOAuth &&
+      !oauthTokens &&
+      this.isStdioConfig() &&
+      this.hasPreConfiguredOAuth()
+    ) {
+      const result = await this.handleOAuthRequired();
+      if (result?.tokens) {
+        oauthTokens = result.tokens;
+        if (this.tokenMethods?.createToken) {
+          try {
+            await MCPTokenStorage.storeTokens({
+              userId: this.userId!,
+              serverName: this.serverName,
+              tokens: result.tokens,
+              createToken: this.tokenMethods.createToken,
+              updateToken: this.tokenMethods.updateToken,
+              findToken: this.tokenMethods.findToken,
+              clientInfo: result.clientInfo,
+              metadata: result.metadata,
+            });
+            logger.info(`${this.logPrefix} OAuth tokens saved to storage (proactive stdio flow)`);
+          } catch (error) {
+            logger.error(`${this.logPrefix} Failed to save OAuth tokens to storage`, error);
+          }
+        }
+      } else {
+        // OAuth required but we got no tokens - must not create connection with placeholder
+        throw new Error(
+          'OAuth flow initiated - return early',
+        );
+      }
+    }
+
+    // Inject OAuth token into stdio config env/args when present
+    if (oauthTokens?.access_token && this.isStdioConfig()) {
+      injectMCPOAuthTokenIntoConfig(this.serverConfig, oauthTokens.access_token);
+    }
+
     const connection = new MCPConnection({
       serverName: this.serverName,
       serverConfig: this.serverConfig,
@@ -283,7 +363,7 @@ export class MCPConnectionFactory {
       return await MCPOAuthHandler.refreshOAuthTokens(
         refreshToken,
         {
-          serverUrl: (this.serverConfig as t.SSEOptions | t.StreamableHTTPOptions).url,
+          serverUrl: this.getServerUrlForOAuth(),
           serverName: metadata.serverName,
           clientInfo: metadata.clientInfo,
         },
@@ -318,7 +398,7 @@ export class MCPConnectionFactory {
             flowMetadata,
           } = await MCPOAuthHandler.initiateOAuthFlow(
             this.serverName,
-            data.serverUrl || '',
+            data.serverUrl || this.getServerUrlForOAuth(),
             this.userId!,
             config?.oauth_headers ?? {},
             config?.oauth,
@@ -466,7 +546,7 @@ export class MCPConnectionFactory {
     clientInfo?: OAuthClientInformation;
     metadata?: OAuthMetadata;
   } | null> {
-    const serverUrl = (this.serverConfig as t.SSEOptions | t.StreamableHTTPOptions).url;
+    const serverUrl = this.getServerUrlForOAuth();
     logger.debug(
       `${this.logPrefix} \`handleOAuthRequired\` called with serverUrl: ${serverUrl ? sanitizeUrlForLogging(serverUrl) : 'undefined'}`,
     );
@@ -521,6 +601,19 @@ export class MCPConnectionFactory {
         );
       }
 
+      /** When returnOnOAuth, store the flow so the callback can find it, then throw */
+      if (this.returnOnOAuth) {
+        this.flowManager
+          .createFlow(newFlowId, 'mcp_oauth', flowMetadata as FlowMetadata, this.signal)
+          .catch((err) =>
+            logger.warn(
+              `${this.logPrefix} OAuth flow promise rejected (expected when user completes via callback)`,
+              err?.message,
+            ),
+          );
+        throw new Error('OAuth flow initiated - return early');
+      }
+
       /** Tokens from the new flow */
       const tokens = await this.flowManager.createFlow(
         newFlowId,
@@ -543,6 +636,9 @@ export class MCPConnectionFactory {
         metadata,
       };
     } catch (error) {
+      if (error instanceof Error && error.message === 'OAuth flow initiated - return early') {
+        throw error;
+      }
       logger.error(`${this.logPrefix} Failed to complete OAuth flow for ${this.serverName}`, error);
       return null;
     }
