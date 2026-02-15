@@ -371,6 +371,12 @@ export class MCPConnection extends EventEmitter {
           if (!isStdioOptions(options)) {
             throw new Error('Invalid options for stdio transport.');
           }
+          const stdioArgs = options.args ?? [];
+          const scriptPath = stdioArgs[0];
+          logger.info(
+            `${this.getLogPrefix()} Creating stdio transport: command=${options.command}, ` +
+              `args[0]=${scriptPath ?? '(none)'}, envKeys=[${Object.keys(options.env ?? {}).join(', ')}]`,
+          );
           return new StdioClientTransport({
             command: options.command,
             args: options.args,

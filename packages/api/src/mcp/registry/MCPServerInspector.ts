@@ -77,7 +77,18 @@ export class MCPServerInspector {
 
   private async detectOAuth(): Promise<void> {
     if (this.config.requiresOAuth != null) return;
-    if (this.config.url == null || this.config.startup === false) {
+
+    // Stdio: no URL, but can have pre-configured OAuth
+    if (this.config.url == null) {
+      const hasPreConfiguredOAuth =
+        this.config.oauth?.authorization_url &&
+        this.config.oauth?.token_url &&
+        this.config.oauth?.client_id;
+      this.config.requiresOAuth = !!hasPreConfiguredOAuth;
+      return;
+    }
+
+    if (this.config.startup === false) {
       this.config.requiresOAuth = false;
       return;
     }
