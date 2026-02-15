@@ -81,6 +81,7 @@ export interface InitializeAgentParams {
     model: string | null;
     tool_options: AgentToolOptions | undefined;
     tool_resources: AgentToolResources | undefined;
+    schedulerTargetAgentIds?: string[];
   }) => Promise<{
     /** Full tool instances (only present when definitionsOnly=false) */
     tools?: GenericTool[];
@@ -293,6 +294,7 @@ export async function initializeAgent(
     model: agent.model,
     tool_options: agent.tool_options,
     tool_resources,
+    schedulerTargetAgentIds: agent.schedulerTargetAgentIds,
   })) ?? {
     tools: [],
     toolContextMap: {},

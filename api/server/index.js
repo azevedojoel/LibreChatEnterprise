@@ -28,6 +28,7 @@ const { jwtLogin, ldapLogin, passportLogin } = require('~/strategies');
 const { updateInterfacePermissions } = require('~/models/interface');
 const { checkMigrations } = require('./services/start/migration');
 const initializeMCPs = require('./services/initializeMCPs');
+const { startScheduler } = require('./services/ScheduledAgents/scheduler');
 const configureSocialLogins = require('./socialLogins');
 const { getAppConfig } = require('./services/Config');
 const staticCache = require('./utils/staticCache');
@@ -168,6 +169,7 @@ const startServer = async () => {
   app.use('/api/permissions', routes.accessPermissions);
 
   app.use('/api/tags', routes.tags);
+  app.use('/api/scheduled-agents', routes.scheduledAgents);
   app.use('/api/mcp', routes.mcp);
 
   app.use(ErrorController);
@@ -204,6 +206,7 @@ const startServer = async () => {
     await initializeMCPs();
     await initializeOAuthReconnectManager();
     await checkMigrations();
+    startScheduler();
 
     // Configure stream services (auto-detects Redis from USE_REDIS env var)
     const streamServices = createStreamServices();

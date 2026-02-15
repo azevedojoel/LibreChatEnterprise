@@ -64,11 +64,17 @@ export enum QueryKeys {
   activeJobs = 'activeJobs',
   /* Agent API Keys */
   agentApiKeys = 'agentApiKeys',
+  /* Scheduled Agents */
+  scheduledAgents = 'scheduledAgents',
+  scheduledAgentRuns = 'scheduledAgentRuns',
 }
 
 // Dynamic query keys that require parameters
 export const DynamicQueryKeys = {
   agentFiles: (agentId: string) => ['agentFiles', agentId] as const,
+  scheduledAgentRuns: (limit?: number) =>
+    [QueryKeys.scheduledAgentRuns, limit] as const,
+  scheduledAgentRun: (id: string) => [QueryKeys.scheduledAgentRuns, id] as const,
 } as const;
 
 export enum MutationKeys {

@@ -90,7 +90,8 @@
     "migrate:agent-permissions:batch": "node config/migrate-agent-permissions.js --batch-size=50",
     "migrate:prompt-permissions:dry-run": "node config/migrate-prompt-permissions.js --dry-run",
     "migrate:prompt-permissions": "node config/migrate-prompt-permissions.js",
-    "migrate:prompt-permissions:batch": "node config/migrate-prompt-permissions.js --batch-size=50"
+    "migrate:prompt-permissions:batch": "node config/migrate-prompt-permissions.js --batch-size=50",
+    "postinstall": "patch-package"
   },
   "repository": {
     "type": "git",
@@ -127,6 +128,7 @@
     "husky": "^9.1.7",
     "jest": "^30.2.0",
     "lint-staged": "^15.4.3",
+    "patch-package": "^8.0.0",
     "prettier": "^3.5.0",
     "prettier-plugin-tailwindcss": "^0.6.11",
     "typescript-eslint": "^8.24.0"

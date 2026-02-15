@@ -1019,6 +1019,52 @@ export const updateMemoryPreferences = (preferences: {
   return request.patch(endpoints.memoryPreferences(), preferences);
 };
 
+export const listScheduledAgents = (): Promise<q.ScheduledAgentSchedule[]> =>
+  request.get(endpoints.scheduledAgents());
+
+export const createScheduledAgent = (data: {
+  name: string;
+  agentId: string;
+  prompt: string;
+  scheduleType: 'recurring' | 'one-off';
+  cronExpression?: string;
+  runAt?: string;
+  timezone?: string;
+  selectedTools?: string[] | null;
+}): Promise<q.ScheduledAgentSchedule> => request.post(endpoints.scheduledAgents(), data);
+
+export const updateScheduledAgent = (
+  id: string,
+  data: Partial<{
+    name: string;
+    agentId: string;
+    prompt: string;
+    scheduleType: 'recurring' | 'one-off';
+    cronExpression: string;
+    runAt: string;
+    enabled: boolean;
+    timezone: string;
+    selectedTools: string[] | null;
+  }>,
+): Promise<q.ScheduledAgentSchedule> =>
+  request.patch(`${endpoints.scheduledAgents()}/${id}`, data);
+
+export const deleteScheduledAgent = (id: string): Promise<void> =>
+  request.delete(`${endpoints.scheduledAgents()}/${id}`);
+
+export const runScheduledAgent = (
+  id: string,
+): Promise<{ success: boolean; conversationId?: string; error?: string }> =>
+  request.post(`${endpoints.scheduledAgents()}/${id}/run`);
+
+export const listScheduledAgentRuns = (limit?: number): Promise<q.ScheduledRun[]> =>
+  request.get(
+    limit ? `${endpoints.scheduledAgentRuns()}?limit=${limit}` : endpoints.scheduledAgentRuns(),
+  );
+
+export const getScheduledAgentRun = (id: string): Promise<q.ScheduledRunDetail> =>
+  request.get(endpoints.scheduledAgentRun(id));
+
 export const createMemory = (data: {
   key: string;
   value: string;

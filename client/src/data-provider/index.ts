@@ -4,6 +4,8 @@ export * from './Endpoints';
 export * from './Files';
 /* Memories */
 export * from './Memories';
+/* Scheduled Agents */
+export * from './ScheduledAgents';
 export * from './Messages';
 export * from './Misc';
 export * from './Tools';

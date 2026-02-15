@@ -60,6 +60,9 @@ const { recordUsage } = require('~/server/services/Threads');
 const { loadTools } = require('~/app/clients/tools/util');
 const { redactMessage } = require('~/config/parsers');
 const { findPluginAuthsByKeys } = require('~/models');
+const { getAgents } = require('~/models/Agent');
+const { buildSchedulerTargetContext } = require('~/server/services/ScheduledAgents/schedulerContext');
+const { SCHEDULER_DEFAULT_INSTRUCTIONS } = require('~/server/services/ScheduledAgents/schedulerInstructions');
 const { getFlowStateManager } = require('~/config');
 const { getLogStores } = require('~/cache');
 /**
@@ -415,6 +418,13 @@ const nativeTools = new Set([
   Tools.list_files,
   Tools.search_files,
   Tools.glob_files,
+  Tools.list_schedules,
+  Tools.create_schedule,
+  Tools.update_schedule,
+  Tools.delete_schedule,
+  Tools.run_schedule,
+  Tools.list_runs,
+  Tools.get_run,
 ]);
 
 /** Checks if a tool name is a known built-in tool */
@@ -482,9 +492,26 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
     toolsToFilter = [...new Set([...toolsToFilter, ...workspaceTools])];
   }
 
+  /** Inject scheduling tools when manage_scheduling is enabled (same pattern as execute_code) */
+  if (toolsToFilter.includes(AgentCapabilities.manage_scheduling)) {
+    const schedulingTools = [
+      Tools.list_schedules,
+      Tools.create_schedule,
+      Tools.update_schedule,
+      Tools.delete_schedule,
+      Tools.run_schedule,
+      Tools.list_runs,
+      Tools.get_run,
+    ];
+    toolsToFilter = [...new Set([...toolsToFilter, ...schedulingTools])];
+  }
+
   /** Filter by ephemeralAgent (chat badge overrides) */
   const ephemeralAgent = req?.body?.ephemeralAgent;
-  if (Array.isArray(ephemeralAgent?.mcp)) {
+  if (Array.isArray(ephemeralAgent?.tools)) {
+    const toolsSet = new Set(ephemeralAgent.tools);
+    toolsToFilter = toolsToFilter.filter((tool) => toolsSet.has(tool));
+  } else if (Array.isArray(ephemeralAgent?.mcp)) {
     toolsToFilter = toolsToFilter.filter((tool) => {
       if (typeof tool !== 'string' || !tool.includes(Constants.mcp_delimiter)) {
         return true;
@@ -496,6 +523,7 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
 
   const filteredTools = toolsToFilter.filter((tool) => {
     if (tool == null || typeof tool !== 'string') return false;
+    if (Array.isArray(ephemeralAgent?.tools)) return true;
     if (tool === Tools.file_search) {
       if (ephemeralAgent != null && 'file_search' in ephemeralAgent) {
         return ephemeralAgent.file_search === true;
@@ -507,6 +535,10 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
         return ephemeralAgent.execute_code === true;
       }
       return checkCapability(AgentCapabilities.execute_code);
+    }
+    if (tool === AgentCapabilities.manage_scheduling) {
+      if (appConfig?.interfaceConfig?.scheduledAgents === false) return false;
+      return checkCapability(AgentCapabilities.manage_scheduling);
     }
     if (tool === Tools.web_search) {
       if (ephemeralAgent != null && 'web_search' in ephemeralAgent) {
@@ -526,6 +558,18 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
         return ephemeralAgent.execute_code === true;
       }
       return checkCapability(AgentCapabilities.execute_code);
+    }
+    if (
+      tool === Tools.list_schedules ||
+      tool === Tools.create_schedule ||
+      tool === Tools.update_schedule ||
+      tool === Tools.delete_schedule ||
+      tool === Tools.run_schedule ||
+      tool === Tools.list_runs ||
+      tool === Tools.get_run
+    ) {
+      if (appConfig?.interfaceConfig?.scheduledAgents === false) return false;
+      return checkCapability(AgentCapabilities.manage_scheduling);
     }
     if (!areToolsEnabled && !tool.includes(actionDelimiter)) {
       return false;
@@ -821,6 +865,32 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
     }
   }
 
+  const hasSchedulingTools =
+    filteredTools.includes(Tools.list_schedules) ||
+    filteredTools.includes(Tools.create_schedule) ||
+    filteredTools.includes(Tools.update_schedule) ||
+    filteredTools.includes(Tools.delete_schedule) ||
+    filteredTools.includes(Tools.run_schedule) ||
+    filteredTools.includes(Tools.list_runs) ||
+    filteredTools.includes(Tools.get_run);
+  if (hasSchedulingTools) {
+    const parts = [SCHEDULER_DEFAULT_INSTRUCTIONS];
+    if (agent.schedulerTargetAgentIds?.length > 0) {
+      try {
+        const schedulerContext = await buildSchedulerTargetContext(
+          agent.schedulerTargetAgentIds,
+          getAgents,
+        );
+        if (schedulerContext) {
+          parts.push(schedulerContext);
+        }
+      } catch (error) {
+        logger.error('[loadToolDefinitionsWrapper] Error building scheduler target context:', error);
+      }
+    }
+    toolContextMap[Tools.create_schedule] = parts.filter(Boolean).join('\n\n');
+  }
+
   return {
     toolRegistry,
     userMCPAuthMap,
@@ -914,7 +984,10 @@ async function loadAgentTools({
 
   /** Filter by ephemeralAgent (chat badge overrides) */
   const ephemeralAgent = req?.body?.ephemeralAgent;
-  if (Array.isArray(ephemeralAgent?.mcp)) {
+  if (Array.isArray(ephemeralAgent?.tools)) {
+    const toolsSet = new Set(ephemeralAgent.tools);
+    toolsToFilter = toolsToFilter.filter((tool) => toolsSet.has(tool));
+  } else if (Array.isArray(ephemeralAgent?.mcp)) {
     toolsToFilter = toolsToFilter.filter((tool) => {
       if (typeof tool !== 'string' || !tool.includes(Constants.mcp_delimiter)) {
         return true;
@@ -927,6 +1000,7 @@ async function loadAgentTools({
   let includesWebSearch = false;
   const _agentTools = toolsToFilter.filter((tool) => {
     if (tool == null || typeof tool !== 'string') return false;
+    if (Array.isArray(ephemeralAgent?.tools)) return true;
     if (tool === Tools.file_search) {
       if (ephemeralAgent != null && 'file_search' in ephemeralAgent) {
         return ephemeralAgent.file_search === true;
@@ -937,6 +1011,9 @@ async function loadAgentTools({
         return ephemeralAgent.execute_code === true;
       }
       return checkCapability(AgentCapabilities.execute_code);
+    } else if (tool === AgentCapabilities.manage_scheduling) {
+      if (appConfig?.interfaceConfig?.scheduledAgents === false) return false;
+      return checkCapability(AgentCapabilities.manage_scheduling);
     } else if (tool === Tools.web_search) {
       if (ephemeralAgent != null && 'web_search' in ephemeralAgent) {
         includesWebSearch = ephemeralAgent.web_search === true;
@@ -957,6 +1034,17 @@ async function loadAgentTools({
         return ephemeralAgent.execute_code === true;
       }
       return checkCapability(AgentCapabilities.execute_code);
+    } else if (
+      tool === Tools.list_schedules ||
+      tool === Tools.create_schedule ||
+      tool === Tools.update_schedule ||
+      tool === Tools.delete_schedule ||
+      tool === Tools.run_schedule ||
+      tool === Tools.list_runs ||
+      tool === Tools.get_run
+    ) {
+      if (appConfig?.interfaceConfig?.scheduledAgents === false) return false;
+      return checkCapability(AgentCapabilities.manage_scheduling);
     } else if (!areToolsEnabled && !tool.includes(actionDelimiter)) {
       return false;
     }

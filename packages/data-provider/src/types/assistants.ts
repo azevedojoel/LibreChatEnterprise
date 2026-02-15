@@ -31,6 +31,13 @@ export enum Tools {
   list_files = 'list_files',
   search_files = 'search_files',
   glob_files = 'glob_files',
+  list_schedules = 'list_schedules',
+  create_schedule = 'create_schedule',
+  update_schedule = 'update_schedule',
+  delete_schedule = 'delete_schedule',
+  run_schedule = 'run_schedule',
+  list_runs = 'list_runs',
+  get_run = 'get_run',
 }
 
 export enum EToolResources {
@@ -284,6 +291,8 @@ export type Agent = {
   support_contact?: SupportContact;
   /** Per-tool configuration options (deferred loading, allowed callers, etc.) */
   tool_options?: AgentToolOptions;
+  /** Agent IDs this scheduler can schedule (when Enable Scheduling is on) */
+  schedulerTargetAgentIds?: string[];
 };
 
 export type TAgentsMap = Record<string, Agent | undefined>;

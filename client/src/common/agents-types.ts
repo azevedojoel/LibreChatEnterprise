@@ -23,6 +23,7 @@ export type TAgentCapabilities = {
   [AgentCapabilities.web_search]: boolean;
   [AgentCapabilities.file_search]: boolean;
   [AgentCapabilities.execute_code]: boolean;
+  [AgentCapabilities.manage_scheduling]?: boolean;
   [AgentCapabilities.end_after_tools]?: boolean;
   [AgentCapabilities.hide_sequential_outputs]?: boolean;
 };
@@ -42,6 +43,7 @@ export type AgentForm = {
   /** @deprecated Use edges instead */
   agent_ids?: string[];
   edges?: GraphEdge[];
+  schedulerTargetAgentIds?: string[];
   [AgentCapabilities.artifacts]?: ArtifactModes | string;
   recursion_limit?: number;
   support_contact?: SupportContact;

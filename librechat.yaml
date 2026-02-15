@@ -46,7 +46,7 @@ interface:
     groups: true
     roles: true
   marketplace:
-    use: false
+    use: true
   remoteAgents:
     use: false
     create: false
@@ -305,6 +305,7 @@ endpoints:
       - tools
       - chain
       - ocr
+      - manage_scheduling
 
   # Anthropic with Vertex AI (uncomment if using)
   # anthropic:

@@ -25,6 +25,8 @@ import AgentAvatar from './AgentAvatar';
 import FileContext from './FileContext';
 import SearchForm from './Search/Form';
 import FileSearch from './FileSearch';
+import SchedulingCheckbox from './SchedulingCheckbox';
+import SchedulerTargetAgents from './SchedulerTargetAgents';
 import Artifacts from './Artifacts';
 import AgentTool from './AgentTool';
 import CodeForm from './Code/Form';
@@ -85,6 +87,7 @@ export default function AgentConfig() {
     artifactsEnabled,
     webSearchEnabled,
     fileSearchEnabled,
+    manageSchedulingEnabled,
   } = useAgentCapabilities(agentsConfig?.capabilities);
 
   const context_files = useMemo(() => {
@@ -288,7 +291,8 @@ export default function AgentConfig() {
           fileSearchEnabled ||
           artifactsEnabled ||
           contextEnabled ||
-          webSearchEnabled) && (
+          webSearchEnabled ||
+          manageSchedulingEnabled) && (
           <div className="mb-4 flex w-full flex-col items-start gap-3">
             <label className="text-token-text-primary block font-medium">
               {localize('com_assistants_capabilities')}
@@ -303,6 +307,22 @@ export default function AgentConfig() {
             {artifactsEnabled && <Artifacts />}
             {/* File Search */}
             {fileSearchEnabled && <FileSearch agent_id={agent_id} files={knowledge_files} />}
+            {/* Manage Scheduling */}
+            {manageSchedulingEnabled && (
+              <>
+                <SchedulingCheckbox />
+                <Controller
+                  name="schedulerTargetAgentIds"
+                  control={control}
+                  render={({ field }) => (
+                    <SchedulerTargetAgents
+                      field={field}
+                      currentAgentId={agent_id ?? ''}
+                    />
+                  )}
+                />
+              </>
+            )}
           </div>
         )}
         {/* MCP Section */}

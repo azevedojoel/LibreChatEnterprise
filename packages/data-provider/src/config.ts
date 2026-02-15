@@ -187,6 +187,7 @@ export enum AgentCapabilities {
   tools = 'tools',
   chain = 'chain',
   ocr = 'ocr',
+  manage_scheduling = 'manage_scheduling',
 }
 
 export const defaultAssistantsVersion = {
@@ -671,6 +672,7 @@ export const interfaceSchema = z
         public: z.boolean().optional(),
       })
       .optional(),
+    scheduledAgents: z.boolean().optional(),
   })
   .default({
     endpointsMenu: true,

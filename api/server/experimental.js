@@ -26,6 +26,7 @@ const { jwtLogin, ldapLogin, passportLogin } = require('~/strategies');
 const { updateInterfacePermissions } = require('~/models/interface');
 const { checkMigrations } = require('./services/start/migration');
 const initializeMCPs = require('./services/initializeMCPs');
+const { startScheduler } = require('./services/ScheduledAgents/scheduler');
 const configureSocialLogins = require('./socialLogins');
 const { getAppConfig } = require('./services/Config');
 const staticCache = require('./utils/staticCache');
@@ -360,6 +361,7 @@ if (cluster.isMaster) {
       await initializeMCPs();
       await initializeOAuthReconnectManager();
       await checkMigrations();
+      startScheduler();
     });
 
     /** Handle inter-process messages from master */

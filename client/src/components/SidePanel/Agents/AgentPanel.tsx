@@ -70,6 +70,7 @@ export function composeAgentUpdatePayload(data: AgentForm, agent_id?: string | n
     provider: _provider,
     agent_ids,
     edges,
+    schedulerTargetAgentIds,
     end_after_tools,
     hide_sequential_outputs,
     recursion_limit,
@@ -119,6 +120,7 @@ export function composeAgentUpdatePayload(data: AgentForm, agent_id?: string | n
       model_parameters,
       agent_ids,
       edges,
+      schedulerTargetAgentIds,
       end_after_tools,
       hide_sequential_outputs,
       recursion_limit,
@@ -450,6 +452,16 @@ export default function AgentPanel() {
           Tools.glob_files,
         ].filter((t): t is string => t != null && t !== '');
         tools.push(...workspaceTools);
+      }
+      if (data.manage_scheduling === true) {
+        tools.push(AgentCapabilities.manage_scheduling);
+
+        if (!data.schedulerTargetAgentIds?.length) {
+          return showToast({
+            message: localize('com_agents_scheduler_target_agents_required'),
+            status: 'error',
+          });
+        }
       }
 
       const { payload: basePayload, provider, model } = composeAgentUpdatePayload(data, agent_id);

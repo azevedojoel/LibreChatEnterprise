@@ -564,3 +564,91 @@ export const useDeleteAgentApiKeyMutation = (): UseMutationResult<void, unknown,
     },
   });
 };
+
+/* Scheduled Agents */
+export const useGetScheduledAgentsQuery = (
+  config?: UseQueryOptions<q.ScheduledAgentSchedule[]>,
+): QueryObserverResult<q.ScheduledAgentSchedule[]> => {
+  return useQuery<q.ScheduledAgentSchedule[]>(
+    [QueryKeys.scheduledAgents],
+    () => dataService.listScheduledAgents(),
+    { refetchOnWindowFocus: false, ...config },
+  );
+};
+
+export const useGetScheduledAgentRunsQuery = (
+  limit = 25,
+  config?: UseQueryOptions<q.ScheduledRun[]>,
+): QueryObserverResult<q.ScheduledRun[]> => {
+  return useQuery<q.ScheduledRun[]>(
+    [QueryKeys.scheduledAgentRuns, limit],
+    () => dataService.listScheduledAgentRuns(limit),
+    { refetchOnWindowFocus: false, ...config },
+  );
+};
+
+export const useGetScheduledAgentRunQuery = (
+  id: string,
+  config?: UseQueryOptions<q.ScheduledRunDetail>,
+): QueryObserverResult<q.ScheduledRunDetail> => {
+  return useQuery<q.ScheduledRunDetail>(
+    [QueryKeys.scheduledAgentRuns, id],
+    () => dataService.getScheduledAgentRun(id),
+    { enabled: !!id, refetchOnWindowFocus: false, ...config },
+  );
+};
+
+export const useCreateScheduledAgentMutation = (): UseMutationResult<
+  q.ScheduledAgentSchedule,
+  unknown,
+  Parameters<typeof dataService.createScheduledAgent>[0]
+> => {
+  const queryClient = useQueryClient();
+  return useMutation(dataService.createScheduledAgent, {
+    onSuccess: () => {
+      queryClient.invalidateQueries([QueryKeys.scheduledAgents]);
+      queryClient.invalidateQueries([QueryKeys.scheduledAgentRuns]);
+    },
+  });
+};
+
+export const useUpdateScheduledAgentMutation = (): UseMutationResult<
+  q.ScheduledAgentSchedule,
+  unknown,
+  { id: string; data: Parameters<typeof dataService.updateScheduledAgent>[1] }
+> => {
+  const queryClient = useQueryClient();
+  return useMutation(
+    ({ id, data }) => dataService.updateScheduledAgent(id, data),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries([QueryKeys.scheduledAgents]);
+        queryClient.invalidateQueries([QueryKeys.scheduledAgentRuns]);
+      },
+    },
+  );
+};
+
+export const useDeleteScheduledAgentMutation = (): UseMutationResult<void, unknown, string> => {
+  const queryClient = useQueryClient();
+  return useMutation(dataService.deleteScheduledAgent, {
+    onSuccess: () => {
+      queryClient.invalidateQueries([QueryKeys.scheduledAgents]);
+      queryClient.invalidateQueries([QueryKeys.scheduledAgentRuns]);
+    },
+  });
+};
+
+export const useRunScheduledAgentMutation = (): UseMutationResult<
+  { success: boolean; conversationId?: string; error?: string },
+  unknown,
+  string
+> => {
+  const queryClient = useQueryClient();
+  return useMutation(dataService.runScheduledAgent, {
+    onSuccess: () => {
+      queryClient.invalidateQueries([QueryKeys.scheduledAgents]);
+      queryClient.invalidateQueries([QueryKeys.scheduledAgentRuns]);
+    },
+  });
+};

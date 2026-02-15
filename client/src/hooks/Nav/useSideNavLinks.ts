@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Blocks, MCPIcon, AttachmentIcon } from '@librechat/client';
-import { Database, Bookmark, Settings2, ArrowRightToLine, MessageSquareQuote } from 'lucide-react';
+import { Database, Bookmark, Settings2, ArrowRightToLine, MessageSquareQuote, Clock } from 'lucide-react';
 import {
   Permissions,
   EModelEndpoint,
@@ -11,6 +11,7 @@ import {
 } from 'librechat-data-provider';
 import type { TInterfaceConfig, TEndpointsConfig } from 'librechat-data-provider';
 import MCPBuilderPanel from '~/components/SidePanel/MCPBuilder/MCPBuilderPanel';
+import ScheduledAgentsPanel from '~/components/SidePanel/ScheduledAgents/ScheduledAgentsPanel';
 import type { NavLink } from '~/common';
 import AgentPanelSwitch from '~/components/SidePanel/Agents/AgentPanelSwitch';
 import BookmarkPanel from '~/components/SidePanel/Bookmarks/BookmarkPanel';
@@ -160,6 +161,20 @@ export default function useSideNavLinks({
     }
 
     if (
+      endpointsConfig?.[EModelEndpoint.agents] &&
+      hasAccessToAgents &&
+      (interfaceConfig.scheduledAgents !== false)
+    ) {
+      links.push({
+        title: 'com_sidepanel_scheduled_agents',
+        label: '',
+        icon: Clock,
+        id: 'scheduled-agents',
+        Component: ScheduledAgentsPanel,
+      });
+    }
+
+    if (
       (hasAccessToUseMCPSettings && availableMCPServers && availableMCPServers.length > 0) ||
       hasAccessToCreateMCP
     ) {
@@ -191,6 +206,7 @@ export default function useSideNavLinks({
     hasAccessToMemories,
     hasAccessToReadMemories,
     interfaceConfig.parameters,
+    interfaceConfig.scheduledAgents,
     endpointType,
     hasAccessToBookmarks,
     availableMCPServers,

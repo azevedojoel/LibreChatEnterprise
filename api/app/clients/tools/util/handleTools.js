@@ -41,6 +41,10 @@ const {
 const { primeFiles: primeCodeFiles } = require('~/server/services/Files/Code/process');
 const { createLocalCodeExecutionTool } = require('~/server/services/LocalCodeExecution');
 const { createWorkspaceCodeEditTools } = require('~/server/services/WorkspaceCodeEdit');
+const { createSchedulingTools } = require('~/server/services/ScheduledAgents/schedulingTools');
+const { buildSchedulerTargetContext } = require('~/server/services/ScheduledAgents/schedulerContext');
+const { SCHEDULER_DEFAULT_INSTRUCTIONS } = require('~/server/services/ScheduledAgents/schedulerInstructions');
+const { getAgents } = require('~/models/Agent');
 const { createFileSearchTool, primeFiles: primeSearchFiles } = require('./fileSearch');
 const { getUserPluginAuthValue } = require('~/server/services/PluginService');
 const { createMCPTool, createMCPTools } = require('~/server/services/MCP');
@@ -345,6 +349,42 @@ const loadTools = async ({
         await ensureWorkspaceInjected();
         return toolMap[tool];
       };
+      continue;
+    } else if (
+      tool === Tools.list_schedules ||
+      tool === Tools.create_schedule ||
+      tool === Tools.update_schedule ||
+      tool === Tools.delete_schedule ||
+      tool === Tools.run_schedule ||
+      tool === Tools.list_runs ||
+      tool === Tools.get_run
+    ) {
+      const currentAgent = options.req?.body?.agent ?? agent;
+      const currentAgentId = currentAgent?.id ?? agent?.id;
+      const schedulerTargetAgentIds = currentAgent?.schedulerTargetAgentIds ?? [];
+      const schedulingTools = createSchedulingTools({
+        userId: user,
+        agentId: currentAgentId,
+        schedulerTargetAgentIds,
+      });
+      requestedTools[tool] = async () => schedulingTools[tool];
+      if (!toolContextMap[Tools.create_schedule]) {
+        const parts = [SCHEDULER_DEFAULT_INSTRUCTIONS];
+        if (schedulerTargetAgentIds.length > 0) {
+          try {
+            const schedulerContext = await buildSchedulerTargetContext(
+              schedulerTargetAgentIds,
+              getAgents,
+            );
+            if (schedulerContext) {
+              parts.push(schedulerContext);
+            }
+          } catch (err) {
+            logger.debug('[handleTools] Error building scheduler target context:', err);
+          }
+        }
+        toolContextMap[Tools.create_schedule] = parts.filter(Boolean).join('\n\n');
+      }
       continue;
     } else if (tool === Tools.file_search) {
       requestedTools[tool] = async () => {

@@ -41,6 +41,8 @@ export * from './tools';
 export * from './web';
 /* Cache */
 export * from './cache';
+/* Cluster / Leader election */
+export * from './cluster';
 /* Stream */
 export * from './stream';
 /* types */

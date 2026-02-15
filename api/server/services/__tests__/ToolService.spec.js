@@ -1,4 +1,16 @@
-const { AgentCapabilities, defaultAgentCapabilities } = require('librechat-data-provider');
+const { AgentCapabilities, defaultAgentCapabilities, Tools } = require('librechat-data-provider');
+
+/**
+ * Simulates ephemeralAgent.tools filtering from loadToolDefinitionsWrapper and loadAgentTools.
+ * When ephemeralAgent.tools is an array, only tools in that set are kept.
+ */
+function filterToolsByEphemeralAgent(toolsToFilter, ephemeralAgent) {
+  if (!Array.isArray(ephemeralAgent?.tools)) {
+    return toolsToFilter;
+  }
+  const toolsSet = new Set(ephemeralAgent.tools);
+  return toolsToFilter.filter((tool) => toolsSet.has(tool));
+}
 
 /**
  * Tests for ToolService capability checking logic.
@@ -144,6 +156,52 @@ describe('ToolService - Capability Checking', () => {
       );
 
       expect(enabledCapabilities.has(AgentCapabilities.deferred_tools)).toBe(true);
+    });
+  });
+
+  describe('ephemeralAgent.tools filtering', () => {
+    it('should filter to only tools in ephemeralAgent.tools when array provided', () => {
+      const toolsToFilter = [Tools.file_search, Tools.web_search, 'search_mcp_github'];
+      const ephemeralAgent = { tools: [Tools.file_search] };
+
+      const result = filterToolsByEphemeralAgent(toolsToFilter, ephemeralAgent);
+
+      expect(result).toEqual([Tools.file_search]);
+    });
+
+    it('should return empty array when ephemeralAgent.tools is empty', () => {
+      const toolsToFilter = [Tools.file_search, Tools.web_search];
+      const ephemeralAgent = { tools: [] };
+
+      const result = filterToolsByEphemeralAgent(toolsToFilter, ephemeralAgent);
+
+      expect(result).toEqual([]);
+    });
+
+    it('should not filter when ephemeralAgent.tools is undefined', () => {
+      const toolsToFilter = [Tools.file_search, 'search_mcp_github'];
+      const ephemeralAgent = {};
+
+      const result = filterToolsByEphemeralAgent(toolsToFilter, ephemeralAgent);
+
+      expect(result).toEqual(toolsToFilter);
+    });
+
+    it('should not filter when ephemeralAgent is null or undefined', () => {
+      const toolsToFilter = [Tools.file_search, Tools.execute_code];
+
+      expect(filterToolsByEphemeralAgent(toolsToFilter, null)).toEqual(toolsToFilter);
+      expect(filterToolsByEphemeralAgent(toolsToFilter, undefined)).toEqual(toolsToFilter);
+    });
+
+    it('should filter MCP tool IDs correctly by ephemeralAgent.tools', () => {
+      const mcpToolId = `search_mcp_github`;
+      const toolsToFilter = [Tools.file_search, mcpToolId, 'list_files_mcp_Google-Workspace'];
+      const ephemeralAgent = { tools: [mcpToolId] };
+
+      const result = filterToolsByEphemeralAgent(toolsToFilter, ephemeralAgent);
+
+      expect(result).toEqual([mcpToolId]);
     });
   });
 });

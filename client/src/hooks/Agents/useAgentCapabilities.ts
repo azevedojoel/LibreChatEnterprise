@@ -12,6 +12,7 @@ interface AgentCapabilitiesResult {
   codeEnabled: boolean;
   deferredToolsEnabled: boolean;
   programmaticToolsEnabled: boolean;
+  manageSchedulingEnabled: boolean;
 }
 
 export default function useAgentCapabilities(
@@ -67,6 +68,11 @@ export default function useAgentCapabilities(
     [capabilities],
   );
 
+  const manageSchedulingEnabled = useMemo(
+    () => capabilities?.includes(AgentCapabilities.manage_scheduling) ?? false,
+    [capabilities],
+  );
+
   return {
     ocrEnabled,
     codeEnabled,
@@ -78,5 +84,6 @@ export default function useAgentCapabilities(
     fileSearchEnabled,
     deferredToolsEnabled,
     programmaticToolsEnabled,
+    manageSchedulingEnabled,
   };
 }

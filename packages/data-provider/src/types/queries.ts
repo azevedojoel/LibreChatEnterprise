@@ -206,3 +206,43 @@ export type GraphTokenResponse = {
   expires_in: number;
   scope: string;
 };
+
+/* Scheduled Agents */
+export type ScheduleType = 'recurring' | 'one-off';
+export type ScheduledRunStatus = 'success' | 'failed' | 'running' | 'pending';
+
+export type ScheduledAgentSchedule = {
+  _id: string;
+  userId: string;
+  agentId: string;
+  name: string;
+  prompt: string;
+  scheduleType: ScheduleType;
+  cronExpression?: string | null;
+  runAt?: string | null;
+  enabled: boolean;
+  timezone?: string;
+  selectedTools?: string[] | null;
+  lastRunAt?: string | null;
+  lastRunStatus?: ScheduledRunStatus | null;
+  conversationId?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type ScheduledRun = {
+  _id: string;
+  scheduleId: string | { _id: string; name: string; agentId: string };
+  userId: string;
+  conversationId: string;
+  runAt: string;
+  status: ScheduledRunStatus;
+  error?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type ScheduledRunDetail = ScheduledRun & {
+  conversation: s.TConversation | null;
+  messages: s.TMessage[];
+};

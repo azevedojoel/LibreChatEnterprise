@@ -376,6 +376,9 @@ export const verifyTwoFactorTemp = () => `${BASE_URL}/api/auth/2fa/verify-temp`;
 
 /* Memories */
 export const memories = () => `${BASE_URL}/api/memories`;
+export const scheduledAgents = () => `${BASE_URL}/api/scheduled-agents`;
+export const scheduledAgentRuns = () => `${scheduledAgents()}/runs`;
+export const scheduledAgentRun = (id: string) => `${scheduledAgentRuns()}/${id}`;
 export const memory = (key: string) => `${memories()}/${encodeURIComponent(key)}`;
 export const memoryPreferences = () => `${memories()}/preferences`;
 

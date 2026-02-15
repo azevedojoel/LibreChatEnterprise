@@ -63,9 +63,20 @@ export default function AgentSelect({
         [AgentCapabilities.web_search]: false,
         [AgentCapabilities.file_search]: false,
         [AgentCapabilities.execute_code]: false,
+        [AgentCapabilities.manage_scheduling]: false,
         [AgentCapabilities.end_after_tools]: false,
         [AgentCapabilities.hide_sequential_outputs]: false,
       };
+
+      const schedulingToolSet = new Set([
+        Tools.list_schedules,
+        Tools.create_schedule,
+        Tools.update_schedule,
+        Tools.delete_schedule,
+        Tools.run_schedule,
+        Tools.list_runs,
+        Tools.get_run,
+      ]);
 
       const agentTools: string[] = [];
       (fullAgent.tools ?? []).forEach((tool) => {
@@ -83,6 +94,13 @@ export default function AgentSelect({
           tool === Tools.glob_files
         ) {
           capabilities[AgentCapabilities.execute_code] = true;
+          return;
+        }
+        if (schedulingToolSet.has(tool)) {
+          capabilities[AgentCapabilities.manage_scheduling] = true;
+          if (!agentTools.includes(AgentCapabilities.manage_scheduling)) {
+            agentTools.push(AgentCapabilities.manage_scheduling);
+          }
           return;
         }
 
@@ -124,6 +142,15 @@ export default function AgentSelect({
         }
 
         if (name === 'edges' && Array.isArray(value)) {
+          formValues[name] = value;
+          return;
+        }
+
+        if (
+          name === 'schedulerTargetAgentIds' &&
+          Array.isArray(value) &&
+          value.every((item) => typeof item === 'string')
+        ) {
           formValues[name] = value;
           return;
         }

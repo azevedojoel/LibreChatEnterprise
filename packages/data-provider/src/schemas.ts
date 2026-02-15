@@ -248,6 +248,8 @@ export const defaultAgentFormValues = {
   [Tools.execute_code]: false,
   [Tools.file_search]: false,
   [Tools.web_search]: false,
+  manage_scheduling: false,
+  schedulerTargetAgentIds: [],
   category: 'general',
   support_contact: {
     name: '',
@@ -760,6 +762,8 @@ export const tConversationSchema = z.object({
   iconURL: z.string().nullable().optional(),
   /* temporary chat */
   expiredAt: z.string().nullable().optional(),
+  /* scheduled agent run - excludes from main convo list */
+  scheduledRunId: z.string().nullable().optional(),
   /* file token limits */
   fileTokenLimit: coerceNumber.optional(),
   /** @deprecated */

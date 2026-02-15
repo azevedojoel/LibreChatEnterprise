@@ -62,8 +62,16 @@ function createToolLoader(signal, streamId = null, definitionsOnly = false) {
     provider,
     tool_options,
     tool_resources,
+    schedulerTargetAgentIds,
   }) {
-    const agent = { id: agentId, tools, provider, model, tool_options };
+    const agent = {
+      id: agentId,
+      tools,
+      provider,
+      model,
+      tool_options,
+      schedulerTargetAgentIds,
+    };
     try {
       return await loadAgentTools({
         req,
@@ -94,7 +102,15 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
   /** @type {ArtifactPromises} */
   const artifactPromises = [];
   const { contentParts, aggregateContent } = createContentAggregator();
-  const toolEndCallback = createToolEndCallback({ req, res, artifactPromises, streamId });
+  /** Tracks handed-off agent so conversation uses it for subsequent replies */
+  const handoffState = { currentAgentId: null };
+  const toolEndCallback = createToolEndCallback({
+    req,
+    res,
+    artifactPromises,
+    streamId,
+    handoffState,
+  });
 
   /**
    * Agent context store - populated after initialization, accessed by callback via closure.
@@ -140,6 +156,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
     toolEndCallback,
     collectedUsage,
     streamId,
+    handoffState,
   });
 
   if (!endpointOption.agent) {
@@ -404,6 +421,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
     resendFiles: primaryConfig.resendFiles ?? true,
     maxContextTokens: primaryConfig.maxContextTokens,
     endpoint: isEphemeralAgentId(primaryConfig.id) ? primaryConfig.endpoint : EModelEndpoint.agents,
+    handoffState,
   });
 
   if (streamId) {
