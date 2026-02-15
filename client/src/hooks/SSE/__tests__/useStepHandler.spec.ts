@@ -1,5 +1,5 @@
 import { renderHook, act } from '@testing-library/react';
-import { StepTypes, ContentTypes, ToolCallTypes } from 'librechat-data-provider';
+import { StepTypes, ContentTypes, ToolCallTypes, EModelEndpoint } from 'librechat-data-provider';
 import type {
   TMessageContentParts,
   EventSubmission,
@@ -722,6 +722,7 @@ describe('useStepHandler', () => {
       );
       consoleSpy.mockRestore();
     });
+
   });
 
   describe('clearStepMaps', () => {

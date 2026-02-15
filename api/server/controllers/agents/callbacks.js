@@ -179,6 +179,7 @@ async function emitEvent(res, streamId, eventData) {
  * @param {Array<UsageMetadata>} options.collectedUsage - The list of collected usage metadata.
  * @param {string | null} [options.streamId] - The stream ID for resumable mode, or null for standard mode.
  * @param {ToolExecuteOptions} [options.toolExecuteOptions] - Options for event-driven tool execution.
+ * @param {{ currentAgentId: string | null }} [options.handoffState] - When ON_HANDOFF fires (direct handoff tools), set currentAgentId for subsequent replies.
  * @returns {Record<string, t.EventHandler>} The default handlers.
  * @throws {Error} If the request is not found.
  */
@@ -189,6 +190,7 @@ function getDefaultHandlers({
   collectedUsage,
   streamId = null,
   toolExecuteOptions = null,
+  handoffState = null,
 }) {
   if (!res || !aggregateContent) {
     throw new Error(
@@ -302,6 +304,25 @@ function getDefaultHandlers({
     handlers[GraphEvents.ON_TOOL_EXECUTE] = createToolExecuteHandler(toolExecuteOptions);
   }
 
+  /** ON_HANDOFF: Fired when direct handoff tools complete - update handoffState and emit agent_handoff */
+  const onHandoffEvent = GraphEvents.ON_HANDOFF ?? 'on_handoff';
+  handlers[onHandoffEvent] = {
+      handle: async (_event, data) => {
+        const targetAgentId = data?.destinationAgentId ?? (data?.toolName && typeof data.toolName === 'string'
+          ? data.toolName.replace(Constants.LC_TRANSFER_TO_, '')
+          : null);
+        if (handoffState && targetAgentId) {
+          handoffState.currentAgentId = targetAgentId;
+          if (streamId) {
+            await emitEvent(res, streamId, {
+              event: 'agent_handoff',
+              data: { agent_id: targetAgentId },
+            });
+          }
+        }
+      },
+    };
+
   return handlers;
 }
 
@@ -327,9 +348,16 @@ function writeAttachment(res, streamId, attachment) {
  * @param {ServerResponse} params.res
  * @param {Promise<MongoFile | { filename: string; filepath: string; expires: number;} | null>[]} params.artifactPromises
  * @param {string | null} [params.streamId] - The stream ID for resumable mode, or null for standard mode.
+ * @param {{ currentAgentId: string | null }} [params.handoffState] - When handoff tool completes, set currentAgentId so conversation uses it for subsequent replies.
  * @returns {ToolEndCallback} The tool end callback.
  */
-function createToolEndCallback({ req, res, artifactPromises, streamId = null }) {
+function createToolEndCallback({
+  req,
+  res,
+  artifactPromises,
+  streamId = null,
+  handoffState = null,
+}) {
   /**
    * @type {ToolEndCallback}
    */
@@ -337,6 +365,27 @@ function createToolEndCallback({ req, res, artifactPromises, streamId = null }) 
     const output = data?.output;
     if (!output) {
       return;
+    }
+
+    /** Detect handoff tool to switch conversation to handed-off agent for subsequent replies */
+    const toolName = output.name;
+    if (
+      handoffState &&
+      toolName &&
+      typeof toolName === 'string' &&
+      toolName.startsWith(Constants.LC_TRANSFER_TO_)
+    ) {
+      const targetAgentId = toolName.replace(Constants.LC_TRANSFER_TO_, '');
+      if (targetAgentId) {
+        handoffState.currentAgentId = targetAgentId;
+        /** Emit dedicated event for immediate UI update (resumable mode only) */
+        if (streamId) {
+          await emitEvent(res, streamId, {
+            event: 'agent_handoff',
+            data: { agent_id: targetAgentId },
+          });
+        }
+      }
     }
 
     if (!output.artifact) {

@@ -540,7 +540,6 @@ export default function useStepHandler({
         }
       } else if (event === 'on_run_step_completed') {
         const { result } = data as unknown as { result: Agents.ToolEndEvent };
-
         const { id: stepId } = result;
 
         const runStep = stepMap.current.get(stepId);
@@ -589,7 +588,13 @@ export default function useStepHandler({
         stepMap.current.clear();
       };
     },
-    [getMessages, lastAnnouncementTimeRef, announcePolite, setMessages, calculateContentIndex],
+    [
+      getMessages,
+      lastAnnouncementTimeRef,
+      announcePolite,
+      setMessages,
+      calculateContentIndex,
+    ],
   );
 
   const clearStepMaps = useCallback(() => {

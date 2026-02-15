@@ -5,8 +5,13 @@ jest.mock('nanoid', () => ({
   nanoid: jest.fn(() => 'mock-id'),
 }));
 
+const mockEmitChunk = jest.fn().mockResolvedValue();
+
 jest.mock('@librechat/api', () => ({
   sendEvent: jest.fn(),
+  GenerationJobManager: {
+    emitChunk: (...args) => mockEmitChunk(...args),
+  },
 }));
 
 jest.mock('@librechat/data-schemas', () => ({
@@ -326,5 +331,176 @@ describe('createToolEndCallback', () => {
       expect(artifactPromises).toHaveLength(0);
       expect(res.write).not.toHaveBeenCalled();
     });
+  });
+
+  describe('handoff tool handling', () => {
+    it('should set handoffState.currentAgentId when lc_transfer_to_ tool completes', async () => {
+      const handoffState = { currentAgentId: null };
+      const toolEndCallback = createToolEndCallback({
+        req,
+        res,
+        artifactPromises,
+        handoffState,
+      });
+
+      const output = {
+        name: 'lc_transfer_to_agent-456',
+        tool_call_id: 'tool123',
+        // No artifact - handoff runs before artifact check
+      };
+
+      await toolEndCallback({ output }, { run_id: 'run456', thread_id: 'thread789' });
+
+      expect(handoffState.currentAgentId).toBe('agent-456');
+    });
+
+    it('should emit agent_handoff event when handoff tool completes with streamId', async () => {
+      const handoffState = { currentAgentId: null };
+      const toolEndCallback = createToolEndCallback({
+        req,
+        res,
+        artifactPromises,
+        streamId: 'stream-xyz',
+        handoffState,
+      });
+
+      const output = {
+        name: 'lc_transfer_to_schedule-manager',
+        tool_call_id: 'tool123',
+      };
+
+      await toolEndCallback({ output }, { run_id: 'run456', thread_id: 'thread789' });
+
+      expect(handoffState.currentAgentId).toBe('schedule-manager');
+      expect(mockEmitChunk).toHaveBeenCalledWith('stream-xyz', {
+        event: 'agent_handoff',
+        data: { agent_id: 'schedule-manager' },
+      });
+    });
+
+    it('should NOT emit agent_handoff when streamId is null', async () => {
+      const handoffState = { currentAgentId: null };
+      const toolEndCallback = createToolEndCallback({
+        req,
+        res,
+        artifactPromises,
+        streamId: null,
+        handoffState,
+      });
+
+      const output = {
+        name: 'lc_transfer_to_other-agent',
+        tool_call_id: 'tool123',
+      };
+
+      await toolEndCallback({ output }, { run_id: 'run456', thread_id: 'thread789' });
+
+      expect(handoffState.currentAgentId).toBe('other-agent');
+      expect(mockEmitChunk).not.toHaveBeenCalled();
+    });
+
+    it('should NOT modify handoffState when handoffState is null', async () => {
+      const toolEndCallback = createToolEndCallback({
+        req,
+        res,
+        artifactPromises,
+        handoffState: null,
+      });
+
+      const output = {
+        name: 'lc_transfer_to_agent-789',
+        tool_call_id: 'tool123',
+      };
+
+      await toolEndCallback({ output }, { run_id: 'run456', thread_id: 'thread789' });
+
+      expect(mockEmitChunk).not.toHaveBeenCalled();
+    });
+
+    it('should NOT treat non-handoff tools as handoff', async () => {
+      const handoffState = { currentAgentId: 'original' };
+      const toolEndCallback = createToolEndCallback({
+        req,
+        res,
+        artifactPromises,
+        streamId: 'stream-abc',
+        handoffState,
+      });
+
+      const output = {
+        name: 'web_search',
+        tool_call_id: 'tool123',
+      };
+
+      await toolEndCallback({ output }, { run_id: 'run456', thread_id: 'thread789' });
+
+      expect(handoffState.currentAgentId).toBe('original');
+      expect(mockEmitChunk).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe('getDefaultHandlers - ON_HANDOFF', () => {
+  let req, res, getDefaultHandlers;
+  const { GraphEvents } = require('@librechat/agents');
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    const callbacks = require('../callbacks');
+    getDefaultHandlers = callbacks.getDefaultHandlers;
+    emitEvent = require('@librechat/api').sendEvent;
+
+    req = { user: { id: 'user123' } };
+    res = { headersSent: false, write: jest.fn() };
+  });
+
+  it('should update handoffState and emit agent_handoff when ON_HANDOFF fires with streamId', async () => {
+    const handoffState = { currentAgentId: null };
+    const streamId = 'stream-xyz';
+    const handlers = getDefaultHandlers({
+      res,
+      aggregateContent: jest.fn(),
+      toolEndCallback: jest.fn(),
+      collectedUsage: [],
+      streamId,
+      handoffState,
+    });
+
+    const onHandoffEvent = GraphEvents.ON_HANDOFF ?? 'on_handoff';
+    const handler = handlers[onHandoffEvent];
+    expect(handler).toBeDefined();
+
+    await handler.handle(onHandoffEvent, {
+      toolName: 'lc_transfer_to_schedule-manager',
+      destinationAgentId: 'schedule-manager',
+    });
+
+    expect(handoffState.currentAgentId).toBe('schedule-manager');
+    expect(mockEmitChunk).toHaveBeenCalledWith(streamId, {
+      event: 'agent_handoff',
+      data: { agent_id: 'schedule-manager' },
+    });
+  });
+
+  it('should update handoffState but NOT emit when streamId is null', async () => {
+    const handoffState = { currentAgentId: null };
+    const handlers = getDefaultHandlers({
+      res,
+      aggregateContent: jest.fn(),
+      toolEndCallback: jest.fn(),
+      collectedUsage: [],
+      streamId: null,
+      handoffState,
+    });
+
+    const onHandoffEvent = GraphEvents.ON_HANDOFF ?? 'on_handoff';
+    const handler = handlers[onHandoffEvent];
+    await handler.handle(onHandoffEvent, {
+      toolName: 'lc_transfer_to_agent-456',
+      destinationAgentId: 'agent-456',
+    });
+
+    expect(handoffState.currentAgentId).toBe('agent-456');
+    expect(mockEmitChunk).not.toHaveBeenCalled();
   });
 });

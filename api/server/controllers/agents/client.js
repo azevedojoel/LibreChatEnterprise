@@ -315,7 +315,7 @@ class AgentClient extends BaseClient {
       Object.assign(
         {
           endpoint: this.options.endpoint,
-          agent_id: this.options.agent.id,
+          agent_id: this.options.handoffState?.currentAgentId ?? this.options.agent.id,
           modelLabel: this.options.modelLabel,
           maxContextTokens: this.options.maxContextTokens,
           resendFiles: this.options.resendFiles,
@@ -336,6 +336,24 @@ class AgentClient extends BaseClient {
    */
   getBuildMessagesOptions() {
     return {};
+  }
+
+  /**
+   * Override to use fresh save options when persisting the response.
+   * The initial saveOptions is captured before handoff; by the time we save the response,
+   * handoffState.currentAgentId may be set. Calling getSaveOptions() here ensures the
+   * conversation is persisted with the handed-off agent_id.
+   * @param {TMessage} message
+   * @param {Partial<TConversation>} endpointOptions
+   * @param {string | null} user
+   */
+  async saveMessageToDatabase(message, endpointOptions, user = null) {
+    const isResponse = !message?.isCreatedByUser;
+    const optionsToUse =
+      isResponse && this.options.handoffState
+        ? { ...endpointOptions, ...this.getSaveOptions() }
+        : endpointOptions;
+    return super.saveMessageToDatabase(message, optionsToUse, user);
   }
 
   /**
