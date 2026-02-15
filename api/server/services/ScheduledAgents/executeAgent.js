@@ -10,9 +10,10 @@ const { disposeClient } = require('~/server/cleanup');
 /**
  * Execute a scheduled agent run.
  * Runs the agent with the given prompt, saves messages/conversation,
- * then tags the conversation with scheduledRunId and creates a ScheduledRun record.
+ * then tags the conversation with scheduledRunId and creates or updates a ScheduledRun record.
  *
  * @param {Object} params
+ * @param {string} [params.runId] - Optional: existing ScheduledRun _id (from queue). When provided, updates existing run instead of creating.
  * @param {string} params.scheduleId - ScheduledAgent _id
  * @param {string} params.userId - User ID (string)
  * @param {string} params.agentId - Agent ID
@@ -22,6 +23,7 @@ const { disposeClient } = require('~/server/cleanup');
  * @returns {Promise<{ success: boolean; conversationId?: string; error?: string }>}
  */
 async function executeScheduledAgent({
+  runId: existingRunId,
   scheduleId,
   userId,
   agentId,
@@ -35,6 +37,17 @@ async function executeScheduledAgent({
   let scheduledRunDoc = null;
 
   try {
+    if (existingRunId) {
+      const updated = await ScheduledRun.findByIdAndUpdate(
+        existingRunId,
+        { $set: { status: 'running', runAt } },
+        { new: true },
+      );
+      if (!updated) {
+        throw new Error(`ScheduledRun not found: ${existingRunId}`);
+      }
+      scheduledRunDoc = updated;
+    }
     const user = await User.findById(userId).lean();
     if (!user) {
       throw new Error(`User not found: ${userId}`);
@@ -135,17 +148,24 @@ async function executeScheduledAgent({
 
     await databasePromise;
 
-    scheduledRunDoc = await ScheduledRun.create({
-      scheduleId,
-      userId,
-      conversationId,
-      runAt,
-      status: 'success',
-    });
+    if (existingRunId && scheduledRunDoc) {
+      await ScheduledRun.findByIdAndUpdate(existingRunId, {
+        $set: { status: 'success', conversationId },
+      });
+    } else {
+      scheduledRunDoc = await ScheduledRun.create({
+        scheduleId,
+        userId,
+        conversationId,
+        runAt,
+        status: 'success',
+      });
+    }
 
+    const runDocId = scheduledRunDoc?._id ?? existingRunId;
     await Conversation.findOneAndUpdate(
       { conversationId, user: userId },
-      { $set: { scheduledRunId: scheduledRunDoc._id } },
+      { $set: { scheduledRunId: runDocId } },
     );
 
     await ScheduledAgent.findByIdAndUpdate(scheduleId, {
@@ -174,16 +194,22 @@ async function executeScheduledAgent({
     }
 
     try {
-      await ScheduledRun.create({
-        scheduleId,
-        userId,
-        conversationId,
-        runAt,
-        status: 'failed',
-        error: errorMessage,
-      });
+      if (existingRunId) {
+        await ScheduledRun.findByIdAndUpdate(existingRunId, {
+          $set: { status: 'failed', error: errorMessage },
+        });
+      } else {
+        await ScheduledRun.create({
+          scheduleId,
+          userId,
+          conversationId,
+          runAt,
+          status: 'failed',
+          error: errorMessage,
+        });
+      }
     } catch (createErr) {
-      logger.error('[ScheduledAgents] Failed to create ScheduledRun record:', createErr);
+      logger.error('[ScheduledAgents] Failed to create/update ScheduledRun record:', createErr);
     }
 
     await ScheduledAgent.findByIdAndUpdate(scheduleId, {

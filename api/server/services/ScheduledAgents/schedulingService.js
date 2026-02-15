@@ -3,6 +3,7 @@
  * Used by both HTTP controllers and agent tools.
  */
 const mongoose = require('mongoose');
+const { v4 } = require('uuid');
 const dbModels = require('~/db/models');
 const { getConvo } = require('~/models/Conversation');
 const { getMessages } = require('~/models/Message');
@@ -104,7 +105,7 @@ async function deleteScheduleForUser(userId, scheduleId) {
 /**
  * @param {string} userId - User ID
  * @param {string} scheduleId - Schedule ID
- * @returns {Promise<{ success: boolean; conversationId?: string; error?: string }>}
+ * @returns {Promise<{ success: boolean; runId?: string; status?: string; conversationId?: string; error?: string }>}
  */
 async function runScheduleForUser(userId, scheduleId) {
   const schedule = await ScheduledAgent.findOne({
@@ -116,19 +117,50 @@ async function runScheduleForUser(userId, scheduleId) {
     return { success: false, error: 'Schedule not found' };
   }
 
-  const { executeScheduledAgent } = require('./executeAgent');
-  if (typeof executeScheduledAgent !== 'function') {
-    throw new Error('[ScheduledAgents] executeAgent module did not export executeScheduledAgent correctly');
-  }
+  const conversationId = v4();
+  const runAt = new Date();
 
-  return await executeScheduledAgent({
+  const run = await ScheduledRun.create({
+    scheduleId: schedule._id,
+    userId: schedule.userId,
+    conversationId,
+    runAt,
+    status: 'queued',
+  });
+  const runId = run._id.toString();
+
+  const { enqueueRun, isQueueAvailable } = require('./jobQueue');
+  const { executeScheduledAgent } = require('./executeAgent');
+
+  const payload = {
     scheduleId: schedule._id.toString(),
     userId: schedule.userId.toString(),
     agentId: schedule.agentId,
     prompt: schedule.prompt,
-    conversationId: schedule.conversationId || undefined,
+    conversationId,
     selectedTools: schedule.selectedTools,
-  });
+  };
+
+  if (isQueueAvailable()) {
+    await enqueueRun(runId, payload);
+  } else {
+    const { logger } = require('@librechat/data-schemas');
+    logger.warn(
+      '[ScheduledAgents] Redis not available; running in background. Jobs may be lost on restart.',
+    );
+    setImmediate(() => {
+      executeScheduledAgent({ runId, ...payload }).catch((err) => {
+        logger.error('[ScheduledAgents] Background run failed:', err);
+      });
+    });
+  }
+
+  return {
+    success: true,
+    runId,
+    status: 'queued',
+    conversationId,
+  };
 }
 
 /**

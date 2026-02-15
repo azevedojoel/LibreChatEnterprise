@@ -235,7 +235,8 @@ function createSchedulingTools({ userId, agentId: currentAgentId, schedulerTarge
     },
     {
       name: Tools.run_schedule,
-      description: 'Trigger a schedule run immediately by schedule ID.',
+      description:
+        'Queue a schedule run by schedule ID. Returns immediately with runId and status (queued). Use get_run with runId to check progress or completion.',
       schema: {
         type: 'object',
         properties: { scheduleId: { type: 'string', description: 'Schedule ID' } },

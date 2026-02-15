@@ -29,6 +29,7 @@ const { updateInterfacePermissions } = require('~/models/interface');
 const { checkMigrations } = require('./services/start/migration');
 const initializeMCPs = require('./services/initializeMCPs');
 const { startScheduler } = require('./services/ScheduledAgents/scheduler');
+const { startWorker, requireRedisAtStartup } = require('./services/ScheduledAgents/jobQueue');
 const configureSocialLogins = require('./socialLogins');
 const { getAppConfig } = require('./services/Config');
 const staticCache = require('./utils/staticCache');
@@ -52,6 +53,8 @@ const startServer = async () => {
   await connectDb();
 
   logger.info('Connected to MongoDB');
+
+  requireRedisAtStartup();
 
   // Clear config caches on startup so librechat.yaml changes (e.g. new providers) take effect immediately
   const configCache = getLogStores(CacheKeys.CONFIG_STORE);
@@ -207,6 +210,7 @@ const startServer = async () => {
     await initializeOAuthReconnectManager();
     await checkMigrations();
     startScheduler();
+    startWorker();
 
     // Configure stream services (auto-detects Redis from USE_REDIS env var)
     const streamServices = createStreamServices();

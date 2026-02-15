@@ -27,6 +27,7 @@ const { updateInterfacePermissions } = require('~/models/interface');
 const { checkMigrations } = require('./services/start/migration');
 const initializeMCPs = require('./services/initializeMCPs');
 const { startScheduler } = require('./services/ScheduledAgents/scheduler');
+const { startWorker, requireRedisAtStartup } = require('./services/ScheduledAgents/jobQueue');
 const configureSocialLogins = require('./socialLogins');
 const { getAppConfig } = require('./services/Config');
 const staticCache = require('./utils/staticCache');
@@ -207,6 +208,8 @@ if (cluster.isMaster) {
     await connectDb();
     logger.info(`Worker ${process.pid}: Connected to MongoDB`);
 
+    requireRedisAtStartup();
+
     /** Background index sync (non-blocking) */
     indexSync().catch((err) => {
       logger.error(`[Worker ${process.pid}][indexSync] Background sync failed:`, err);
@@ -362,6 +365,7 @@ if (cluster.isMaster) {
       await initializeOAuthReconnectManager();
       await checkMigrations();
       startScheduler();
+      startWorker();
     });
 
     /** Handle inter-process messages from master */
