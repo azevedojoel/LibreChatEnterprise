@@ -295,7 +295,12 @@ const loadTools = async ({
           toolContextMap[tool] = toolContext;
         }
         const CodeExecutionTool = useLocalExecution
-          ? createLocalCodeExecutionTool({ user_id: user, files, req: options.req })
+          ? createLocalCodeExecutionTool({
+              agentId: agent?.id,
+              user_id: user,
+              files,
+              req: options.req,
+            })
           : createCodeExecutionTool({
               user_id: user,
               files,
@@ -316,16 +321,23 @@ const loadTools = async ({
     ) {
       const conversationId =
         options.req?.body?.conversationId ?? options.conversationId;
-      if (!conversationId) {
+      const agentId = agent?.id;
+      const userId = user;
+      if (!conversationId && !(agentId && userId)) {
         continue;
       }
       const pathMod = require('path');
       const {
         getSessionBaseDir,
         injectAgentFiles,
-      } = require('~/server/services/LocalCodeExecution/executor');
-      const workspaceRoot = pathMod.join(getSessionBaseDir(), `conv_${conversationId}`);
-      const outputDir = pathMod.join(workspaceRoot, 'output');
+        getWorkspaceSessionId,
+      } = require('~/server/services/LocalCodeExecution');
+      const sessionId = getWorkspaceSessionId({
+        agentId,
+        userId,
+        conversationId,
+      });
+      const workspaceRoot = pathMod.join(getSessionBaseDir(), sessionId);
 
       let workspaceInjected = false;
       const ensureWorkspaceInjected = async () => {
@@ -334,7 +346,7 @@ const loadTools = async ({
           { ...options, agentId: agent?.id },
           '',
         );
-        await injectAgentFiles(outputDir, files, options.req);
+        await injectAgentFiles(workspaceRoot, files, options.req);
         workspaceInjected = true;
       };
 

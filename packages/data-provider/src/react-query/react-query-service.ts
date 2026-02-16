@@ -671,3 +671,16 @@ export const useRunScheduledAgentMutation = (): UseMutationResult<
     },
   });
 };
+
+export const useCancelScheduledRunMutation = (): UseMutationResult<
+  { success: boolean; cancelled?: boolean },
+  unknown,
+  string
+> => {
+  const queryClient = useQueryClient();
+  return useMutation(dataService.cancelScheduledRun, {
+    onSuccess: () => {
+      queryClient.invalidateQueries([QueryKeys.scheduledAgentRuns]);
+    },
+  });
+};

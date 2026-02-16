@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAtomValue } from 'jotai';
 import { useRecoilValue } from 'recoil';
 import { CSSTransition } from 'react-transition-group';
@@ -33,6 +33,10 @@ function MessagesViewContent({
   } = useMessageScrolling(_messagesTree);
 
   const { conversationId } = conversation ?? {};
+
+  useEffect(() => {
+    setCurrentEditId(-1);
+  }, [conversationId]);
 
   return (
     <>

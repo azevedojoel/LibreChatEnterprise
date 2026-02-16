@@ -249,6 +249,7 @@ describe('ToolCall', () => {
       renderWithRecoil(
         <ToolCall
           {...mockProps}
+          output={null}
           initialProgress={0.5} // Less than 1 so it's not complete
           auth="https://auth.example.com"
           isSubmitting={true} // Should be submitting for auth to show
@@ -272,6 +273,7 @@ describe('ToolCall', () => {
       renderWithRecoil(
         <ToolCall
           {...mockProps}
+          output={null}
           auth="https://auth.example.com" // Need auth URL to extract domain
           initialProgress={0.5} // Less than 1
           isSubmitting={true} // Still submitting
@@ -289,14 +291,14 @@ describe('ToolCall', () => {
       renderWithRecoil(
         <ToolCall
           {...mockProps}
+          output={null}
           auth="https://auth.example.com"
-          authDomain="example.com"
-          progress={0.5}
-          cancelled={true}
+          initialProgress={0.5}
+          isSubmitting={false}
         />,
       );
 
-      expect(screen.queryByText('Sign in to example.com')).not.toBeInTheDocument();
+      expect(screen.queryByText('Sign in to auth.example.com')).not.toBeInTheDocument();
     });
 
     it('should not show auth section when progress is complete', () => {
@@ -304,13 +306,12 @@ describe('ToolCall', () => {
         <ToolCall
           {...mockProps}
           auth="https://auth.example.com"
-          authDomain="example.com"
-          progress={1}
-          cancelled={false}
+          initialProgress={1}
+          isSubmitting={false}
         />,
       );
 
-      expect(screen.queryByText('Sign in to example.com')).not.toBeInTheDocument();
+      expect(screen.queryByText('Sign in to auth.example.com')).not.toBeInTheDocument();
     });
   });
 

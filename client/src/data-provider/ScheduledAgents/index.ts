@@ -6,4 +6,5 @@ export {
   useUpdateScheduledAgentMutation,
   useDeleteScheduledAgentMutation,
   useRunScheduledAgentMutation,
+  useCancelScheduledRunMutation,
 } from 'librechat-data-provider/react-query';

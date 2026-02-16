@@ -1,8 +1,8 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRecoilValue } from 'recoil';
 import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { Trans } from 'react-i18next';
-import { Plus, Play, Trash2, ExternalLink, Loader2 } from 'lucide-react';
+import { Plus, Play, Trash2, ExternalLink, Loader2, Square } from 'lucide-react';
 import cronstrue from 'cronstrue';
 import {
   Button,
@@ -14,7 +14,11 @@ import {
   useToastContext,
 } from '@librechat/client';
 import { PermissionBits, QueryKeys, dataService } from 'librechat-data-provider';
-import type { ScheduledAgentSchedule, ScheduledRun } from 'librechat-data-provider';
+import type {
+  ScheduledAgentSchedule,
+  ScheduledRun,
+  TConversation,
+} from 'librechat-data-provider';
 import {
   useGetScheduledAgentsQuery,
   useGetScheduledAgentRunsQuery,
@@ -22,11 +26,14 @@ import {
   useUpdateScheduledAgentMutation,
   useDeleteScheduledAgentMutation,
   useRunScheduledAgentMutation,
+  useCancelScheduledRunMutation,
 } from '~/data-provider';
 import { useListAgentsQuery } from '~/data-provider/Agents';
-import { useLocalize } from '~/hooks';
+import { useLocalize, useNavigateToConvo } from '~/hooks';
 import ScheduleForm from '~/components/SidePanel/ScheduledAgents/ScheduleForm';
+import { ScheduledRunProgress } from '~/components/SidePanel/ScheduledAgents/ScheduledRunProgress';
 import { cn } from '~/utils';
+import store from '~/store';
 
 const RUNS_LIMIT = 25;
 
@@ -100,8 +107,9 @@ const UNDO_DELAY_MS = 5000;
 
 export default function ScheduledAgentsPanel() {
   const localize = useLocalize();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { navigateToConvo } = useNavigateToConvo(0);
+  const conversation = useRecoilValue(store.conversationByIndex(0));
   const { showToast } = useToastContext();
   const [formOpen, setFormOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<ScheduledAgentSchedule | null>(null);
@@ -133,6 +141,7 @@ export default function ScheduledAgentsPanel() {
 
   const deleteMutation = useDeleteScheduledAgentMutation();
   const runMutation = useRunScheduledAgentMutation();
+  const cancelRunMutation = useCancelScheduledRunMutation();
 
   const handleDeleteSuccess = useCallback(() => {
     setPendingDeleteId(null);
@@ -188,8 +197,10 @@ export default function ScheduledAgentsPanel() {
     error?: string;
   }) => {
     if (res.success && res.conversationId) {
-      navigate(`/c/${res.conversationId}`);
-      showToast({ message: localize('com_ui_success'), status: 'success' });
+      showToast({
+        message: localize('com_sidepanel_scheduled_agents_conversation_created'),
+        status: 'success',
+      });
     } else {
       showToast({ message: res.error || localize('com_ui_error'), status: 'error' });
     }
@@ -242,7 +253,28 @@ export default function ScheduledAgentsPanel() {
   };
 
   const handleViewRun = (run: ScheduledRun) => {
-    navigate(`/c/${run.conversationId}`);
+    if (run.conversationId) {
+      queryClient.invalidateQueries([QueryKeys.messages, run.conversationId]);
+      navigateToConvo(
+        { conversationId: run.conversationId } as TConversation,
+        {
+          currentConvoId: conversation?.conversationId ?? undefined,
+          resetLatestMessage: true,
+        },
+      );
+    }
+  };
+
+  const handleCancelRun = (runId: string) => {
+    cancelRunMutation.mutate(runId, {
+      onSuccess: () => {
+        showToast({ message: localize('com_ui_success'), status: 'success' });
+      },
+      onError: (err: unknown) => {
+        const msg = err instanceof Error ? err.message : localize('com_ui_error');
+        showToast({ message: msg, status: 'error' });
+      },
+    });
   };
 
   const handleFormClose = () => {
@@ -385,6 +417,36 @@ export default function ScheduledAgentsPanel() {
           )}
         </div>
 
+        {formOpen && (
+          <div className="mt-4">
+            <ScheduleForm
+              agents={agents}
+              schedule={editingSchedule}
+              onClose={handleFormClose}
+              onSubmit={(data) => {
+                const payload = {
+                  name: data.name,
+                  agentId: data.agentId,
+                  prompt: data.prompt,
+                  scheduleType: data.scheduleType,
+                  ...(data.scheduleType === 'recurring'
+                    ? { cronExpression: data.cronExpression }
+                    : { runAt: data.runAt }),
+                  timezone: data.timezone || 'UTC',
+                  ...(data.selectedTools !== undefined && { selectedTools: data.selectedTools }),
+                };
+                const opts = { onSuccess: handleFormSuccess, onError: handleFormError };
+                if (editingSchedule) {
+                  updateMutation.mutate({ id: editingSchedule._id, data: payload }, opts);
+                } else {
+                  createMutation.mutate(payload, opts);
+                }
+              }}
+              isSubmitting={createMutation.isLoading || updateMutation.isLoading}
+            />
+          </div>
+        )}
+
         {/* Recent runs */}
         <div className="mt-4">
           <h3 className="mb-2 text-sm font-medium text-text-primary">
@@ -406,14 +468,36 @@ export default function ScheduledAgentsPanel() {
                 return (
                   <div
                     key={run._id}
-                    className="flex items-center justify-between gap-2 rounded border border-border-medium bg-surface-primary px-2 py-1.5"
+                    className="flex flex-col gap-1 rounded border border-border-medium bg-surface-primary px-2 py-1.5"
                   >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm text-text-primary">{scheduleInfo.name}</p>
-                      <p className="text-xs text-text-secondary">{formatRunTime(run.runAt)}</p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm text-text-primary">{scheduleInfo.name}</p>
+                        <p className="text-xs text-text-secondary">{formatRunTime(run.runAt)}</p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
                       <StatusBadge status={run.status} />
+                      {(run.status === 'queued' || run.status === 'running') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7"
+                          onClick={() => handleCancelRun(run._id)}
+                          disabled={
+                            cancelRunMutation.isLoading &&
+                            cancelRunMutation.variables === run._id
+                          }
+                          aria-label={localize('com_nav_stop_generating')}
+                          title={localize('com_nav_stop_generating')}
+                        >
+                          {cancelRunMutation.isLoading &&
+                          cancelRunMutation.variables === run._id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+                          ) : (
+                            <Square className="h-3 w-3" aria-hidden="true" fill="currentColor" />
+                          )}
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
@@ -424,6 +508,14 @@ export default function ScheduledAgentsPanel() {
                         <ExternalLink className="h-3 w-3" aria-hidden="true" />
                       </Button>
                     </div>
+                    </div>
+                    {run.status === 'running' && run.conversationId && (
+                      <ScheduledRunProgress
+                        runId={run._id}
+                        streamId={run.conversationId}
+                        status={run.status}
+                      />
+                    )}
                   </div>
                 );
               })}
@@ -463,34 +555,6 @@ export default function ScheduledAgentsPanel() {
           }}
         />
       </OGDialog>
-
-      {formOpen && (
-        <ScheduleForm
-          agents={agents}
-          schedule={editingSchedule}
-          onClose={handleFormClose}
-          onSubmit={(data) => {
-            const payload = {
-              name: data.name,
-              agentId: data.agentId,
-              prompt: data.prompt,
-              scheduleType: data.scheduleType,
-              ...(data.scheduleType === 'recurring'
-                ? { cronExpression: data.cronExpression }
-                : { runAt: data.runAt }),
-              timezone: data.timezone || 'UTC',
-              ...(data.selectedTools !== undefined && { selectedTools: data.selectedTools }),
-            };
-            const opts = { onSuccess: handleFormSuccess, onError: handleFormError };
-            if (editingSchedule) {
-              updateMutation.mutate({ id: editingSchedule._id, data: payload }, opts);
-            } else {
-              createMutation.mutate(payload, opts);
-            }
-          }}
-          isSubmitting={createMutation.isLoading || updateMutation.isLoading}
-        />
-      )}
     </div>
   );
 }

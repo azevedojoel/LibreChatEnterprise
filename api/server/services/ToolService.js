@@ -6,6 +6,7 @@ const {
   GraphEvents,
   createToolSearch,
   Constants: AgentConstants,
+  EnvVar,
 } = require('@librechat/agents');
 const {
   sendEvent,
@@ -18,6 +19,7 @@ const {
   buildWebSearchContext,
   buildImageToolContext,
   buildToolClassification,
+  getToolDefinition,
 } = require('@librechat/api');
 const {
   Time,
@@ -1200,12 +1202,72 @@ async function loadAgentTools({
 
   agentTools.push(...additionalTools);
 
+  /**
+   * Merge built-in tool definitions (file_search, execute_code, web_search, etc.) into
+   * toolDefinitions. buildToolClassification only returns MCP + tool_search, so native
+   * tools would be omitted when buildToolSet prefers toolDefinitions (e.g. inbound email).
+   * This ensures the LLM receives all tools the agent has configured.
+   */
+  const existingDefNames = new Set((toolDefinitions ?? []).map((d) => d.name));
+  let useLocalCodeExecution;
+  let hasRemoteCodeKeyForExecuteCode = false;
+  const disableLocalCodeExecution =
+    process.env.DISABLE_LOCAL_CODE_EXECUTION === 'true' ||
+    process.env.DISABLE_LOCAL_CODE_EXECUTION === '1';
+  if (_agentTools.includes(Tools.execute_code)) {
+    try {
+      const authValues = await loadAuthValues({
+        userId: req.user.id,
+        authFields: [EnvVar.CODE_API_KEY],
+        optional: new Set([EnvVar.CODE_API_KEY]),
+        throwError: false,
+      });
+      const codeApiKey = authValues[EnvVar.CODE_API_KEY] ?? '';
+      hasRemoteCodeKeyForExecuteCode = !!codeApiKey && codeApiKey !== 'local';
+      useLocalCodeExecution = disableLocalCodeExecution
+        ? false
+        : !codeApiKey || codeApiKey === 'local';
+    } catch {
+      useLocalCodeExecution = disableLocalCodeExecution ? false : true;
+    }
+  }
+  const mcpToolPattern = /_mcp_/;
+  const builtInToolDefs = [];
+  for (const toolName of _agentTools) {
+    if (!toolName || typeof toolName !== 'string') continue;
+    if (toolName.includes(actionDelimiter) || mcpToolPattern.test(toolName)) continue;
+    if (!isBuiltInTool(toolName)) continue;
+    if (existingDefNames.has(toolName)) continue;
+    if (
+      toolName === Tools.execute_code &&
+      disableLocalCodeExecution &&
+      !hasRemoteCodeKeyForExecuteCode
+    ) {
+      continue;
+    }
+    const registryDef = getToolDefinition(toolName, {
+      useLocalCodeExecution:
+        toolName === Tools.execute_code ? useLocalCodeExecution : undefined,
+    });
+    if (!registryDef) continue;
+    builtInToolDefs.push({
+      name: toolName,
+      description: registryDef.description,
+      parameters: registryDef.schema,
+      allowed_callers: ['direct'],
+    });
+  }
+  const mergedToolDefinitions = [
+    ...(toolDefinitions ?? []),
+    ...builtInToolDefs,
+  ];
+
   if (!checkCapability(AgentCapabilities.actions)) {
     return {
       toolRegistry,
       userMCPAuthMap,
       toolContextMap,
-      toolDefinitions,
+      toolDefinitions: mergedToolDefinitions,
       hasDeferredTools,
       tools: agentTools,
     };
@@ -1220,7 +1282,7 @@ async function loadAgentTools({
       toolRegistry,
       userMCPAuthMap,
       toolContextMap,
-      toolDefinitions,
+      toolDefinitions: mergedToolDefinitions,
       hasDeferredTools,
       tools: agentTools,
     };
@@ -1352,7 +1414,7 @@ async function loadAgentTools({
     toolRegistry,
     toolContextMap,
     userMCPAuthMap,
-    toolDefinitions,
+    toolDefinitions: mergedToolDefinitions,
     hasDeferredTools,
     tools: agentTools,
   };

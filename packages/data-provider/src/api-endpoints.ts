@@ -244,6 +244,10 @@ export const agents = ({ path = '', options }: { path?: string; options?: object
 
 export const activeJobs = () => `${BASE_URL}/api/agents/chat/active`;
 
+/** SSE stream URL for agent generation. Use for both conversation and scheduled run streams. */
+export const agentStream = (streamId: string, resume = false) =>
+  `${BASE_URL}/api/agents/chat/stream/${encodeURIComponent(streamId)}${resume ? '?resume=true' : ''}`;
+
 export const mcp = {
   tools: `${BASE_URL}/api/mcp/tools`,
   servers: `${BASE_URL}/api/mcp/servers`,
@@ -380,6 +384,7 @@ export const memories = () => `${BASE_URL}/api/memories`;
 export const scheduledAgents = () => `${BASE_URL}/api/scheduled-agents`;
 export const scheduledAgentRuns = () => `${scheduledAgents()}/runs`;
 export const scheduledAgentRun = (id: string) => `${scheduledAgentRuns()}/${id}`;
+export const scheduledAgentRunCancel = (id: string) => `${scheduledAgentRun(id)}/cancel`;
 export const memory = (key: string) => `${memories()}/${encodeURIComponent(key)}`;
 export const memoryPreferences = () => `${memories()}/preferences`;
 

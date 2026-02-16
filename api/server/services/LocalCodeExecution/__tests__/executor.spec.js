@@ -23,7 +23,7 @@ describe('LocalCodeExecution', () => {
       expect(r.files[0].buffer.toString()).toBe('hello');
     });
 
-    it('should redirect /mnt/data/ paths to output dir', async () => {
+    it('should redirect /mnt/data/ paths to workspace dir', async () => {
       const code = 'with open("/mnt/data/x.txt", "w") as f:\n  f.write("from mnt data")';
       const r = await runCodeLocally({ lang: 'py', code });
       expect(r.files).toHaveLength(1);
@@ -107,6 +107,48 @@ print("done")
       expect(result.artifact.files[0].buffer.toString()).toBe('ok');
       if (result.artifact.session_id) {
         const sessionDir = path.join(getSessionBaseDir(), result.artifact.session_id);
+        await fs.rm(sessionDir, { recursive: true, force: true }).catch(() => {});
+      }
+    });
+
+    it('should persist files across conversations when agentId and userId are provided', async () => {
+      const agentId = 'agent-test-123';
+      const userId = 'user-test-456';
+      const testTool = createLocalCodeExecutionTool({
+        agentId,
+        user_id: userId,
+        files: [],
+      });
+      const expectedSessionId = `agent_${agentId}_user_${userId}`;
+      try {
+        const result1 = await testTool.invoke(
+          { lang: 'py', code: 'with open("cross_conv.txt", "w") as f:\n  f.write("from conv A")' },
+          { toolCall: { id: 'tc-a' }, configurable: { thread_id: 'conv-aaa' } }
+        );
+        expect(result1.artifact.session_id).toBe(expectedSessionId);
+        expect(result1.artifact.files).toHaveLength(1);
+
+        const result2 = await testTool.invoke(
+          {
+            lang: 'py',
+            code: `
+with open("cross_conv.txt", "r") as f:
+  content = f.read()
+with open("cross_conv.txt", "w") as f:
+  f.write(content + " + conv B")
+print("done")
+`,
+          },
+          { toolCall: { id: 'tc-b' }, configurable: { thread_id: 'conv-bbb' } }
+        );
+        expect(result2.artifact.session_id).toBe(expectedSessionId);
+        expect(result2.content).toContain('done');
+        expect(result2.artifact.files).toHaveLength(1);
+        expect(result2.artifact.files[0].buffer.toString()).toBe(
+          'from conv A + conv B'
+        );
+      } finally {
+        const sessionDir = path.join(getSessionBaseDir(), expectedSessionId);
         await fs.rm(sessionDir, { recursive: true, force: true }).catch(() => {});
       }
     });

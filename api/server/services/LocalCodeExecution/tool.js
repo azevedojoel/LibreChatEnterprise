@@ -10,6 +10,7 @@ const {
   getSessionBaseDir,
   injectAgentFiles,
 } = require('./executor');
+const { getWorkspaceSessionId } = require('./workspaceKey');
 
 const imageMessage = 'Image is already displayed to the user';
 const otherMessage = 'File is already downloaded by the user';
@@ -38,7 +39,7 @@ const CodeExecutionToolSchema = {
       type: 'string',
       description: `The complete, self-contained Python code to execute.
 - Use print() for all outputs.
-- Matplotlib: Use plt.savefig() to save plots as files in the output directory.`,
+- Matplotlib: Use plt.savefig() to save plots as files in the working directory.`,
     },
     args: {
       type: 'array',
@@ -51,6 +52,8 @@ const CodeExecutionToolSchema = {
 
 /**
  * @param {object} [params] - Optional params for compatibility with createCodeExecutionTool signature
+ * @param {string} [params.agentId] - Agent ID for agent-user workspace scope (files persist across conversations)
+ * @param {string} [params.user_id] - User ID for agent-user workspace scope
  * @param {Array<{ filepath?: string; filename: string; source?: string }>} [params.files] - Agent-uploaded files to copy into workspace
  * @param {import('express').Request} [params.req] - Request object for resolving file paths (required for injected files)
  * @returns {import('@langchain/core/tools').DynamicStructuredTool}
@@ -58,6 +61,8 @@ const CodeExecutionToolSchema = {
 function createLocalCodeExecutionTool(params = {}) {
   const agentFiles = params.files ?? [];
   const req = params.req;
+  const agentId = params.agentId;
+  const userId = params.user_id;
   return tool(
     async (rawInput, config) => {
       const { lang, code, args } = rawInput;
@@ -66,12 +71,13 @@ function createLocalCodeExecutionTool(params = {}) {
       const threadId = configurable.thread_id;
       const emitCodeOutputChunk = configurable.emitCodeOutputChunk;
       const toolCallId = toolCall?.id;
-      const session_id =
-        toolCall?.session_id ?? (threadId ? `conv_${threadId}` : undefined);
-      const resolvedSessionId = session_id ?? `local_${Date.now().toString(36)}`;
+      const resolvedSessionId = getWorkspaceSessionId({
+        agentId,
+        userId,
+        conversationId: threadId,
+      });
       const sessionDir = path.join(getSessionBaseDir(), resolvedSessionId);
-      const outputDir = path.join(sessionDir, 'output');
-      await injectAgentFiles(outputDir, agentFiles, req);
+      await injectAgentFiles(sessionDir, agentFiles, req);
       const onOutput =
         typeof emitCodeOutputChunk === 'function' && toolCallId
           ? ({ source, chunk }) => emitCodeOutputChunk(toolCallId, chunk, source)
@@ -81,7 +87,7 @@ function createLocalCodeExecutionTool(params = {}) {
           lang,
           code,
           args: args ?? [],
-          session_id: session_id ?? resolvedSessionId,
+          session_id: resolvedSessionId,
           onOutput,
         });
         let formattedOutput = '';

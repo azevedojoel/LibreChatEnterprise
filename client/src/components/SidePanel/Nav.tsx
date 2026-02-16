@@ -37,6 +37,7 @@ function NavContent({ links, isCollapsed, resize }: Omit<NavProps, 'defaultActiv
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="relative"
                           onClick={(e) => {
                             if (link.onClick) {
                               link.onClick(e);
@@ -48,6 +49,11 @@ function NavContent({ links, isCollapsed, resize }: Omit<NavProps, 'defaultActiv
                           }}
                         >
                           <link.icon className="h-4 w-4 text-text-secondary" />
+                          {link.badge && (
+                            <span className="absolute -right-0.5 -top-0.5">
+                              {link.badge}
+                            </span>
+                          )}
                           <span className="sr-only">{localize(link.title)}</span>
                         </Button>
                       }
@@ -74,8 +80,11 @@ function NavContent({ links, isCollapsed, resize }: Omit<NavProps, 'defaultActiv
                                 }
                               }}
                             >
-                              <link.icon className="mr-2 h-4 w-4" aria-hidden="true" />
+                              <link.icon className="mr-2 h-4 w-4 shrink-0" aria-hidden="true" />
                               {localize(link.title)}
+                              {link.badge && (
+                                <span className="ml-1.5 shrink-0">{link.badge}</span>
+                              )}
                               {link.label != null && link.label && (
                                 <span
                                   className={cn(
