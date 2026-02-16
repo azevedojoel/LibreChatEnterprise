@@ -34,7 +34,6 @@ import {
 } from '~/utils';
 import { useDeleteFilesMutation, useGetEndpointsQuery, useGetStartupConfig } from '~/data-provider';
 import useAssistantListMap from './Assistants/useAssistantListMap';
-import { useResetChatBadges } from './useChatBadges';
 import { useApplyModelSpecEffects } from './Agents';
 import { usePauseGlobalAudio } from './Audio';
 import { useHasAccess } from '~/hooks';
@@ -49,7 +48,6 @@ const useNewConvo = (index = 0) => {
   const defaultPreset = useRecoilValue(store.defaultPreset);
   const { setConversation } = store.useCreateConversationAtom(index);
   const [files, setFiles] = useRecoilState(store.filesByIndex(index));
-  const saveBadgesState = useRecoilValue<boolean>(store.saveBadgesState);
   const clearAllLatestMessages = store.useClearLatestMessages(`useNewConvo ${index}`);
   const setSubmission = useSetRecoilState<TSubmission | null>(store.submissionByIndex(index));
   const { data: endpointsConfig = {} as TEndpointsConfig } = useGetEndpointsQuery();
@@ -63,7 +61,6 @@ const useNewConvo = (index = 0) => {
   const assistantsListMap = useAssistantListMap();
   const { pauseGlobalAudio } = usePauseGlobalAudio(index);
   const saveDrafts = useRecoilValue<boolean>(store.saveDrafts);
-  const resetBadges = useResetChatBadges();
 
   const { mutateAsync } = useDeleteFilesMutation({
     onSuccess: () => {
@@ -273,9 +270,6 @@ const useNewConvo = (index = 0) => {
       disableParams?: boolean;
     } = {}) {
       pauseGlobalAudio();
-      if (!saveBadgesState) {
-        resetBadges();
-      }
 
       const templateConvoId = _template.conversationId ?? '';
       const paramEndpoint =
@@ -356,9 +350,7 @@ const useNewConvo = (index = 0) => {
       setFiles,
       saveDrafts,
       mutateAsync,
-      resetBadges,
       startupConfig,
-      saveBadgesState,
       pauseGlobalAudio,
       switchToConversation,
       applyModelSpecEffects,

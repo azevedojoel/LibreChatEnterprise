@@ -64,13 +64,6 @@ const toggleSwitchConfigs = [
     key: 'showScrollButton',
   },
   {
-    stateAtom: store.saveBadgesState,
-    localizationKey: 'com_nav_save_badges_state' as const,
-    switchId: 'showBadges',
-    hoverCardText: 'com_nav_info_save_badges_state' as const,
-    key: 'showBadges',
-  },
-  {
     stateAtom: store.modularChat,
     localizationKey: 'com_nav_modular_chat' as const,
     switchId: 'modularChat',

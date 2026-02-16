@@ -2,12 +2,7 @@ import { memo, useRef, useMemo, useEffect, useState, useCallback } from 'react';
 import { useWatch } from 'react-hook-form';
 import { TextareaAutosize } from '@librechat/client';
 import { useRecoilState, useRecoilValue } from 'recoil';
-import {
-  Constants,
-  isAssistantsEndpoint,
-  isAgentsEndpoint,
-  defaultAgentCapabilities,
-} from 'librechat-data-provider';
+import { Constants, isAssistantsEndpoint } from 'librechat-data-provider';
 import {
   useChatContext,
   useChatFormContext,
@@ -23,10 +18,8 @@ import {
   useQueryParams,
   useSubmitMessage,
   useFocusChatEffect,
-  useGetAgentsConfig,
-  useAgentCapabilities,
 } from '~/hooks';
-import { mainTextareaId, BadgeItem } from '~/common';
+import { mainTextareaId } from '~/common';
 import AttachFileChat from './Files/AttachFileChat';
 import FileFormChat from './Files/FileFormChat';
 import { cn, removeFocusRings } from '~/utils';
@@ -37,8 +30,6 @@ import CollapseChat from './CollapseChat';
 import StreamAudio from './StreamAudio';
 import StopButton from './StopButton';
 import SendButton from './SendButton';
-import EditBadges from './EditBadges';
-import BadgeRow from './BadgeRow';
 import Mention from './Mention';
 import store from '~/store';
 
@@ -52,7 +43,6 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
   const [, setIsScrollable] = useState(false);
   const [visualRowCount, setVisualRowCount] = useState(1);
   const [isTextAreaFocused, setIsTextAreaFocused] = useState(false);
-  const [backupBadges, setBackupBadges] = useState<Pick<BadgeItem, 'id'>[]>([]);
 
   const SpeechToText = useRecoilValue(store.speechToText);
   const TextToSpeech = useRecoilValue(store.textToSpeech);
@@ -62,8 +52,6 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
   const centerFormOnLanding = useRecoilValue(store.centerFormOnLanding);
   const isTemporary = useRecoilValue(store.isTemporary);
 
-  const [badges, setBadges] = useRecoilState(store.chatBadges);
-  const [isEditingBadges, setIsEditingBadges] = useRecoilState(store.isEditingBadges);
   const [showStopButton, setShowStopButton] = useRecoilState(store.showStopButtonByIndex(index));
   const [showPlusPopover, setShowPlusPopover] = useRecoilState(store.showPlusPopoverFamily(index));
   const [showMentionPopover, setShowMentionPopover] = useRecoilState(
@@ -87,10 +75,6 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
     setConversation: setAddedConvo,
   } = useAddedChatContext();
   const assistantMap = useAssistantsMapContext();
-  const { agentsConfig } = useGetAgentsConfig();
-  const { artifactsEnabled } = useAgentCapabilities(
-    agentsConfig?.capabilities ?? defaultAgentCapabilities,
-  );
 
   const endpoint = useMemo(
     () => conversation?.endpointType ?? conversation?.endpoint,
@@ -181,25 +165,6 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
     }
   }, [textValue]);
 
-  useEffect(() => {
-    if (isEditingBadges && backupBadges.length === 0) {
-      setBackupBadges([...badges]);
-    }
-  }, [isEditingBadges, badges, backupBadges.length]);
-
-  const handleSaveBadges = useCallback(() => {
-    setIsEditingBadges(false);
-    setBackupBadges([]);
-  }, [setIsEditingBadges, setBackupBadges]);
-
-  const handleCancelBadges = useCallback(() => {
-    if (backupBadges.length > 0) {
-      setBadges([...backupBadges]);
-    }
-    setIsEditingBadges(false);
-    setBackupBadges([]);
-  }, [backupBadges, setBadges, setIsEditingBadges]);
-
   const isMoreThanThreeRows = visualRowCount > 3;
 
   const baseClasses = useMemo(
@@ -259,13 +224,6 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
             )}
           >
             <TextareaHeader addedConvo={addedConvo} setAddedConvo={setAddedConvo} />
-            {/* WIP */}
-            <EditBadges
-              isEditingChatBadges={isEditingBadges}
-              handleCancelBadges={handleCancelBadges}
-              handleSaveBadges={handleSaveBadges}
-              setBadges={setBadges}
-            />
             <FileFormChat conversation={conversation} />
             {endpoint && (
               <div className={cn('flex', isRTL ? 'flex-row-reverse' : 'flex-row')}>
@@ -330,22 +288,6 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
               <div className={`${isRTL ? 'mr-2' : 'ml-2'}`}>
                 <AttachFileChat conversation={conversation} disableInputs={disableInputs} />
               </div>
-              <BadgeRow
-                showEphemeralBadges={
-                  (!!endpoint &&
-                    !isAgentsEndpoint(endpoint) &&
-                    !isAssistantsEndpoint(endpoint)) ||
-                  (!!endpoint &&
-                    isAgentsEndpoint(endpoint) &&
-                    artifactsEnabled)
-                }
-                isSubmitting={isSubmitting}
-                conversationId={conversationId}
-                onChange={setBadges}
-                isInChat={
-                  Array.isArray(conversation?.messages) && conversation.messages.length >= 1
-                }
-              />
               <div className="mx-auto flex" />
               {SpeechToText && (
                 <AudioRecorder
