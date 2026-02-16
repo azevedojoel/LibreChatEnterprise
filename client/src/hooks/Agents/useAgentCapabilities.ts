@@ -13,6 +13,7 @@ interface AgentCapabilitiesResult {
   deferredToolsEnabled: boolean;
   programmaticToolsEnabled: boolean;
   manageSchedulingEnabled: boolean;
+  inboundEmailEnabled: boolean;
 }
 
 export default function useAgentCapabilities(
@@ -73,6 +74,11 @@ export default function useAgentCapabilities(
     [capabilities],
   );
 
+  const inboundEmailEnabled = useMemo(
+    () => capabilities?.includes(AgentCapabilities.inbound_email) ?? false,
+    [capabilities],
+  );
+
   return {
     ocrEnabled,
     codeEnabled,
@@ -85,5 +91,6 @@ export default function useAgentCapabilities(
     deferredToolsEnabled,
     programmaticToolsEnabled,
     manageSchedulingEnabled,
+    inboundEmailEnabled,
   };
 }

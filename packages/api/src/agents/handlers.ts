@@ -30,6 +30,9 @@ export type ToolEndCallback = (
   metadata: ToolEndCallbackMetadata,
 ) => Promise<void>;
 
+/** Marker for headless OAuth URL in error message (from MCP.js) */
+const HEADLESS_OAUTH_URL_MARKER = 'To authenticate, open this URL in your browser:\n';
+
 export interface ToolExecuteOptions {
   /** Loads tools by name, using agentId to look up agent-specific context */
   loadTools: (
@@ -42,6 +45,8 @@ export interface ToolExecuteOptions {
   }>;
   /** Callback to process tool artifacts (code output files, file citations, etc.) */
   toolEndCallback?: ToolEndCallback;
+  /** Callback to capture OAuth URL when headless OAuth error occurs (e.g., inbound email) */
+  captureOAuthUrl?: (url: string) => void;
 }
 
 /**
@@ -50,7 +55,7 @@ export interface ToolExecuteOptions {
  * executes them in parallel, and resolves with the results.
  */
 export function createToolExecuteHandler(options: ToolExecuteOptions): EventHandler {
-  const { loadTools, toolEndCallback } = options;
+  const { loadTools, toolEndCallback, captureOAuthUrl } = options;
 
   return {
     handle: async (_event: string, data: ToolExecuteBatchRequest) => {
@@ -155,11 +160,20 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
             } catch (toolError) {
               const error = toolError as Error;
               logger.error(`[ON_TOOL_EXECUTE] Tool ${tc.name} error:`, error);
+              const errorMessage = error.message ?? '';
+              if (captureOAuthUrl && errorMessage.includes(HEADLESS_OAUTH_URL_MARKER)) {
+                const url = errorMessage
+                  .slice(errorMessage.indexOf(HEADLESS_OAUTH_URL_MARKER) + HEADLESS_OAUTH_URL_MARKER.length)
+                  .trim();
+                if (url) {
+                  captureOAuthUrl(url);
+                }
+              }
               return {
                 toolCallId: tc.id,
                 status: 'error' as const,
                 content: '',
-                errorMessage: error.message,
+                errorMessage,
               };
             }
           }),

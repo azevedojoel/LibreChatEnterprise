@@ -155,6 +155,11 @@ export default function AgentSelect({
           return;
         }
 
+        if (name === 'inboundEmailToken' && (value === null || typeof value === 'string')) {
+          formValues[name] = value ?? '';
+          return;
+        }
+
         if (name === 'tool_options' && typeof value === 'object' && value !== null) {
           formValues[name] = value;
           return;

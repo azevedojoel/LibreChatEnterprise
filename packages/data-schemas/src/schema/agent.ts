@@ -128,6 +128,13 @@ const agentSchema = new Schema<IAgent>(
       type: [String],
       default: undefined,
     },
+    /** Token for inbound email routing; when set, agent can receive email at hash+token@inbound */
+    inboundEmailToken: {
+      type: String,
+      default: undefined,
+      index: true,
+      sparse: true,
+    },
   },
   {
     timestamps: true,

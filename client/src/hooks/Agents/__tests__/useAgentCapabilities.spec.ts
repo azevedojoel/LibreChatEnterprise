@@ -16,6 +16,7 @@ describe('useAgentCapabilities', () => {
     expect(result.current.codeEnabled).toBe(false);
     expect(result.current.deferredToolsEnabled).toBe(false);
     expect(result.current.programmaticToolsEnabled).toBe(false);
+    expect(result.current.inboundEmailEnabled).toBe(false);
   });
 
   it('should return all capabilities as false when capabilities is empty array', () => {
@@ -108,5 +109,13 @@ describe('useAgentCapabilities', () => {
     expect(result.current.codeEnabled).toBe(true);
     expect(result.current.deferredToolsEnabled).toBe(true);
     expect(result.current.programmaticToolsEnabled).toBe(true);
+  });
+
+  it('should return inboundEmailEnabled as true when inbound_email is in capabilities', () => {
+    const capabilities = [AgentCapabilities.inbound_email];
+
+    const { result } = renderHook(() => useAgentCapabilities(capabilities));
+
+    expect(result.current.inboundEmailEnabled).toBe(true);
   });
 });

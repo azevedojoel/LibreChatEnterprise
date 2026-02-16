@@ -44,6 +44,7 @@ export type AgentForm = {
   agent_ids?: string[];
   edges?: GraphEdge[];
   schedulerTargetAgentIds?: string[];
+  inboundEmailToken?: string | null;
   [AgentCapabilities.artifacts]?: ArtifactModes | string;
   recursion_limit?: number;
   support_contact?: SupportContact;

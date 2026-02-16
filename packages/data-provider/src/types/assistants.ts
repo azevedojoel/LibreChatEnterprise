@@ -293,6 +293,8 @@ export type Agent = {
   tool_options?: AgentToolOptions;
   /** Agent IDs this scheduler can schedule (when Enable Scheduling is on) */
   schedulerTargetAgentIds?: string[];
+  /** Token for inbound email routing; when set, agent can receive email at hash+token@inbound */
+  inboundEmailToken?: string;
 };
 
 export type TAgentsMap = Record<string, Agent | undefined>;
@@ -345,6 +347,8 @@ export type AgentUpdateParams = {
   | 'category'
   | 'support_contact'
   | 'tool_options'
+  | 'schedulerTargetAgentIds'
+  | 'inboundEmailToken'
 >;
 
 export type AgentListParams = {

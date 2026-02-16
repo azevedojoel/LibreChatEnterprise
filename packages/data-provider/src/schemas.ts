@@ -250,6 +250,7 @@ export const defaultAgentFormValues = {
   [Tools.web_search]: false,
   manage_scheduling: false,
   schedulerTargetAgentIds: [],
+  inboundEmailToken: '',
   category: 'general',
   support_contact: {
     name: '',

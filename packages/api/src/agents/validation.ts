@@ -88,6 +88,8 @@ export const agentBaseSchema = z.object({
   support_contact: agentSupportContactSchema,
   category: z.string().optional(),
   schedulerTargetAgentIds: z.array(z.string()).optional(),
+  /** Token for inbound email routing; when set, agent can receive email at hash+token@inbound */
+  inboundEmailToken: z.string().nullable().optional(),
 });
 
 /** Create schema extends base with required fields for creation */

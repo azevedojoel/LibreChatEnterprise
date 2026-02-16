@@ -188,6 +188,7 @@ export enum AgentCapabilities {
   chain = 'chain',
   ocr = 'ocr',
   manage_scheduling = 'manage_scheduling',
+  inbound_email = 'inbound_email',
 }
 
 export const defaultAssistantsVersion = {
@@ -276,6 +277,7 @@ export const defaultAgentCapabilities = [
   AgentCapabilities.chain,
   AgentCapabilities.ocr,
   AgentCapabilities.manage_scheduling,
+  AgentCapabilities.inbound_email,
 ];
 
 export const agentsEndpointSchema = baseEndpointSchema
