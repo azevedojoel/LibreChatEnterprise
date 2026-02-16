@@ -3,6 +3,7 @@ import { EToolResources } from 'librechat-data-provider';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   QueryKeys,
+  DynamicQueryKeys,
   dataService,
   MutationKeys,
   defaultOrderQuery,
@@ -161,7 +162,17 @@ export const useDeleteFilesMutation = (
             message: localize('com_ui_delete_not_allowed'),
             status: 'error',
           });
+        } else {
+          showToast({
+            message: localize('com_ui_delete_error') ?? 'Failed to delete file',
+            status: 'error',
+          });
         }
+      } else {
+        showToast({
+          message: localize('com_ui_delete_error') ?? 'Failed to delete file',
+          status: 'error',
+        });
       }
       onError?.(error, vars, context);
     },
@@ -185,6 +196,7 @@ export const useDeleteFilesMutation = (
       onSuccess?.(data, vars, context);
       if (vars.agent_id != null && vars.agent_id) {
         queryClient.refetchQueries([QueryKeys.agent, vars.agent_id]);
+        queryClient.invalidateQueries(DynamicQueryKeys.agentFiles(vars.agent_id));
       }
     },
   });

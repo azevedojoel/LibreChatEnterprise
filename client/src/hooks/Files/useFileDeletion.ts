@@ -22,6 +22,8 @@ const useFileDeletion = ({
   const [_batch, setFileDeleteBatch] = useState<t.BatchFile[]>([]);
   const setFilesToDelete = useSetFilesToDelete();
 
+  const hasAgentOrAssistant = Boolean(agent_id || assistant_id);
+
   const executeBatchDelete = useCallback(
     ({
       filesToDelete,
@@ -39,7 +41,6 @@ const useFileDeletion = ({
         assistant_id,
         tool_resource,
       });
-      console.log('Deleting files:', filesToDelete, payload);
       mutateAsync({ files: filesToDelete, ...payload });
       setFileDeleteBatch([]);
     },
@@ -50,7 +51,6 @@ const useFileDeletion = ({
   const debouncedDelete = useCallback(debounce(executeBatchDelete, 1000), []);
 
   useEffect(() => {
-    // Cleanup function for debouncedDelete when component unmounts or before re-render
     return () => debouncedDelete.cancel();
   }, [debouncedDelete]);
 
@@ -77,6 +77,33 @@ const useFileDeletion = ({
         source,
       };
 
+      if (attached) {
+        return;
+      }
+
+      if (hasAgentOrAssistant && setFiles) {
+        mutateAsync({
+          files: [file],
+          agent_id,
+          assistant_id,
+          tool_resource,
+        })
+          .then(() => {
+            setFiles((currentFiles) => {
+              const updatedFiles = new Map(currentFiles);
+              updatedFiles.delete(file_id);
+              updatedFiles.delete(temp_file_id);
+              const files = Object.fromEntries(updatedFiles);
+              setFilesToDelete(files);
+              return updatedFiles;
+            });
+          })
+          .catch(() => {
+            /* Error toast handled by mutation onError */
+          });
+        return;
+      }
+
       if (setFiles) {
         setFiles((currentFiles) => {
           const updatedFiles = new Map(currentFiles);
@@ -86,10 +113,6 @@ const useFileDeletion = ({
           setFilesToDelete(files);
           return updatedFiles;
         });
-      }
-
-      if (attached) {
-        return;
       }
 
       setFileDeleteBatch((prevBatch) => {
@@ -103,7 +126,7 @@ const useFileDeletion = ({
         return newBatch;
       });
     },
-    [debouncedDelete, setFilesToDelete, agent_id, assistant_id, tool_resource],
+    [debouncedDelete, setFilesToDelete, agent_id, assistant_id, tool_resource, hasAgentOrAssistant, mutateAsync],
   );
 
   const deleteFiles = useCallback(
