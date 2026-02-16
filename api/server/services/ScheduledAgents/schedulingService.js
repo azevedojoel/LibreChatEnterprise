@@ -166,8 +166,7 @@ async function runScheduleForUser(userId, scheduleId) {
   });
   const runId = run._id.toString();
 
-  const { enqueueRun, isQueueAvailable } = require('./jobQueue');
-  const { executeScheduledAgent } = require('./executeAgent');
+  const { enqueueRun, isQueueAvailable, runSerializedPerAgent } = require('./jobQueue');
 
   const payload = {
     scheduleId: schedule._id.toString(),
@@ -185,11 +184,7 @@ async function runScheduleForUser(userId, scheduleId) {
     logger.warn(
       '[ScheduledAgents] Redis not available; running in background. Jobs may be lost on restart.',
     );
-    setImmediate(() => {
-      executeScheduledAgent({ runId, ...payload }).catch((err) => {
-        logger.error('[ScheduledAgents] Background run failed:', err);
-      });
-    });
+    runSerializedPerAgent(runId, payload).catch(() => {});
   }
 
   return {

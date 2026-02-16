@@ -6,7 +6,7 @@
  * ioredis and provides its own prefix option.
  */
 const IoRedis = require('ioredis');
-const { Queue, Worker } = require('bullmq');
+const { Queue, Worker, Job, DelayedError } = require('bullmq');
 const { logger } = require('@librechat/data-schemas');
 const { cacheConfig, isEnabled } = require('@librechat/api');
 const { executeScheduledAgent } = require('./executeAgent');
@@ -17,6 +17,7 @@ const MIN_CONCURRENCY = 1;
 const MAX_CONCURRENCY = 20;
 const JOB_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 const RETRY_ATTEMPTS = 3;
+const AGENT_LOCK_DELAY_MS = 5000;
 
 function getConcurrency() {
   const raw = parseInt(process.env.SCHEDULED_AGENTS_QUEUE_CONCURRENCY, 10);
@@ -85,6 +86,49 @@ function getBullPrefix() {
 }
 
 /**
+ * Redis key for per-agent lock. Ensures only one scheduled run per agent at a time.
+ */
+function getAgentLockKey(agentId) {
+  const prefix = getBullPrefix();
+  return `${prefix}:agent-lock:${agentId}`;
+}
+
+/**
+ * Try to acquire a per-agent lock. Returns true if acquired, false if another run holds it.
+ */
+async function tryAcquireAgentLock(agentId, runId) {
+  const conn = getRedisConnection();
+  if (!conn) return false;
+  try {
+    const key = getAgentLockKey(agentId);
+    const result = await conn.set(key, runId, 'PX', JOB_TIMEOUT_MS, 'NX');
+    return result === 'OK';
+  } catch (err) {
+    logger.error(`[ScheduledAgents] Failed to acquire lock for agent ${agentId}:`, err);
+    return false;
+  }
+}
+
+/**
+ * Release the per-agent lock only if we still hold it (value matches runId).
+ */
+async function releaseAgentLock(agentId, runId) {
+  const conn = getRedisConnection();
+  if (!conn) return;
+  try {
+    const key = getAgentLockKey(agentId);
+    await conn.eval(
+      `if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end`,
+      1,
+      key,
+      runId,
+    );
+  } catch (err) {
+    logger.error(`[ScheduledAgents] Failed to release lock for agent ${agentId}:`, err);
+  }
+}
+
+/**
  * Fail startup when scheduled agents are enabled but Redis is unavailable.
  * Tied to interface.scheduledAgents from config; respects SCHEDULED_AGENTS_REQUIRE_REDIS=false opt-out.
  * @param {boolean} [schedulerEnabled] - From appConfig?.interfaceConfig?.scheduledAgents. When !== false, Redis is required.
@@ -112,27 +156,13 @@ function requireRedisAtStartup(schedulerEnabled = true) {
  * @returns {Promise<import('bullmq').Job|null>} The added job, or null if queue unavailable
  */
 async function enqueueRun(runId, payload) {
-  const connection = getRedisConnection();
-  if (!connection) {
+  const q = getQueue();
+  if (!q) {
     return null;
   }
 
   try {
-    if (!queue) {
-      queue = new Queue(QUEUE_NAME, {
-        connection,
-        prefix: getBullPrefix(),
-        defaultJobOptions: {
-          attempts: RETRY_ATTEMPTS,
-          backoff: { type: 'exponential', delay: 5000 },
-          removeOnComplete: { age: 24 * 3600 },
-          removeOnFail: { age: 7 * 24 * 3600 },
-          timeout: JOB_TIMEOUT_MS,
-        },
-      });
-    }
-
-    const job = await queue.add(
+    const job = await q.add(
       'run',
       { runId, ...payload },
       { jobId: runId },
@@ -164,21 +194,32 @@ function startWorker() {
   const concurrency = getConcurrency();
   worker = new Worker(
     QUEUE_NAME,
-    async (job) => {
+    async (job, token) => {
       const { runId, scheduleId, userId, agentId, prompt, conversationId, selectedTools } =
         job.data;
 
       logger.info(`[ScheduledAgents] Processing job: runId=${runId} scheduleId=${scheduleId}`);
 
-      await executeScheduledAgent({
-        runId,
-        scheduleId,
-        userId,
-        agentId,
-        prompt,
-        conversationId: conversationId || undefined,
-        selectedTools,
-      });
+      const lockAcquired = await tryAcquireAgentLock(agentId, runId);
+      if (!lockAcquired) {
+        logger.debug(`[ScheduledAgents] Agent ${agentId} busy, delaying job runId=${runId}`);
+        await job.moveToDelayed(Date.now() + AGENT_LOCK_DELAY_MS, token);
+        throw new DelayedError();
+      }
+
+      try {
+        await executeScheduledAgent({
+          runId,
+          scheduleId,
+          userId,
+          agentId,
+          prompt,
+          conversationId: conversationId || undefined,
+          selectedTools,
+        });
+      } finally {
+        await releaseAgentLock(agentId, runId);
+      }
     },
     {
       connection,
@@ -230,8 +271,96 @@ function isQueueAvailable() {
   return !!getRedisConnection();
 }
 
+/**
+ * Get or create the queue instance.
+ * @returns {import('bullmq').Queue|null}
+ */
+function getQueue() {
+  const connection = getRedisConnection();
+  if (!connection) return null;
+  if (!queue) {
+    queue = new Queue(QUEUE_NAME, {
+      connection,
+      prefix: getBullPrefix(),
+      defaultJobOptions: {
+        attempts: RETRY_ATTEMPTS,
+        backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: { age: 24 * 3600 },
+        removeOnFail: { age: 7 * 24 * 3600 },
+        timeout: JOB_TIMEOUT_MS,
+      },
+    });
+  }
+  return queue;
+}
+
+/**
+ * Per-agent promise chains for when Redis is unavailable.
+ * Ensures only one run per agent at a time; different agents can run in parallel.
+ */
+const agentChains = new Map();
+
+/**
+ * Run a scheduled agent when the queue is unavailable (no Redis).
+ * Serializes per agentId: same agent waits, different agents run in parallel.
+ * @param {string} runId - ScheduledRun _id
+ * @param {Object} payload - Same as enqueueRun payload
+ * @returns {Promise<void>}
+ */
+async function runSerializedPerAgent(runId, payload) {
+  const { agentId } = payload;
+  const prev = agentChains.get(agentId) ?? Promise.resolve();
+  const next = prev
+    .then(() => executeScheduledAgent({ runId, ...payload }))
+    .catch((err) => {
+      logger.error(`[ScheduledAgents] Background run failed: runId=${runId}`, err);
+    })
+    .finally(() => {
+      if (agentChains.get(agentId) === next) {
+        agentChains.delete(agentId);
+      }
+    });
+  agentChains.set(agentId, next);
+  return next;
+}
+
+/**
+ * Remove a queued run from the BullMQ queue.
+ * Fails if the job is already being processed (active).
+ * @param {string} runId - ScheduledRun _id (used as jobId)
+ * @returns {Promise<{ removed: boolean; error?: string }>}
+ */
+async function removeRun(runId) {
+  const q = getQueue();
+  if (!q) {
+    return { removed: false, error: 'Queue unavailable' };
+  }
+  try {
+    const job = await Job.fromId(q, runId);
+    if (!job) {
+      return { removed: false, error: 'Job not found' };
+    }
+    const state = await job.getState();
+    if (state === 'active') {
+      return { removed: false, error: 'Job is being processed' };
+    }
+    await job.remove();
+    logger.debug(`[ScheduledAgents] Job removed: runId=${runId}`);
+    return { removed: true };
+  } catch (err) {
+    const errMsg = err?.message || String(err);
+    if (errMsg.includes('being processed') || errMsg.includes('active')) {
+      return { removed: false, error: 'Job is being processed' };
+    }
+    logger.error(`[ScheduledAgents] Failed to remove job runId=${runId}:`, err);
+    return { removed: false, error: errMsg };
+  }
+}
+
 module.exports = {
   enqueueRun,
+  removeRun,
+  runSerializedPerAgent,
   startWorker,
   stopWorker,
   isQueueAvailable,

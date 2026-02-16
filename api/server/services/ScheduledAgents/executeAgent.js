@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { logger } = require('@librechat/data-schemas');
 const { EModelEndpoint, ResourceType, PermissionBits } = require('librechat-data-provider');
+const { GenerationJobManager } = require('@librechat/api');
 const { getAppConfig } = require('~/server/services/Config');
 const { initializeClient } = require('~/server/services/Endpoints/agents');
 const { getAgent } = require('~/models/Agent');
@@ -8,6 +9,7 @@ const { checkPermission } = require('~/server/services/PermissionService');
 const { buildOptions } = require('~/server/services/Endpoints/agents/build');
 const { Conversation, ScheduledAgent, ScheduledRun, User } = require('~/db/models');
 const { disposeClient } = require('~/server/cleanup');
+const abortRegistry = require('./abortRegistry');
 
 /**
  * Execute a scheduled agent run.
@@ -35,6 +37,8 @@ async function executeScheduledAgent({
 }) {
   const conversationId = existingConversationId || crypto.randomUUID();
   const runAt = new Date();
+  // Use conversationId as streamId so getJob(conversationId) finds it - same as normal agent runs
+  const streamId = existingRunId ? conversationId : null;
 
   let scheduledRunDoc = null;
 
@@ -99,8 +103,12 @@ async function executeScheduledAgent({
       user: { id: userId, role: user.role },
       config: appConfig,
       body,
-      _resumableStreamId: null,
+      _resumableStreamId: streamId,
     };
+
+    if (streamId) {
+      await GenerationJobManager.createJob(streamId, userId, conversationId);
+    }
 
     const endpointOption = await buildOptions(
       mockReq,
@@ -127,6 +135,9 @@ async function executeScheduledAgent({
     };
 
     const abortController = new AbortController();
+    if (existingRunId) {
+      abortRegistry.register(existingRunId, abortController);
+    }
 
     const { client } = await initializeClient({
       req: mockReq,
@@ -156,6 +167,10 @@ async function executeScheduledAgent({
       progressOptions: { res: noopRes },
     };
 
+    if (streamId && client?.contentParts) {
+      GenerationJobManager.setContentParts(streamId, client.contentParts);
+    }
+
     const response = await client.sendMessage(prompt, messageOptions);
     const databasePromise = response.databasePromise;
 
@@ -163,7 +178,8 @@ async function executeScheduledAgent({
       throw new Error('No database promise from agent run');
     }
 
-    await databasePromise;
+    const dbResult = await databasePromise;
+    const conversation = dbResult?.conversation ?? {};
 
     if (existingRunId && scheduledRunDoc) {
       await ScheduledRun.findByIdAndUpdate(existingRunId, {
@@ -200,17 +216,59 @@ async function executeScheduledAgent({
       disposeClient(client);
     }
 
+    if (streamId) {
+      const runTitle =
+        schedule?.name ?? 'Scheduled run';
+      const finalEvent = {
+        final: true,
+        conversation: {
+          conversationId,
+          title: runTitle,
+          scheduledRunId: runDocId,
+        },
+        title: runTitle,
+        requestMessage: {
+          messageId: null,
+          conversationId,
+          text: prompt,
+          isCreatedByUser: true,
+        },
+        responseMessage: (() => {
+          const { databasePromise: _, ...msg } = response;
+          return msg;
+        })(),
+      };
+      await GenerationJobManager.emitDone(streamId, finalEvent);
+      GenerationJobManager.completeJob(streamId);
+    }
+
     logger.info(`[ScheduledAgents] Run completed: schedule=${scheduleId} conv=${conversationId}`);
 
     return { success: true, conversationId };
   } catch (error) {
     const errorMessage = error?.message || String(error);
     const errorStack = error?.stack;
+    const wasAborted =
+      error?.name === 'AbortError' || (typeof error?.message === 'string' && error.message.includes('abort'));
+
     logger.error(
       `[ScheduledAgents] Run failed: scheduleId=${scheduleId} userId=${userId} agentId=${agentId} error=${errorMessage}`,
     );
     if (errorStack) {
       logger.error(`[ScheduledAgents] Run failed stack:`, errorStack);
+    }
+
+    if (streamId) {
+      try {
+        if (wasAborted) {
+          await GenerationJobManager.abortJob(streamId);
+        } else {
+          await GenerationJobManager.emitError(streamId, errorMessage);
+          GenerationJobManager.completeJob(streamId, errorMessage);
+        }
+      } catch (streamErr) {
+        logger.error(`[ScheduledAgents] Failed to finalize stream ${streamId}:`, streamErr);
+      }
     }
 
     try {
@@ -240,6 +298,10 @@ async function executeScheduledAgent({
     }).catch(() => {});
 
     return { success: false, error: errorMessage };
+  } finally {
+    if (existingRunId) {
+      abortRegistry.unregister(existingRunId);
+    }
   }
 }
 
