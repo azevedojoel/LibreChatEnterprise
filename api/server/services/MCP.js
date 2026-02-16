@@ -210,6 +210,7 @@ async function reconnectServer({
   logger.debug(
     `[MCP][reconnectServer] serverName: ${serverName}, user: ${user?.id}, hasUserMCPAuthMap: ${!!userMCPAuthMap}`,
   );
+  const isHeadless = !res || typeof res?.write !== 'function';
   const runId = Constants.USE_PRELIM_RESPONSE_MESSAGE_ID;
   const flowId = `${user.id}:${serverName}:${Date.now()}`;
   const flowManager = getFlowStateManager(getLogStores(CacheKeys.FLOWS));
@@ -236,27 +237,35 @@ async function reconnectServer({
   }
 
   try {
-    const runStepEmitter = createRunStepEmitter({
-      res,
-      index,
-      runId,
-      stepId,
-      toolCall,
-      streamId,
-    });
-    const runStepDeltaEmitter = createRunStepDeltaEmitter({
-      res,
-      stepId,
-      toolCall,
-      streamId,
-    });
-    const callback = createOAuthCallback({ runStepEmitter, runStepDeltaEmitter });
-    const oauthStart = createOAuthStart({
-      res,
-      flowId,
-      callback,
-      flowManager,
-    });
+    const oauthStart = isHeadless
+      ? async (authURL) => {
+          throw new Error(
+            HEADLESS_OAUTH_MESSAGE +
+              (authURL ? `\n\nTo authenticate, open this URL in your browser:\n${authURL}` : ''),
+          );
+        }
+      : (() => {
+          const runStepEmitter = createRunStepEmitter({
+            res,
+            index,
+            runId,
+            stepId,
+            toolCall,
+            streamId,
+          });
+          const runStepDeltaEmitter = createRunStepDeltaEmitter({
+            res,
+            stepId,
+            toolCall,
+            streamId,
+          });
+          const callback = createOAuthCallback({ runStepEmitter, runStepDeltaEmitter });
+          return createOAuthStart({
+            flowId,
+            flowManager,
+            callback,
+          });
+        })();
     return await reinitMCPServer({
       user,
       signal,
@@ -433,6 +442,9 @@ async function createMCPTool({
   });
 }
 
+const HEADLESS_OAUTH_MESSAGE =
+  'This integration requires re-authentication in LibreChat. Please sign in at the LibreChat app and reconnect this service under Settings, then try your request again.';
+
 function createToolInstance({
   res,
   toolName,
@@ -441,6 +453,7 @@ function createToolInstance({
   provider: _provider,
   streamId = null,
 }) {
+  const isHeadless = !res || typeof res?.write !== 'function';
   /** @type {LCTool} */
   const { description, parameters } = toolDefinition;
   const isGoogle = _provider === Providers.VERTEXAI || _provider === Providers.GOOGLE;
@@ -482,17 +495,26 @@ function createToolInstance({
         toolCall,
         streamId,
       });
-      const oauthStart = createOAuthStart({
-        flowId,
-        flowManager,
-        callback: runStepDeltaEmitter,
-      });
-      const oauthEnd = createOAuthEnd({
-        res,
-        stepId,
-        toolCall,
-        streamId,
-      });
+      const oauthStart = isHeadless
+        ? async (authURL) => {
+            throw new Error(
+              HEADLESS_OAUTH_MESSAGE +
+                (authURL ? `\n\nTo authenticate, open this URL in your browser:\n${authURL}` : ''),
+            );
+          }
+        : createOAuthStart({
+            flowId,
+            flowManager,
+            callback: runStepDeltaEmitter,
+          });
+      const oauthEnd = isHeadless
+        ? async () => {}
+        : createOAuthEnd({
+            res,
+            stepId,
+            toolCall,
+            streamId,
+          });
 
       if (derivedSignal) {
         abortHandler = createAbortHandler({ userId, serverName, toolName, flowManager });
@@ -536,6 +558,11 @@ function createToolInstance({
         `[MCP][${serverName}][${toolName}][User: ${userId}] Error calling MCP tool:`,
         error,
       );
+
+      /** Headless OAuth message - pass through for agent to relay to user */
+      if (error?.message?.startsWith(HEADLESS_OAUTH_MESSAGE)) {
+        throw error;
+      }
 
       /** OAuth error, provide a helpful message */
       const isOAuthError =
