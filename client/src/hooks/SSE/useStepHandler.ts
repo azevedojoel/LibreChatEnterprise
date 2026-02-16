@@ -322,7 +322,8 @@ export default function useStepHandler({
         // Store tool call IDs if present
         if (runStep.stepDetails.type === StepTypes.TOOL_CALLS) {
           let updatedResponse = { ...response };
-          (runStep.stepDetails.tool_calls as Agents.ToolCall[]).forEach((toolCall) => {
+          const toolCalls = runStep.stepDetails.tool_calls as Agents.ToolCall[];
+          toolCalls.forEach((toolCall, i) => {
             const toolCallId = toolCall.id ?? '';
             if ('id' in toolCall && toolCallId) {
               toolCallIdMap.current.set(runStep.id, toolCallId);
@@ -337,10 +338,10 @@ export default function useStepHandler({
               },
             };
 
-            // Use the pre-calculated contentIndex which handles parallel agent indexing
+            // Use contentIndex + i so each parallel tool gets its own content slot
             updatedResponse = updateContent(
               updatedResponse,
-              contentIndex,
+              contentIndex + i,
               contentPart,
               false,
               getStepMetadata(runStep),
@@ -563,18 +564,6 @@ export default function useStepHandler({
           }
         }
 
-        const currentIndex =
-          runStep != null
-            ? runStep.index + initialContent.length
-            : typeof resultIndex === 'number'
-              ? resultIndex + initialContent.length
-              : -1;
-
-        if (!responseMessageId || currentIndex < 0) {
-          console.warn('No run step or runId found for completed tool call event');
-          return;
-        }
-
         let response = messageMap.current.get(responseMessageId);
         if (!response) {
           const responseMessage =
@@ -592,6 +581,33 @@ export default function useStepHandler({
             };
             messageMap.current.set(responseMessageId, response);
           }
+        }
+
+        if (!response) {
+          return;
+        }
+
+        // Resolve content index: prefer resultIndex when valid; otherwise find by tool_call.id
+        // (backend may send wrong index for parallel tools, so matching by id is most reliable)
+        let currentIndex: number;
+        const toolCallId = toolCallResult.id ?? '';
+        const content = response.content ?? [];
+        const indexById = toolCallId
+          ? content.findIndex(
+              (p) =>
+                p?.type === ContentTypes.TOOL_CALL &&
+                (p[ContentTypes.TOOL_CALL] as Agents.ToolCall)?.id === toolCallId,
+            )
+          : -1;
+        if (indexById >= 0) {
+          currentIndex = indexById;
+        } else if (typeof resultIndex === 'number' && resultIndex >= 0) {
+          currentIndex = resultIndex + initialContent.length;
+        } else if (runStep != null) {
+          currentIndex = runStep.index + initialContent.length;
+        } else {
+          console.warn('No run step or runId found for completed tool call event');
+          return;
         }
 
         if (response) {

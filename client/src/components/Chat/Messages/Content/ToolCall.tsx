@@ -188,10 +188,13 @@ export default function ToolCall({
   }, [auth]);
 
   const progress = useProgress(initialProgress);
-  // If the tool has output, it ran successfully—don't show cancelled even if progress lags
+  // If the tool has output, it ran successfully—never show cancelled even if progress lags
   const hasOutput = output != null && output !== '';
   const displayProgress = hasOutput ? 1 : progress;
-  const cancelled = (!isSubmitting && progress < 1 && !hasOutput) || error === true;
+  // Never show cancelled when we have successful output; show error state for tool errors;
+  // show cancelled only when stream ended without completion and no output
+  const cancelled =
+    error === true || (hasOutput ? false : !isSubmitting && progress < 1);
 
   const labelWithPattern = useMemo(
     () => (inlinePattern ? `${displayName} '${inlinePattern}'` : displayName),
