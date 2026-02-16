@@ -11,7 +11,7 @@ const LOCAL_CODE_EXECUTION_DEFINITION: ToolRegistryDefinition = {
 - No network access available.
 - Generated files are automatically delivered; **DO NOT** provide download links.
 - Supports Python only. Use print() for outputs; matplotlib: use plt.savefig() to save plots.
-- Use relative paths for files (e.g., open('out.txt', 'w'), plt.savefig('plot.png')). Working directory is the output directory.`,
+- Use relative paths for files (e.g., open('out.txt', 'w'), plt.savefig('plot.png')). Working directory is the session workspace.`,
   schema: {
     type: 'object',
     properties: {
@@ -24,7 +24,7 @@ const LOCAL_CODE_EXECUTION_DEFINITION: ToolRegistryDefinition = {
         type: 'string',
         description: `The complete, self-contained Python code to execute.
 - Use print() for all outputs.
-- Matplotlib: Use plt.savefig() to save plots as files in the output directory.
+- Matplotlib: Use plt.savefig() to save plots as files in the working directory.
 - Use relative paths for file I/O (e.g., open('out.txt', 'w'), plt.savefig('plot.png')).`,
       },
       args: {
@@ -762,14 +762,14 @@ const deleteFileDefinition: ToolRegistryDefinition = {
 const listFilesDefinition: ToolRegistryDefinition = {
   name: 'list_files',
   description:
-    'List files and subdirectories in one directory. Use when: exploring a known path; use glob_files when you need pattern-based discovery (e.g. *.py). For Code Interpreter: use path "output" for uploads and generated files.',
+    'List files and subdirectories in one directory. Use when: exploring a known path; use glob_files when you need pattern-based discovery (e.g. *.py).',
   schema: {
     type: 'object',
     properties: {
       path: {
         type: 'string',
         description:
-          'Directory path relative to workspace root. Use "." for root; use "output" for Code Interpreter uploads and generated files (default: ".")',
+          'Directory path relative to workspace root. Use "." for root (default: ".")',
       },
       extension: {
         type: 'string',

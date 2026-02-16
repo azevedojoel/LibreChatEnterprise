@@ -175,14 +175,14 @@ function createWorkspaceCodeEditTools({ workspaceRoot }) {
     {
       name: 'list_files',
       description:
-        'List files and subdirectories in one directory. Use when: exploring a known path; use glob_files when you need pattern-based discovery (e.g. *.py). For Code Interpreter: use path "output" for uploads and generated files.',
+        'List files and subdirectories in one directory. Use when: exploring a known path; use glob_files when you need pattern-based discovery (e.g. *.py).',
       schema: {
         type: 'object',
         properties: {
           path: {
             type: 'string',
             description:
-              'Directory path relative to workspace root. Use "." for root; use "output" for Code Interpreter uploads and generated files (default: ".")',
+              'Directory path relative to workspace root. Use "." for root (default: ".")',
           },
           extension: {
             type: 'string',

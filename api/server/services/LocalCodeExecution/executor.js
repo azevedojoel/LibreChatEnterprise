@@ -25,17 +25,17 @@ function getSessionBaseDir() {
 }
 
 /**
- * Copies agent-uploaded files into the output dir so Python can read them via /mnt/data paths.
+ * Copies agent-uploaded files into the workspace dir so Python can read them via /mnt/data paths.
  * Resolves virtual filepaths (e.g. /uploads/user/file) and supports cloud storage via streaming.
- * @param {string} outputDir - e.g. SESSION_BASE_DIR/conv_xxx/output (where /mnt/data maps to)
+ * @param {string} workspaceDir - Session directory (workspace root; /mnt/data maps here)
  * @param {Array<{ filepath?: string; filename: string; source?: string }>} agentFiles - Files to copy
  * @param {import('express').Request} [req] - Request object for resolving paths and streaming (required for non-local or virtual paths)
  */
-async function injectAgentFiles(outputDir, agentFiles, req) {
+async function injectAgentFiles(workspaceDir, agentFiles, req) {
   if (!agentFiles?.length) {
     return;
   }
-  await fs.mkdir(outputDir, { recursive: true });
+  await fs.mkdir(workspaceDir, { recursive: true });
   const { pipeline } = require('stream').promises;
   const { createWriteStream } = require('fs');
   const { getStrategyFunctions } = require('~/server/services/Files/strategies');
@@ -49,7 +49,7 @@ async function injectAgentFiles(outputDir, agentFiles, req) {
       });
       continue;
     }
-    const dest = path.join(outputDir, path.basename(f.filename));
+    const dest = path.join(workspaceDir, path.basename(f.filename));
     try {
       if (req) {
         const source = f.source ?? FileSources.local;
@@ -73,7 +73,7 @@ async function injectAgentFiles(outputDir, agentFiles, req) {
  * @param {string} params.lang - py (Python only)
  * @param {string} params.code
  * @param {string[]} [params.args]
- * @param {string} [params.session_id] - Reuse this session's output dir for file persistence
+ * @param {string} [params.session_id] - Reuse this session's workspace for file persistence
  * @param {(params: { source: 'stdout'|'stderr'; chunk: string }) => void} [params.onOutput] - Called for each stdout/stderr chunk for streaming
  * @returns {Promise<{ stdout: string; stderr: string; session_id: string; files: Array<{ name: string; buffer: Buffer }> }>}
  */
@@ -86,20 +86,19 @@ async function runCodeLocally({
 }) {
   const session_id = existingSessionId ?? `local_${uuidv4().replace(/-/g, '')}`;
   const sessionDir = path.join(SESSION_BASE_DIR, session_id);
-  const outputDir = path.join(sessionDir, 'output');
 
-  await fs.mkdir(outputDir, { recursive: true });
+  await fs.mkdir(sessionDir, { recursive: true });
 
   if (lang !== 'py') {
     throw new Error('Local execution supports Python only.');
   }
 
   const scriptPath = path.join(sessionDir, 'script.py');
-  const outputDirForward = outputDir.replace(/\\/g, '/');
+  const workspaceDirForward = sessionDir.replace(/\\/g, '/');
   const patchedCode = code
-    .replace(/\/mnt\/data\//g, outputDirForward + '/')
-    .replace(/\/mnt\/data\b/g, outputDirForward);
-  const wrappedCode = `import os\nos.chdir(${JSON.stringify(outputDir)})\n${patchedCode}`;
+    .replace(/\/mnt\/data\//g, workspaceDirForward + '/')
+    .replace(/\/mnt\/data\b/g, workspaceDirForward);
+  const wrappedCode = `import os\nos.chdir(${JSON.stringify(sessionDir)})\n${patchedCode}`;
   await fs.writeFile(scriptPath, wrappedCode, 'utf8');
 
   const { stdout, stderr } = await runWithTimeout('python3', [scriptPath, ...args], {
@@ -110,10 +109,10 @@ async function runCodeLocally({
 
   const files = [];
   try {
-    const entries = await fs.readdir(outputDir, { withFileTypes: true });
+    const entries = await fs.readdir(sessionDir, { withFileTypes: true });
     for (const ent of entries) {
-      if (ent.isFile()) {
-        const fp = path.join(outputDir, ent.name);
+      if (ent.isFile() && ent.name !== 'script.py') {
+        const fp = path.join(sessionDir, ent.name);
         const buf = await fs.readFile(fp);
         if (buf.length <= 50 * 1024 * 1024) {
           files.push({ name: ent.name, buffer: buf });
@@ -121,7 +120,7 @@ async function runCodeLocally({
       }
     }
   } catch (e) {
-    logger.warn('[LocalCodeExecution] Error reading output files:', e);
+    logger.warn('[LocalCodeExecution] Error reading generated files:', e);
   }
 
   return {
