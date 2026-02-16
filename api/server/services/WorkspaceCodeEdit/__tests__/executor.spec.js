@@ -120,6 +120,63 @@ describe('WorkspaceCodeEdit', () => {
       });
       expect(r2.error).toContain('positive integers');
     });
+
+    it('should truncate when content exceeds READ_FILE_MAX_LINES', async () => {
+      const lines = Array.from({ length: 600 }, (_, i) => `line${i + 1}`);
+      await fs.writeFile(path.join(workspaceRoot, 'large.txt'), lines.join('\n'), 'utf8');
+      const originalMax = process.env.READ_FILE_MAX_LINES;
+      process.env.READ_FILE_MAX_LINES = '500';
+      try {
+        const r = await readFile({ workspaceRoot, relativePath: 'large.txt' });
+        expect(r.content).toContain('line1');
+        expect(r.content).toContain('line500');
+        expect(r.content).not.toContain('line501');
+        expect(r.content).toMatch(/\(100 more lines\)$/);
+      } finally {
+        if (originalMax !== undefined) {
+          process.env.READ_FILE_MAX_LINES = originalMax;
+        } else {
+          delete process.env.READ_FILE_MAX_LINES;
+        }
+      }
+    });
+
+    it('should not truncate when content is under limit', async () => {
+      const lines = Array.from({ length: 100 }, (_, i) => `line${i + 1}`);
+      await fs.writeFile(path.join(workspaceRoot, 'small.txt'), lines.join('\n'), 'utf8');
+      const originalMax = process.env.READ_FILE_MAX_LINES;
+      process.env.READ_FILE_MAX_LINES = '500';
+      try {
+        const r = await readFile({ workspaceRoot, relativePath: 'small.txt' });
+        expect(r.content).toBe(lines.join('\n'));
+        expect(r.content).not.toMatch(/\(\d+ more lines\)$/);
+      } finally {
+        if (originalMax !== undefined) {
+          process.env.READ_FILE_MAX_LINES = originalMax;
+        } else {
+          delete process.env.READ_FILE_MAX_LINES;
+        }
+      }
+    });
+
+    it('should respect custom READ_FILE_MAX_LINES from env', async () => {
+      const lines = Array.from({ length: 150 }, (_, i) => `line${i + 1}`);
+      await fs.writeFile(path.join(workspaceRoot, 'medium.txt'), lines.join('\n'), 'utf8');
+      const originalMax = process.env.READ_FILE_MAX_LINES;
+      process.env.READ_FILE_MAX_LINES = '100';
+      try {
+        const r = await readFile({ workspaceRoot, relativePath: 'medium.txt' });
+        expect(r.content).toContain('line100');
+        expect(r.content).not.toContain('line101');
+        expect(r.content).toMatch(/\(50 more lines\)$/);
+      } finally {
+        if (originalMax !== undefined) {
+          process.env.READ_FILE_MAX_LINES = originalMax;
+        } else {
+          delete process.env.READ_FILE_MAX_LINES;
+        }
+      }
+    });
   });
 
   describe('editFile', () => {

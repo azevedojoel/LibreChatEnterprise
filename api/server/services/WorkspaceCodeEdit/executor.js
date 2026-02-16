@@ -75,6 +75,15 @@ async function readFile({ workspaceRoot, relativePath, startLine, endLine }) {
         endLine != null ? Math.max(start, Math.min(endLine, lines.length) - 1) : lines.length - 1;
       content = lines.slice(start, end + 1).join('\n');
     }
+    const parsed = process.env.READ_FILE_MAX_LINES
+      ? parseInt(process.env.READ_FILE_MAX_LINES, 10)
+      : 500;
+    const maxLines = Number.isInteger(parsed) && parsed > 0 ? parsed : 500;
+    const lines = content.split(/\r?\n/);
+    if (lines.length > maxLines) {
+      const omitted = lines.length - maxLines;
+      content = lines.slice(0, maxLines).join('\n') + `\n(${omitted} more lines)`;
+    }
     return { content };
   } catch (err) {
     if (err.code === 'ENOENT') {
