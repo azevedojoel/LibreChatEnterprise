@@ -13,6 +13,9 @@ const {
   listRunsForUser,
   getRunForUser,
 } = require('~/server/services/ScheduledAgents/schedulingService');
+const { removeRun } = require('~/server/services/ScheduledAgents/jobQueue');
+const abortRegistry = require('~/server/services/ScheduledAgents/abortRegistry');
+const { ScheduledRun } = require('~/db/models');
 
 /**
  * Verify user has VIEW permission on the agent before creating/updating a schedule.
@@ -204,6 +207,58 @@ async function getRun(req, res) {
   }
 }
 
+/**
+ * Cancel a queued or running scheduled run
+ * POST /api/scheduled-agents/runs/:id/cancel
+ */
+async function cancelRun(req, res) {
+  try {
+    const runId = req.params.id;
+    const run = await getRunForUser(req.user.id, runId);
+
+    if (!run) {
+      return res.status(404).json({ error: 'Run not found' });
+    }
+
+    if (run.status === 'success' || run.status === 'failed' || run.status === 'pending') {
+      return res.status(204).send();
+    }
+
+    if (run.status === 'queued') {
+      const result = await removeRun(runId);
+      if (result.removed) {
+        await ScheduledRun.findByIdAndUpdate(runId, {
+          $set: { status: 'failed', error: 'Cancelled by user' },
+        });
+        return res.json({ success: true, cancelled: true });
+      }
+      if (result.error === 'Job is being processed') {
+        const aborted = abortRegistry.abort(runId);
+        return res.json({
+          success: true,
+          cancelled: aborted,
+          ...(aborted ? {} : { message: 'Run is starting; it will stop once processing begins' }),
+        });
+      }
+      return res.status(400).json({ error: result.error || 'Failed to cancel run' });
+    }
+
+    if (run.status === 'running') {
+      const aborted = abortRegistry.abort(runId);
+      return res.json({
+        success: true,
+        cancelled: aborted,
+        ...(aborted ? {} : { message: 'Run not found in active workers; it may have completed' }),
+      });
+    }
+
+    return res.status(400).json({ error: 'Cannot cancel run in current state' });
+  } catch (error) {
+    logger.error('[ScheduledAgents] cancelRun error:', error);
+    res.status(500).json({ error: 'Failed to cancel run' });
+  }
+}
+
 module.exports = {
   checkAgentAccess,
   listSchedules,
@@ -213,4 +268,5 @@ module.exports = {
   runSchedule,
   listRuns,
   getRun,
+  cancelRun,
 };
