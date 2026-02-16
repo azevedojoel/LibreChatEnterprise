@@ -125,6 +125,8 @@ export type AgentIconMapProps = IconMapProps & { agentName?: string };
 export type NavLink = {
   title: TranslationKeys;
   label?: string;
+  /** Optional badge/indicator (e.g. status dot) shown next to the link */
+  badge?: React.ReactNode;
   icon: LucideIcon | React.FC;
   Component?: React.ComponentType;
   onClick?: (e?: React.MouseEvent) => void;
