@@ -70,6 +70,7 @@ export default function useSSE(
     contentHandler,
     createdHandler,
     attachmentHandler,
+    executeCodeOutputHandler,
     abortConversation,
   } = useEventHandlers({
     setMessages,
@@ -111,6 +112,18 @@ export default function useSSE(
       try {
         const data = JSON.parse(e.data);
         attachmentHandler({ data, submission: submission as EventSubmission });
+      } catch (error) {
+        console.error(error);
+      }
+    });
+
+    sse.addEventListener('execute_code_output', (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data);
+        executeCodeOutputHandler({
+          data: data as { tool_call_id: string; chunk: string; source: string },
+          submission: submission as EventSubmission,
+        });
       } catch (error) {
         console.error(error);
       }

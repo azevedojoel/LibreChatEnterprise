@@ -467,7 +467,7 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
   const endpointsConfig = await getEndpointsConfig(req);
   let enabledCapabilities = new Set(endpointsConfig?.[EModelEndpoint.agents]?.capabilities ?? []);
 
-  if (enabledCapabilities.size === 0 && isEphemeralAgentId(agent.id)) {
+  if (enabledCapabilities.size === 0) {
     enabledCapabilities = new Set(
       appConfig.endpoints?.[EModelEndpoint.agents]?.capabilities ?? defaultAgentCapabilities,
     );
@@ -508,6 +508,7 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
 
   /** Filter by ephemeralAgent (chat badge overrides) */
   const ephemeralAgent = req?.body?.ephemeralAgent;
+  const isPersistentAgent = !isEphemeralAgentId(agent?.id);
   if (Array.isArray(ephemeralAgent?.tools)) {
     const toolsSet = new Set(ephemeralAgent.tools);
     toolsToFilter = toolsToFilter.filter((tool) => toolsSet.has(tool));
@@ -525,12 +526,20 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
     if (tool == null || typeof tool !== 'string') return false;
     if (Array.isArray(ephemeralAgent?.tools)) return true;
     if (tool === Tools.file_search) {
+      if (isPersistentAgent) {
+        if (ephemeralAgent?.file_search === false) return false;
+        return checkCapability(AgentCapabilities.file_search);
+      }
       if (ephemeralAgent != null && 'file_search' in ephemeralAgent) {
         return ephemeralAgent.file_search === true;
       }
       return checkCapability(AgentCapabilities.file_search);
     }
     if (tool === Tools.execute_code) {
+      if (isPersistentAgent) {
+        if (ephemeralAgent?.execute_code === false) return false;
+        return checkCapability(AgentCapabilities.execute_code);
+      }
       if (ephemeralAgent != null && 'execute_code' in ephemeralAgent) {
         return ephemeralAgent.execute_code === true;
       }
@@ -541,6 +550,10 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
       return checkCapability(AgentCapabilities.manage_scheduling);
     }
     if (tool === Tools.web_search) {
+      if (isPersistentAgent) {
+        if (ephemeralAgent?.web_search === false) return false;
+        return checkCapability(AgentCapabilities.web_search);
+      }
       if (ephemeralAgent != null && 'web_search' in ephemeralAgent) {
         return ephemeralAgent.web_search === true;
       }
@@ -554,6 +567,10 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
       tool === Tools.search_files ||
       tool === Tools.glob_files
     ) {
+      if (isPersistentAgent) {
+        if (ephemeralAgent?.execute_code === false) return false;
+        return checkCapability(AgentCapabilities.execute_code);
+      }
       if (ephemeralAgent != null && 'execute_code' in ephemeralAgent) {
         return ephemeralAgent.execute_code === true;
       }
@@ -943,7 +960,7 @@ async function loadAgentTools({
   const endpointsConfig = await getEndpointsConfig(req);
   let enabledCapabilities = new Set(endpointsConfig?.[EModelEndpoint.agents]?.capabilities ?? []);
   /** Edge case: use defined/fallback capabilities when the "agents" endpoint is not enabled */
-  if (enabledCapabilities.size === 0 && isEphemeralAgentId(agent.id)) {
+  if (enabledCapabilities.size === 0) {
     enabledCapabilities = new Set(
       appConfig.endpoints?.[EModelEndpoint.agents]?.capabilities ?? defaultAgentCapabilities,
     );
@@ -984,6 +1001,7 @@ async function loadAgentTools({
 
   /** Filter by ephemeralAgent (chat badge overrides) */
   const ephemeralAgent = req?.body?.ephemeralAgent;
+  const isPersistentAgent = !isEphemeralAgentId(agent?.id);
   if (Array.isArray(ephemeralAgent?.tools)) {
     const toolsSet = new Set(ephemeralAgent.tools);
     toolsToFilter = toolsToFilter.filter((tool) => toolsSet.has(tool));
@@ -1002,11 +1020,19 @@ async function loadAgentTools({
     if (tool == null || typeof tool !== 'string') return false;
     if (Array.isArray(ephemeralAgent?.tools)) return true;
     if (tool === Tools.file_search) {
+      if (isPersistentAgent) {
+        if (ephemeralAgent?.file_search === false) return false;
+        return checkCapability(AgentCapabilities.file_search);
+      }
       if (ephemeralAgent != null && 'file_search' in ephemeralAgent) {
         return ephemeralAgent.file_search === true;
       }
       return checkCapability(AgentCapabilities.file_search);
     } else if (tool === Tools.execute_code) {
+      if (isPersistentAgent) {
+        if (ephemeralAgent?.execute_code === false) return false;
+        return checkCapability(AgentCapabilities.execute_code);
+      }
       if (ephemeralAgent != null && 'execute_code' in ephemeralAgent) {
         return ephemeralAgent.execute_code === true;
       }
@@ -1015,6 +1041,14 @@ async function loadAgentTools({
       if (appConfig?.interfaceConfig?.scheduledAgents === false) return false;
       return checkCapability(AgentCapabilities.manage_scheduling);
     } else if (tool === Tools.web_search) {
+      if (isPersistentAgent) {
+        if (ephemeralAgent?.web_search === false) {
+          includesWebSearch = false;
+          return false;
+        }
+        includesWebSearch = checkCapability(AgentCapabilities.web_search);
+        return includesWebSearch;
+      }
       if (ephemeralAgent != null && 'web_search' in ephemeralAgent) {
         includesWebSearch = ephemeralAgent.web_search === true;
         return includesWebSearch;
@@ -1030,6 +1064,10 @@ async function loadAgentTools({
       tool === Tools.search_files ||
       tool === Tools.glob_files
     ) {
+      if (isPersistentAgent) {
+        if (ephemeralAgent?.execute_code === false) return false;
+        return checkCapability(AgentCapabilities.execute_code);
+      }
       if (ephemeralAgent != null && 'execute_code' in ephemeralAgent) {
         return ephemeralAgent.execute_code === true;
       }
@@ -1444,6 +1482,29 @@ async function loadToolsForExecution({
       }
     }
     configurable.ptcToolMap = ptcToolMap;
+  }
+
+  if (
+    toolNames.includes(Tools.execute_code) &&
+    (res || streamId) &&
+    res &&
+    typeof res.write === 'function'
+  ) {
+    configurable.emitCodeOutputChunk = (toolCallId, chunk, source) => {
+      const data = { tool_call_id: toolCallId, chunk, source };
+      if (streamId) {
+        GenerationJobManager.emitChunk(streamId, {
+          event: 'execute_code_output',
+          data,
+        }).catch((err) => logger.debug('[emitCodeOutputChunk] emit failed:', err?.message));
+      } else if (!res.writableEnded) {
+        try {
+          res.write(`event: execute_code_output\ndata: ${JSON.stringify(data)}\n\n`);
+        } catch (err) {
+          logger.debug('[emitCodeOutputChunk] res.write failed:', err?.message);
+        }
+      }
+    };
   }
 
   return {

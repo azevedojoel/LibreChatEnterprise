@@ -60,6 +60,7 @@ export default function ExecuteCode({
   const localize = useLocalize();
   const hasOutput = output.length > 0;
   const outputRef = useRef<string>(output);
+  const outputContainerRef = useRef<HTMLDivElement>(null);
   const codeContentRef = useRef<HTMLDivElement>(null);
   const [isAnimating, setIsAnimating] = useState(false);
   const showAnalysisCode = useRecoilValue(store.showCode);
@@ -82,8 +83,12 @@ export default function ExecuteCode({
           }
         }, 10);
       }
+
+      if (outputContainerRef.current && isSubmitting) {
+        outputContainerRef.current.scrollTop = outputContainerRef.current.scrollHeight;
+      }
     }
-  }, [output, showCode]);
+  }, [output, showCode, isSubmitting]);
 
   useEffect(() => {
     if (showCode !== prevShowCodeRef.current) {
@@ -200,8 +205,9 @@ export default function ExecuteCode({
           )}
           {hasOutput && (
             <div
+              ref={outputContainerRef}
               className={cn(
-                'bg-surface-tertiary p-4 text-xs',
+                'bg-surface-tertiary max-h-96 overflow-y-auto p-4 text-xs',
                 showCode ? 'border-t border-surface-primary-contrast' : '',
               )}
               style={{
@@ -212,7 +218,7 @@ export default function ExecuteCode({
                 boxShadow: showCode ? '0 -1px 0 rgba(0,0,0,0.05)' : 'none',
               }}
             >
-              <div className="prose flex flex-col-reverse">
+              <div className="prose">
                 <Stdout output={output} />
               </div>
             </div>

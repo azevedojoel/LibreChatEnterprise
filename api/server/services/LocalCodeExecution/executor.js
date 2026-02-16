@@ -74,9 +74,16 @@ async function injectAgentFiles(outputDir, agentFiles, req) {
  * @param {string} params.code
  * @param {string[]} [params.args]
  * @param {string} [params.session_id] - Reuse this session's output dir for file persistence
+ * @param {(params: { source: 'stdout'|'stderr'; chunk: string }) => void} [params.onOutput] - Called for each stdout/stderr chunk for streaming
  * @returns {Promise<{ stdout: string; stderr: string; session_id: string; files: Array<{ name: string; buffer: Buffer }> }>}
  */
-async function runCodeLocally({ lang, code, args = [], session_id: existingSessionId }) {
+async function runCodeLocally({
+  lang,
+  code,
+  args = [],
+  session_id: existingSessionId,
+  onOutput,
+}) {
   const session_id = existingSessionId ?? `local_${uuidv4().replace(/-/g, '')}`;
   const sessionDir = path.join(SESSION_BASE_DIR, session_id);
   const outputDir = path.join(sessionDir, 'output');
@@ -98,6 +105,7 @@ async function runCodeLocally({ lang, code, args = [], session_id: existingSessi
   const { stdout, stderr } = await runWithTimeout('python3', [scriptPath, ...args], {
     cwd: sessionDir,
     timeout: EXEC_TIMEOUT_MS,
+    onOutput,
   });
 
   const files = [];
@@ -130,14 +138,25 @@ function truncateOutput(str, max) {
 }
 
 function runWithTimeout(cmd, args, opts) {
+  const onOutput = opts?.onOutput;
   return new Promise((resolve, reject) => {
     const proc = spawn(cmd, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
       ...opts,
     });
     const chunks = { out: [], err: [] };
-    proc.stdout?.on('data', (c) => chunks.out.push(c));
-    proc.stderr?.on('data', (c) => chunks.err.push(c));
+    proc.stdout?.on('data', (c) => {
+      chunks.out.push(c);
+      if (typeof onOutput === 'function') {
+        onOutput({ source: 'stdout', chunk: c.toString('utf8') });
+      }
+    });
+    proc.stderr?.on('data', (c) => {
+      chunks.err.push(c);
+      if (typeof onOutput === 'function') {
+        onOutput({ source: 'stderr', chunk: c.toString('utf8') });
+      }
+    });
 
     const timeout = setTimeout(() => {
       proc.kill('SIGKILL');

@@ -119,6 +119,7 @@ export default function useResumableSSE(
     createdHandler,
     syncStepMessage,
     attachmentHandler,
+    executeCodeOutputHandler,
     resetContentHandler,
     handleAgentHandoff,
   } = useEventHandlers({
@@ -224,6 +225,14 @@ export default function useResumableSSE(
               data.data.agent_id,
               currentSubmission.conversation?.conversationId,
             );
+            return;
+          }
+
+          if (data.event === 'execute_code_output' && data.data) {
+            executeCodeOutputHandler({
+              data: data.data as { tool_call_id: string; chunk: string; source: string },
+              submission: currentSubmission as EventSubmission,
+            });
             return;
           }
 

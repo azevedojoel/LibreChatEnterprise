@@ -688,15 +688,15 @@ describe('useStepHandler', () => {
       expect(toolCallContent?.tool_call?.progress).toBe(1);
     });
 
-    it('should warn when step not found for completed event', () => {
+    it('should warn when step not found and fallback cannot resolve index', () => {
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
 
       const { result } = renderHook(() => useStepHandler(createHookParams()));
 
+      // No index in result - fallback cannot determine content slot
       const completedEvent = {
         result: {
           id: 'nonexistent-step',
-          index: 0,
           tool_call: {
             id: 'tool-call-1',
             name: 'test_tool',
@@ -721,6 +721,61 @@ describe('useStepHandler', () => {
         'No run step or runId found for completed tool call event',
       );
       consoleSpy.mockRestore();
+    });
+
+    it('should apply tool result via fallback when step not in map but result has index', () => {
+      const responseMessage = createResponseMessage();
+      mockGetMessages.mockReturnValue([responseMessage]);
+
+      const { result } = renderHook(() => useStepHandler(createHookParams()));
+      const submission = createSubmission();
+
+      const completedEvent = {
+        result: {
+          id: 'nonexistent-step',
+          index: 0,
+          tool_call: {
+            id: 'tool-call-1',
+            name: 'test_tool',
+            args: '{}',
+            output: 'Tool result output',
+            type: ToolCallTypes.TOOL_CALL,
+          },
+        },
+      };
+
+      // First add tool call via on_run_step so content exists, but use different step id
+      // so on_run_step_completed won't find it in stepMap
+      act(() => {
+        result.current.stepHandler(
+          {
+            event: 'on_run_step',
+            data: createToolCallRunStep({ id: 'other-step-id' }),
+          },
+          submission,
+        );
+      });
+
+      mockSetMessages.mockClear();
+
+      act(() => {
+        result.current.stepHandler(
+          {
+            event: 'on_run_step_completed',
+            data: completedEvent as unknown as Agents.ToolEndEvent,
+          },
+          submission,
+        );
+      });
+
+      expect(mockSetMessages).toHaveBeenCalled();
+      const lastCall = mockSetMessages.mock.calls[mockSetMessages.mock.calls.length - 1][0];
+      const responseMsg = lastCall.find((m: TMessage) => !m.isCreatedByUser);
+      const toolCallContent = responseMsg?.content?.find(
+        (c: TMessageContentParts) => c.type === ContentTypes.TOOL_CALL,
+      );
+      expect(toolCallContent?.tool_call?.output).toBe('Tool result output');
+      expect(toolCallContent?.tool_call?.progress).toBe(1);
     });
 
   });

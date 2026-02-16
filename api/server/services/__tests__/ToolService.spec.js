@@ -1,4 +1,25 @@
-const { AgentCapabilities, defaultAgentCapabilities, Tools } = require('librechat-data-provider');
+const {
+  AgentCapabilities,
+  defaultAgentCapabilities,
+  Tools,
+  isEphemeralAgentId,
+} = require('librechat-data-provider');
+
+/**
+ * Simulates the file_search tool inclusion logic from loadAgentTools / loadToolDefinitionsWrapper.
+ * Used to test persistent vs ephemeral agent behavior.
+ */
+function shouldIncludeFileSearch(agentId, ephemeralAgent, checkCapability) {
+  const isPersistentAgent = !isEphemeralAgentId(agentId);
+  if (isPersistentAgent) {
+    if (ephemeralAgent?.file_search === false) return false;
+    return checkCapability(AgentCapabilities.file_search);
+  }
+  if (ephemeralAgent != null && 'file_search' in ephemeralAgent) {
+    return ephemeralAgent.file_search === true;
+  }
+  return checkCapability(AgentCapabilities.file_search);
+}
 
 /**
  * Simulates ephemeralAgent.tools filtering from loadToolDefinitionsWrapper and loadAgentTools.
@@ -128,6 +149,8 @@ describe('ToolService - Capability Checking', () => {
       expect(defaultAgentCapabilities).toContain(AgentCapabilities.tools);
       expect(defaultAgentCapabilities).toContain(AgentCapabilities.chain);
       expect(defaultAgentCapabilities).toContain(AgentCapabilities.ocr);
+      expect(defaultAgentCapabilities).toContain(AgentCapabilities.manage_scheduling);
+      expect(defaultAgentCapabilities).toContain(AgentCapabilities.inbound_email);
     });
   });
 
@@ -202,6 +225,63 @@ describe('ToolService - Capability Checking', () => {
       const result = filterToolsByEphemeralAgent(toolsToFilter, ephemeralAgent);
 
       expect(result).toEqual([mcpToolId]);
+    });
+  });
+
+  describe('persistent vs ephemeral agent tool filtering', () => {
+    const checkCapabilityEnabled = (capability) =>
+      new Set([AgentCapabilities.file_search]).has(capability);
+    const checkCapabilityDisabled = () => false;
+
+    it('persistent agent + ephemeralAgent undefined → tool included when capability enabled', () => {
+      const agentId = 'agent_abc123';
+      const ephemeralAgent = undefined;
+
+      expect(shouldIncludeFileSearch(agentId, ephemeralAgent, checkCapabilityEnabled)).toBe(true);
+    });
+
+    it('persistent agent + ephemeralAgent.file_search: false → tool excluded', () => {
+      const agentId = 'agent_abc123';
+      const ephemeralAgent = { file_search: false };
+
+      expect(shouldIncludeFileSearch(agentId, ephemeralAgent, checkCapabilityEnabled)).toBe(false);
+    });
+
+    it('persistent agent + ephemeralAgent.file_search: false → excluded even when capability enabled', () => {
+      const agentId = 'agent_abc123';
+      const ephemeralAgent = { file_search: false };
+
+      expect(shouldIncludeFileSearch(agentId, ephemeralAgent, checkCapabilityEnabled)).toBe(false);
+    });
+
+    it('ephemeral agent + ephemeralAgent.file_search: false → tool excluded', () => {
+      const agentId = 'ephemeral';
+      const ephemeralAgent = { file_search: false };
+
+      expect(shouldIncludeFileSearch(agentId, ephemeralAgent, checkCapabilityEnabled)).toBe(false);
+    });
+
+    it('ephemeral agent + no ephemeralAgent → uses checkCapability as fallback', () => {
+      const agentId = 'ephemeral';
+      const ephemeralAgent = undefined;
+
+      // Ephemeral with no ephemeralAgent: falls through to checkCapability
+      expect(shouldIncludeFileSearch(agentId, ephemeralAgent, checkCapabilityEnabled)).toBe(true);
+      expect(shouldIncludeFileSearch(agentId, ephemeralAgent, checkCapabilityDisabled)).toBe(false);
+    });
+
+    it('ephemeral agent + ephemeralAgent.file_search: true → tool included', () => {
+      const agentId = 'ephemeral';
+      const ephemeralAgent = { file_search: true };
+
+      expect(shouldIncludeFileSearch(agentId, ephemeralAgent, checkCapabilityDisabled)).toBe(true);
+    });
+
+    it('ephemeral agent + empty string id treated as ephemeral', () => {
+      const agentId = '';
+      const ephemeralAgent = { file_search: false };
+
+      expect(shouldIncludeFileSearch(agentId, ephemeralAgent, checkCapabilityEnabled)).toBe(false);
     });
   });
 });

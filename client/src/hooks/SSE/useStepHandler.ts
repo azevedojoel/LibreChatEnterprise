@@ -540,7 +540,11 @@ export default function useStepHandler({
         }
       } else if (event === 'on_run_step_completed') {
         const { result } = data as unknown as { result: Agents.ToolEndEvent };
-        const { id: stepId } = result;
+        const { id: stepId, index: resultIndex, tool_call: toolCallResult } = result;
+
+        if (!toolCallResult) {
+          return;
+        }
 
         const runStep = stepMap.current.get(stepId);
         let responseMessageId = runStep?.runId ?? '';
@@ -549,28 +553,57 @@ export default function useStepHandler({
           parentMessageId = submission?.initialResponse?.parentMessageId ?? '';
         }
 
-        if (!runStep || !responseMessageId) {
+        // Fallback when step not in map (e.g. reconnection, event ordering): use result.index
+        // and find response message from initialResponse or last assistant message
+        if (!responseMessageId) {
+          responseMessageId = submission?.initialResponse?.messageId ?? '';
+          if (!responseMessageId) {
+            const lastAssistant = [...messages].reverse().find((m) => !m.isCreatedByUser);
+            responseMessageId = lastAssistant?.messageId ?? '';
+          }
+        }
+
+        const currentIndex =
+          runStep != null
+            ? runStep.index + initialContent.length
+            : typeof resultIndex === 'number'
+              ? resultIndex + initialContent.length
+              : -1;
+
+        if (!responseMessageId || currentIndex < 0) {
           console.warn('No run step or runId found for completed tool call event');
           return;
         }
 
-        const response = messageMap.current.get(responseMessageId);
+        let response = messageMap.current.get(responseMessageId);
+        if (!response) {
+          const responseMessage =
+            messages.find((m) => m.messageId === responseMessageId) ??
+            (submission?.initialResponse?.messageId === responseMessageId
+              ? (submission.initialResponse as TMessage)
+              : null);
+          if (responseMessage) {
+            response = {
+              ...responseMessage,
+              parentMessageId: responseMessage.parentMessageId ?? userMessage.messageId,
+              conversationId: responseMessage.conversationId ?? userMessage.conversationId,
+              messageId: responseMessageId,
+              content: responseMessage.content ?? [],
+            };
+            messageMap.current.set(responseMessageId, response);
+          }
+        }
+
         if (response) {
-          let updatedResponse = { ...response };
-
-          const contentPart: Agents.MessageContentComplex = {
-            type: ContentTypes.TOOL_CALL,
-            tool_call: result.tool_call,
-          };
-
-          // Use server's index, offset by initialContent for edit scenarios
-          const currentIndex = runStep.index + initialContent.length;
-          updatedResponse = updateContent(
-            updatedResponse,
+          const updatedResponse = updateContent(
+            { ...response },
             currentIndex,
-            contentPart,
+            {
+              type: ContentTypes.TOOL_CALL,
+              tool_call: toolCallResult,
+            },
             true,
-            getStepMetadata(runStep),
+            runStep != null ? getStepMetadata(runStep) : undefined,
           );
 
           messageMap.current.set(responseMessageId, updatedResponse);

@@ -62,19 +62,27 @@ function createLocalCodeExecutionTool(params = {}) {
     async (rawInput, config) => {
       const { lang, code, args } = rawInput;
       const toolCall = config?.toolCall ?? config?.configurable?.toolCall;
-      const threadId = config?.configurable?.thread_id;
+      const configurable = config?.configurable ?? {};
+      const threadId = configurable.thread_id;
+      const emitCodeOutputChunk = configurable.emitCodeOutputChunk;
+      const toolCallId = toolCall?.id;
       const session_id =
         toolCall?.session_id ?? (threadId ? `conv_${threadId}` : undefined);
       const resolvedSessionId = session_id ?? `local_${Date.now().toString(36)}`;
       const sessionDir = path.join(getSessionBaseDir(), resolvedSessionId);
       const outputDir = path.join(sessionDir, 'output');
       await injectAgentFiles(outputDir, agentFiles, req);
+      const onOutput =
+        typeof emitCodeOutputChunk === 'function' && toolCallId
+          ? ({ source, chunk }) => emitCodeOutputChunk(toolCallId, chunk, source)
+          : undefined;
       try {
         const result = await runCodeLocally({
           lang,
           code,
           args: args ?? [],
           session_id: session_id ?? resolvedSessionId,
+          onOutput,
         });
         let formattedOutput = '';
         if (result.stdout) {

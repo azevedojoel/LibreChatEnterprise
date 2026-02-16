@@ -234,6 +234,48 @@ export default function useEventHandlers({
   });
   const attachmentHandler = useAttachmentHandler(queryClient);
 
+  const executeCodeOutputHandler = useCallback(
+    ({
+      data,
+      submission,
+    }: {
+      data: { tool_call_id: string; chunk: string; source: string };
+      submission: EventSubmission;
+    }) => {
+      const { tool_call_id, chunk } = data;
+      const messages = getMessages();
+      if (!messages || messages.length === 0) return;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i];
+        if (msg.isCreatedByUser || !msg.content) continue;
+        const content = msg.content;
+        const index = content.findIndex(
+          (part) =>
+            part?.type === ContentTypes.TOOL_CALL &&
+            part?.tool_call?.id === tool_call_id,
+        );
+        if (index < 0) continue;
+        const part = content[index];
+        const toolCall = part?.tool_call;
+        if (!toolCall) continue;
+        const existingOutput = toolCall.output ?? '';
+        const newOutput = existingOutput + chunk;
+        const updatedContent = [...content];
+        updatedContent[index] = {
+          ...part,
+          tool_call: { ...toolCall, output: newOutput },
+        };
+        const updatedMessage = { ...msg, content: updatedContent };
+        const updatedMessages = messages.map((m) =>
+          m.messageId === msg.messageId ? updatedMessage : m,
+        );
+        setMessages(updatedMessages);
+        return;
+      }
+    },
+    [getMessages, setMessages],
+  );
+
   const messageHandler = useCallback(
     (data: string | undefined, submission: EventSubmission) => {
       const { messages, userMessage, initialResponse, isRegenerate = false } = submission;
@@ -880,6 +922,7 @@ export default function useEventHandlers({
     createdHandler,
     syncStepMessage,
     attachmentHandler,
+    executeCodeOutputHandler,
     abortConversation,
     resetContentHandler,
     handleAgentHandoff,

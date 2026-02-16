@@ -188,7 +188,10 @@ export default function ToolCall({
   }, [auth]);
 
   const progress = useProgress(initialProgress);
-  const cancelled = (!isSubmitting && progress < 1) || error === true;
+  // If the tool has output, it ran successfully—don't show cancelled even if progress lags
+  const hasOutput = output != null && output !== '';
+  const displayProgress = hasOutput ? 1 : progress;
+  const cancelled = (!isSubmitting && progress < 1 && !hasOutput) || error === true;
 
   const labelWithPattern = useMemo(
     () => (inlinePattern ? `${displayName} '${inlinePattern}'` : displayName),
@@ -265,7 +268,7 @@ export default function ToolCall({
       <div className="relative my-2.5 flex h-5 shrink-0 items-center gap-2.5">
         <ProgressText
           muted
-          progress={progress}
+          progress={displayProgress}
           onClick={() => setShowInfo((prev) => !prev)}
           inProgressText={
             labelWithPattern
@@ -317,14 +320,14 @@ export default function ToolCall({
                 domain={authDomain || (domain ?? '')}
                 function_name={function_name}
                 displayName={labelWithPattern}
-                pendingAuth={authDomain.length > 0 && !cancelled && progress < 1}
+                pendingAuth={authDomain.length > 0 && !cancelled && displayProgress < 1}
                 attachments={attachments}
               />
             )}
           </div>
         </div>
       </div>
-      {auth != null && auth && progress < 1 && !cancelled && (
+      {auth != null && auth && displayProgress < 1 && !cancelled && (
         <div className="flex w-full flex-col gap-2.5">
           <div className="mb-1 mt-2">
             <Button
