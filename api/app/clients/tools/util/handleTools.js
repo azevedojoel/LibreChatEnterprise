@@ -37,7 +37,7 @@ const {
   TavilySearchResults,
   createGeminiImageTool,
   createOpenAIImageTools,
-  PostmarkSendEmail,
+  PostmarkSendUserEmail,
 } = require('../');
 const { primeFiles: primeCodeFiles } = require('~/server/services/Files/Code/process');
 const { createLocalCodeExecutionTool } = require('~/server/services/LocalCodeExecution');
@@ -188,7 +188,7 @@ const loadTools = async ({
     'azure-ai-search': StructuredACS,
     traversaal_search: TraversaalSearch,
     tavily_search_results_json: TavilySearchResults,
-    send_email: PostmarkSendEmail,
+    send_user_email: PostmarkSendUserEmail,
   };
 
   const customConstructors = {

@@ -168,9 +168,9 @@
     ]
   },
   {
-    "name": "Send Email",
-    "pluginKey": "send_email",
-    "description": "Send emails via Postmark. Requires POSTMARK_API_KEY. Configure POSTMARK_FROM or EMAIL_FROM for default sender.",
+    "name": "Send User Email",
+    "pluginKey": "send_user_email",
+    "description": "Send emails to the current user via Postmark. Emails are always sent to the logged-in user's address. Requires POSTMARK_API_KEY. Configure POSTMARK_FROM or EMAIL_FROM for default sender.",
     "icon": "https://postmarkapp.com/images/logo-stamp-simple.svg",
     "authConfig": [
       {

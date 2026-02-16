@@ -1,15 +1,11 @@
 const { Tool } = require('@langchain/core/tools');
 const { getEnvironmentVariable } = require('@langchain/core/utils/env');
 const fetch = require('node-fetch');
+const { getUserById } = require('~/models');
 
-const postmarkSendEmailSchema = {
+const postmarkSendUserEmailSchema = {
   type: 'object',
   properties: {
-    to: {
-      type: 'string',
-      description:
-        'Recipient email address(es). For multiple recipients, use comma-separated values (e.g., "user1@example.com, user2@example.com").',
-    },
     subject: {
       type: 'string',
       description: 'Email subject line.',
@@ -28,28 +24,20 @@ const postmarkSendEmailSchema = {
       description:
         'Optional sender address override. Must be a registered Postmark sender. Defaults to POSTMARK_FROM or EMAIL_FROM env.',
     },
-    cc: {
-      type: 'string',
-      description: 'Optional CC recipient(s), comma-separated.',
-    },
-    bcc: {
-      type: 'string',
-      description: 'Optional BCC recipient(s), comma-separated.',
-    },
   },
-  required: ['to', 'subject', 'body'],
+  required: ['subject', 'body'],
 };
 
-class PostmarkSendEmail extends Tool {
-  name = 'send_email';
+class PostmarkSendUserEmail extends Tool {
+  name = 'send_user_email';
   description =
-    'Send an email via Postmark. Requires POSTMARK_API_KEY in the environment. ' +
-    'Provide recipient(s), subject, and body. Optionally include HTML body, CC, or BCC.';
+    'Send an email to the current user via Postmark. The email is always sent to the logged-in user\'s address. ' +
+    'Provide subject and body. Optionally include HTML body. Do NOT ask for or include a recipient—the system uses the user\'s account email automatically.';
 
-  schema = postmarkSendEmailSchema;
+  schema = postmarkSendUserEmailSchema;
 
   static get jsonSchema() {
-    return postmarkSendEmailSchema;
+    return postmarkSendUserEmailSchema;
   }
 
   constructor(fields = {}) {
@@ -59,6 +47,7 @@ class PostmarkSendEmail extends Tool {
     this.apiKey = fields[this.envVar] ?? this.getApiKey();
     this.defaultFrom =
       fields.POSTMARK_FROM ?? fields.EMAIL_FROM ?? this.getDefaultFrom();
+    this.userId = fields.userId;
   }
 
   getApiKey() {
@@ -79,23 +68,26 @@ class PostmarkSendEmail extends Tool {
 
   async _call(args) {
     try {
-      const { to, subject, body, html_body, from, cc, bcc } = args;
+      const { subject, body, html_body, from } = args;
       const fromAddress = from || this.defaultFrom;
+
+      if (!this.userId) {
+        return 'Error: User context not available. Cannot determine recipient.';
+      }
+
+      const user = await getUserById(this.userId, 'email');
+      if (!user?.email) {
+        return 'Error: User has no email address on file.';
+      }
 
       const payload = {
         From: fromAddress,
-        To: to,
+        To: user.email,
         Subject: subject,
         TextBody: body,
       };
       if (html_body) {
         payload.HtmlBody = html_body;
-      }
-      if (cc) {
-        payload.Cc = cc;
-      }
-      if (bcc) {
-        payload.Bcc = bcc;
       }
 
       const res = await fetch('https://api.postmarkapp.com/email', {
@@ -126,4 +118,4 @@ class PostmarkSendEmail extends Tool {
   }
 }
 
-module.exports = PostmarkSendEmail;
+module.exports = PostmarkSendUserEmail;

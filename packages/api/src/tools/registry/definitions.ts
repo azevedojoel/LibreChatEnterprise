@@ -374,15 +374,10 @@ export const tavilySearchSchema: ExtendedJsonSchema = {
   required: ['query'],
 };
 
-/** Postmark Send Email tool JSON schema */
-export const sendEmailSchema: ExtendedJsonSchema = {
+/** Postmark Send User Email tool JSON schema */
+export const sendUserEmailSchema: ExtendedJsonSchema = {
   type: 'object',
   properties: {
-    to: {
-      type: 'string',
-      description:
-        'Recipient email address(es). For multiple recipients, use comma-separated values.',
-    },
     subject: {
       type: 'string',
       description: 'Email subject line.',
@@ -401,16 +396,8 @@ export const sendEmailSchema: ExtendedJsonSchema = {
       description:
         'Optional sender address override. Must be a registered Postmark sender. Defaults to env.',
     },
-    cc: {
-      type: 'string',
-      description: 'Optional CC recipient(s), comma-separated.',
-    },
-    bcc: {
-      type: 'string',
-      description: 'Optional BCC recipient(s), comma-separated.',
-    },
   },
-  required: ['to', 'subject', 'body'],
+  required: ['subject', 'body'],
 };
 
 /** File Search tool JSON schema */
@@ -614,11 +601,11 @@ export const toolDefinitions: Record<string, ToolRegistryDefinition> = {
     schema: tavilySearchSchema,
     toolType: 'builtin',
   },
-  send_email: {
-    name: 'send_email',
+  send_user_email: {
+    name: 'send_user_email',
     description:
-      'Send an email via Postmark. Use when the user wants to send or compose an email. Provide recipient(s), subject, and body. Supports CC, BCC, and optional HTML body.',
-    schema: sendEmailSchema,
+      'Send an email to the current user via Postmark. Use when the user wants to receive an email (summary, report, reminder, etc.). The email is always sent to the logged-in user\'s address. Provide subject and body. Optional HTML body. Do NOT ask for recipient—it is determined automatically.',
+    schema: sendUserEmailSchema,
     toolType: 'builtin',
   },
   file_search: {
