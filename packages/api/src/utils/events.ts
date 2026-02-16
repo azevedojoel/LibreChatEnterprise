@@ -12,6 +12,9 @@ export function sendEvent(res: ServerResponse, event: ServerSentEvent): void {
   if (typeof event.data === 'string' && event.data.length === 0) {
     return;
   }
+  if (!res || typeof res.write !== 'function') {
+    return; // Headless context (e.g. inbound email) - no stream to write to
+  }
   res.write(`event: message\ndata: ${JSON.stringify(event)}\n\n`);
 }
 
@@ -21,6 +24,9 @@ export function sendEvent(res: ServerResponse, event: ServerSentEvent): void {
  * @param message - The error message.
  */
 export function handleError(res: ServerResponse, message: string): void {
+  if (!res || typeof res.write !== 'function') {
+    return; // Headless context - no stream to write to
+  }
   res.write(`event: error\ndata: ${JSON.stringify(message)}\n\n`);
   res.end();
 }

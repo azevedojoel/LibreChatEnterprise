@@ -85,6 +85,8 @@
     "reset-terms": "node config/reset-terms.js",
     "flush-cache": "node config/flush-cache.js",
     "clear-tools-cache": "node config/clear-tools-cache.js",
+    "migrate:send-email-to-send-user-email:dry-run": "node config/migrate-send-email-to-send-user-email.js --dry-run",
+    "migrate:send-email-to-send-user-email": "node config/migrate-send-email-to-send-user-email.js",
     "migrate:agent-permissions:dry-run": "node config/migrate-agent-permissions.js --dry-run",
     "migrate:agent-permissions": "node config/migrate-agent-permissions.js",
     "migrate:agent-permissions:batch": "node config/migrate-agent-permissions.js --batch-size=50",

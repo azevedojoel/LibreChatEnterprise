@@ -71,6 +71,7 @@
     - Flexible & Extensible: Use MCP Servers, tools, file search, code execution, and more
     - Compatible with Custom Endpoints, OpenAI, Azure, Anthropic, AWS Bedrock, Google, Vertex AI, Responses API, and more
     - [Model Context Protocol (MCP) Support](https://modelcontextprotocol.io/clients#librechat) for Tools
+    - [Email My Agent](docs/EMAIL_MY_AGENT.md): Email agents and receive AI replies via Postmark
 
 - 🔍 **Web Search**:  
   - Search the internet and retrieve relevant information to enhance your AI context

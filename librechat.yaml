@@ -308,6 +308,7 @@ endpoints:
       - chain
       - ocr
       - manage_scheduling
+      - inbound_email
 
   # Anthropic with Vertex AI (uncomment if using)
   # anthropic:

@@ -1,0 +1,3 @@
+dev.dailythread.ai {
+	reverse_proxy localhost:3080
+}
