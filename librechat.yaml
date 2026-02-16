@@ -142,6 +142,7 @@ mcpSettings:
     - '*.example.com'
     - 'mcp.stripe.com'
     - '*.plaid.com'
+    - '*.hubspot.com'
 
 # MCP Servers (example - uncomment and configure as needed)
 mcpServers:
