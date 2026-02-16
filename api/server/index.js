@@ -30,6 +30,7 @@ const { checkMigrations } = require('./services/start/migration');
 const initializeMCPs = require('./services/initializeMCPs');
 const { startScheduler } = require('./services/ScheduledAgents/scheduler');
 const { startWorker, requireRedisAtStartup } = require('./services/ScheduledAgents/jobQueue');
+const { startInboundEmailWorker } = require('./services/InboundEmail/jobQueue');
 const configureSocialLogins = require('./socialLogins');
 const { getAppConfig } = require('./services/Config');
 const staticCache = require('./utils/staticCache');
@@ -90,6 +91,10 @@ const startServer = async () => {
   }
 
   app.get('/health', (_req, res) => res.status(200).send('OK'));
+
+  /* Inbound email webhook - must be before express.json() to preserve raw body for signature verification */
+  const inboundEmailRoutes = require('./routes/inboundEmail');
+  app.use('/api/inbound/email', inboundEmailRoutes);
 
   /* Middleware */
   app.use(noIndex);
@@ -210,6 +215,7 @@ const startServer = async () => {
     await checkMigrations();
     startScheduler();
     startWorker();
+    startInboundEmailWorker();
 
     // Configure stream services (auto-detects Redis from USE_REDIS env var)
     const streamServices = createStreamServices();

@@ -3,7 +3,11 @@ const { logger } = require('@librechat/data-schemas');
 const { createTempChatExpirationDate } = require('@librechat/api');
 const { Message } = require('~/db/models');
 
-const idSchema = z.string().uuid();
+const uuidSchema = z.string().uuid();
+const inboundConvoSchema = z.string().regex(
+  /^inbound-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+);
+const idSchema = z.union([uuidSchema, inboundConvoSchema]);
 
 /**
  * Saves a message in the database.

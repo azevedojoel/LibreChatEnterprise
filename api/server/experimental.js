@@ -28,6 +28,7 @@ const { checkMigrations } = require('./services/start/migration');
 const initializeMCPs = require('./services/initializeMCPs');
 const { startScheduler } = require('./services/ScheduledAgents/scheduler');
 const { startWorker, requireRedisAtStartup } = require('./services/ScheduledAgents/jobQueue');
+const { startInboundEmailWorker } = require('./services/InboundEmail/jobQueue');
 const configureSocialLogins = require('./socialLogins');
 const { getAppConfig } = require('./services/Config');
 const staticCache = require('./utils/staticCache');
@@ -245,6 +246,10 @@ if (cluster.isMaster) {
     /** Health check endpoint */
     app.get('/health', (_req, res) => res.status(200).send('OK'));
 
+    /** Inbound email webhook - must be before express.json() to preserve raw body for signature verification */
+    const inboundEmailRoutes = require('./routes/inboundEmail');
+    app.use('/api/inbound/email', inboundEmailRoutes);
+
     /** Middleware */
     app.use(noIndex);
     app.use(express.json({ limit: '3mb' }));
@@ -365,6 +370,7 @@ if (cluster.isMaster) {
       await checkMigrations();
       startScheduler();
       startWorker();
+      startInboundEmailWorker();
     });
 
     /** Handle inter-process messages from master */

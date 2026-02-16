@@ -89,6 +89,21 @@ const getAgent = async (searchParameter) => await Agent.findOne(searchParameter)
 const getAgents = async (searchParameter) => await Agent.find(searchParameter).lean();
 
 /**
+ * Get an agent by its inbound email token.
+ * Used for routing inbound emails to the correct agent.
+ * @param {string} inboundToken - The agent's inboundEmailToken
+ * @returns {Promise<Object|null>} The agent document as a plain object, or null if not found
+ */
+const getAgentByInboundToken = async (inboundToken) => {
+  if (!inboundToken || typeof inboundToken !== 'string') {
+    return null;
+  }
+  return Agent.findOne({ inboundEmailToken: inboundToken.trim() })
+    .populate('author', 'id name email')
+    .lean();
+};
+
+/**
  * Load an agent based on the provided ID
  *
  * @param {Object} params
@@ -440,13 +455,18 @@ const updateAgent = async (searchParameter, updateData, options = {}) => {
       }
     }
 
+    const inboundEmailTokenChanged =
+      directUpdates.inboundEmailToken !== undefined &&
+      String(directUpdates.inboundEmailToken || '') !== String(versionData.inboundEmailToken || '');
+    const effectiveForceVersion = forceVersion || inboundEmailTokenChanged;
+
     const shouldCreateVersion =
       !skipVersioning &&
-      (forceVersion || Object.keys(directUpdates).length > 0 || $push || $pull || $addToSet);
+      (effectiveForceVersion || Object.keys(directUpdates).length > 0 || $push || $pull || $addToSet);
 
     if (shouldCreateVersion) {
       const duplicateVersion = isDuplicateVersion(updateData, versionData, versions, actionsHash);
-      if (duplicateVersion && !forceVersion) {
+      if (duplicateVersion && !effectiveForceVersion) {
         // No changes detected, return the current agent without creating a new version
         const agentObj = currentAgent.toObject();
         agentObj.version = versions.length;
@@ -916,6 +936,7 @@ const countPromotedAgents = async () => {
 module.exports = {
   getAgent,
   getAgents,
+  getAgentByInboundToken,
   loadAgent,
   createAgent,
   updateAgent,
