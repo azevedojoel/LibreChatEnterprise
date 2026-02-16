@@ -1061,8 +1061,13 @@ export const deleteScheduledAgent = (id: string): Promise<void> =>
 
 export const runScheduledAgent = (
   id: string,
-): Promise<{ success: boolean; runId?: string; status?: string; conversationId?: string; error?: string }> =>
-  request.post(`${endpoints.scheduledAgents()}/${id}/run`);
+): Promise<{
+  success: boolean;
+  runId?: string;
+  status?: string;
+  conversationId?: string;
+  error?: string;
+}> => request.post(`${endpoints.scheduledAgents()}/${id}/run`);
 
 export const listScheduledAgentRuns = (limit?: number): Promise<q.ScheduledRun[]> =>
   request.get(
@@ -1071,6 +1076,11 @@ export const listScheduledAgentRuns = (limit?: number): Promise<q.ScheduledRun[]
 
 export const getScheduledAgentRun = (id: string): Promise<q.ScheduledRunDetail> =>
   request.get(endpoints.scheduledAgentRun(id));
+
+export const cancelScheduledRun = (
+  id: string,
+): Promise<{ success: boolean; cancelled?: boolean }> =>
+  request.post(endpoints.scheduledAgentRunCancel(id));
 
 export const createMemory = (data: {
   key: string;
