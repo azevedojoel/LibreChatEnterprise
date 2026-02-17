@@ -14,4 +14,5 @@ export type OutputFormatterConfig =
   | 'passthrough'
   | 'json-to-llm'
   | 'json-to-toon'
+  | 'token-optimized'
   | { module: string };

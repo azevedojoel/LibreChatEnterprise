@@ -210,6 +210,7 @@ actions:
 #   # outputFormatter: Transform raw tool output for better LLM token efficiency.
 #   #   - json-to-toon: Converts JSON to TOON format (default when omitted)
 #   #   - json-to-llm: Converts JSON to human-readable key-value/bullet format
+#   #   - token-optimized: Tool-specific transforms (e.g. tasks.listTasks) strip URLs
 #   #   - passthrough: No transformation
 #   #   - { module: "./path/to/formatter.js" }: Custom formatter (exports default function)
 #   everything:

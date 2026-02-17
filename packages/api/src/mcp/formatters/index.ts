@@ -2,11 +2,13 @@ import type { OutputFormatterConfig, OutputFormatterFn } from './types';
 import { passthroughFormatter } from './passthrough';
 import { jsonToLlmFormatter } from './json-to-llm';
 import { jsonToToonFormatter } from './json-to-toon';
+import { tokenOptimizedFormatter } from './token-optimized';
 
 const BUILT_IN_FORMATTERS: Record<string, OutputFormatterFn> = {
   passthrough: passthroughFormatter,
   'json-to-llm': jsonToLlmFormatter,
   'json-to-toon': jsonToToonFormatter,
+  'token-optimized': tokenOptimizedFormatter,
 };
 
 const formatterCache = new Map<string, OutputFormatterFn>();
@@ -50,3 +52,4 @@ export type { OutputFormatterFn, OutputFormatterConfig } from './types';
 export { passthroughFormatter } from './passthrough';
 export { jsonToLlmFormatter } from './json-to-llm';
 export { jsonToToonFormatter } from './json-to-toon';
+export { tokenOptimizedFormatter } from './token-optimized';

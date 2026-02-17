@@ -103,12 +103,13 @@ const BaseOptionsSchema = z.object({
    * Output formatter for tool results - transforms raw MCP output before sending to the LLM.
    * - json-to-toon: Converts JSON to TOON format (default when omitted, token-efficient for LLMs)
    * - json-to-llm: Converts JSON to human-readable key-value/bullet format
+   * - token-optimized: Tool-specific transforms (e.g. tasks.listTasks) strip URLs, keep id/name/status/date
    * - passthrough: No transformation
    * - { module: "path" }: Custom formatter module (exports default function)
    */
   outputFormatter: z
     .union([
-      z.enum(['passthrough', 'json-to-llm', 'json-to-toon']),
+      z.enum(['passthrough', 'json-to-llm', 'json-to-toon', 'token-optimized']),
       z.object({
         module: z.string().describe('Path to formatter module (exports default function)'),
       }),

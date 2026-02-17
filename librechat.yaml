@@ -156,7 +156,7 @@ mcpServers:
     startup: false
     # Icon: put file in client/public/assets/ and reference as /assets/filename.ext
     iconPath: /assets/google.svg
-    outputFormatter: json-to-toon
+    outputFormatter: token-optimized
     oauth:
       authorization_url: https://accounts.google.com/o/oauth2/v2/auth
       token_url: https://oauth2.googleapis.com/token
@@ -175,7 +175,7 @@ mcpServers:
       - --org-mode
     startup: false
     iconPath: /assets/microsoft.svg
-    outputFormatter: json-to-toon
+    outputFormatter: token-optimized
     oauth:
       authorization_url: https://login.microsoftonline.com/common/oauth2/v2.0/authorize
       token_url: https://login.microsoftonline.com/common/oauth2/v2.0/token
