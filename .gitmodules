@@ -4,3 +4,6 @@
 [submodule "mcp-servers/ms-365-mcp-server"]
 	path = mcp-servers/ms-365-mcp-server
 	url = https://github.com/azevedojoel/ms-365-mcp-server
+[submodule "packages/agents"]
+	path = packages/agents
+	url = https://github.com/azevedojoel/agents

@@ -1777,6 +1777,10 @@ export enum Constants {
   EPHEMERAL_AGENT_ID = 'ephemeral',
   /** Programmatic Tool Calling tool name */
   PROGRAMMATIC_TOOL_CALLING = 'run_tools_with_code',
+  /** Global tool search tool name (for deferred MCP tools) */
+  TOOL_SEARCH = 'tool_search',
+  /** Prefix for per-MCP-server tool search tools (e.g., tool_search_mcp_GitHub) */
+  TOOL_SEARCH_MCP_PREFIX = 'tool_search_mcp_',
 }
 
 export enum LocalStorageKeys {

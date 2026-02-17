@@ -16,6 +16,7 @@ import type { IUser } from '@librechat/data-schemas';
 import type { Agent } from 'librechat-data-provider';
 import type * as t from '~/types';
 import { resolveHeaders, createSafeUser } from '~/utils/env';
+import { isToolSearchTool } from '~/tools/classification';
 
 /** Expected shape of JSON tool search results */
 interface ToolSearchJsonResult {
@@ -88,7 +89,7 @@ export function extractDiscoveredToolsFromHistory(messages: BaseMessage[]): Set<
     }
 
     const name = (message as { name?: string }).name;
-    if (name !== Constants.TOOL_SEARCH) {
+    if (!isToolSearchTool(name ?? '')) {
       continue;
     }
 
@@ -170,6 +171,49 @@ type RunAgent = Omit<Agent, 'tools'> & {
   /** Precomputed flag indicating if any tools have defer_loading enabled */
   hasDeferredTools?: boolean;
 };
+
+/**
+ * Computes the exact tool names sent to the LLM for each agent.
+ * Mirrors AgentContext.getEventDrivenToolsForBinding: only includes tools that
+ * are actually bound (non-deferred, or deferred-but-discovered, with allowed_callers).
+ * Use for persisting metadata.tools so UI shows "tools actually sent" vs "model chose not to use".
+ *
+ * @param params.agents - Agents passed to createRun
+ * @param params.messages - Message history (for discoveredTools extraction)
+ * @returns Map of agentId -> tool names sent to model
+ */
+export function getToolsSentToModel(params: {
+  agents: RunAgent[];
+  messages?: BaseMessage[];
+}): Map<string, string[]> {
+  const { agents, messages = [] } = params;
+  const hasAnyDeferredTools = agents.some((agent) => agent.hasDeferredTools === true);
+  const discoveredTools =
+    hasAnyDeferredTools && messages.length
+      ? extractDiscoveredToolsFromHistory(messages)
+      : new Set<string>();
+
+  const result = new Map<string, string[]>();
+  for (const agent of agents) {
+    const defs = agent.toolDefinitions ?? [];
+    const names = new Set<string>();
+    for (const def of defs) {
+      const name = def?.name;
+      if (!name || typeof name !== 'string') continue;
+      const allowedCallers = def.allowed_callers ?? ['direct'];
+      if (!allowedCallers.includes('direct')) continue;
+      if (def.defer_loading === true && !discoveredTools.has(name)) continue;
+      names.add(name);
+    }
+    for (const name of discoveredTools) {
+      if (agent.toolRegistry?.get(name)) {
+        names.add(name);
+      }
+    }
+    result.set(agent.id, Array.from(names));
+  }
+  return result;
+}
 
 /**
  * Creates a new Run instance with custom handlers and configuration.

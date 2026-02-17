@@ -1,5 +1,6 @@
 export { default as AssistantsProvider } from './AssistantsContext';
 export { default as AgentsProvider } from './AgentsContext';
+export { default as BadgeRowProvider, useBadgeRowContext } from './BadgeRowContext';
 export * from './ActivePanelContext';
 export * from './AgentPanelContext';
 export * from './ChatContext';

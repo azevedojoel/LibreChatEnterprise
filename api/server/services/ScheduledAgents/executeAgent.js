@@ -96,9 +96,8 @@ async function executeScheduledAgent({
       overrideParentMessageId: null,
       responseMessageId: null,
     };
-    if (selectedTools !== undefined && selectedTools !== null) {
-      body.ephemeralAgent = { tools: selectedTools };
-    }
+    // Headless runs (scheduled agents) always include all agent tools - do not pass
+    // ephemeralAgent.tools to restrict. This ensures scheduled runs have full tool access.
     const mockReq = {
       user: { id: userId, role: user.role },
       config: appConfig,

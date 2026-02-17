@@ -719,6 +719,11 @@ describe('useStepHandler', () => {
 
       expect(consoleSpy).toHaveBeenCalledWith(
         'No run step or runId found for completed tool call event',
+        expect.objectContaining({
+          stepId: 'nonexistent-step',
+          toolCallId: 'tool-call-1',
+          toolName: 'test_tool',
+        }),
       );
       consoleSpy.mockRestore();
     });

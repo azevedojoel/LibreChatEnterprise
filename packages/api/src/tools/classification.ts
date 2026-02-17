@@ -7,10 +7,7 @@
 
 import { logger } from '@librechat/data-schemas';
 import { Constants } from 'librechat-data-provider';
-import {
-  createToolSearch,
-  ToolSearchToolDefinition,
-} from '@librechat/agents';
+import { createToolSearch, ToolSearchToolDefinition } from '@librechat/agents';
 import type { AgentToolOptions } from 'librechat-data-provider';
 import type {
   LCToolRegistry,
@@ -28,6 +25,15 @@ export interface ToolDefinition {
   parameters?: JsonSchemaType;
   /** MCP server name extracted from tool name */
   serverName?: string;
+}
+
+/**
+ * Checks if a tool name is the tool search tool.
+ * @param name - The tool name to check
+ * @returns True if the tool is tool_search
+ */
+export function isToolSearchTool(name: string): boolean {
+  return name === Constants.TOOL_SEARCH;
 }
 
 /**
@@ -304,28 +310,36 @@ export async function buildToolClassification(
     return { toolRegistry, toolDefinitions, additionalTools, hasDeferredTools: false };
   }
 
-  /** Tool search uses local mode (no API key needed) */
+  /** Single tool_search for all deferred tools (upstream behavior) */
   if (hasDeferredTools) {
+    const toolName = Constants.TOOL_SEARCH as string;
+    const toolSearchTool = createToolSearch({
+      mode: 'local',
+      toolRegistry,
+    });
+    toolSearchTool.name = toolName;
+    const description = toolSearchTool.description;
+
     if (!definitionsOnly) {
-      const toolSearchTool = createToolSearch({
-        mode: 'local',
-        toolRegistry,
-      });
       additionalTools.push(toolSearchTool);
     }
 
-    /** Add ToolSearch definition for event-driven mode */
+    const schema = ToolSearchToolDefinition.schema as unknown as LCTool['parameters'];
     toolDefinitions.push({
-      name: ToolSearchToolDefinition.name,
-      description: ToolSearchToolDefinition.description,
-      parameters: ToolSearchToolDefinition.schema as unknown as LCTool['parameters'],
+      name: toolName,
+      description,
+      parameters: schema,
     });
-    toolRegistry.set(ToolSearchToolDefinition.name, {
-      name: ToolSearchToolDefinition.name,
+    toolRegistry.set(toolName, {
+      name: toolName,
+      description,
+      parameters: schema,
       allowed_callers: ['direct'],
     });
 
-    logger.debug(`[buildToolClassification] Tool Search enabled for agent ${agentId}`);
+    logger.debug(
+      `[buildToolClassification] Tool Search enabled for agent ${agentId}`,
+    );
   }
 
   /** PTC removed - was dependent on CODE_API_KEY for E2B sandbox execution */

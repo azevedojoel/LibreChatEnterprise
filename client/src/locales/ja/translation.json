@@ -1034,7 +1034,7 @@
   "com_ui_latest_production_version": "最新の製品バージョン",
   "com_ui_latest_version": "最新バージョン",
   "com_ui_leave_blank_to_keep": "既存を維持する場合は空白のままにして下さい",
-  "com_ui_librechat_code_api_key": "LibreChat コードインタープリター APIキーを取得",
+  "com_ui_librechat_code_api_key": "Daily Thread コードインタープリター APIキーを取得",
   "com_ui_librechat_code_api_subtitle": "セキュア。多言語対応。ファイル入出力。",
   "com_ui_librechat_code_api_title": "AIコードを実行",
   "com_ui_light_theme_enabled": "ライトテーマが有効",

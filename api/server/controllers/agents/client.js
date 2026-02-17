@@ -19,6 +19,7 @@ const {
   getTransactionsConfig,
   createMemoryProcessor,
   filterMalformedContentParts,
+  getToolsSentToModel,
 } = require('@librechat/api');
 const {
   Callback,
@@ -427,6 +428,17 @@ class AgentClient extends BaseClient {
       }
 
       await this.addFileContextToMessage(latestMessage, attachments);
+
+      /** Fallback: ensure execute_code attachments (fileIdentifier) get context when extractFileContext returns nothing */
+      if (!latestMessage.fileContext) {
+        const executeCodeFiles = attachments.filter(
+          (f) => f.filename && f.metadata?.fileIdentifier != null,
+        );
+        if (executeCodeFiles.length > 0) {
+          latestMessage.fileContext = `Attached file(s) for code execution: ${executeCodeFiles.map((f) => f.filename).join(', ')}. Use the filename(s) in your code.`;
+        }
+      }
+
       const files = await this.processAttachments(latestMessage, attachments);
 
       this.options.attachments = files;
@@ -795,6 +807,40 @@ class AgentClient extends BaseClient {
     }
   }
 
+  /**
+   * Tool IDs (pluginKeys) that were actually sent to the model in the LLM request.
+   * Uses _toolsSentByAgentId captured before createRun (mirrors createRun's payload).
+   * For handoffs, uses handoffState.currentAgentId to pick the responding agent's tools.
+   * @returns {string[]}
+   */
+  getToolsForResponse() {
+    const effectiveAgentId =
+      this.options.handoffState?.currentAgentId ?? this.options.agent?.id;
+    if (!effectiveAgentId) return [];
+
+    const captured = this._toolsSentByAgentId;
+    if (captured && typeof captured.get === 'function') {
+      const tools = captured.get(effectiveAgentId);
+      if (Array.isArray(tools)) return tools;
+    }
+
+    const agent = this.options.agent;
+    if (!agent) return [];
+    const defs = agent.toolDefinitions;
+    if (Array.isArray(defs) && defs.length > 0) {
+      return defs
+        .map((d) => (d?.name && typeof d.name === 'string' ? d.name : null))
+        .filter(Boolean);
+    }
+    const tools = agent.tools ?? [];
+    if (Array.isArray(tools) && tools.length > 0) {
+      return tools
+        .map((t) => (t?.name && typeof t.name === 'string' ? t.name : null))
+        .filter(Boolean);
+    }
+    return [];
+  }
+
   /** @type {sendCompletion} */
   async sendCompletion(payload, opts = {}) {
     await this.chatCompletion({
@@ -805,7 +851,11 @@ class AgentClient extends BaseClient {
     });
 
     const completion = filterMalformedContentParts(this.contentParts);
-    return { completion };
+    const tools = this.getToolsForResponse();
+    return {
+      completion,
+      metadata: tools.length > 0 ? { tools } : {},
+    };
   }
 
   /**
@@ -1051,6 +1101,8 @@ class AgentClient extends BaseClient {
         // }
 
         memoryPromise = this.runMemory(messages);
+
+        this._toolsSentByAgentId = getToolsSentToModel({ agents, messages });
 
         run = await createRun({
           agents,

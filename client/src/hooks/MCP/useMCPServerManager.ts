@@ -28,7 +28,10 @@ export interface MCPServerDefinition {
 // The init states (isInitializing, isCancellable, etc.) are stored in the global Jotai atom
 type PollIntervals = Record<string, NodeJS.Timeout | null>;
 
-export function useMCPServerManager({ conversationId }: { conversationId?: string | null } = {}) {
+export function useMCPServerManager({
+  conversationId,
+  assignedMcpServerNames,
+}: { conversationId?: string | null; assignedMcpServerNames?: Set<string> | string[] | null } = {}) {
   const localize = useLocalize();
   const queryClient = useQueryClient();
   const { showToast } = useToastContext();
@@ -66,10 +69,19 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
   }, [loadedServers, permissionsMap]);
 
   // Memoize filtered servers for useMCPSelect to prevent infinite loops
-  const selectableServers = useMemo(
-    () => availableMCPServers.filter((s) => s.config.chatMenu !== false && !s.consumeOnly),
-    [availableMCPServers],
-  );
+  const selectableServers = useMemo(() => {
+    let servers = availableMCPServers.filter((s) => s.config.chatMenu !== false && !s.consumeOnly);
+    const assignedSet =
+      assignedMcpServerNames instanceof Set
+        ? assignedMcpServerNames
+        : Array.isArray(assignedMcpServerNames)
+          ? new Set(assignedMcpServerNames)
+          : null;
+    if (assignedSet && assignedSet.size > 0) {
+      servers = servers.filter((s) => assignedSet.has(s.serverName));
+    }
+    return servers;
+  }, [availableMCPServers, assignedMcpServerNames]);
 
   const { mcpValues, setMCPValues, isPinned, setIsPinned } = useMCPSelect({
     conversationId,

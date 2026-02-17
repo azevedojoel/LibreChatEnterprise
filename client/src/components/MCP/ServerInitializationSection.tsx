@@ -94,7 +94,7 @@ export default function ServerInitializationSection({
 
   return (
     <div className="flex items-center gap-2">
-      {requiresOAuth && revokeOAuthForServer && (
+      {requiresOAuth && isConnected && revokeOAuthForServer && (
         <Button
           size="sm"
           variant="destructive"

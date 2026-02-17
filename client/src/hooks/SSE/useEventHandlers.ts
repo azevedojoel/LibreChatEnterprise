@@ -605,6 +605,67 @@ export default function useEventHandlers({
         } else if (requestMessage != null && responseMessage != null) {
           finalMessages = [...messages, requestMessage, responseMessage];
         }
+        // Merge tool outputs from client state when server payload has incomplete tool data
+        // (avoids overwriting stepHandler-updated content with server payload missing output/progress)
+        const responseMsgId = responseMessage?.messageId;
+        if (responseMsgId && currentMessages) {
+          const clientResponse = currentMessages.find((m) => m.messageId === responseMsgId);
+          const serverResponse = finalMessages.find((m) => m.messageId === responseMsgId);
+          if (clientResponse?.content && serverResponse?.content) {
+            const mergedContent = [...(serverResponse.content ?? [])];
+            let merged = false;
+            for (let i = 0; i < mergedContent.length; i++) {
+              const part = mergedContent[i];
+              if (part?.type !== ContentTypes.TOOL_CALL || !part.tool_call) continue;
+              const serverTc = part.tool_call as { output?: string; progress?: number; id?: string };
+              const hasServerOutput = serverTc.output != null && serverTc.output !== '';
+              if (hasServerOutput) continue;
+              const clientPart = clientResponse.content?.[i];
+              const clientTc =
+                clientPart?.type === ContentTypes.TOOL_CALL
+                  ? (clientPart.tool_call as { output?: string; progress?: number; id?: string })
+                  : null;
+              const clientHasOutput = clientTc?.output != null && clientTc.output !== '';
+              if (!clientHasOutput && serverTc.id) {
+                const byId = clientResponse.content?.find(
+                  (p) =>
+                    p?.type === ContentTypes.TOOL_CALL &&
+                    (p.tool_call as { id?: string })?.id === serverTc.id,
+                );
+                const matchTc =
+                  byId?.type === ContentTypes.TOOL_CALL
+                    ? (byId.tool_call as { output?: string; progress?: number })
+                    : null;
+                if (matchTc?.output != null && matchTc.output !== '') {
+                  mergedContent[i] = {
+                    ...part,
+                    tool_call: {
+                      ...part.tool_call,
+                      output: matchTc.output,
+                      progress: matchTc.progress ?? 1,
+                    },
+                  };
+                  merged = true;
+                }
+              } else if (clientHasOutput) {
+                mergedContent[i] = {
+                  ...part,
+                  tool_call: {
+                    ...part.tool_call,
+                    output: clientTc!.output,
+                    progress: (clientTc as { progress?: number }).progress ?? 1,
+                  },
+                };
+                merged = true;
+              }
+            }
+            if (merged) {
+              finalMessages = finalMessages.map((m) =>
+                m.messageId === responseMsgId ? { ...m, content: mergedContent } : m,
+              );
+            }
+          }
+        }
         if (finalMessages.length > 0) {
           setFinalMessages(conversation.conversationId, finalMessages);
         } else if (

@@ -256,7 +256,23 @@ function getDefaultHandlers({
        * @param {GraphRunnableConfig['configurable']} [metadata] The runnable metadata.
        */
       handle: async (event, data, metadata) => {
+        // Ensure result.index is set BEFORE aggregateContent (needed for fallback resolution)
+        if (data?.result != null && typeof data.result.index !== 'number') {
+          data.result.index = 0;
+        }
         aggregateContent({ event, data });
+        // Diagnostic: verify tool_call has output for tool-call-cancelled fix
+        const toolCall = data?.result?.tool_call;
+        if (
+          data?.result != null &&
+          toolCall &&
+          (toolCall.output == null || toolCall.output === '')
+        ) {
+          logger.debug('[ON_RUN_STEP_COMPLETED] tool_call missing output', {
+            stepId: data.result.id,
+            toolName: toolCall.name,
+          });
+        }
         if (data?.result != null) {
           await emitEvent(res, streamId, { event, data });
         } else if (checkIfLastAgent(metadata?.last_agent_id, metadata?.langgraph_node)) {
@@ -307,21 +323,23 @@ function getDefaultHandlers({
   /** ON_HANDOFF: Fired when direct handoff tools complete - update handoffState and emit agent_handoff */
   const onHandoffEvent = GraphEvents.ON_HANDOFF ?? 'on_handoff';
   handlers[onHandoffEvent] = {
-      handle: async (_event, data) => {
-        const targetAgentId = data?.destinationAgentId ?? (data?.toolName && typeof data.toolName === 'string'
+    handle: async (_event, data) => {
+      const targetAgentId =
+        data?.destinationAgentId ??
+        (data?.toolName && typeof data.toolName === 'string'
           ? data.toolName.replace(Constants.LC_TRANSFER_TO_, '')
           : null);
-        if (handoffState && targetAgentId) {
-          handoffState.currentAgentId = targetAgentId;
-          if (streamId) {
-            await emitEvent(res, streamId, {
-              event: 'agent_handoff',
-              data: { agent_id: targetAgentId },
-            });
-          }
+      if (handoffState && targetAgentId) {
+        handoffState.currentAgentId = targetAgentId;
+        if (streamId) {
+          await emitEvent(res, streamId, {
+            event: 'agent_handoff',
+            data: { agent_id: targetAgentId },
+          });
         }
-      },
-    };
+      }
+    },
+  };
 
   return handlers;
 }

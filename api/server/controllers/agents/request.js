@@ -14,6 +14,50 @@ const { handleAbortError } = require('~/server/middleware');
 const { logViolation } = require('~/cache');
 const { saveMessage } = require('~/models');
 
+/**
+ * Patches tool_search (and tool_search_mcp_*) parts missing output/progress before save.
+ * When tool_search ran (has args) but completion was not persisted, infer completion.
+ *
+ * Root cause: @librechat/agents createContentAggregator may fail to merge on_run_step_completed
+ * into the correct content slot when multiple tools run (e.g. tool_search + gmail). Index resolution
+ * uses stepMap.get(stepId) and runStep.index; if the event order or IDs mismatch, tool_search
+ * completion is skipped. This patch is the defensive fallback for that persistence gap.
+ *
+ * @param {object} message - Message object with content array (mutated in place)
+ */
+function patchToolSearchBeforeSave(message) {
+  const content = message?.content;
+  if (!content || !Array.isArray(content)) {
+    return;
+  }
+  for (const part of content) {
+    if (part?.type !== 'tool_call' || !part.tool_call) {
+      continue;
+    }
+    const tc = part.tool_call;
+    const isToolSearch =
+      tc.name === Constants.TOOL_SEARCH ||
+      (typeof tc.name === 'string' && tc.name.startsWith('tool_search_mcp_'));
+    if (!isToolSearch) {
+      continue;
+    }
+    const hasOutput = tc.output != null && tc.output !== '';
+    const hasProgress = tc.progress != null && tc.progress >= 1;
+    const hasArgs =
+      tc.args != null &&
+      (typeof tc.args === 'string'
+        ? tc.args.trim() !== ''
+        : Object.keys(tc.args || {}).length > 0);
+    if (!hasOutput && !hasProgress && hasArgs) {
+      tc.progress = 1;
+      tc.output = 'Tools discovered';
+      logger.debug('[AgentController] Patched tool_search before save (missing output/progress)', {
+        toolName: tc.name,
+      });
+    }
+  }
+}
+
 function createCloseHandler(abortController) {
   return function (manual) {
     if (!manual) {
@@ -131,6 +175,8 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
         if (req.body?.agent_id) {
           partialMessage.agent_id = req.body.agent_id;
         }
+
+        patchToolSearchBeforeSave(partialMessage);
 
         await saveMessage(req, partialMessage, {
           context: 'api/server/controllers/agents/request.js - partial response on disconnect',
@@ -285,11 +331,11 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
         // This prevents race conditions where the client sends a follow-up message
         // before the response is saved to the database, causing orphaned parentMessageIds.
         if (client.savedMessageIds && !client.savedMessageIds.has(messageId)) {
-          await saveMessage(
-            req,
-            { ...response, user: userId, unfinished: wasAbortedBeforeComplete },
-            { context: 'api/server/controllers/agents/request.js - resumable response end' },
-          );
+          const toSave = { ...response, user: userId, unfinished: wasAbortedBeforeComplete };
+          patchToolSearchBeforeSave(toSave);
+          await saveMessage(req, toSave, {
+            context: 'api/server/controllers/agents/request.js - resumable response end',
+          });
         }
 
         // Check if our job was replaced by a new request before emitting
@@ -324,6 +370,20 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
             responseMessageId: response?.messageId,
             conversationId: conversation?.conversationId,
           });
+
+          // Diagnostic: verify tool parts in final response have output and progress for tool-call-cancelled fix
+          const content = response?.content ?? [];
+          const toolParts = content.filter((p) => p?.type === 'tool_call' && p?.tool_call);
+          const incompleteToolParts = toolParts.filter((p) => {
+            const tc = p.tool_call;
+            return (tc.output == null || tc.output === '') && (tc.progress == null || tc.progress < 1);
+          });
+          if (incompleteToolParts.length > 0) {
+            logger.debug(`[ResumableAgentController] FINAL has ${incompleteToolParts.length} tool part(s) missing output/progress`, {
+              streamId,
+              toolNames: incompleteToolParts.map((p) => p.tool_call?.name),
+            });
+          }
 
           await GenerationJobManager.emitDone(streamId, finalEvent);
           GenerationJobManager.completeJob(streamId);
@@ -670,11 +730,11 @@ const _LegacyAgentController = async (req, res, next, initializeClient, addTitle
 
       // Save the message if needed
       if (client.savedMessageIds && !client.savedMessageIds.has(messageId)) {
-        await saveMessage(
-          req,
-          { ...finalResponse, user: userId },
-          { context: 'api/server/controllers/agents/request.js - response end' },
-        );
+        const toSave = { ...finalResponse, user: userId };
+        patchToolSearchBeforeSave(toSave);
+        await saveMessage(req, toSave, {
+          context: 'api/server/controllers/agents/request.js - response end',
+        });
       }
     }
     // Edge case: sendMessage completed but abort happened during sendCompletion

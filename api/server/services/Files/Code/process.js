@@ -46,7 +46,9 @@ const primeFiles = async (options, _codeApiKey) => {
 
   let toolContext = null;
   if (files.length > 0) {
-    toolContext = `- Note: Use the ${Tools.execute_code} tool. Files available: ${files.map((f) => f.filename).join(', ')}`;
+    const filenames = files.map((f) => f.filename).join(', ');
+    const exampleFilename = files[0]?.filename ?? 'file.csv';
+    toolContext = `- The user has attached file(s) for analysis: ${filenames}. Use the ${Tools.execute_code} tool. These files are pre-loaded in your workspace—reference them by filename (e.g., pd.read_csv('${exampleFilename}')).`;
   }
 
   return { files, toolContext };

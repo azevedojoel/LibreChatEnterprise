@@ -7,9 +7,27 @@ import {
   buildToolClassification,
   getServerNameFromTool,
   agentHasDeferredTools,
+  isToolSearchTool,
 } from './classification';
+import { Constants } from 'librechat-data-provider';
 
 describe('classification.ts', () => {
+  describe('isToolSearchTool', () => {
+    it('should return true for tool_search', () => {
+      expect(isToolSearchTool('tool_search')).toBe(true);
+    });
+
+    it('should return false for tool_search_mcp_* (upstream uses single tool_search only)', () => {
+      expect(isToolSearchTool('tool_search_mcp_GitHub')).toBe(false);
+      expect(isToolSearchTool('tool_search_mcp_github')).toBe(false);
+    });
+
+    it('should return false for other tools', () => {
+      expect(isToolSearchTool('list_commits_mcp_github')).toBe(false);
+      expect(isToolSearchTool('execute_code')).toBe(false);
+    });
+  });
+
   describe('getServerNameFromTool', () => {
     it('should extract server name from MCP tool name', () => {
       const result = getServerNameFromTool('list_files_mcp_Google-Workspace');
@@ -214,11 +232,13 @@ describe('classification.ts', () => {
       expect(result.toolRegistry?.get('tool2')?.defer_loading).toBe(false);
     });
 
-    it('should create tool search when deferredToolsEnabled is true and has deferred tools', async () => {
-      const loadedTools: GenericTool[] = [createMCPTool('tool1')];
+    it('should create tool_search when deferredToolsEnabled is true and has deferred tools', async () => {
+      const loadedTools: GenericTool[] = [
+        createMCPTool('list_commits_mcp_github'),
+      ];
 
       const agentToolOptions: AgentToolOptions = {
-        tool1: { defer_loading: true },
+        list_commits_mcp_github: { defer_loading: true },
       };
 
       const result = await buildToolClassification({
@@ -231,14 +251,51 @@ describe('classification.ts', () => {
       });
 
       expect(result.hasDeferredTools).toBe(true);
-      expect(result.additionalTools.some((t) => t.name === 'tool_search')).toBe(true);
+      expect(
+        result.additionalTools.some((t) => t.name === Constants.TOOL_SEARCH),
+      ).toBe(true);
+    });
+
+    it('should use rich tool_search description from createToolSearch (not minimal override)', async () => {
+      const loadedTools: GenericTool[] = [
+        createMCPTool('list_commits_mcp_github'),
+      ];
+
+      const agentToolOptions: AgentToolOptions = {
+        list_commits_mcp_github: { defer_loading: true },
+      };
+
+      const result = await buildToolClassification({
+        loadedTools,
+        userId: 'user1',
+        agentId: 'agent1',
+        agentToolOptions,
+        deferredToolsEnabled: true,
+        loadAuthValues: mockLoadAuthValues,
+      });
+
+      const toolSearchDef = result.toolDefinitions.find(
+        (d) => d.name === Constants.TOOL_SEARCH,
+      );
+      const toolSearchTool = result.additionalTools.find(
+        (t) => t.name === Constants.TOOL_SEARCH,
+      );
+
+      const description = toolSearchDef?.description ?? toolSearchTool?.description ?? '';
+      expect(description).toContain('Deferred tools');
+      expect(description).toContain('search');
+      expect(description).not.toBe(
+        'Searches deferred tools using BM25 ranking. Multi-word queries supported.',
+      );
     });
 
     it('should NOT create tool search when deferredToolsEnabled is false', async () => {
-      const loadedTools: GenericTool[] = [createMCPTool('tool1')];
+      const loadedTools: GenericTool[] = [
+        createMCPTool('list_commits_mcp_github'),
+      ];
 
       const agentToolOptions: AgentToolOptions = {
-        tool1: { defer_loading: true },
+        list_commits_mcp_github: { defer_loading: true },
       };
 
       const result = await buildToolClassification({
@@ -251,7 +308,9 @@ describe('classification.ts', () => {
       });
 
       expect(result.hasDeferredTools).toBe(false);
-      expect(result.additionalTools.some((t) => t.name === 'tool_search')).toBe(false);
+      expect(
+        result.additionalTools.some((t) => isToolSearchTool(t.name)),
+      ).toBe(false);
     });
 
     it('should default deferredToolsEnabled to true when not specified', async () => {
@@ -273,7 +332,10 @@ describe('classification.ts', () => {
     });
 
     it('should default MCP tools to deferred when no agentToolOptions provided', async () => {
-      const loadedTools: GenericTool[] = [createMCPTool('tool1'), createMCPTool('tool2')];
+      const loadedTools: GenericTool[] = [
+        createMCPTool('list_commits_mcp_github'),
+        createMCPTool('search_code_mcp_github'),
+      ];
 
       const result = await buildToolClassification({
         loadedTools,
@@ -284,9 +346,15 @@ describe('classification.ts', () => {
       });
 
       expect(result.hasDeferredTools).toBe(true);
-      expect(result.toolRegistry?.get('tool1')?.defer_loading).toBe(true);
-      expect(result.toolRegistry?.get('tool2')?.defer_loading).toBe(true);
-      expect(result.additionalTools.some((t) => t.name === 'tool_search')).toBe(true);
+      expect(
+        result.toolRegistry?.get('list_commits_mcp_github')?.defer_loading,
+      ).toBe(true);
+      expect(
+        result.toolRegistry?.get('search_code_mcp_github')?.defer_loading,
+      ).toBe(true);
+      expect(
+        result.additionalTools.some((t) => t.name === Constants.TOOL_SEARCH),
+      ).toBe(true);
     });
 
     it('should return early when no MCP tools are present', async () => {
@@ -344,10 +412,12 @@ describe('classification.ts', () => {
     });
 
     it('should still add tool_search definition when definitionsOnly=true and has deferred tools', async () => {
-      const loadedTools: GenericTool[] = [createMCPTool('tool1')];
+      const loadedTools: GenericTool[] = [
+        createMCPTool('list_commits_mcp_github'),
+      ];
 
       const agentToolOptions: AgentToolOptions = {
-        tool1: { defer_loading: true },
+        list_commits_mcp_github: { defer_loading: true },
       };
 
       const result = await buildToolClassification({
@@ -360,15 +430,17 @@ describe('classification.ts', () => {
         loadAuthValues: mockLoadAuthValues,
       });
 
-      expect(result.toolDefinitions.some((d) => d.name === 'tool_search')).toBe(true);
-      expect(result.toolRegistry?.has('tool_search')).toBe(true);
+      expect(result.toolDefinitions.some((d) => d.name === Constants.TOOL_SEARCH)).toBe(true);
+      expect(result.toolRegistry?.has(Constants.TOOL_SEARCH)).toBe(true);
     });
 
     it('should create tool instances when definitionsOnly=false (default)', async () => {
-      const loadedTools: GenericTool[] = [createMCPTool('tool1')];
+      const loadedTools: GenericTool[] = [
+        createMCPTool('list_commits_mcp_github'),
+      ];
 
       const agentToolOptions: AgentToolOptions = {
-        tool1: { defer_loading: true },
+        list_commits_mcp_github: { defer_loading: true },
       };
 
       const result = await buildToolClassification({
@@ -380,7 +452,9 @@ describe('classification.ts', () => {
         loadAuthValues: mockLoadAuthValues,
       });
 
-      expect(result.additionalTools.some((t) => t.name === 'tool_search')).toBe(true);
+      expect(
+        result.additionalTools.some((t) => t.name === Constants.TOOL_SEARCH),
+      ).toBe(true);
     });
 
     it('should NOT add PTC (run_tools_with_code) when agent has programmatic tools - PTC removed (was CODE_API_KEY/E2B dependent)', async () => {

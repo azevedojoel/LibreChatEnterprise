@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { MCPIcon } from '@librechat/client';
+import { useState, useRef, useCallback } from 'react';
+import { MCPIcon, Button, Spinner, OGDialog, OGDialogTemplate, useToastContext } from '@librechat/client';
 import { PermissionBits, hasPermissions } from 'librechat-data-provider';
 import type { MCPServerStatusIconProps } from '~/components/MCP/MCPServerStatusIcon';
 import type { MCPServerDefinition } from '~/hooks';
@@ -7,6 +7,7 @@ import MCPServerDialog from './MCPServerDialog';
 import { getStatusDotColor } from './MCPStatusBadge';
 import MCPCardActions from './MCPCardActions';
 import { useMCPServerManager, useLocalize } from '~/hooks';
+import { useDeleteMCPServerMutation } from '~/data-provider/MCP';
 import { cn } from '~/utils';
 
 interface MCPServerCardProps {
@@ -29,9 +30,12 @@ export default function MCPServerCard({
   canCreateEditMCPs,
 }: MCPServerCardProps) {
   const localize = useLocalize();
+  const { showToast } = useToastContext();
   const triggerRef = useRef<HTMLDivElement>(null);
   const { initializeServer, revokeOAuthForServer } = useMCPServerManager();
+  const deleteMutation = useDeleteMCPServerMutation();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const statusIconProps = getServerStatusIconProps(server.serverName);
   const {
@@ -48,6 +52,7 @@ export default function MCPServerCard({
   const description = server.config?.description;
   const statusDotColor = getStatusDotColor(serverStatus, isInitializing);
   const canEdit = canCreateEditMCPs && canEditThisServer;
+  const canDelete = canCreateEditMCPs && !!server.dbId;
 
   const handleInitialize = () => {
     /** If server has custom user vars and is not already connected, show config dialog first
@@ -70,6 +75,35 @@ export default function MCPServerCard({
     setDialogOpen(true);
   };
 
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDelete = useCallback(async () => {
+    try {
+      await deleteMutation.mutateAsync(server.serverName);
+      showToast({
+        message: localize('com_ui_mcp_server_deleted'),
+        status: 'success',
+      });
+      setShowDeleteConfirm(false);
+      setDialogOpen(false);
+    } catch (error: unknown) {
+      let errorMessage = localize('com_ui_error');
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as { response?: { data?: { error?: string } } };
+        if (axiosError.response?.data?.error) {
+          errorMessage = axiosError.response.data.error;
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      showToast({ message: errorMessage, status: 'error' });
+    }
+  }, [server.serverName, deleteMutation, showToast, localize]);
+
   // Determine status text for accessibility
   const getStatusText = () => {
     if (isInitializing) return localize('com_nav_mcp_status_initializing');
@@ -88,6 +122,28 @@ export default function MCPServerCard({
 
   return (
     <>
+      {/* Delete confirmation dialog */}
+      <OGDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <OGDialogTemplate
+          title={localize('com_ui_delete_mcp_server')}
+          className="w-11/12 max-w-md"
+          description={localize('com_ui_mcp_server_delete_confirm', { 0: server.serverName })}
+          selection={
+            <Button
+              onClick={handleDelete}
+              variant="destructive"
+              aria-live="polite"
+              disabled={deleteMutation.isPending}
+              aria-label={
+                deleteMutation.isPending ? localize('com_ui_deleting') : localize('com_ui_delete')
+              }
+            >
+              {deleteMutation.isPending ? <Spinner /> : localize('com_ui_delete')}
+            </Button>
+          }
+        />
+      </OGDialog>
+
       <div
         className={cn(
           'group flex items-center gap-3 rounded-lg px-3 py-2.5',
@@ -136,12 +192,14 @@ export default function MCPServerCard({
             canCancel={canCancel}
             hasCustomUserVars={hasCustomUserVars}
             canEdit={canEdit}
+            canDelete={canDelete}
             editButtonRef={triggerRef}
             onEditClick={handleEditClick}
             onConfigClick={onConfigClick}
             onInitialize={handleInitialize}
             onCancel={onCancel}
             onRevoke={handleRevoke}
+            onDelete={handleDeleteClick}
           />
         </div>
       </div>

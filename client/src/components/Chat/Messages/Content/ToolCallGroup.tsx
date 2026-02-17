@@ -1,5 +1,5 @@
 import { useState, useMemo, type ReactNode } from 'react';
-import { ContentTypes } from 'librechat-data-provider';
+import { Constants, ContentTypes } from 'librechat-data-provider';
 import type { TMessageContentParts, TAttachment, Agents } from 'librechat-data-provider';
 import { useLocalize } from '~/hooks';
 import ProgressText from './ProgressText';
@@ -12,12 +12,31 @@ type ToolCallGroupProps = {
   isLast: boolean;
 };
 
+function isToolSearch(name: string | undefined): boolean {
+  return (
+    name === Constants.TOOL_SEARCH ||
+    (typeof name === 'string' && name.startsWith('tool_search_mcp_'))
+  );
+}
+
 function getToolCallProgress(part: TMessageContentParts): number {
   const toolCall = part?.[ContentTypes.TOOL_CALL] as Agents.ToolCall | undefined;
   if (!toolCall) {
     return 1;
   }
-  const p = toolCall.progress ?? (toolCall.function?.output != null ? 1 : 0.1);
+  const hasOutput = toolCall.output != null && toolCall.output !== '';
+  const hasArgs =
+    (typeof toolCall.args === 'string' && toolCall.args.trim() !== '') ||
+    (typeof toolCall.args === 'object' && toolCall.args != null && Object.keys(toolCall.args).length > 0);
+  if (
+    isToolSearch(toolCall.name) &&
+    !hasOutput &&
+    (toolCall.progress == null || toolCall.progress < 1) &&
+    hasArgs
+  ) {
+    return 1;
+  }
+  const p = toolCall.progress ?? (hasOutput ? 1 : 0.1);
   return typeof p === 'number' ? p : 1;
 }
 

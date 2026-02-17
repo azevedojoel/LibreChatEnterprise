@@ -1,11 +1,13 @@
 import React, { useRef, useState, useMemo, useEffect, useCallback } from 'react';
+import { useRecoilState } from 'recoil';
 import copy from 'copy-to-clipboard';
 import { InfoIcon } from 'lucide-react';
 import { Tools } from 'librechat-data-provider';
-import { Clipboard, CheckMark, TooltipAnchor } from '@librechat/client';
+import { Clipboard, CheckMark, TooltipAnchor, Switch } from '@librechat/client';
 import type { CodeBarProps } from '~/common';
 import ResultSwitcher from '~/components/Messages/Content/ResultSwitcher';
-import { useToolCallsMapContext, useMessageContext } from '~/Providers';
+import { useToolCallsMapContext, useMessageContext, useShowCodeToggle } from '~/Providers';
+import store from '~/store';
 import { LogContent } from '~/components/Chat/Messages/Content/Parts';
 import RunCode from '~/components/Messages/Content/RunCode';
 import { useLocalize } from '~/hooks';
@@ -27,6 +29,8 @@ const CodeBar: React.FC<CodeBarProps> = React.memo(
   ({ lang, error, codeRef, blockIndex, plugin = null, allowExecution = true }) => {
     const localize = useLocalize();
     const [isCopied, setIsCopied] = useState(false);
+    const showCodeToggle = useShowCodeToggle();
+    const [showCode, setShowCode] = useRecoilState(store.showCode);
     return (
       <div className="relative flex items-center justify-between rounded-tl-md rounded-tr-md bg-gray-700 px-4 py-2 font-sans text-xs text-gray-200 dark:bg-gray-700">
         <span className="">{lang}</span>
@@ -36,6 +40,22 @@ const CodeBar: React.FC<CodeBarProps> = React.memo(
           <div className="flex items-center justify-center gap-4">
             {allowExecution === true && (
               <RunCode lang={lang} codeRef={codeRef} blockIndex={blockIndex} />
+            )}
+            {showCodeToggle && (
+              <TooltipAnchor
+                description={localize('com_nav_show_code')}
+                render={
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <Switch
+                      checked={showCode}
+                      onCheckedChange={setShowCode}
+                      className="scale-75"
+                      aria-label={localize('com_nav_show_code')}
+                    />
+                    <span className="text-[11px]">{localize('com_ui_show_code')}</span>
+                  </label>
+                }
+              />
             )}
             <button
               type="button"
@@ -155,6 +175,7 @@ const CodeBlock: React.FC<CodeBlockProps> = ({
   const codeRef = useRef<HTMLElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isBarVisible, setIsBarVisible] = useState(false);
+  const showCodeToggle = useShowCodeToggle();
   const toolCallsMap = useToolCallsMapContext();
   const { messageId, partIndex } = useMessageContext();
   const key = allowExecution

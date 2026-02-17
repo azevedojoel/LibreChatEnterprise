@@ -82,10 +82,17 @@ function truncateToolCallOutputs(_messages, maxContextTokens, getTokenCountForMe
 
     const newContent = [...message.content];
 
-    // Truncate all tool outputs since we're over threshold
+    // Truncate tool outputs since we're over threshold.
+    // Never truncate tool_search output - extractDiscoveredToolsFromHistory needs it
+    // to include discovered tools in the follow-up LLM request.
+    const isToolSearch = (name) => name === 'tool_search';
+
     for (const index of toolCallIndices) {
       const toolCall = newContent[index].tool_call;
       if (!toolCall || !toolCall.output) {
+        continue;
+      }
+      if (isToolSearch(toolCall.name)) {
         continue;
       }
 

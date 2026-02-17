@@ -8,6 +8,9 @@ type TCodeBlockContext = {
 export const CodeBlockContext = createContext<TCodeBlockContext>({} as TCodeBlockContext);
 export const useCodeBlockContext = () => useContext(CodeBlockContext);
 
+export const ShowCodeToggleContext = createContext(false);
+export const useShowCodeToggle = () => useContext(ShowCodeToggleContext);
+
 export function CodeBlockProvider({ children }: { children: ReactNode }) {
   const counterRef = useRef(0);
 

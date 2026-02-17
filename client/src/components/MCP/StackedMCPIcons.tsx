@@ -7,11 +7,16 @@ import { cn } from '~/utils';
 interface StackedMCPIconsProps {
   selectedServers: MCPServerDefinition[];
   maxIcons?: number;
-  iconSize?: 'sm' | 'md';
-  variant?: 'default' | 'submenu';
+  iconSize?: 'xs' | 'sm' | 'md';
+  variant?: 'default' | 'submenu' | 'muted';
 }
 
 const sizeConfig = {
+  xs: {
+    icon: 'h-3.5 w-3.5',
+    container: 'h-5 w-5',
+    overlap: '-ml-1.5',
+  },
   sm: {
     icon: 'h-[18px] w-[18px]',
     container: 'h-[22px] w-[22px]',
@@ -28,10 +33,17 @@ const variantConfig = {
   default: {
     border: 'border-border-medium',
     bg: 'bg-surface-secondary',
+    iconColor: 'text-text-primary',
   },
   submenu: {
     border: 'border-surface-primary',
     bg: 'bg-surface-primary',
+    iconColor: 'text-text-primary',
+  },
+  muted: {
+    border: 'border-border-light',
+    bg: 'bg-surface-tertiary',
+    iconColor: 'text-text-secondary',
   },
 };
 
@@ -77,19 +89,26 @@ export default function StackedMCPIcons({
             <img
               src={icon.iconPath}
               alt={icon.displayName}
-              className={cn('rounded-full object-cover', sizes.icon)}
+              className={cn(
+                'rounded-full object-cover',
+                sizes.icon,
+                variant === 'muted' && 'opacity-80',
+              )}
             />
           ) : (
-            <MCPIcon className={cn('text-text-primary', sizes.icon)} />
+            <MCPIcon className={cn(sizes.icon, colors.iconColor)} />
           )}
         </div>
       ))}
       {overflowCount > 0 && (
         <div
           className={cn(
-            'relative flex items-center justify-center rounded-full border border-surface-primary bg-surface-tertiary text-xs font-medium text-text-secondary',
+            'relative flex items-center justify-center rounded-full border text-[10px] font-medium',
             sizes.container,
             sizes.overlap,
+            colors.border,
+            colors.bg,
+            colors.iconColor,
           )}
           style={{ zIndex: 0 }}
         >

@@ -7,12 +7,20 @@ import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import type { PluggableList } from 'unified';
 import { code, codeNoExecution, a, p, img } from './MarkdownComponents';
-import { CodeBlockProvider, ArtifactProvider } from '~/Providers';
+import { CodeBlockProvider, ArtifactProvider, ShowCodeToggleContext } from '~/Providers';
 import MarkdownErrorBoundary from './MarkdownErrorBoundary';
 import { langSubset } from '~/utils';
 
 const MarkdownLite = memo(
-  ({ content = '', codeExecution = true }: { content?: string; codeExecution?: boolean }) => {
+  ({
+    content = '',
+    codeExecution = true,
+    showCodeToggle = false,
+  }: {
+    content?: string;
+    codeExecution?: boolean;
+    showCodeToggle?: boolean;
+  }) => {
     const rehypePlugins: PluggableList = [
       [rehypeKatex],
       [
@@ -25,11 +33,8 @@ const MarkdownLite = memo(
       ],
     ];
 
-    return (
-      <MarkdownErrorBoundary content={content} codeExecution={codeExecution}>
-        <ArtifactProvider>
-          <CodeBlockProvider>
-            <ReactMarkdown
+    const markdown = (
+      <ReactMarkdown
               remarkPlugins={[
                 /** @ts-ignore */
                 supersub,
@@ -51,6 +56,17 @@ const MarkdownLite = memo(
             >
               {content}
             </ReactMarkdown>
+    );
+
+    return (
+      <MarkdownErrorBoundary content={content} codeExecution={codeExecution}>
+        <ArtifactProvider>
+          <CodeBlockProvider>
+            {showCodeToggle ? (
+              <ShowCodeToggleContext.Provider value={true}>{markdown}</ShowCodeToggleContext.Provider>
+            ) : (
+              markdown
+            )}
           </CodeBlockProvider>
         </ArtifactProvider>
       </MarkdownErrorBoundary>
