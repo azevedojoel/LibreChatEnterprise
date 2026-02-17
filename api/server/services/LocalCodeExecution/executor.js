@@ -20,8 +20,52 @@ const MAX_OUTPUT_BYTES = 512 * 1024;
 const SESSION_BASE_DIR =
   process.env.LIBRECHAT_CODE_SESSIONS_DIR ?? path.join(os.tmpdir(), 'librechat_code_sessions');
 
+const CODE_EXEC_VENV_DIR =
+  process.env.LIBRECHAT_CODE_VENV_DIR ?? path.join(path.dirname(SESSION_BASE_DIR), 'librechat_code_venv');
+
+const REQUIREMENTS_PATH = path.join(__dirname, 'requirements.txt');
+
+let _venvReady = false;
+
 function getSessionBaseDir() {
   return SESSION_BASE_DIR;
+}
+
+/**
+ * Ensures the code execution venv exists with standard libs installed.
+ * Skips if LIBRECHAT_CODE_VENV_DIR is set to empty or if python3 -m venv is unavailable.
+ */
+async function ensureCodeExecVenv() {
+  if (process.env.LIBRECHAT_CODE_VENV_DIR === '') {
+    return null;
+  }
+  if (_venvReady) {
+    return path.join(CODE_EXEC_VENV_DIR, process.platform === 'win32' ? 'Scripts' : 'bin', 'python');
+  }
+  try {
+    await fs.mkdir(CODE_EXEC_VENV_DIR, { recursive: true });
+    const markerPath = path.join(CODE_EXEC_VENV_DIR, '.librechat-venv-ready');
+    try {
+      await fs.access(markerPath);
+      _venvReady = true;
+      return path.join(CODE_EXEC_VENV_DIR, process.platform === 'win32' ? 'Scripts' : 'bin', 'python');
+    } catch {
+      /* venv not ready yet */
+    }
+    const { execFile } = require('child_process');
+    const { promisify } = require('util');
+    const exec = promisify(execFile);
+    const pip = path.join(CODE_EXEC_VENV_DIR, process.platform === 'win32' ? 'Scripts' : 'bin', 'pip');
+    await exec('python3', ['-m', 'venv', CODE_EXEC_VENV_DIR], { timeout: 60000 });
+    await exec(pip, ['install', '--quiet', '-r', REQUIREMENTS_PATH], { timeout: 120000 });
+    await fs.writeFile(markerPath, 'ok', 'utf8');
+    _venvReady = true;
+    logger.info('[LocalCodeExecution] Venv ready with standard libs at', CODE_EXEC_VENV_DIR);
+    return path.join(CODE_EXEC_VENV_DIR, process.platform === 'win32' ? 'Scripts' : 'bin', 'python');
+  } catch (e) {
+    logger.warn('[LocalCodeExecution] Could not setup venv, falling back to system python3:', e?.message);
+    return null;
+  }
 }
 
 /**
@@ -101,7 +145,8 @@ async function runCodeLocally({
   const wrappedCode = `import os\nos.chdir(${JSON.stringify(sessionDir)})\n${patchedCode}`;
   await fs.writeFile(scriptPath, wrappedCode, 'utf8');
 
-  const { stdout, stderr } = await runWithTimeout('python3', [scriptPath, ...args], {
+  const pythonPath = (await ensureCodeExecVenv()) ?? 'python3';
+  const { stdout, stderr } = await runWithTimeout(pythonPath, [scriptPath, ...args], {
     cwd: sessionDir,
     timeout: EXEC_TIMEOUT_MS,
     onOutput,

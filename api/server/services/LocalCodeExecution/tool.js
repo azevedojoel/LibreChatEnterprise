@@ -19,13 +19,28 @@ const accessMessage =
 const emptyOutputMessage =
   "stdout: Empty. Ensure you're writing output explicitly.\n";
 
+/** Common demo/test filenames excluded from "Generated files" output (inputs, not outputs) */
+const EXCLUDED_OUTPUT_FILENAMES = ['test.txt', 'sample.txt'];
+
 const CodeExecutionToolName = 'execute_code';
-const CodeExecutionToolDescription = `
+
+const BASE_CODE_EXECUTION_DESCRIPTION = `
 Runs Python code locally and returns stdout/stderr output. Each execution is isolated and independent.
 - Use print() for all outputs. Matplotlib: use plt.savefig() to save plots.
 - Generated files are automatically delivered; **DO NOT** provide download links.
 - Supports Python only. No network access.
 `.trim();
+
+const buildCodeExecutionDescription = (agentFiles) => {
+  if (agentFiles.length === 0) {
+    return BASE_CODE_EXECUTION_DESCRIPTION;
+  }
+  const filenames = agentFiles.map((f) => f.filename).join(', ');
+  return `Runs Python code locally. User-attached files (${filenames}) are pre-loaded in the working directory—use the filename(s) directly in your code (e.g., pd.read_csv('${agentFiles[0]?.filename ?? 'filename.csv'}')).
+- Use print() for all outputs. Matplotlib: use plt.savefig() to save plots.
+- Generated files are automatically delivered; **DO NOT** provide download links.
+- Supports Python only. No network access.`.trim();
+};
 
 const CodeExecutionToolSchema = {
   type: 'object',
@@ -90,6 +105,16 @@ function createLocalCodeExecutionTool(params = {}) {
           session_id: resolvedSessionId,
           onOutput,
         });
+
+        const excludeNames = new Set(
+          agentFiles.map((f) => path.basename(f.filename || '')).filter(Boolean),
+        );
+        const filteredFiles = (result.files || []).filter(
+          (f) =>
+            !excludeNames.has(f.name) &&
+            !EXCLUDED_OUTPUT_FILENAMES.includes(f.name.toLowerCase()),
+        );
+
         let formattedOutput = '';
         if (result.stdout) {
           formattedOutput += `stdout:\n${result.stdout}\n`;
@@ -99,14 +124,14 @@ function createLocalCodeExecutionTool(params = {}) {
         if (result.stderr) {
           formattedOutput += `stderr:\n${result.stderr}\n`;
         }
-        if (result.files && result.files.length > 0) {
+        if (filteredFiles.length > 0) {
           formattedOutput += 'Generated files:\n';
-          for (let i = 0; i < result.files.length; i++) {
-            const f = result.files[i];
+          for (let i = 0; i < filteredFiles.length; i++) {
+            const f = filteredFiles[i];
             const isImage = imageExtRegex.test(f.name);
             formattedOutput += `- ${f.name} | ${isImage ? imageMessage : otherMessage}`;
-            if (i < result.files.length - 1) {
-              formattedOutput += result.files.length <= 3 ? ', ' : ',\n';
+            if (i < filteredFiles.length - 1) {
+              formattedOutput += filteredFiles.length <= 3 ? ', ' : ',\n';
             }
           }
           formattedOutput += `\n\n${accessMessage}`;
@@ -115,7 +140,7 @@ function createLocalCodeExecutionTool(params = {}) {
           formattedOutput.trim(),
           {
             session_id: result.session_id,
-            files: result.files || [],
+            files: filteredFiles,
           },
         ];
       } catch (err) {
@@ -126,7 +151,7 @@ function createLocalCodeExecutionTool(params = {}) {
     },
     {
       name: CodeExecutionToolName,
-      description: CodeExecutionToolDescription,
+      description: buildCodeExecutionDescription(agentFiles),
       schema: CodeExecutionToolSchema,
       responseFormat: 'content_and_artifact',
     }

@@ -3,6 +3,14 @@
  */
 const fs = require('fs').promises;
 const path = require('path');
+jest.mock('../executor', () => {
+  const actual = jest.requireActual('../executor');
+  return {
+    ...actual,
+    injectAgentFiles: jest.fn().mockResolvedValue(undefined),
+  };
+});
+
 const { runCodeLocally, getSessionBaseDir } = require('../executor');
 const { createLocalCodeExecutionTool } = require('../tool');
 
@@ -150,6 +158,69 @@ print("done")
       } finally {
         const sessionDir = path.join(getSessionBaseDir(), expectedSessionId);
         await fs.rm(sessionDir, { recursive: true, force: true }).catch(() => {});
+      }
+    });
+
+    it('should exclude test.txt from artifact (blocklist)', async () => {
+      const testTool = createLocalCodeExecutionTool({ files: [] });
+      const code =
+        'with open("test.txt", "w") as f:\n  f.write("sample content")';
+      const result = await testTool.invoke(
+        { lang: 'py', code },
+        { toolCall: { id: 'tc-exclude' } }
+      );
+      expect(result.artifact).toBeDefined();
+      expect(result.artifact.files).toHaveLength(0);
+      expect(result.content).not.toContain('test.txt');
+      if (result.artifact.session_id) {
+        const sessionDir = path.join(getSessionBaseDir(), result.artifact.session_id);
+        await fs.rm(sessionDir, { recursive: true, force: true }).catch(() => {});
+      }
+    });
+
+    it('should exclude sample.txt from artifact (blocklist)', async () => {
+      const testTool = createLocalCodeExecutionTool({ files: [] });
+      const code =
+        'with open("sample.txt", "w") as f:\n  f.write("demo")';
+      const result = await testTool.invoke(
+        { lang: 'py', code },
+        { toolCall: { id: 'tc-sample' } }
+      );
+      expect(result.artifact).toBeDefined();
+      expect(result.artifact.files).toHaveLength(0);
+      expect(result.content).not.toContain('sample.txt');
+      if (result.artifact.session_id) {
+        const sessionDir = path.join(getSessionBaseDir(), result.artifact.session_id);
+        await fs.rm(sessionDir, { recursive: true, force: true }).catch(() => {});
+      }
+    });
+
+    it('should exclude agent-injected files from artifact', async () => {
+      const testTool = createLocalCodeExecutionTool({
+        files: [{ filename: 'input_data.txt', filepath: '/tmp/any' }],
+      });
+      const code = [
+        'with open("input_data.txt", "w") as f: f.write("would be input")',
+        'with open("output.txt", "w") as f: f.write("generated")',
+      ].join('\n');
+      const result = await testTool.invoke(
+        { lang: 'py', code },
+        { toolCall: { id: 'tc-agent' }, configurable: { thread_id: 'conv-agent' } }
+      );
+      expect(result.artifact).toBeDefined();
+      expect(result.artifact.files).toHaveLength(1);
+      expect(result.artifact.files[0].name).toBe('output.txt');
+      expect(result.artifact.files[0].buffer.toString()).toBe('generated');
+      expect(result.content).not.toContain('input_data.txt');
+      expect(result.content).toContain('output.txt');
+      if (result.artifact.session_id) {
+        const sessionDir = path.join(
+          getSessionBaseDir(),
+          result.artifact.session_id
+        );
+        await fs.rm(sessionDir, { recursive: true, force: true }).catch(
+          () => {}
+        );
       }
     });
   });
