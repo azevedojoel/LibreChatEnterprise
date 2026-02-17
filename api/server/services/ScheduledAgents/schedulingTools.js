@@ -44,7 +44,7 @@ function createSchedulingTools({ userId, agentId: currentAgentId, schedulerTarge
     {
       name: Tools.list_schedules,
       description:
-        "List the user's scheduled agent runs. Returns schedules with id, name, agentId, prompt, scheduleType, cronExpression, runAt, enabled, timezone.",
+        "List the user's scheduled prompts. Returns schedules with id, name, agentId, promptGroupId, scheduleType, cronExpression, runAt, enabled, timezone.",
       schema: { type: 'object', properties: {}, required: [] },
     },
   );
@@ -57,7 +57,7 @@ function createSchedulingTools({ userId, agentId: currentAgentId, schedulerTarge
         });
       }
 
-      const { name, agentId, prompt, scheduleType, cronExpression, runAt, timezone, selectedTools } =
+      const { name, agentId, promptGroupId, scheduleType, cronExpression, runAt, timezone, selectedTools } =
         rawInput;
 
       if (!isAgentAllowed(agentId)) {
@@ -69,9 +69,9 @@ function createSchedulingTools({ userId, agentId: currentAgentId, schedulerTarge
         });
       }
 
-      if (!name || !agentId || !prompt || !scheduleType) {
+      if (!name || !agentId || !promptGroupId || !scheduleType) {
         return JSON.stringify({
-          error: 'Missing required fields: name, agentId, prompt, scheduleType',
+          error: 'Missing required fields: name, agentId, promptGroupId, scheduleType',
         });
       }
       if (scheduleType === 'recurring' && !cronExpression) {
@@ -85,7 +85,7 @@ function createSchedulingTools({ userId, agentId: currentAgentId, schedulerTarge
         const schedule = await createScheduleForUser(userId, {
           name,
           agentId,
-          prompt,
+          promptGroupId,
           scheduleType,
           cronExpression,
           runAt,
@@ -100,7 +100,7 @@ function createSchedulingTools({ userId, agentId: currentAgentId, schedulerTarge
     {
       name: Tools.create_schedule,
       description:
-        'Create a scheduled agent run. Infer agentId from the user request by matching to the injected target agents (e.g. "marketing report" → Marketing Bot). NEVER ask which agent. Required: name, agentId (from injected list), prompt, scheduleType. For recurring: cronExpression. For one-off: runAt (ISO date). Optional: timezone, selectedTools.',
+        'Schedule a prompt to run with an agent on a given interval. Infer agentId from the user request. Required: name, agentId (from injected list), promptGroupId (from injected prompt list), scheduleType. For recurring: cronExpression. For one-off: runAt (ISO date). Optional: timezone, selectedTools.',
       schema: {
         type: 'object',
         properties: {
@@ -110,7 +110,7 @@ function createSchedulingTools({ userId, agentId: currentAgentId, schedulerTarge
             description:
               'Agent ID from the injected target list. Infer from user request - NEVER ask the user. Match by name or purpose.',
           },
-          prompt: { type: 'string', description: 'Prompt to send' },
+          promptGroupId: { type: 'string', description: 'Prompt group ID from the injected prompt list. Match user request to prompt name/command.' },
           scheduleType: {
             type: 'string',
             enum: ['recurring', 'one-off'],
@@ -125,7 +125,7 @@ function createSchedulingTools({ userId, agentId: currentAgentId, schedulerTarge
             description: 'Optional tool IDs to limit the scheduled run to',
           },
         },
-        required: ['name', 'agentId', 'prompt', 'scheduleType'],
+        required: ['name', 'agentId', 'promptGroupId', 'scheduleType'],
       },
     },
   );
@@ -169,7 +169,7 @@ function createSchedulingTools({ userId, agentId: currentAgentId, schedulerTarge
     {
       name: Tools.update_schedule,
       description:
-        'Update an existing schedule. Provide scheduleId and any fields to update: name, agentId, prompt, scheduleType, cronExpression, runAt, enabled, timezone, selectedTools.',
+        'Update an existing scheduled prompt. Provide scheduleId and any fields to update: name, agentId, promptGroupId, scheduleType, cronExpression, runAt, enabled, timezone, selectedTools.',
       schema: {
         type: 'object',
         properties: {
@@ -180,7 +180,7 @@ function createSchedulingTools({ userId, agentId: currentAgentId, schedulerTarge
             description:
               'Agent ID from the injected target list. Infer from user request when changing agent - NEVER ask. Match by name or purpose.',
           },
-          prompt: { type: 'string', description: 'Prompt' },
+          promptGroupId: { type: 'string', description: 'Prompt group ID from the injected prompt list' },
           scheduleType: { type: 'string', enum: ['recurring', 'one-off'] },
           cronExpression: { type: 'string' },
           runAt: { type: 'string' },

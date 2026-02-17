@@ -14,7 +14,7 @@ jest.mock('~/db/models', () => {
     userId: 'user-1',
     agentId: 'agent-1',
     name: 'Test Schedule',
-    prompt: 'Hello',
+    promptGroupId: 'pg-1',
     scheduleType: 'recurring',
     cronExpression: '0 0 * * *',
     runAt: null,
@@ -29,7 +29,7 @@ jest.mock('~/db/models', () => {
   });
 
   return {
-    ScheduledAgent: {
+    ScheduledPrompt: {
       find: jest.fn().mockReturnValue({ sort: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) }) }),
       findOne: jest.fn(),
       create: jest.fn(),
@@ -62,12 +62,24 @@ jest.mock('@librechat/data-schemas', () => ({
   logger: { error: jest.fn() },
 }));
 
+jest.mock('~/models/Agent', () => ({
+  getAgent: jest.fn().mockResolvedValue({ _id: 'agent-1', id: 'agent-1' }),
+}));
+
+jest.mock('~/models/Prompt', () => ({
+  getPromptGroup: jest.fn().mockResolvedValue({ _id: 'pg-1', name: 'Test Prompt' }),
+}));
+
+jest.mock('~/server/services/PermissionService', () => ({
+  checkPermission: jest.fn().mockResolvedValue(true),
+}));
+
 const dbModels = require('~/db/models');
 const { createSchedule, updateSchedule, runSchedule } = require('../scheduledAgents');
 
 describe('scheduledAgents controller - selectedTools', () => {
   const mockReq = (overrides = {}) => ({
-    user: { id: 'user-1' },
+    user: { id: 'user-1', role: 'USER' },
     body: {},
     params: {},
     query: {},
@@ -94,19 +106,19 @@ describe('scheduledAgents controller - selectedTools', () => {
         userId: 'user-1',
         agentId: 'agent-1',
         name: 'Test',
-        prompt: 'Hi',
+        promptGroupId: 'pg-1',
         scheduleType: 'recurring',
         cronExpression: '0 0 * * *',
         selectedTools: ['tool_a', 'tool_b'],
         toObject: () => ({ _id: 'sched-1', selectedTools: ['tool_a', 'tool_b'] }),
       };
-      dbModels.ScheduledAgent.create.mockResolvedValue(created);
+      dbModels.ScheduledPrompt.create.mockResolvedValue(created);
 
       const req = mockReq({
         body: {
           name: 'Test',
           agentId: 'agent-1',
-          prompt: 'Hi',
+          promptGroupId: 'pg-1',
           scheduleType: 'recurring',
           cronExpression: '0 0 * * *',
           selectedTools: ['tool_a', 'tool_b'],
@@ -116,7 +128,7 @@ describe('scheduledAgents controller - selectedTools', () => {
 
       await createSchedule(req, res);
 
-      expect(dbModels.ScheduledAgent.create).toHaveBeenCalledWith(
+      expect(dbModels.ScheduledPrompt.create).toHaveBeenCalledWith(
         expect.objectContaining({
           selectedTools: ['tool_a', 'tool_b'],
         }),
@@ -129,19 +141,19 @@ describe('scheduledAgents controller - selectedTools', () => {
         userId: 'user-1',
         agentId: 'agent-1',
         name: 'Test',
-        prompt: 'Hi',
+        promptGroupId: 'pg-1',
         scheduleType: 'recurring',
         cronExpression: '0 0 * * *',
         selectedTools: null,
         toObject: () => ({ _id: 'sched-1', selectedTools: null }),
       };
-      dbModels.ScheduledAgent.create.mockResolvedValue(created);
+      dbModels.ScheduledPrompt.create.mockResolvedValue(created);
 
       const req = mockReq({
         body: {
           name: 'Test',
           agentId: 'agent-1',
-          prompt: 'Hi',
+          promptGroupId: 'pg-1',
           scheduleType: 'recurring',
           cronExpression: '0 0 * * *',
           selectedTools: null,
@@ -151,7 +163,7 @@ describe('scheduledAgents controller - selectedTools', () => {
 
       await createSchedule(req, res);
 
-      expect(dbModels.ScheduledAgent.create).toHaveBeenCalledWith(
+      expect(dbModels.ScheduledPrompt.create).toHaveBeenCalledWith(
         expect.objectContaining({
           selectedTools: null,
         }),
@@ -164,19 +176,19 @@ describe('scheduledAgents controller - selectedTools', () => {
         userId: 'user-1',
         agentId: 'agent-1',
         name: 'Test',
-        prompt: 'Hi',
+        promptGroupId: 'pg-1',
         scheduleType: 'recurring',
         cronExpression: '0 0 * * *',
         selectedTools: [],
         toObject: () => ({ _id: 'sched-1', selectedTools: [] }),
       };
-      dbModels.ScheduledAgent.create.mockResolvedValue(created);
+      dbModels.ScheduledPrompt.create.mockResolvedValue(created);
 
       const req = mockReq({
         body: {
           name: 'Test',
           agentId: 'agent-1',
-          prompt: 'Hi',
+          promptGroupId: 'pg-1',
           scheduleType: 'recurring',
           cronExpression: '0 0 * * *',
           selectedTools: [],
@@ -186,7 +198,7 @@ describe('scheduledAgents controller - selectedTools', () => {
 
       await createSchedule(req, res);
 
-      expect(dbModels.ScheduledAgent.create).toHaveBeenCalledWith(
+      expect(dbModels.ScheduledPrompt.create).toHaveBeenCalledWith(
         expect.objectContaining({
           selectedTools: [],
         }),
@@ -201,14 +213,14 @@ describe('scheduledAgents controller - selectedTools', () => {
         userId: 'user-1',
         agentId: 'agent-1',
         name: 'Test',
-        prompt: 'Hi',
+        promptGroupId: 'pg-1',
         scheduleType: 'recurring',
         cronExpression: '0 0 * * *',
         selectedTools: null,
         save: jest.fn().mockResolvedValue(undefined),
         toObject: () => ({ _id: 'sched-1', selectedTools: ['tool_x'] }),
       };
-      dbModels.ScheduledAgent.findOne.mockResolvedValue(schedule);
+      dbModels.ScheduledPrompt.findOne.mockResolvedValue(schedule);
 
       const req = mockReq({
         params: { id: 'sched-1' },
@@ -230,7 +242,7 @@ describe('scheduledAgents controller - selectedTools', () => {
         save: jest.fn().mockResolvedValue(undefined),
         toObject: () => ({ _id: 'sched-1' }),
       };
-      dbModels.ScheduledAgent.findOne.mockResolvedValue(schedule);
+      dbModels.ScheduledPrompt.findOne.mockResolvedValue(schedule);
 
       await updateSchedule(
         mockReq({ params: { id: 'sched-1' }, body: { selectedTools: null } }),
@@ -249,12 +261,12 @@ describe('scheduledAgents controller - selectedTools', () => {
 
   describe('runSchedule', () => {
     it('should pass schedule.selectedTools to executeScheduledAgent', async () => {
-      dbModels.ScheduledAgent.findOne.mockReturnValue({
+      dbModels.ScheduledPrompt.findOne.mockReturnValue({
         lean: jest.fn().mockResolvedValue({
           _id: 'sched-1',
           userId: 'user-1',
           agentId: 'agent-1',
-          prompt: 'Hi',
+          promptGroupId: 'pg-1',
           selectedTools: ['tool_a', 'tool_b'],
         }),
       });

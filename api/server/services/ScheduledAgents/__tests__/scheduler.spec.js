@@ -9,7 +9,7 @@ jest.mock('../schedulingService', () => ({
 }));
 
 jest.mock('~/db/models', () => ({
-  ScheduledAgent: {
+  ScheduledPrompt: {
     find: jest.fn(),
     findByIdAndUpdate: jest.fn(),
   },
@@ -35,14 +35,14 @@ jest.mock('cron-parser', () => ({
   })),
 }));
 
-const { ScheduledAgent } = require('~/db/models');
+const { ScheduledPrompt } = require('~/db/models');
 const { processDueSchedules } = require('../scheduler');
 
 describe('scheduler', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockRunScheduleForUser.mockResolvedValue({ success: true, runId: 'run-1', status: 'queued' });
-    ScheduledAgent.findByIdAndUpdate.mockResolvedValue({});
+    ScheduledPrompt.findByIdAndUpdate.mockResolvedValue({});
   });
 
   it('should call runScheduleForUser with userId and scheduleId for each due schedule', async () => {
@@ -55,10 +55,10 @@ describe('scheduler', () => {
       runAt: new Date(Date.now() - 1000),
       selectedTools: ['a', 'b'],
     };
-    ScheduledAgent.find.mockReturnValueOnce({
+    ScheduledPrompt.find.mockReturnValueOnce({
       lean: jest.fn().mockResolvedValue([]),
     });
-    ScheduledAgent.find.mockReturnValueOnce({
+    ScheduledPrompt.find.mockReturnValueOnce({
       lean: jest.fn().mockResolvedValue([schedule]),
     });
 
@@ -77,17 +77,17 @@ describe('scheduler', () => {
       runAt: new Date(Date.now() - 1000),
       selectedTools: [],
     };
-    ScheduledAgent.find.mockReturnValueOnce({
+    ScheduledPrompt.find.mockReturnValueOnce({
       lean: jest.fn().mockResolvedValue([]),
     });
-    ScheduledAgent.find.mockReturnValueOnce({
+    ScheduledPrompt.find.mockReturnValueOnce({
       lean: jest.fn().mockResolvedValue([schedule]),
     });
     mockRunScheduleForUser.mockResolvedValue({ success: true });
 
     await processDueSchedules();
 
-    expect(ScheduledAgent.findByIdAndUpdate).toHaveBeenCalledWith(
+    expect(ScheduledPrompt.findByIdAndUpdate).toHaveBeenCalledWith(
       'sched-1',
       { $set: { enabled: false } },
     );
@@ -103,17 +103,17 @@ describe('scheduler', () => {
       runAt: new Date(Date.now() - 1000),
       selectedTools: [],
     };
-    ScheduledAgent.find.mockReturnValueOnce({
+    ScheduledPrompt.find.mockReturnValueOnce({
       lean: jest.fn().mockResolvedValue([]),
     });
-    ScheduledAgent.find.mockReturnValueOnce({
+    ScheduledPrompt.find.mockReturnValueOnce({
       lean: jest.fn().mockResolvedValue([schedule]),
     });
     mockRunScheduleForUser.mockResolvedValue({ success: false, error: 'Schedule not found' });
 
     await processDueSchedules();
 
-    expect(ScheduledAgent.findByIdAndUpdate).not.toHaveBeenCalled();
+    expect(ScheduledPrompt.findByIdAndUpdate).not.toHaveBeenCalled();
   });
 
   it('should NOT disable recurring schedule after trigger', async () => {
@@ -126,16 +126,16 @@ describe('scheduler', () => {
       cronExpression: '* * * * *',
       selectedTools: [],
     };
-    ScheduledAgent.find.mockReturnValueOnce({
+    ScheduledPrompt.find.mockReturnValueOnce({
       lean: jest.fn().mockResolvedValue([schedule]),
     });
-    ScheduledAgent.find.mockReturnValueOnce({
+    ScheduledPrompt.find.mockReturnValueOnce({
       lean: jest.fn().mockResolvedValue([]),
     });
 
     await processDueSchedules();
 
     expect(mockRunScheduleForUser).toHaveBeenCalledWith('user-1', 'sched-2');
-    expect(ScheduledAgent.findByIdAndUpdate).not.toHaveBeenCalled();
+    expect(ScheduledPrompt.findByIdAndUpdate).not.toHaveBeenCalled();
   });
 });

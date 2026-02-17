@@ -65,8 +65,13 @@ const { loadTools } = require('~/app/clients/tools/util');
 const { redactMessage } = require('~/config/parsers');
 const { findPluginAuthsByKeys } = require('~/models');
 const { getAgents } = require('~/models/Agent');
-const { buildSchedulerTargetContext } = require('~/server/services/ScheduledAgents/schedulerContext');
-const { SCHEDULER_DEFAULT_INSTRUCTIONS } = require('~/server/services/ScheduledAgents/schedulerInstructions');
+const {
+  buildSchedulerTargetContext,
+  buildSchedulerPromptContext,
+} = require('~/server/services/ScheduledAgents/schedulerContext');
+const {
+  SCHEDULER_DEFAULT_INSTRUCTIONS,
+} = require('~/server/services/ScheduledAgents/schedulerInstructions');
 const { getFlowStateManager } = require('~/config');
 const { getLogStores } = require('~/cache');
 /**
@@ -427,13 +432,13 @@ const nativeTools = new Set([
   Tools.execute_code,
   Tools.file_search,
   Tools.web_search,
-  Tools.read_file,
-  Tools.edit_file,
-  Tools.create_file,
-  Tools.delete_file,
-  Tools.list_files,
-  Tools.search_files,
-  Tools.glob_files,
+  Tools.workspace_read_file,
+  Tools.workspace_edit_file,
+  Tools.workspace_create_file,
+  Tools.workspace_delete_file,
+  Tools.workspace_list_files,
+  Tools.search_user_files,
+  Tools.workspace_glob_files,
   Tools.list_schedules,
   Tools.create_schedule,
   Tools.update_schedule,
@@ -497,13 +502,13 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
   let toolsToFilter = (agent.tools ?? []).filter((t) => t != null && typeof t === 'string');
   if (toolsToFilter.includes(Tools.execute_code)) {
     const workspaceTools = [
-      Tools.read_file,
-      Tools.edit_file,
-      Tools.create_file,
-      Tools.delete_file,
-      Tools.list_files,
-      Tools.search_files,
-      Tools.glob_files,
+      Tools.workspace_read_file,
+      Tools.workspace_edit_file,
+      Tools.workspace_create_file,
+      Tools.workspace_delete_file,
+      Tools.workspace_list_files,
+      Tools.search_user_files,
+      Tools.workspace_glob_files,
     ];
     toolsToFilter = [...new Set([...toolsToFilter, ...workspaceTools])];
   }
@@ -576,13 +581,13 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
       return checkCapability(AgentCapabilities.web_search);
     }
     if (
-      tool === Tools.read_file ||
-      tool === Tools.edit_file ||
-      tool === Tools.create_file ||
-      tool === Tools.delete_file ||
-      tool === Tools.list_files ||
-      tool === Tools.search_files ||
-      tool === Tools.glob_files
+      tool === Tools.workspace_read_file ||
+      tool === Tools.workspace_edit_file ||
+      tool === Tools.workspace_create_file ||
+      tool === Tools.workspace_delete_file ||
+      tool === Tools.workspace_list_files ||
+      tool === Tools.search_user_files ||
+      tool === Tools.workspace_glob_files
     ) {
       if (isPersistentAgent) {
         if (ephemeralAgent?.execute_code === false) return false;
@@ -828,13 +833,13 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
   const hasExecuteCode = filteredTools.includes(Tools.execute_code);
   const hasWorkspaceCodeEdit =
     filteredTools.includes(Tools.execute_code) &&
-    (filteredTools.includes(Tools.read_file) ||
-      filteredTools.includes(Tools.edit_file) ||
-      filteredTools.includes(Tools.create_file) ||
-      filteredTools.includes(Tools.delete_file) ||
-      filteredTools.includes(Tools.list_files) ||
-      filteredTools.includes(Tools.search_files) ||
-      filteredTools.includes(Tools.glob_files));
+    (filteredTools.includes(Tools.workspace_read_file) ||
+      filteredTools.includes(Tools.workspace_edit_file) ||
+      filteredTools.includes(Tools.workspace_create_file) ||
+      filteredTools.includes(Tools.workspace_delete_file) ||
+      filteredTools.includes(Tools.workspace_list_files) ||
+      filteredTools.includes(Tools.search_user_files) ||
+      filteredTools.includes(Tools.workspace_glob_files));
 
   if (hasWebSearch) {
     toolContextMap[Tools.web_search] = buildWebSearchContext();
@@ -845,19 +850,18 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
   }
 
   if (hasExecuteCode) {
-    toolContextMap[Tools.execute_code] =
-      '- Code execution runs locally. Supports Python only.';
+    toolContextMap[Tools.execute_code] = '- Code execution runs locally. Supports Python only.';
   }
 
   if (hasWorkspaceCodeEdit) {
-    toolContextMap[Tools.read_file] =
-      toolContextMap[Tools.edit_file] =
-      toolContextMap[Tools.create_file] =
-      toolContextMap[Tools.delete_file] =
-      toolContextMap[Tools.list_files] =
-      toolContextMap[Tools.search_files] =
-      toolContextMap[Tools.glob_files] =
-        '- Workspace: conversation-scoped (shared with execute_code)';
+    toolContextMap[Tools.workspace_read_file] =
+      toolContextMap[Tools.workspace_edit_file] =
+      toolContextMap[Tools.workspace_create_file] =
+      toolContextMap[Tools.workspace_delete_file] =
+      toolContextMap[Tools.workspace_list_files] =
+      toolContextMap[Tools.search_user_files] =
+      toolContextMap[Tools.workspace_glob_files] =
+        '- Workspace tools: operate on the conversation-scoped workspace (shared with execute_code). Files from email attachments or file_search are NOT in the workspace—use file_search for those.';
   }
 
   if (hasFileSearch && tool_resources) {
@@ -923,8 +927,25 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
           parts.push(schedulerContext);
         }
       } catch (error) {
-        logger.error('[loadToolDefinitionsWrapper] Error building scheduler target context:', error);
+        logger.error(
+          '[loadToolDefinitionsWrapper] Error building scheduler target context:',
+          error,
+        );
       }
+    }
+    try {
+      const promptContext = await buildSchedulerPromptContext(
+        req.user?.id,
+        req.user?.role ?? 'USER',
+      );
+      if (promptContext) {
+        parts.push(promptContext);
+      }
+    } catch (error) {
+      logger.error(
+        '[loadToolDefinitionsWrapper] Error building scheduler prompt context:',
+        error,
+      );
     }
     toolContextMap[Tools.create_schedule] = parts.filter(Boolean).join('\n\n');
   }
@@ -1007,17 +1028,15 @@ async function loadAgentTools({
   let toolsToFilter = (agent.tools ?? []).filter((t) => t != null && typeof t === 'string');
   if (toolsToFilter.includes(Tools.execute_code)) {
     const workspaceTools = [
-      Tools.read_file,
-      Tools.edit_file,
-      Tools.create_file,
-      Tools.delete_file,
-      Tools.list_files,
-      Tools.search_files,
-      Tools.glob_files,
+      Tools.workspace_read_file,
+      Tools.workspace_edit_file,
+      Tools.workspace_create_file,
+      Tools.workspace_delete_file,
+      Tools.workspace_list_files,
+      Tools.search_user_files,
+      Tools.workspace_glob_files,
     ];
-    toolsToFilter = [
-      ...new Set([...toolsToFilter, ...workspaceTools]),
-    ];
+    toolsToFilter = [...new Set([...toolsToFilter, ...workspaceTools])];
   }
 
   /** Filter by ephemeralAgent (chat badge overrides) */
@@ -1077,13 +1096,13 @@ async function loadAgentTools({
       includesWebSearch = checkCapability(AgentCapabilities.web_search);
       return includesWebSearch;
     } else if (
-      tool === Tools.read_file ||
-      tool === Tools.edit_file ||
-      tool === Tools.create_file ||
-      tool === Tools.delete_file ||
-      tool === Tools.list_files ||
-      tool === Tools.search_files ||
-      tool === Tools.glob_files
+      tool === Tools.workspace_read_file ||
+      tool === Tools.workspace_edit_file ||
+      tool === Tools.workspace_create_file ||
+      tool === Tools.workspace_delete_file ||
+      tool === Tools.workspace_list_files ||
+      tool === Tools.search_user_files ||
+      tool === Tools.workspace_glob_files
     ) {
       if (isPersistentAgent) {
         if (ephemeralAgent?.execute_code === false) return false;
@@ -1171,13 +1190,13 @@ async function loadAgentTools({
       tool.name &&
       (tool.name === Tools.execute_code ||
         tool.name === Tools.file_search ||
-        tool.name === Tools.read_file ||
-        tool.name === Tools.edit_file ||
-        tool.name === Tools.create_file ||
-        tool.name === Tools.delete_file ||
-        tool.name === Tools.list_files ||
-        tool.name === Tools.search_files ||
-        tool.name === Tools.glob_files)
+        tool.name === Tools.workspace_read_file ||
+        tool.name === Tools.workspace_edit_file ||
+        tool.name === Tools.workspace_create_file ||
+        tool.name === Tools.workspace_delete_file ||
+        tool.name === Tools.workspace_list_files ||
+        tool.name === Tools.search_user_files ||
+        tool.name === Tools.workspace_glob_files)
     ) {
       agentTools.push(tool);
       continue;
@@ -1265,8 +1284,7 @@ async function loadAgentTools({
       continue;
     }
     const registryDef = getToolDefinition(toolName, {
-      useLocalCodeExecution:
-        toolName === Tools.execute_code ? useLocalCodeExecution : undefined,
+      useLocalCodeExecution: toolName === Tools.execute_code ? useLocalCodeExecution : undefined,
     });
     if (!registryDef) continue;
     builtInToolDefs.push({
@@ -1276,10 +1294,7 @@ async function loadAgentTools({
       allowed_callers: ['direct'],
     });
   }
-  const mergedToolDefinitions = [
-    ...(toolDefinitions ?? []),
-    ...builtInToolDefs,
-  ];
+  const mergedToolDefinitions = [...(toolDefinitions ?? []), ...builtInToolDefs];
 
   if (!checkCapability(AgentCapabilities.actions)) {
     return {

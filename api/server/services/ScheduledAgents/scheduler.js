@@ -1,6 +1,6 @@
 const cron = require('node-cron');
 const { logger } = require('@librechat/data-schemas');
-const { ScheduledAgent } = require('~/db/models');
+const { ScheduledPrompt } = require('~/db/models');
 const { runScheduleForUser } = require('./schedulingService');
 
 let isLeader = () => Promise.resolve(true);
@@ -28,13 +28,13 @@ async function processDueSchedules() {
     const now = new Date();
     const oneMinuteAgo = new Date(now.getTime() - 60 * 1000);
 
-    const recurringSchedules = await ScheduledAgent.find({
+    const recurringSchedules = await ScheduledPrompt.find({
       enabled: true,
       scheduleType: 'recurring',
       cronExpression: { $exists: true, $ne: null, $ne: '' },
     }).lean();
 
-    const oneOffSchedules = await ScheduledAgent.find({
+    const oneOffSchedules = await ScheduledPrompt.find({
       enabled: true,
       scheduleType: 'one-off',
       runAt: { $lte: now },
@@ -73,7 +73,7 @@ async function processDueSchedules() {
           schedule._id.toString(),
         );
         if (result.success && schedule.scheduleType === 'one-off') {
-          await ScheduledAgent.findByIdAndUpdate(schedule._id, { $set: { enabled: false } });
+          await ScheduledPrompt.findByIdAndUpdate(schedule._id, { $set: { enabled: false } });
         } else if (!result.success) {
           logger.error(
             `[ScheduledAgents] Failed to trigger schedule ${schedule._id}: ${result.error || 'unknown'}`,

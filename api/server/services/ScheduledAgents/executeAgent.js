@@ -7,9 +7,10 @@ const { initializeClient } = require('~/server/services/Endpoints/agents');
 const { getAgent } = require('~/models/Agent');
 const { checkPermission } = require('~/server/services/PermissionService');
 const { buildOptions } = require('~/server/services/Endpoints/agents/build');
-const { Conversation, ScheduledAgent, ScheduledRun, User } = require('~/db/models');
+const { Conversation, PromptGroup, ScheduledPrompt, ScheduledRun, User } = require('~/db/models');
 const { disposeClient } = require('~/server/cleanup');
 const abortRegistry = require('./abortRegistry');
+const { resolveScheduledPrompt } = require('./resolvePrompt');
 
 /**
  * Execute a scheduled agent run.
@@ -18,10 +19,9 @@ const abortRegistry = require('./abortRegistry');
  *
  * @param {Object} params
  * @param {string} [params.runId] - Optional: existing ScheduledRun _id (from queue). When provided, updates existing run instead of creating.
- * @param {string} params.scheduleId - ScheduledAgent _id
+ * @param {string} params.scheduleId - ScheduledPrompt _id
  * @param {string} params.userId - User ID (string)
  * @param {string} params.agentId - Agent ID
- * @param {string} params.prompt - Prompt to send
  * @param {string} [params.conversationId] - Optional: continue in same thread
  * @param {string[] | null} [params.selectedTools] - Optional: tools to use (null = all, [] = none)
  * @returns {Promise<{ success: boolean; conversationId?: string; error?: string }>}
@@ -31,7 +31,6 @@ async function executeScheduledAgent({
   scheduleId,
   userId,
   agentId,
-  prompt,
   conversationId: existingConversationId,
   selectedTools,
 }) {
@@ -41,6 +40,7 @@ async function executeScheduledAgent({
   const streamId = existingRunId ? conversationId : null;
 
   let scheduledRunDoc = null;
+  let resolvedPrompt = null;
 
   try {
     if (existingRunId) {
@@ -74,6 +74,34 @@ async function executeScheduledAgent({
       throw new Error(`User ${userId} does not have permission to use agent ${agentId}`);
     }
 
+    const schedule = await ScheduledPrompt.findById(scheduleId).select('name promptGroupId').lean();
+    if (!schedule) {
+      throw new Error(`Schedule not found: ${scheduleId}`);
+    }
+
+    const hasPromptGroupAccess = await checkPermission({
+      userId,
+      role: user.role,
+      resourceType: ResourceType.PROMPTGROUP,
+      resourceId: schedule.promptGroupId,
+      requiredPermission: PermissionBits.VIEW,
+    });
+    if (!hasPromptGroupAccess) {
+      throw new Error(`User ${userId} does not have permission to use prompt group ${schedule.promptGroupId}`);
+    }
+
+    const promptGroup = await PromptGroup.findById(schedule.promptGroupId).populate('productionId', 'prompt').lean();
+    if (!promptGroup?.productionId?.prompt) {
+      throw new Error(`Prompt group ${schedule.promptGroupId} has no production prompt`);
+    }
+
+    const templatePrompt = promptGroup.productionId.prompt;
+    resolvedPrompt = resolveScheduledPrompt(templatePrompt, {
+      user,
+      runAt,
+      body: { conversationId },
+    });
+
     const appConfig = await getAppConfig({ role: user.role });
 
     const parsedBody = {
@@ -83,7 +111,7 @@ async function executeScheduledAgent({
     };
 
     const body = {
-      text: prompt,
+      text: resolvedPrompt,
       conversationId,
       parentMessageId: null,
       agent_id: agentId,
@@ -170,7 +198,7 @@ async function executeScheduledAgent({
       GenerationJobManager.setContentParts(streamId, client.contentParts);
     }
 
-    const response = await client.sendMessage(prompt, messageOptions);
+    const response = await client.sendMessage(resolvedPrompt, messageOptions);
     const databasePromise = response.databasePromise;
 
     if (!databasePromise) {
@@ -182,20 +210,20 @@ async function executeScheduledAgent({
 
     if (existingRunId && scheduledRunDoc) {
       await ScheduledRun.findByIdAndUpdate(existingRunId, {
-        $set: { status: 'success', conversationId },
+        $set: { status: 'success', conversationId, prompt: resolvedPrompt },
       });
     } else {
       scheduledRunDoc = await ScheduledRun.create({
         scheduleId,
         userId,
         conversationId,
+        prompt: resolvedPrompt,
         runAt,
         status: 'success',
       });
     }
 
     const runDocId = scheduledRunDoc?._id ?? existingRunId;
-    const schedule = await ScheduledAgent.findById(scheduleId).select('name').lean();
     const runTitle = `${schedule?.name ?? 'Scheduled run'} — ${runAt.toLocaleString()}`;
 
     await Conversation.findOneAndUpdate(
@@ -203,7 +231,7 @@ async function executeScheduledAgent({
       { $set: { scheduledRunId: runDocId, title: runTitle } },
     );
 
-    await ScheduledAgent.findByIdAndUpdate(scheduleId, {
+    await ScheduledPrompt.findByIdAndUpdate(scheduleId, {
       $set: {
         lastRunAt: runAt,
         lastRunStatus: 'success',
@@ -229,7 +257,7 @@ async function executeScheduledAgent({
         requestMessage: {
           messageId: null,
           conversationId,
-          text: prompt,
+          text: resolvedPrompt,
           isCreatedByUser: true,
         },
         responseMessage: (() => {
@@ -271,15 +299,17 @@ async function executeScheduledAgent({
     }
 
     try {
+      const promptToStore = (typeof resolvedPrompt === 'string' ? resolvedPrompt : '') || '';
       if (existingRunId) {
         await ScheduledRun.findByIdAndUpdate(existingRunId, {
-          $set: { status: 'failed', error: errorMessage },
+          $set: { status: 'failed', error: errorMessage, prompt: promptToStore },
         });
       } else {
         await ScheduledRun.create({
           scheduleId,
           userId,
           conversationId,
+          prompt: promptToStore,
           runAt,
           status: 'failed',
           error: errorMessage,
@@ -289,7 +319,7 @@ async function executeScheduledAgent({
       logger.error('[ScheduledAgents] Failed to create/update ScheduledRun record:', createErr);
     }
 
-    await ScheduledAgent.findByIdAndUpdate(scheduleId, {
+    await ScheduledPrompt.findByIdAndUpdate(scheduleId, {
       $set: {
         lastRunAt: runAt,
         lastRunStatus: 'failed',

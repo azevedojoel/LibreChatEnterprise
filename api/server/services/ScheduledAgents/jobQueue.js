@@ -195,7 +195,7 @@ function startWorker() {
   worker = new Worker(
     QUEUE_NAME,
     async (job, token) => {
-      const { runId, scheduleId, userId, agentId, prompt, conversationId, selectedTools } =
+      const { runId, scheduleId, userId, agentId, conversationId, selectedTools } =
         job.data;
 
       logger.info(`[ScheduledAgents] Processing job: runId=${runId} scheduleId=${scheduleId}`);
@@ -213,7 +213,6 @@ function startWorker() {
           scheduleId,
           userId,
           agentId,
-          prompt,
           conversationId: conversationId || undefined,
           selectedTools,
         });

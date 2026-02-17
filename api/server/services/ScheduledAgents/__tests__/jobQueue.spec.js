@@ -28,7 +28,6 @@ describe('runSerializedPerAgent', () => {
       scheduleId: 'sched-1',
       userId: 'user-1',
       agentId: 'agent-1',
-      prompt: 'Hi',
       conversationId: 'conv-1',
       selectedTools: ['a'],
     };
@@ -46,7 +45,6 @@ describe('runSerializedPerAgent', () => {
       scheduleId: 'sched-1',
       userId: 'user-1',
       agentId: 'agent-A',
-      prompt: 'First',
       conversationId: 'conv-1',
       selectedTools: [],
     };
@@ -54,7 +52,6 @@ describe('runSerializedPerAgent', () => {
       scheduleId: 'sched-2',
       userId: 'user-1',
       agentId: 'agent-A',
-      prompt: 'Second',
       conversationId: 'conv-2',
       selectedTools: [],
     };
@@ -62,7 +59,7 @@ describe('runSerializedPerAgent', () => {
     let firstStarted = false;
     let secondStartedBeforeFirstFinished = false;
     mockExecuteScheduledAgent.mockImplementation(async (args) => {
-      if (args.prompt === 'First') {
+      if (args.scheduleId === 'sched-1') {
         firstStarted = true;
         await new Promise((r) => setTimeout(r, 50));
         if (secondStartedBeforeFirstFinished) {
@@ -70,8 +67,8 @@ describe('runSerializedPerAgent', () => {
         }
         return { success: true };
       }
-      if (args.prompt === 'Second') {
-        secondStartedBeforeFirstFinished = firstStarted; // would be true if we ran in parallel
+      if (args.scheduleId === 'sched-2') {
+        secondStartedBeforeFirstFinished = firstStarted;
         return { success: true };
       }
     });
@@ -82,8 +79,8 @@ describe('runSerializedPerAgent', () => {
     await Promise.all([p1, p2]);
 
     expect(mockExecuteScheduledAgent).toHaveBeenCalledTimes(2);
-    expect(mockExecuteScheduledAgent).toHaveBeenNthCalledWith(1, expect.objectContaining({ runId: 'run-1', prompt: 'First' }));
-    expect(mockExecuteScheduledAgent).toHaveBeenNthCalledWith(2, expect.objectContaining({ runId: 'run-2', prompt: 'Second' }));
+    expect(mockExecuteScheduledAgent).toHaveBeenNthCalledWith(1, expect.objectContaining({ runId: 'run-1', scheduleId: 'sched-1' }));
+    expect(mockExecuteScheduledAgent).toHaveBeenNthCalledWith(2, expect.objectContaining({ runId: 'run-2', scheduleId: 'sched-2' }));
   });
 
   it('should run different agents in parallel', async () => {
@@ -91,7 +88,6 @@ describe('runSerializedPerAgent', () => {
       scheduleId: 'sched-1',
       userId: 'user-1',
       agentId: 'agent-A',
-      prompt: 'Agent A',
       conversationId: 'conv-1',
       selectedTools: [],
     };
@@ -99,7 +95,6 @@ describe('runSerializedPerAgent', () => {
       scheduleId: 'sched-2',
       userId: 'user-1',
       agentId: 'agent-B',
-      prompt: 'Agent B',
       conversationId: 'conv-2',
       selectedTools: [],
     };

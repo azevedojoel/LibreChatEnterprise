@@ -672,9 +672,9 @@ Generated image IDs will be returned in the response, so you can refer to them i
 
 /** Workspace code edit tools - use conversation-scoped workspace derived at runtime */
 const readFileDefinition: ToolRegistryDefinition = {
-  name: 'read_file',
+  name: 'workspace_read_file',
   description:
-    'Read file contents. Path is relative to workspace root. Use when: inspecting a file, verifying edits, or reading a specific section. Optionally use start_line and end_line (1-based, inclusive) to read a range—helps with large files.',
+    'Read file contents from workspace. Path is relative to workspace root. Use when: inspecting a file, verifying edits, or reading a specific section. Optionally use start_line and end_line (1-based, inclusive) to read a range—helps with large files.',
   schema: {
     type: 'object',
     properties: {
@@ -697,9 +697,9 @@ const readFileDefinition: ToolRegistryDefinition = {
 };
 
 const editFileDefinition: ToolRegistryDefinition = {
-  name: 'edit_file',
+  name: 'workspace_edit_file',
   description:
-    'Replace exact old_string with new_string in a file. old_string must match exactly once. Fails if old_string appears 0 or 2+ times; use search_files first to verify. Whitespace must match exactly.',
+    'Edit a file in the workspace. Replace exact old_string with new_string. old_string must match exactly once. Fails if old_string appears 0 or 2+ times; use search_user_files first to verify. Whitespace must match exactly.',
   schema: {
     type: 'object',
     properties: {
@@ -722,9 +722,9 @@ const editFileDefinition: ToolRegistryDefinition = {
 };
 
 const createFileDefinition: ToolRegistryDefinition = {
-  name: 'create_file',
+  name: 'workspace_create_file',
   description:
-    'Create or overwrite a file. Overwrites if file exists. Parent directories created if needed.',
+    'Create or overwrite a file in the workspace. Overwrites if file exists. Parent directories created if needed.',
   schema: {
     type: 'object',
     properties: {
@@ -743,9 +743,9 @@ const createFileDefinition: ToolRegistryDefinition = {
 };
 
 const deleteFileDefinition: ToolRegistryDefinition = {
-  name: 'delete_file',
+  name: 'workspace_delete_file',
   description:
-    'Delete a file. Permanent. Prefer for temporary/scratch files; confirm path before deleting. Path is relative to workspace root.',
+    'Delete a file from the workspace. Permanent. Prefer for temporary/scratch files; confirm path before deleting. Path is relative to workspace root.',
   schema: {
     type: 'object',
     properties: {
@@ -760,9 +760,9 @@ const deleteFileDefinition: ToolRegistryDefinition = {
 };
 
 const listFilesDefinition: ToolRegistryDefinition = {
-  name: 'list_files',
+  name: 'workspace_list_files',
   description:
-    'List files and subdirectories in one directory. Use when: exploring a known path; use glob_files when you need pattern-based discovery (e.g. *.py).',
+    'List files and subdirectories in a workspace directory. Use when: exploring a known path; use workspace_glob_files when you need pattern-based discovery (e.g. *.py).',
   schema: {
     type: 'object',
     properties: {
@@ -781,9 +781,9 @@ const listFilesDefinition: ToolRegistryDefinition = {
 };
 
 const searchFilesDefinition: ToolRegistryDefinition = {
-  name: 'search_files',
+  name: 'search_user_files',
   description:
-    'Search file contents for a pattern. Returns path:line: content per match. Use when: finding definitions, usages, references, or debugging. Supports literal (default) or regex (use_regex=true), context_lines for surrounding lines, case_sensitive. With context_lines > 0, output includes path:line blocks separated by ---.',
+    'Search file contents in the user files for a pattern. Returns path:line: content per match. Use when: finding definitions, usages, references, or debugging. Supports literal (default) or regex (use_regex=true), context_lines for surrounding lines, case_sensitive. With context_lines > 0, output includes path:line blocks separated by ---.',
   schema: {
     type: 'object',
     properties: {
@@ -823,9 +823,9 @@ const searchFilesDefinition: ToolRegistryDefinition = {
 };
 
 const globFilesDefinition: ToolRegistryDefinition = {
-  name: 'glob_files',
+  name: 'workspace_glob_files',
   description:
-    'Find files matching a glob pattern (e.g. *.py, src/**/*.ts). Use when: discovering files by pattern (all tests, configs, etc.). Prefer over list_files when you need pattern matching across subdirectories. Path: directory to search (default "."). Results limited to max_results (default 200).',
+    'Find files in the workspace matching a glob pattern (e.g. *.py, src/**/*.ts). Use when: discovering files by pattern (all tests, configs, etc.). Prefer over workspace_list_files when you need pattern matching across subdirectories. Path: directory to search (default "."). Results limited to max_results (default 200).',
   schema: {
     type: 'object',
     properties: {
@@ -851,7 +851,7 @@ const globFilesDefinition: ToolRegistryDefinition = {
 const listSchedulesDefinition: ToolRegistryDefinition = {
   name: 'list_schedules',
   description:
-    "List the user's scheduled agent runs. Returns schedules with id, name, agentId, prompt, scheduleType, cronExpression, runAt, enabled, timezone.",
+    "List the user's scheduled prompts. Returns schedules with id, name, agentId, promptGroupId, scheduleType, cronExpression, runAt, enabled, timezone.",
   schema: { type: 'object', properties: {}, required: [] } as ExtendedJsonSchema,
   toolType: 'builtin',
 };
@@ -859,7 +859,7 @@ const listSchedulesDefinition: ToolRegistryDefinition = {
 const createScheduleDefinition: ToolRegistryDefinition = {
   name: 'create_schedule',
   description:
-    'Create a scheduled agent run. Infer agentId from the user request by matching to the injected target agents (e.g. "marketing report" → Marketing Bot). NEVER ask which agent. Required: name, agentId (from injected list), prompt, scheduleType. For recurring: cronExpression. For one-off: runAt (ISO date). Optional: timezone, selectedTools.',
+    'Schedule a prompt to run with an agent on a given interval. Infer agentId from the user request. Required: name, agentId (from injected list), promptGroupId (from injected prompt list), scheduleType. For recurring: cronExpression. For one-off: runAt (ISO date). Optional: timezone, selectedTools.',
   schema: {
     type: 'object',
     properties: {
@@ -869,7 +869,10 @@ const createScheduleDefinition: ToolRegistryDefinition = {
         description:
           'Agent ID from the injected target list. Infer from user request - NEVER ask the user. Match by name or purpose.',
       },
-      prompt: { type: 'string', description: 'Prompt to send' },
+      promptGroupId: {
+        type: 'string',
+        description: 'Prompt group ID from the injected prompt list. Match user request to prompt name/command.',
+      },
       scheduleType: {
         type: 'string',
         enum: ['recurring', 'one-off'],
@@ -887,7 +890,7 @@ const createScheduleDefinition: ToolRegistryDefinition = {
         description: 'Optional tool IDs to limit the scheduled run to',
       },
     },
-    required: ['name', 'agentId', 'prompt', 'scheduleType'],
+    required: ['name', 'agentId', 'promptGroupId', 'scheduleType'],
   } as ExtendedJsonSchema,
   toolType: 'builtin',
 };
@@ -895,7 +898,7 @@ const createScheduleDefinition: ToolRegistryDefinition = {
 const updateScheduleDefinition: ToolRegistryDefinition = {
   name: 'update_schedule',
   description:
-    'Update an existing schedule. Provide scheduleId and any fields to update: name, agentId, prompt, scheduleType, cronExpression, runAt, enabled, timezone, selectedTools.',
+    'Update an existing scheduled prompt. Provide scheduleId and any fields to update: name, agentId, promptGroupId, scheduleType, cronExpression, runAt, enabled, timezone, selectedTools.',
   schema: {
     type: 'object',
     properties: {
@@ -906,7 +909,7 @@ const updateScheduleDefinition: ToolRegistryDefinition = {
         description:
           'Agent ID from the injected target list. Infer from user request when changing agent - NEVER ask. Match by name or purpose.',
       },
-      prompt: { type: 'string', description: 'Prompt' },
+      promptGroupId: { type: 'string', description: 'Prompt group ID from the injected prompt list' },
       scheduleType: { type: 'string', enum: ['recurring', 'one-off'] },
       cronExpression: { type: 'string' },
       runAt: { type: 'string' },
@@ -968,13 +971,13 @@ const getRunDefinition: ToolRegistryDefinition = {
 
 /** Tool definitions from @librechat/agents */
 const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
-  read_file: readFileDefinition,
-  edit_file: editFileDefinition,
-  create_file: createFileDefinition,
-  delete_file: deleteFileDefinition,
-  list_files: listFilesDefinition,
-  search_files: searchFilesDefinition,
-  glob_files: globFilesDefinition,
+  workspace_read_file: readFileDefinition,
+  workspace_edit_file: editFileDefinition,
+  workspace_create_file: createFileDefinition,
+  workspace_delete_file: deleteFileDefinition,
+  workspace_list_files: listFilesDefinition,
+  search_user_files: searchFilesDefinition,
+  workspace_glob_files: globFilesDefinition,
   list_schedules: listSchedulesDefinition,
   create_schedule: createScheduleDefinition,
   update_schedule: updateScheduleDefinition,

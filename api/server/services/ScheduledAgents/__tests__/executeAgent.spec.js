@@ -1,5 +1,5 @@
 /**
- * Tests for executeScheduledAgent - selectedTools propagation to mockReq.body.ephemeralAgent
+ * Tests for executeScheduledAgent - prompt resolution and successful run
  */
 jest.mock('~/server/services/Endpoints/agents/build', () => jest.fn());
 jest.mock('~/server/services/Endpoints/agents', () => ({
@@ -13,11 +13,23 @@ jest.mock('~/db/models', () => ({
     }),
   },
   Conversation: { findOneAndUpdate: jest.fn().mockResolvedValue({}) },
-  ScheduledAgent: {
+  PromptGroup: {
+    findById: jest.fn().mockReturnValue({
+      populate: jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue({
+          productionId: { prompt: 'Hello' },
+        }),
+      }),
+    }),
+  },
+  ScheduledPrompt: {
     findByIdAndUpdate: jest.fn().mockResolvedValue({}),
     findById: jest.fn().mockReturnValue({
       select: jest.fn().mockReturnValue({
-        lean: jest.fn().mockResolvedValue({ name: 'Test Schedule' }),
+        lean: jest.fn().mockResolvedValue({
+          name: 'Test Schedule',
+          promptGroupId: 'pg-1',
+        }),
       }),
     }),
   },
@@ -37,7 +49,11 @@ jest.mock('@librechat/data-schemas', () => ({
 }));
 
 jest.mock('~/models/Agent', () => ({
-  loadAgent: jest.fn().mockResolvedValue({ id: 'agent-1', tools: [] }),
+  getAgent: jest.fn().mockResolvedValue({ _id: 'agent-1', id: 'agent-1', tools: [] }),
+}));
+
+jest.mock('~/server/services/PermissionService', () => ({
+  checkPermission: jest.fn().mockResolvedValue(true),
 }));
 
 const buildOptions = require('~/server/services/Endpoints/agents/build');
@@ -45,7 +61,7 @@ const { initializeClient } = require('~/server/services/Endpoints/agents');
 const { User, ScheduledRun } = require('~/db/models');
 const { executeScheduledAgent } = require('../executeAgent');
 
-describe('executeScheduledAgent - selectedTools propagation', () => {
+describe('executeScheduledAgent', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     User.findById.mockReturnValue({
@@ -64,59 +80,31 @@ describe('executeScheduledAgent - selectedTools propagation', () => {
     });
   });
 
-  it('should set mockReq.body.ephemeralAgent when selectedTools is an array', async () => {
+  it('should resolve prompt from PromptGroup and send resolved prompt to agent', async () => {
     const result = await executeScheduledAgent({
       scheduleId: 'sched-1',
       userId: 'user-1',
       agentId: 'agent-1',
-      prompt: 'Hello',
-      selectedTools: ['tool_a', 'tool_b'],
     });
 
     expect(result.success).toBe(true);
     expect(buildOptions).toHaveBeenCalled();
     const capturedReq = buildOptions.mock.calls[0][0];
-    expect(capturedReq.body.ephemeralAgent).toEqual({ tools: ['tool_a', 'tool_b'] });
+    expect(capturedReq.body.text).toBe('Hello');
   });
 
-  it('should set mockReq.body.ephemeralAgent to empty tools when selectedTools is []', async () => {
+  it('should store resolved prompt in ScheduledRun on success', async () => {
     await executeScheduledAgent({
       scheduleId: 'sched-1',
       userId: 'user-1',
       agentId: 'agent-1',
-      prompt: 'Hello',
-      selectedTools: [],
     });
 
-    expect(buildOptions).toHaveBeenCalled();
-    const capturedReq = buildOptions.mock.calls[0][0];
-    expect(capturedReq.body.ephemeralAgent).toEqual({ tools: [] });
-  });
-
-  it('should NOT set ephemeralAgent when selectedTools is undefined', async () => {
-    await executeScheduledAgent({
-      scheduleId: 'sched-1',
-      userId: 'user-1',
-      agentId: 'agent-1',
-      prompt: 'Hello',
-    });
-
-    expect(buildOptions).toHaveBeenCalled();
-    const capturedReq = buildOptions.mock.calls[0][0];
-    expect(capturedReq.body.ephemeralAgent).toBeUndefined();
-  });
-
-  it('should NOT set ephemeralAgent when selectedTools is null', async () => {
-    await executeScheduledAgent({
-      scheduleId: 'sched-1',
-      userId: 'user-1',
-      agentId: 'agent-1',
-      prompt: 'Hello',
-      selectedTools: null,
-    });
-
-    expect(buildOptions).toHaveBeenCalled();
-    const capturedReq = buildOptions.mock.calls[0][0];
-    expect(capturedReq.body.ephemeralAgent).toBeUndefined();
+    expect(ScheduledRun.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: 'Hello',
+        status: 'success',
+      }),
+    );
   });
 });

@@ -16,7 +16,7 @@ const {
 const { removeRun } = require('~/server/services/ScheduledAgents/jobQueue');
 const abortRegistry = require('~/server/services/ScheduledAgents/abortRegistry');
 const { ScheduledRun } = require('~/db/models');
-
+const { getPromptGroup } = require('~/models/Prompt');
 /**
  * Verify user has VIEW permission on the agent before creating/updating a schedule.
  * @returns {{ ok: boolean; status?: number; message?: string }}
@@ -32,6 +32,23 @@ async function ensureUserCanUseAgent(userId, role, agentId) {
     requiredPermission: PermissionBits.VIEW,
   });
   return hasAccess ? { ok: true } : { ok: false, status: 403, message: 'Insufficient permissions to use this agent' };
+}
+
+/**
+ * Verify user has VIEW permission on the prompt group before creating/updating a schedule.
+ * @returns {{ ok: boolean; status?: number; message?: string }}
+ */
+async function ensureUserCanUsePromptGroup(userId, role, promptGroupId) {
+  const group = await getPromptGroup({ _id: promptGroupId });
+  if (!group) return { ok: false, status: 404, message: 'Prompt group not found' };
+  const hasAccess = await checkPermission({
+    userId,
+    role,
+    resourceType: ResourceType.PROMPTGROUP,
+    resourceId: group._id,
+    requiredPermission: PermissionBits.VIEW,
+  });
+  return hasAccess ? { ok: true } : { ok: false, status: 403, message: 'Insufficient permissions to use this prompt group' };
 }
 
 const checkAgentAccess = generateCheckAccess({
@@ -60,11 +77,11 @@ async function listSchedules(req, res) {
  */
 async function createSchedule(req, res) {
   try {
-    const { name, agentId, prompt, scheduleType, cronExpression, runAt, timezone, selectedTools } =
+    const { name, agentId, promptGroupId, scheduleType, cronExpression, runAt, timezone, selectedTools } =
       req.body;
 
-    if (!name || !agentId || !prompt || !scheduleType) {
-      return res.status(400).json({ error: 'Missing required fields: name, agentId, prompt, scheduleType' });
+    if (!name || !agentId || !promptGroupId || !scheduleType) {
+      return res.status(400).json({ error: 'Missing required fields: name, agentId, promptGroupId, scheduleType' });
     }
 
     if (scheduleType === 'recurring' && !cronExpression) {
@@ -80,10 +97,15 @@ async function createSchedule(req, res) {
       return res.status(agentCheck.status).json({ error: agentCheck.message });
     }
 
+    const promptGroupCheck = await ensureUserCanUsePromptGroup(req.user.id, req.user.role, promptGroupId);
+    if (!promptGroupCheck.ok) {
+      return res.status(promptGroupCheck.status).json({ error: promptGroupCheck.message });
+    }
+
     const schedule = await createScheduleForUser(req.user.id, {
       name,
       agentId,
-      prompt,
+      promptGroupId,
       scheduleType,
       cronExpression,
       runAt,
@@ -108,6 +130,13 @@ async function updateSchedule(req, res) {
       const agentCheck = await ensureUserCanUseAgent(req.user.id, req.user.role, req.body.agentId);
       if (!agentCheck.ok) {
         return res.status(agentCheck.status).json({ error: agentCheck.message });
+      }
+    }
+
+    if (req.body.promptGroupId) {
+      const promptGroupCheck = await ensureUserCanUsePromptGroup(req.user.id, req.user.role, req.body.promptGroupId);
+      if (!promptGroupCheck.ok) {
+        return res.status(promptGroupCheck.status).json({ error: promptGroupCheck.message });
       }
     }
 

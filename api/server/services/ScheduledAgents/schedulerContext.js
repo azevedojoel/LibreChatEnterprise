@@ -1,3 +1,7 @@
+const { PermissionBits, ResourceType } = require('librechat-data-provider');
+const { PromptGroup } = require('~/db/models');
+const { findAccessibleResources } = require('~/server/services/PermissionService');
+
 /**
  * Builds prompt context for Schedule Manager agents listing which agents they can schedule.
  * Injected into toolContextMap so the agent sees target agent ids and names in its instructions.
@@ -38,4 +42,43 @@ ${agentList}`;
   }
 }
 
-module.exports = { buildSchedulerTargetContext };
+/**
+ * Builds prompt context listing which prompt groups the user can schedule.
+ * Use promptGroupId (the _id) in create_schedule/update_schedule.
+ *
+ * @param {string} userId - User ID
+ * @param {string} role - User role
+ * @returns {Promise<string|null>} Formatted context string or null if empty
+ */
+async function buildSchedulerPromptContext(userId, role) {
+  try {
+    const accessibleIds = await findAccessibleResources({
+      userId,
+      role,
+      resourceType: ResourceType.PROMPTGROUP,
+      requiredPermissions: PermissionBits.VIEW,
+    });
+    if (!accessibleIds?.length) {
+      return null;
+    }
+    const groups = await PromptGroup.find({ _id: { $in: accessibleIds } })
+      .select('_id name command')
+      .lean();
+    if (groups.length === 0) {
+      return null;
+    }
+    const parts = groups.map((g) => {
+      const label = g.command ? `/${g.command} - ${g.name}` : g.name;
+      return `[${g._id}] ${label}`;
+    });
+    return `# Prompts you can schedule (use promptGroupId in create_schedule/update_schedule)
+- Select a prompt by matching the user's request to a prompt name or command below.
+- Use the promptGroupId (the ID in brackets) when creating or updating schedules.
+
+${parts.join('\n')}`;
+  } catch (err) {
+    return null;
+  }
+}
+
+module.exports = { buildSchedulerTargetContext, buildSchedulerPromptContext };

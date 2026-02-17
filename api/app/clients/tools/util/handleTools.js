@@ -43,7 +43,7 @@ const { primeFiles: primeCodeFiles } = require('~/server/services/Files/Code/pro
 const { createLocalCodeExecutionTool } = require('~/server/services/LocalCodeExecution');
 const { createWorkspaceCodeEditTools } = require('~/server/services/WorkspaceCodeEdit');
 const { createSchedulingTools } = require('~/server/services/ScheduledAgents/schedulingTools');
-const { buildSchedulerTargetContext } = require('~/server/services/ScheduledAgents/schedulerContext');
+const { buildSchedulerTargetContext, buildSchedulerPromptContext } = require('~/server/services/ScheduledAgents/schedulerContext');
 const { SCHEDULER_DEFAULT_INSTRUCTIONS } = require('~/server/services/ScheduledAgents/schedulerInstructions');
 const { getAgents } = require('~/models/Agent');
 const { createFileSearchTool, primeFiles: primeSearchFiles } = require('./fileSearch');
@@ -311,13 +311,13 @@ const loadTools = async ({
       };
       continue;
     } else if (
-      tool === Tools.read_file ||
-      tool === Tools.edit_file ||
-      tool === Tools.create_file ||
-      tool === Tools.delete_file ||
-      tool === Tools.list_files ||
-      tool === Tools.search_files ||
-      tool === Tools.glob_files
+      tool === Tools.workspace_read_file ||
+      tool === Tools.workspace_edit_file ||
+      tool === Tools.workspace_create_file ||
+      tool === Tools.workspace_delete_file ||
+      tool === Tools.workspace_list_files ||
+      tool === Tools.search_user_files ||
+      tool === Tools.workspace_glob_files
     ) {
       const conversationId =
         options.req?.body?.conversationId ?? options.conversationId;
@@ -360,13 +360,13 @@ const loadTools = async ({
         searchFilesTool,
       ] = createWorkspaceCodeEditTools({ workspaceRoot });
       const toolMap = {
-        [Tools.read_file]: readFileTool,
-        [Tools.edit_file]: editFileTool,
-        [Tools.create_file]: createFileTool,
-        [Tools.delete_file]: deleteFileTool,
-        [Tools.list_files]: listFilesTool,
-        [Tools.search_files]: searchFilesTool,
-        [Tools.glob_files]: globFilesTool,
+        [Tools.workspace_read_file]: readFileTool,
+        [Tools.workspace_edit_file]: editFileTool,
+        [Tools.workspace_create_file]: createFileTool,
+        [Tools.workspace_delete_file]: deleteFileTool,
+        [Tools.workspace_list_files]: listFilesTool,
+        [Tools.search_user_files]: searchFilesTool,
+        [Tools.workspace_glob_files]: globFilesTool,
       };
       requestedTools[tool] = async () => {
         await ensureWorkspaceInjected();
@@ -405,6 +405,17 @@ const loadTools = async ({
           } catch (err) {
             logger.debug('[handleTools] Error building scheduler target context:', err);
           }
+        }
+        try {
+          const promptContext = await buildSchedulerPromptContext(
+            user,
+            options.req?.user?.role ?? 'USER',
+          );
+          if (promptContext) {
+            parts.push(promptContext);
+          }
+        } catch (err) {
+          logger.debug('[handleTools] Error building scheduler prompt context:', err);
         }
         toolContextMap[Tools.create_schedule] = parts.filter(Boolean).join('\n\n');
       }
@@ -549,6 +560,7 @@ const loadTools = async ({
           continue;
         }
         const mcpParams = {
+          req: options.req,
           index,
           signal,
           user: safeUser,
