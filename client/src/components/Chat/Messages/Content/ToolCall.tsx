@@ -8,8 +8,8 @@ import {
 
 /** Friendly display names for built-in tools */
 const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
-  [Tools.search_files]: 'Grepped',
-  [Tools.glob_files]: 'Globbed',
+  [Tools.search_user_files]: 'Grepped',
+  [Tools.workspace_glob_files]: 'Globbed',
   [Constants.TOOL_SEARCH]: 'Discovery',
   // Google Tasks tools (underscore: default, dot: --use-dot-names)
   tasks_listTaskLists: 'List Task Lists',
@@ -104,7 +104,7 @@ export default function ToolCall({
   );
 
   const inlinePattern = useMemo(() => {
-    if (function_name !== Tools.search_files && function_name !== Tools.glob_files) {
+    if (function_name !== Tools.search_user_files && function_name !== Tools.workspace_glob_files) {
       return '';
     }
     try {
@@ -208,7 +208,7 @@ export default function ToolCall({
     if (cancelled) {
       return localize('com_ui_cancelled');
     }
-    if (function_name === Tools.search_files || function_name === Tools.glob_files || isTasksTool) {
+    if (function_name === Tools.search_user_files || function_name === Tools.workspace_glob_files || isTasksTool) {
       return labelWithPattern;
     }
     if (isMCPToolCall === true) {

@@ -24,13 +24,13 @@ export enum Tools {
   function = 'function',
   memory = 'memory',
   ui_resources = 'ui_resources',
-  read_file = 'read_file',
-  edit_file = 'edit_file',
-  create_file = 'create_file',
-  delete_file = 'delete_file',
-  list_files = 'list_files',
-  search_files = 'search_files',
-  glob_files = 'glob_files',
+  workspace_read_file = 'workspace_read_file',
+  workspace_edit_file = 'workspace_edit_file',
+  workspace_create_file = 'workspace_create_file',
+  workspace_delete_file = 'workspace_delete_file',
+  workspace_list_files = 'workspace_list_files',
+  search_user_files = 'search_user_files',
+  workspace_glob_files = 'workspace_glob_files',
   list_schedules = 'list_schedules',
   create_schedule = 'create_schedule',
   update_schedule = 'update_schedule',
@@ -206,7 +206,7 @@ export interface AgentToolResources {
 /**
  * A resource for the execute_code tool.
  * Contains file IDs made available to the tool (max 20 files) and already fetched files.
- * read_file, edit_file, create_file use a conversation-scoped workspace derived at runtime.
+ * workspace_read_file, workspace_edit_file, workspace_create_file use a conversation-scoped workspace derived at runtime.
  */
 export interface ExecuteCodeResource extends AgentBaseResource {}
 

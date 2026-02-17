@@ -84,7 +84,7 @@ export default function ToolCallInfo({
 
   const nameForTitle = displayName ?? function_name;
   const isGreppedOrGlobbed =
-    function_name === Tools.search_files || function_name === Tools.glob_files;
+    function_name === Tools.search_user_files || function_name === Tools.workspace_glob_files;
   let title: string;
   if (domain != null && domain) {
     title = localize('com_assistants_domain_info', { 0: domain });
@@ -110,7 +110,7 @@ export default function ToolCallInfo({
   const openInArtifact = useOpenInArtifact();
 
   const readFileData = useMemo(() => {
-    if (function_name !== Tools.read_file || !output) {
+    if (function_name !== Tools.workspace_read_file || !output) {
       return null;
     }
     try {
@@ -134,7 +134,7 @@ export default function ToolCallInfo({
   }, [function_name, output, input]);
 
   const searchFilesData = useMemo(() => {
-    if (function_name !== Tools.search_files || !output) {
+    if (function_name !== Tools.search_user_files || !output) {
       return null;
     }
     if (output.startsWith('Error:') || output === 'No matches found.') {
@@ -158,7 +158,7 @@ export default function ToolCallInfo({
   }, [function_name, output]);
 
   const globFilesData = useMemo(() => {
-    if (function_name !== Tools.glob_files || !output) {
+    if (function_name !== Tools.workspace_glob_files || !output) {
       return null;
     }
     if (output.startsWith('Error:') || output === 'No files found.') {

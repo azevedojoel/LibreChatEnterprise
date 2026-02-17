@@ -445,13 +445,13 @@ export default function AgentPanel() {
       }
       if (data.execute_code === true) {
         const workspaceTools = [
-          Tools.read_file,
-          Tools.edit_file,
-          Tools.create_file,
-          Tools.delete_file,
-          Tools.list_files,
-          Tools.search_files,
-          Tools.glob_files,
+          Tools.workspace_read_file,
+          Tools.workspace_edit_file,
+          Tools.workspace_create_file,
+          Tools.workspace_delete_file,
+          Tools.workspace_list_files,
+          Tools.search_user_files,
+          Tools.workspace_glob_files,
         ].filter((t): t is string => t != null && t !== '');
         tools.push(...workspaceTools);
       }

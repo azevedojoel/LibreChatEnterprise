@@ -34,9 +34,9 @@ function createWorkspaceCodeEditTools({ workspaceRoot }) {
       return result.content;
     },
     {
-      name: 'read_file',
+      name: 'workspace_read_file',
       description:
-        'Read file contents. Path is relative to workspace root. Use when: inspecting a file, verifying edits, or reading a specific section. Optionally use start_line and end_line (1-based, inclusive) to read a range—helps with large files.',
+        'Read file contents from workspace. Path is relative to workspace root. Use when: inspecting a file, verifying edits, or reading a specific section. Optionally use start_line and end_line (1-based, inclusive) to read a range—helps with large files.',
       schema: {
         type: 'object',
         properties: {
@@ -74,9 +74,9 @@ function createWorkspaceCodeEditTools({ workspaceRoot }) {
       return 'File edited successfully.';
     },
     {
-      name: 'edit_file',
+      name: 'workspace_edit_file',
       description:
-        'Replace exact old_string with new_string in a file. old_string must match exactly once. Fails if old_string appears 0 or 2+ times; use search_files first to verify. Whitespace must match exactly.',
+        'Edit a file in the workspace. Replace exact old_string with new_string. old_string must match exactly once. Fails if old_string appears 0 or 2+ times; use search_user_files first to verify. Whitespace must match exactly.',
       schema: {
         type: 'object',
         properties: {
@@ -111,9 +111,9 @@ function createWorkspaceCodeEditTools({ workspaceRoot }) {
       return 'File created successfully.';
     },
     {
-      name: 'create_file',
+      name: 'workspace_create_file',
       description:
-        'Create or overwrite a file. Overwrites if file exists. Parent directories created if needed.',
+        'Create or overwrite a file in the workspace. Overwrites if file exists. Parent directories created if needed.',
       schema: {
         type: 'object',
         properties: {
@@ -143,9 +143,9 @@ function createWorkspaceCodeEditTools({ workspaceRoot }) {
       return 'File deleted successfully.';
     },
     {
-      name: 'delete_file',
+      name: 'workspace_delete_file',
       description:
-        'Delete a file. Permanent. Prefer for temporary/scratch files; confirm path before deleting. Path is relative to workspace root.',
+        'Delete a file from the workspace. Permanent. Prefer for temporary/scratch files; confirm path before deleting. Path is relative to workspace root.',
       schema: {
         type: 'object',
         properties: {
@@ -173,9 +173,9 @@ function createWorkspaceCodeEditTools({ workspaceRoot }) {
       return lines.length ? lines.join('\n') : '(empty)';
     },
     {
-      name: 'list_files',
+      name: 'workspace_list_files',
       description:
-        'List files and subdirectories in one directory. Use when: exploring a known path; use glob_files when you need pattern-based discovery (e.g. *.py).',
+        'List files and subdirectories in a workspace directory. Use when: exploring a known path; use workspace_glob_files when you need pattern-based discovery (e.g. *.py).',
       schema: {
         type: 'object',
         properties: {
@@ -235,9 +235,9 @@ function createWorkspaceCodeEditTools({ workspaceRoot }) {
       return lines.join('\n');
     },
     {
-      name: 'search_files',
+      name: 'search_user_files',
       description:
-        'Search file contents for a pattern. Returns path:line: content per match. Use when: finding definitions, usages, references, or debugging. Supports literal (default) or regex (use_regex=true), context_lines for surrounding lines, case_sensitive. With context_lines > 0, output includes path:line blocks separated by ---.',
+        'Search file contents in the user files for a pattern. Returns path:line: content per match. Use when: finding definitions, usages, references, or debugging. Supports literal (default) or regex (use_regex=true), context_lines for surrounding lines, case_sensitive. With context_lines > 0, output includes path:line blocks separated by ---.',
       schema: {
         type: 'object',
         properties: {
@@ -293,9 +293,9 @@ function createWorkspaceCodeEditTools({ workspaceRoot }) {
       return result.paths.join('\n');
     },
     {
-      name: 'glob_files',
+      name: 'workspace_glob_files',
       description:
-        'Find files matching a glob pattern (e.g. *.py, src/**/*.ts). Use when: discovering files by pattern (all tests, configs, etc.). Prefer over list_files when you need pattern matching across subdirectories. Path: directory to search (default "."). Results limited to max_results (default 200).',
+        'Find files in the workspace matching a glob pattern (e.g. *.py, src/**/*.ts). Use when: discovering files by pattern (all tests, configs, etc.). Prefer over workspace_list_files when you need pattern matching across subdirectories. Path: directory to search (default "."). Results limited to max_results (default 200).',
       schema: {
         type: 'object',
         properties: {
