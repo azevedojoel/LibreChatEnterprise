@@ -17,6 +17,7 @@ import type {
 import type { SetterOrUpdater } from 'recoil';
 import type { AnnounceOptions } from '~/common';
 import { MESSAGE_UPDATE_INTERVAL } from '~/common';
+import { logger } from '~/utils';
 
 type TUseStepHandler = {
   announcePolite: (options: AnnounceOptions) => void;
@@ -60,7 +61,8 @@ export default function useStepHandler({
   announcePolite,
   lastAnnouncementTimeRef,
 }: TUseStepHandler) {
-  const toolCallIdMap = useRef(new Map<string, string | undefined>());
+  /** stepId -> array of tool call IDs (one per parallel tool in that step) */
+  const toolCallIdMap = useRef(new Map<string, string[]>());
   const messageMap = useRef(new Map<string, TMessage>());
   const stepMap = useRef(new Map<string, Agents.RunStep>());
   /** Buffer for deltas that arrive before their corresponding run step */
@@ -319,15 +321,18 @@ export default function useStepHandler({
           setMessages([...updatedMessages, response]);
         }
 
-        // Store tool call IDs if present
+        // Store tool call IDs if present (array for parallel tools)
         if (runStep.stepDetails.type === StepTypes.TOOL_CALLS) {
           let updatedResponse = { ...response };
           const toolCalls = runStep.stepDetails.tool_calls as Agents.ToolCall[];
+          const toolCallIds = toolCalls
+            .map((tc) => ('id' in tc && tc.id ? tc.id : ''))
+            .filter(Boolean);
+          if (toolCallIds.length > 0) {
+            toolCallIdMap.current.set(runStep.id, toolCallIds);
+          }
           toolCalls.forEach((toolCall, i) => {
             const toolCallId = toolCall.id ?? '';
-            if ('id' in toolCall && toolCallId) {
-              toolCallIdMap.current.set(runStep.id, toolCallId);
-            }
 
             const contentPart: Agents.MessageContentComplex = {
               type: ContentTypes.TOOL_CALL,
@@ -490,11 +495,71 @@ export default function useStepHandler({
         }
 
         if (!runStep || !responseMessageId) {
+          // Fallback: when delta has auth but step is missing, try to merge auth into a matching tool call
+          if (
+            runStepDelta.delta?.auth != null &&
+            runStepDelta.delta?.tool_calls?.length &&
+            runStepDelta.delta.type === StepTypes.TOOL_CALLS
+          ) {
+            const fallbackMessageId =
+              responseMessageId ||
+              submission?.initialResponse?.messageId ||
+              messages.find((m) => !m.isCreatedByUser)?.messageId;
+            if (fallbackMessageId) {
+              const response =
+                messageMap.current.get(fallbackMessageId) ??
+                messages.find((m) => m.messageId === fallbackMessageId);
+              const content = response?.content ?? [];
+              const toolName = runStepDelta.delta.tool_calls[0]?.name;
+              const contentIndex = content.findIndex(
+                (part) =>
+                  part?.type === ContentTypes.TOOL_CALL &&
+                  (part as { tool_call?: { name?: string } })?.tool_call?.name === toolName &&
+                  !(part as { tool_call?: { auth?: string } })?.tool_call?.auth,
+              );
+              if (contentIndex >= 0) {
+                logger.debug('[MCP OAuth] on_run_step_delta: applying auth via fallback (no step)', {
+                  stepId: runStepDelta.id,
+                  toolName,
+                  contentIndex,
+                });
+                const existingPart = content[contentIndex] as { tool_call?: Record<string, unknown> };
+                const updatedContent = [...content];
+                updatedContent[contentIndex] = {
+                  ...existingPart,
+                  tool_call: {
+                    ...existingPart?.tool_call,
+                    auth: runStepDelta.delta.auth,
+                    expires_at: runStepDelta.delta.expires_at,
+                  },
+                };
+                const updatedResponse = { ...response, content: updatedContent };
+                messageMap.current.set(fallbackMessageId, updatedResponse);
+                const updatedMessages = messages.map((msg) =>
+                  msg.messageId === fallbackMessageId ? updatedResponse : msg,
+                );
+                setMessages(updatedMessages);
+                return;
+              }
+            }
+          }
+          logger.debug('[MCP OAuth] on_run_step_delta: buffering (step or responseMessageId missing)', {
+            stepId: runStepDelta.id,
+            hasRunStep: !!runStep,
+            responseMessageId: responseMessageId || 'empty',
+            hasAuth: runStepDelta.delta?.auth != null,
+          });
           const buffer = pendingDeltaBuffer.current.get(runStepDelta.id) ?? [];
           buffer.push({ event: 'on_run_step_delta', data: runStepDelta });
           pendingDeltaBuffer.current.set(runStepDelta.id, buffer);
           return;
         }
+
+        logger.debug('[MCP OAuth] on_run_step_delta: processing', {
+          stepId: runStepDelta.id,
+          responseMessageId,
+          hasAuth: runStepDelta.delta?.auth != null,
+        });
 
         const response = messageMap.current.get(responseMessageId);
         if (
@@ -503,9 +568,13 @@ export default function useStepHandler({
           runStepDelta.delta.tool_calls
         ) {
           let updatedResponse = { ...response };
+          const toolCallIds = toolCallIdMap.current.get(runStepDelta.id) ?? [];
 
-          runStepDelta.delta.tool_calls.forEach((toolCallDelta) => {
-            const toolCallId = toolCallIdMap.current.get(runStepDelta.id) ?? '';
+          runStepDelta.delta.tool_calls.forEach((toolCallDelta, i) => {
+            const explicitIndex = (toolCallDelta as { index?: number }).index;
+            const deltaIndex =
+              typeof explicitIndex === 'number' ? explicitIndex : i;
+            const toolCallId = toolCallIds[deltaIndex] ?? toolCallIds[0] ?? '';
 
             const contentPart: Agents.MessageContentComplex = {
               type: ContentTypes.TOOL_CALL,
@@ -521,8 +590,9 @@ export default function useStepHandler({
               contentPart.tool_call.expires_at = runStepDelta.delta.expires_at;
             }
 
-            // Use server's index, offset by initialContent for edit scenarios
-            const currentIndex = runStep.index + initialContent.length;
+            // Use delta index when present for parallel tools; fallback to runStep.index
+            const currentIndex =
+              runStep.index + initialContent.length + deltaIndex;
             updatedResponse = updateContent(
               updatedResponse,
               currentIndex,
@@ -587,27 +657,158 @@ export default function useStepHandler({
           return;
         }
 
-        // Resolve content index: prefer resultIndex when valid; otherwise find by tool_call.id
+        // Resolve content index: prefer tool_call.id; fallback to name+args; then resultIndex; then runStep.index
         // (backend may send wrong index for parallel tools, so matching by id is most reliable)
         let currentIndex: number;
         const toolCallId = toolCallResult.id ?? '';
         const content = response.content ?? [];
-        const indexById = toolCallId
+        const getToolCall = (p: TMessageContentParts) =>
+          (p?.type === ContentTypes.TOOL_CALL
+            ? (p.tool_call ?? (p[ContentTypes.TOOL_CALL] as Agents.ToolCall))
+            : undefined) as Agents.ToolCall | undefined;
+
+        let indexById = toolCallId
           ? content.findIndex(
               (p) =>
-                p?.type === ContentTypes.TOOL_CALL &&
-                (p[ContentTypes.TOOL_CALL] as Agents.ToolCall)?.id === toolCallId,
+                p?.type === ContentTypes.TOOL_CALL && getToolCall(p)?.id === toolCallId,
             )
           : -1;
+        if (indexById < 0 && toolCallResult.name) {
+          const toolCallsWithName = content
+            .map((p, i) => (p?.type === ContentTypes.TOOL_CALL ? { p, i } : null))
+            .filter(
+              (v): v is { p: TMessageContentParts; i: number } =>
+                v != null && getToolCall(v.p)?.name === toolCallResult.name,
+            );
+          const withoutOutput = toolCallsWithName.filter(
+            (v) => !getToolCall(v.p)?.output,
+          );
+          if (withoutOutput.length === 1) {
+            indexById = withoutOutput[0].i;
+          } else if (toolCallsWithName.length === 1) {
+            indexById = toolCallsWithName[0].i;
+          }
+        }
         if (indexById >= 0) {
           currentIndex = indexById;
         } else if (typeof resultIndex === 'number' && resultIndex >= 0) {
+          if (indexById < 0 && toolCallId) {
+            console.warn('[useStepHandler] on_run_step_completed: indexById not found, using resultIndex', {
+              toolCallId,
+              resultIndex,
+              stepId,
+            });
+          }
           currentIndex = resultIndex + initialContent.length;
         } else if (runStep != null) {
           currentIndex = runStep.index + initialContent.length;
         } else {
-          console.warn('No run step or runId found for completed tool call event');
-          return;
+          const pendingCalls = content
+            .map((p, i) =>
+              p?.type === ContentTypes.TOOL_CALL && !getToolCall(p)?.output
+                ? { p, i }
+                : null,
+            )
+            .filter(
+              (v): v is { p: TMessageContentParts; i: number } =>
+                v != null &&
+                (toolCallResult.name == null ||
+                  getToolCall(v.p)?.name === toolCallResult.name),
+            );
+          if (pendingCalls.length === 1) {
+            currentIndex = pendingCalls[0].i;
+          } else {
+            const isToolSearch =
+              toolCallResult.name === 'tool_search' ||
+              (typeof toolCallResult.name === 'string' && toolCallResult.name.startsWith('tool_search_mcp_'));
+            const hasOutput = toolCallResult.output != null && toolCallResult.output !== '';
+            const toolCallsWithoutOutputIndices = content
+              .map((p, i) =>
+                p?.type === ContentTypes.TOOL_CALL && !getToolCall(p)?.output
+                  ? { i, tc: getToolCall(p) }
+                  : null,
+              )
+              .filter((v): v is { i: number; tc: Agents.ToolCall } => v != null);
+            const toolSearchMatches = toolCallsWithoutOutputIndices.filter(
+              (v) =>
+                v.tc?.name === 'tool_search' ||
+                (typeof v.tc?.name === 'string' && v.tc.name.startsWith('tool_search_mcp_')),
+            );
+            if (isToolSearch && hasOutput) {
+              if (toolSearchMatches.length === 1) {
+                currentIndex = toolSearchMatches[0].i;
+              } else if (
+                toolSearchMatches.length > 1 &&
+                toolCallResult.name &&
+                toolSearchMatches.some((m) => m.tc?.name === toolCallResult.name)
+              ) {
+                const exact = toolSearchMatches.find(
+                  (m) => m.tc?.name === toolCallResult.name,
+                );
+                currentIndex = exact ? exact.i : toolSearchMatches[0].i;
+              } else if (toolSearchMatches.length > 0) {
+                currentIndex = toolSearchMatches[0].i;
+                console.warn('[useStepHandler] on_run_step_completed: ambiguous tool_search, using first match', {
+                  stepId,
+                  toolName: toolCallResult.name,
+                  toolSearchMatchesCount: toolSearchMatches.length,
+                });
+              } else {
+                const firstWithoutOutput = toolCallsWithoutOutputIndices[0];
+                if (firstWithoutOutput) {
+                  currentIndex = firstWithoutOutput.i;
+                  console.warn('[useStepHandler] on_run_step_completed: no tool_search match, applying to first tool without output', {
+                    stepId,
+                    toolName: toolCallResult.name,
+                    fallbackIndex: firstWithoutOutput.i,
+                  });
+                } else {
+                  console.warn('[useStepHandler] on_run_step_completed: index resolution failed', {
+                    stepId,
+                    resultIndex,
+                    toolCallId,
+                    toolName: toolCallResult.name,
+                    contentLength: content.length,
+                    toolCallIndicesInContent: content
+                      .map((p, i) =>
+                        p?.type === ContentTypes.TOOL_CALL
+                          ? { i, name: getToolCall(p)?.name, hasOutput: !!getToolCall(p)?.output }
+                          : null,
+                      )
+                      .filter(Boolean),
+                  });
+                  return;
+                }
+              }
+            } else {
+              const firstMatch = pendingCalls[0] ?? toolCallsWithoutOutputIndices[0];
+              if (firstMatch) {
+                currentIndex = firstMatch.i;
+                console.warn('[useStepHandler] on_run_step_completed: using first tool without output as fallback', {
+                  stepId,
+                  toolName: toolCallResult.name,
+                  fallbackIndex: firstMatch.i,
+                });
+              } else {
+                console.warn('[useStepHandler] on_run_step_completed: index resolution failed', {
+                  stepId,
+                  resultIndex,
+                  toolCallId,
+                  toolName: toolCallResult.name,
+                  contentLength: content.length,
+                  pendingCallsCount: pendingCalls.length,
+                  toolCallIndicesInContent: content
+                    .map((p, i) =>
+                      p?.type === ContentTypes.TOOL_CALL
+                        ? { i, name: getToolCall(p)?.name, hasOutput: !!getToolCall(p)?.output }
+                        : null,
+                    )
+                    .filter(Boolean),
+                });
+                return;
+              }
+            }
+          }
         }
 
         if (response) {

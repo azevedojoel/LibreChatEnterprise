@@ -186,13 +186,26 @@ export default function useResumableSSE(
               setIsSubmitting(false);
               setShowStopButton(false);
             }
-            // Clear handler maps on stream completion to prevent memory leaks
-            clearStepMaps();
-            // Optimistically remove from active jobs
-            removeActiveJob(currentStreamId);
-            (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
-            sse.close();
-            setStreamId(null);
+            const responseContent = data.responseMessage?.content ?? [];
+            const hasIncompleteTools = responseContent.some(
+              (p: { type?: string; tool_call?: { output?: string; progress?: number } }) =>
+                p?.type === 'tool_call' &&
+                p?.tool_call &&
+                ((p.tool_call.output == null || p.tool_call.output === '') &&
+                  (p.tool_call.progress == null || p.tool_call.progress < 1)),
+            );
+            const closeAndCleanup = () => {
+              clearStepMaps();
+              removeActiveJob(currentStreamId);
+              (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
+              sse.close();
+              setStreamId(null);
+            };
+            if (hasIncompleteTools) {
+              setTimeout(closeAndCleanup, 2000);
+            } else {
+              closeAndCleanup();
+            }
             return;
           }
 
@@ -237,6 +250,16 @@ export default function useResumableSSE(
           }
 
           if (data.event != null) {
+            if (
+              import.meta.env?.DEV &&
+              (data.event === 'on_run_step_completed' || data.event === 'on_run_step_delta')
+            ) {
+              console.debug('[ResumableSSE] step event', {
+                event: data.event,
+                hasResult: !!data.result,
+                toolCallOutput: data.result?.tool_call?.output?.slice?.(0, 50),
+              });
+            }
             stepHandler(data, { ...currentSubmission, userMessage } as EventSubmission);
             return;
           }
