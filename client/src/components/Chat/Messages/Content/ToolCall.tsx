@@ -13,6 +13,7 @@ import {
 const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
   [Tools.search_files]: 'Grepped',
   [Tools.glob_files]: 'Globbed',
+  [Constants.TOOL_SEARCH]: 'Discovery',
   // Google Tasks tools (underscore: default, dot: --use-dot-names)
   tasks_listTaskLists: 'List Task Lists',
   'tasks.listTaskLists': 'List Task Lists',
@@ -169,6 +170,16 @@ export default function ToolCall({
     () => (args?.length ?? 0) > 0 || (output?.length ?? 0) > 0,
     [args, output],
   );
+  const isToolSearch =
+    name === Constants.TOOL_SEARCH ||
+    (typeof name === 'string' && name.startsWith('tool_search_mcp_'));
+  /** tool_search always shows expandable content so users can see query and results */
+  const canExpand = hasInfo || isToolSearch;
+  const hasOutput = output != null && output !== '';
+  const hasArgs =
+    (typeof _args === 'string' && _args.trim() !== '') ||
+    (typeof _args === 'object' && _args != null && Object.keys(_args).length > 0);
+  const toolSearchCompletedFallback = isToolSearch && !hasOutput && hasArgs;
 
   const authDomain = useMemo(() => {
     const authURL = auth ?? '';
@@ -188,13 +199,35 @@ export default function ToolCall({
   }, [auth]);
 
   const progress = useProgress(initialProgress);
-  // If the tool has output, it ran successfully—never show cancelled even if progress lags
-  const hasOutput = output != null && output !== '';
-  const displayProgress = hasOutput ? 1 : progress;
+
+  // Grace period: when stream ends (isSubmitting=false) before output arrives, avoid false
+  // "Cancelled" due to race with on_run_step_completed. Wait 3s for completion event.
+  const [gracePeriodActive, setGracePeriodActive] = useState(false);
+  const gracePeriodStartedRef = useRef(false);
+  const prevIsSubmittingRef = useRef(isSubmitting);
+  useEffect(() => {
+    if (prevIsSubmittingRef.current && !isSubmitting && !hasOutput && progress < 1) {
+      if (!gracePeriodStartedRef.current) {
+        gracePeriodStartedRef.current = true;
+        setGracePeriodActive(true);
+        const t = setTimeout(() => setGracePeriodActive(false), 3000);
+        return () => clearTimeout(t);
+      }
+    }
+    if (hasOutput) {
+      gracePeriodStartedRef.current = false;
+      setGracePeriodActive(false);
+    }
+    prevIsSubmittingRef.current = isSubmitting;
+  }, [isSubmitting, hasOutput, progress]);
+
   // Never show cancelled when we have successful output; show error state for tool errors;
-  // show cancelled only when stream ended without completion and no output
-  const cancelled =
-    error === true || (hasOutput ? false : !isSubmitting && progress < 1);
+  // show cancelled only when stream ended without completion and no output, and grace period expired
+  const wouldBeCancelled =
+    error === true || (hasOutput ? false : !isSubmitting && progress < 1 && !gracePeriodActive);
+  const cancelled = isToolSearch ? false : wouldBeCancelled;
+  const displayProgress =
+    hasOutput || (isToolSearch && wouldBeCancelled) || toolSearchCompletedFallback ? 1 : progress;
 
   const labelWithPattern = useMemo(
     () => (inlinePattern ? `${displayName} '${inlinePattern}'` : displayName),
@@ -282,7 +315,7 @@ export default function ToolCall({
             !cancelled && authDomain.length > 0 ? localize('com_ui_requires_auth') : undefined
           }
           finishedText={getFinishedText()}
-          hasInput={hasInfo}
+          hasInput={canExpand}
           isExpanded={showInfo}
           error={cancelled}
         />
@@ -315,7 +348,7 @@ export default function ToolCall({
           }}
         >
           <div ref={contentRef}>
-            {showInfo && hasInfo && (
+            {showInfo && canExpand && (
               <ToolCallInfo
                 key="tool-call-info"
                 input={args ?? ''}

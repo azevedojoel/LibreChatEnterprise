@@ -110,6 +110,17 @@ const ContentParts = memo(function ContentParts({
     return null;
   }
 
+  // Must be called unconditionally - used in sequential render path below
+  const renderItems = useMemo(() => {
+    const sequentialParts: PartWithIndex[] = [];
+    content?.forEach((part, idx) => {
+      if (part) {
+        sequentialParts.push({ part, idx });
+      }
+    });
+    return groupConsecutiveToolCalls(sequentialParts);
+  }, [content]);
+
   // Edit mode: render editable text parts
   if (edit === true && enterEdit && setSiblingIdx) {
     return (
@@ -170,16 +181,6 @@ const ContentParts = memo(function ContentParts({
   }
 
   // Sequential content: render parts in order (90% of cases)
-  const renderItems = useMemo(() => {
-    const sequentialParts: PartWithIndex[] = [];
-    content?.forEach((part, idx) => {
-      if (part) {
-        sequentialParts.push({ part, idx });
-      }
-    });
-    return groupConsecutiveToolCalls(sequentialParts);
-  }, [content]);
-
   return (
     <SearchContext.Provider value={{ searchResults }}>
       <MemoryArtifacts attachments={attachments} />

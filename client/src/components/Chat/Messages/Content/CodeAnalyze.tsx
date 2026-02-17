@@ -40,7 +40,10 @@ export default function CodeAnalyze({
       </div>
       {showCode && (
         <div className="code-analyze-block mb-3 mt-0.5 overflow-hidden rounded-xl bg-black">
-          <MarkdownLite content={code ? `\`\`\`python\n${code}\n\`\`\`` : ''} />
+          <MarkdownLite
+            content={code ? `\`\`\`python\n${code}\n\`\`\`` : ''}
+            showCodeToggle
+          />
           {logs && (
             <div className="bg-gray-700 p-4 text-xs">
               <div className="mb-1 text-gray-400">{localize('com_ui_result')}</div>

@@ -200,6 +200,7 @@ export default function ExecuteCode({
               <MarkdownLite
                 content={code ? `\`\`\`${lang}\n${code}\n\`\`\`` : ''}
                 codeExecution={false}
+                showCodeToggle
               />
             </div>
           )}

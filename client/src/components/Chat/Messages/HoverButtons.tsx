@@ -6,6 +6,7 @@ import { useGenerationsByLatest, useLocalize } from '~/hooks';
 import { Fork } from '~/components/Conversations';
 import MessageAudio from './MessageAudio';
 import Feedback from './Feedback';
+import MessageToolsIcons from './MessageToolsIcons';
 import { cn } from '~/utils';
 import store from '~/store';
 
@@ -219,8 +220,8 @@ const HoverButtons = ({
         )}
       />
 
-      {/* Edit Button */}
-      {isEditableEndpoint && (
+      {/* Edit Button - only for user messages */}
+      {isEditableEndpoint && isCreatedByUser && (
         <HoverButton
           id={`edit-${message.messageId}`}
           onClick={onEdit}
@@ -258,6 +259,8 @@ const HoverButtons = ({
           className="active"
         />
       )}
+
+      <MessageToolsIcons message={message} conversation={conversation} isLast={isLast} />
 
       {/* Continue Button */}
       {continueSupported && (
