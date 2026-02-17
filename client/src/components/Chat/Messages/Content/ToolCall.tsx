@@ -1,10 +1,7 @@
-import { useMemo, useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
-import { Button } from '@librechat/client';
-import { TriangleAlert } from 'lucide-react';
+import { useMemo, useState, useEffect, useRef, useLayoutEffect } from 'react';
 import {
   Constants,
   Tools,
-  dataService,
   actionDelimiter,
   actionDomainSeparator,
 } from 'librechat-data-provider';
@@ -45,6 +42,7 @@ import { useLocalize, useProgress } from '~/hooks';
 import { AttachmentGroup } from './Parts';
 import ToolCallInfo from './ToolCallInfo';
 import ProgressText from './ProgressText';
+import AuthCTA from './AuthCTA';
 import { logger, cn } from '~/utils';
 
 export default function ToolCall({
@@ -117,36 +115,6 @@ export default function ToolCall({
       return '';
     }
   }, [_args, function_name]);
-
-  const actionId = useMemo(() => {
-    if (isMCPToolCall || !auth) {
-      return '';
-    }
-    try {
-      const url = new URL(auth);
-      const redirectUri = url.searchParams.get('redirect_uri') || '';
-      const match = redirectUri.match(/\/api\/actions\/([^/]+)\/oauth\/callback/);
-      return match?.[1] || '';
-    } catch {
-      return '';
-    }
-  }, [auth, isMCPToolCall]);
-
-  const handleOAuthClick = useCallback(async () => {
-    if (!auth) {
-      return;
-    }
-    try {
-      if (isMCPToolCall && mcpServerName) {
-        await dataService.bindMCPOAuth(mcpServerName);
-      } else if (actionId) {
-        await dataService.bindActionOAuth(actionId);
-      }
-    } catch (e) {
-      logger.error('Failed to bind OAuth CSRF cookie', e);
-    }
-    window.open(auth, '_blank', 'noopener,noreferrer');
-  }, [auth, isMCPToolCall, mcpServerName, actionId]);
 
   const error =
     typeof output === 'string' && output.toLowerCase().includes('error processing tool');
@@ -364,22 +332,7 @@ export default function ToolCall({
         </div>
       </div>
       {auth != null && auth && displayProgress < 1 && !cancelled && (
-        <div className="flex w-full flex-col gap-2.5">
-          <div className="mb-1 mt-2">
-            <Button
-              className="font-mediu inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm"
-              variant="default"
-              rel="noopener noreferrer"
-              onClick={handleOAuthClick}
-            >
-              {localize('com_ui_sign_in_to_domain', { 0: authDomain })}
-            </Button>
-          </div>
-          <p className="flex items-center text-xs text-text-warning">
-            <TriangleAlert className="mr-1.5 inline-block h-4 w-4" aria-hidden="true" />
-            {localize('com_assistants_allow_sites_you_trust')}
-          </p>
-        </div>
+        <AuthCTA auth={auth} name={name} />
       )}
       {attachments && attachments.length > 0 && <AttachmentGroup attachments={attachments} />}
     </>

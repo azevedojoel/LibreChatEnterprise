@@ -36,3 +36,4 @@ export { default as useGenerationsByLatest } from './useGenerationsByLatest';
 export { default as useLocalizedConfig } from './useLocalizedConfig';
 export { default as useResourcePermissions } from './useResourcePermissions';
 export { default as useChatBadges, useResetChatBadges } from './useChatBadges';
+export { default as useOAuthCompleteListener } from './useOAuthCompleteListener';

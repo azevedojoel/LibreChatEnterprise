@@ -71,6 +71,15 @@ jest.mock('~/utils', () => ({
   cn: (...classes: any[]) => classes.filter(Boolean).join(' '),
 }));
 
+jest.mock('librechat-data-provider', () => ({
+  ...jest.requireActual('librechat-data-provider'),
+  dataService: {
+    bindMCPOAuth: jest.fn().mockResolvedValue({ success: true }),
+    bindActionOAuth: jest.fn().mockResolvedValue({ success: true }),
+    cancelMCPOAuth: jest.fn().mockResolvedValue({ success: true }),
+  },
+}));
+
 describe('ToolCall', () => {
   const mockProps = {
     args: '{"test": "input"}',

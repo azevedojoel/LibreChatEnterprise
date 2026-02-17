@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useLocalize } from '~/hooks';
+import { OAUTH_COMPLETE_TYPE } from '~/hooks/useOAuthCompleteListener';
 
 export default function OAuthSuccess() {
   const localize = useLocalize();
@@ -13,6 +14,14 @@ export default function OAuthSuccess() {
       setSecondsLeft((prev) => {
         if (prev <= 1) {
           clearInterval(countdown);
+          try {
+            window.opener?.postMessage?.(
+              { type: OAUTH_COMPLETE_TYPE, serverName: serverName ?? undefined },
+              window.location.origin,
+            );
+          } catch {
+            /* ignore if opener is cross-origin or closed */
+          }
           window.close();
           return 0;
         }
@@ -21,7 +30,7 @@ export default function OAuthSuccess() {
     }, 1000);
 
     return () => clearInterval(countdown);
-  }, []);
+  }, [serverName]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 p-8">

@@ -3,6 +3,7 @@ import { Constants, ContentTypes } from 'librechat-data-provider';
 import type { TMessageContentParts, TAttachment, Agents } from 'librechat-data-provider';
 import { useLocalize } from '~/hooks';
 import ProgressText from './ProgressText';
+import AuthCTA from './AuthCTA';
 import type { PartWithIndex } from './ParallelContent';
 
 type ToolCallGroupProps = {
@@ -40,6 +41,26 @@ function getToolCallProgress(part: TMessageContentParts): number {
   return typeof p === 'number' ? p : 1;
 }
 
+function getPendingAuthPart(
+  parts: PartWithIndex[],
+): { auth: string; name: string } | null {
+  for (const { part } of parts) {
+    const toolCall = part?.[ContentTypes.TOOL_CALL] as Agents.ToolCall | undefined;
+    if (!toolCall?.auth) continue;
+    const hasOutput = toolCall.output != null && toolCall.output !== '';
+    const progress = getToolCallProgress(part);
+    if (progress < 1 && !hasOutput) {
+      const error =
+        typeof toolCall.output === 'string' &&
+        toolCall.output.toLowerCase().includes('error processing tool');
+      if (!error) {
+        return { auth: toolCall.auth, name: toolCall.name || '' };
+      }
+    }
+  }
+  return null;
+}
+
 export default function ToolCallGroup({
   parts,
   messageId,
@@ -54,6 +75,7 @@ export default function ToolCallGroup({
     return values.some((p) => p < 1) ? Math.min(...values) : 1;
   }, [parts]);
 
+  const pendingAuth = useMemo(() => getPendingAuthPart(parts), [parts]);
   const label = localize('com_assistants_tool_group_collapsed', { 0: parts.length });
 
   if (isExpanded) {
@@ -81,16 +103,26 @@ export default function ToolCallGroup({
   }
 
   return (
-    <div className="relative my-2.5 flex h-5 shrink-0 items-center gap-2.5">
-      <ProgressText
-        muted
-        progress={progress}
-        onClick={() => setIsExpanded(true)}
-        inProgressText={label}
-        finishedText={label}
-        hasInput={true}
-        isExpanded={false}
-      />
-    </div>
+    <>
+      <div className="relative my-2.5 flex h-5 shrink-0 items-center gap-2.5">
+        <ProgressText
+          muted
+          progress={progress}
+          onClick={() => setIsExpanded(true)}
+          inProgressText={label}
+          finishedText={label}
+          authText={
+            pendingAuth ? localize('com_ui_requires_auth') : undefined
+          }
+          hasInput={true}
+          isExpanded={false}
+        />
+      </div>
+      {!isExpanded && pendingAuth && (
+        <div className="pl-4">
+          <AuthCTA auth={pendingAuth.auth} name={pendingAuth.name} />
+        </div>
+      )}
+    </>
   );
 }
