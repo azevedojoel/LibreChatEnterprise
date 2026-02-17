@@ -8,8 +8,6 @@ import type {
 } from 'librechat-data-provider';
 import { MessageContext, SearchContext } from '~/Providers';
 import { ParallelContentRenderer, type PartWithIndex } from './ParallelContent';
-import { groupConsecutiveToolCalls } from './utils/groupToolCalls';
-import ToolCallGroup from './ToolCallGroup';
 import { mapAttachments } from '~/utils';
 import { EditTextPart, EmptyText } from './Parts';
 import MemoryArtifacts from './MemoryArtifacts';
@@ -110,15 +108,15 @@ const ContentParts = memo(function ContentParts({
     return null;
   }
 
-  // Must be called unconditionally - used in sequential render path below
-  const renderItems = useMemo(() => {
-    const sequentialParts: PartWithIndex[] = [];
+  // Sequential parts for rendering (no grouping - each tool call shows output directly)
+  const sequentialParts = useMemo(() => {
+    const parts: PartWithIndex[] = [];
     content?.forEach((part, idx) => {
       if (part) {
-        sequentialParts.push({ part, idx });
+        parts.push({ part, idx });
       }
     });
-    return groupConsecutiveToolCalls(sequentialParts);
+    return parts;
   }, [content]);
 
   // Edit mode: render editable text parts
@@ -190,28 +188,13 @@ const ContentParts = memo(function ContentParts({
           <EmptyText />
         </Container>
       )}
-      {renderItems.map((item, i) => {
-        if (item.type === 'single') {
-          return renderPart(
-            item.part,
-            item.idx,
-            i === renderItems.length - 1 && item.idx === lastContentIdx,
-          );
-        }
-        const isLastItem = i === renderItems.length - 1;
-        const lastPartInGroup = item.parts[item.parts.length - 1];
-        const isLast =
-          isLastItem && lastPartInGroup && lastPartInGroup.idx === lastContentIdx;
-        return (
-          <ToolCallGroup
-            key={`tool-call-group-${messageId}-${item.parts[0].idx}`}
-            parts={item.parts}
-            messageId={messageId}
-            renderPart={renderPart}
-            isLast={!!isLast}
-          />
-        );
-      })}
+      {sequentialParts.map(({ part, idx }, i) =>
+        renderPart(
+          part,
+          idx,
+          i === sequentialParts.length - 1 && idx === lastContentIdx,
+        ),
+      )}
     </SearchContext.Provider>
   );
 });

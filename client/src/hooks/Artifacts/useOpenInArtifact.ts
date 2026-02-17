@@ -30,7 +30,7 @@ export interface OpenInArtifactParams {
 
 /**
  * Hook that provides a function to open file content in the artifact viewer.
- * Used when clicking "Open in Artifact" on read_file tool outputs.
+ * Used when clicking "Open in Artifact" on workspace_read_file tool outputs.
  */
 export default function useOpenInArtifact() {
   const setArtifacts = useSetRecoilState(store.artifactsState);

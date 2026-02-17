@@ -1,4 +1,5 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useMemo } from 'react';
+import throttle from 'lodash/throttle';
 import {
   Constants,
   StepTypes,
@@ -18,6 +19,9 @@ import type { SetterOrUpdater } from 'recoil';
 import type { AnnounceOptions } from '~/common';
 import { MESSAGE_UPDATE_INTERVAL } from '~/common';
 import { logger } from '~/utils';
+
+/** Throttle interval for delta updates - allows ~12 updates/sec for smooth streaming feel */
+const DELTA_UPDATE_THROTTLE_MS = 80;
 
 type TUseStepHandler = {
   announcePolite: (options: AnnounceOptions) => void;
@@ -67,6 +71,43 @@ export default function useStepHandler({
   const stepMap = useRef(new Map<string, Agents.RunStep>());
   /** Buffer for deltas that arrive before their corresponding run step */
   const pendingDeltaBuffer = useRef(new Map<string, TStepEvent[]>());
+
+  /**
+   * Flush messageMap updates to setMessages. Used for throttled delta updates
+   * to allow incremental UI renders instead of batching everything into one.
+   * The throttle's setTimeout yields to the event loop (Fix 2: reduce React
+   * batching by deferring updates to a future macrotask).
+   */
+  const flushDeltaUpdates = useCallback(() => {
+    const messages = getMessages();
+    if (!messages?.length) return;
+    let hasUpdates = false;
+    const merged = messages.map((m) => {
+      const mapped = messageMap.current.get(m.messageId);
+      if (mapped) {
+        hasUpdates = true;
+        return mapped;
+      }
+      return m;
+    });
+    if (hasUpdates) {
+      setMessages(merged);
+    }
+  }, [getMessages, setMessages]);
+
+  /**
+   * Throttled flush for delta events. Uses trailing-edge throttle so updates
+   * are batched and flushed ~80ms after the last delta, allowing React to
+   * render intermediate state and creating a smooth streaming feel.
+   */
+  const throttledFlush = useMemo(
+    () =>
+      throttle(flushDeltaUpdates, DELTA_UPDATE_THROTTLE_MS, {
+        leading: false,
+        trailing: true,
+      }),
+    [flushDeltaUpdates],
+  );
 
   /**
    * Calculate content index for a run step.
@@ -318,6 +359,7 @@ export default function useStepHandler({
             updatedMessages = [...updatedMessages, userMessage as TMessage];
           }
 
+          throttledFlush.cancel();
           setMessages([...updatedMessages, response]);
         }
 
@@ -358,6 +400,7 @@ export default function useStepHandler({
             msg.messageId === responseMessageId ? updatedResponse : msg,
           );
 
+          throttledFlush.cancel();
           setMessages(updatedMessages);
         }
 
@@ -397,6 +440,7 @@ export default function useStepHandler({
           );
           messageMap.current.set(responseMessageId, updatedResponse);
           const currentMessages = getMessages() || [];
+          throttledFlush.cancel();
           setMessages([...currentMessages.slice(0, -1), updatedResponse]);
         }
       } else if (event === 'on_message_delta') {
@@ -439,8 +483,7 @@ export default function useStepHandler({
             getStepMetadata(runStep),
           );
           messageMap.current.set(responseMessageId, updatedResponse);
-          const currentMessages = getMessages() || [];
-          setMessages([...currentMessages.slice(0, -1), updatedResponse]);
+          throttledFlush();
         }
       } else if (event === 'on_reasoning_delta') {
         const reasoningDelta = data as Agents.ReasoningDeltaEvent;
@@ -482,8 +525,7 @@ export default function useStepHandler({
             getStepMetadata(runStep),
           );
           messageMap.current.set(responseMessageId, updatedResponse);
-          const currentMessages = getMessages() || [];
-          setMessages([...currentMessages.slice(0, -1), updatedResponse]);
+          throttledFlush();
         }
       } else if (event === 'on_run_step_delta') {
         const runStepDelta = data as Agents.RunStepDeltaEvent;
@@ -538,6 +580,7 @@ export default function useStepHandler({
                 const updatedMessages = messages.map((msg) =>
                   msg.messageId === fallbackMessageId ? updatedResponse : msg,
                 );
+                throttledFlush.cancel();
                 setMessages(updatedMessages);
                 return;
               }
@@ -603,11 +646,7 @@ export default function useStepHandler({
           });
 
           messageMap.current.set(responseMessageId, updatedResponse);
-          const updatedMessages = messages.map((msg) =>
-            msg.messageId === responseMessageId ? updatedResponse : msg,
-          );
-
-          setMessages(updatedMessages);
+          throttledFlush();
         }
       } else if (event === 'on_run_step_completed') {
         const { result } = data as unknown as { result: Agents.ToolEndEvent };
@@ -828,6 +867,7 @@ export default function useStepHandler({
             msg.messageId === responseMessageId ? updatedResponse : msg,
           );
 
+          throttledFlush.cancel();
           setMessages(updatedMessages);
         }
       }
@@ -844,15 +884,17 @@ export default function useStepHandler({
       announcePolite,
       setMessages,
       calculateContentIndex,
+      throttledFlush,
     ],
   );
 
   const clearStepMaps = useCallback(() => {
+    throttledFlush.cancel();
     toolCallIdMap.current.clear();
     messageMap.current.clear();
     stepMap.current.clear();
     pendingDeltaBuffer.current.clear();
-  }, []);
+  }, [throttledFlush]);
 
   /**
    * Sync a message into the step handler's messageMap.
