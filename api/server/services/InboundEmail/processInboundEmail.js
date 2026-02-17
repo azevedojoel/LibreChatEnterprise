@@ -235,7 +235,7 @@ async function processInboundEmail(payload) {
 
   if (requestFiles.length > 0) {
     const fileList = requestFiles.map((f) => f.filename).join(', ');
-    const attachmentHint = `[The user has attached the following file(s): ${fileList}. Use the file_search tool to read and search within these files.]`;
+    const attachmentHint = `[Attached file(s) saved and available via file_search: ${fileList}]`;
     messageText = `${attachmentHint}\n\n${messageText}`;
   }
 
