@@ -280,16 +280,8 @@ async function performSync(flowManager, flowId, flowType) {
 
     return { messagesSync, convosSync };
   } finally {
-    if (indexingDisabled === true) {
-      logger.info('[indexSync] Indexing is disabled, skipping cleanup...');
-    } else if (flowManager && flowId && flowType) {
-      try {
-        await flowManager.deleteFlow(flowId, flowType);
-        logger.debug('[indexSync] Flow state cleaned up');
-      } catch (cleanupErr) {
-        logger.debug('[indexSync] Could not clean up flow state:', cleanupErr.message);
-      }
-    }
+    // Do not delete flow here - createFlowWithHandler needs it to call completeFlow() after
+    // this handler returns. Deleting prematurely causes "Cannot complete flow - flow state not found"
   }
 }
 
