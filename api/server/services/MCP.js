@@ -56,6 +56,13 @@ function createRunStepDeltaEmitter({ res, stepId, toolCall, streamId = null }) {
    * @returns {Promise<void>}
    */
   return async function (authURL) {
+    logger.debug('[MCP OAuth] createRunStepDeltaEmitter: emitting auth URL', {
+      stepId,
+      hasAuthURL: !!authURL,
+      hasRes: !!res,
+      hasStreamId: !!streamId,
+      toolCallName: toolCall?.name,
+    });
     /** @type {{ id: string; delta: AgentToolCallDelta }} */
     const data = {
       id: stepId,
@@ -63,7 +70,7 @@ function createRunStepDeltaEmitter({ res, stepId, toolCall, streamId = null }) {
         type: StepTypes.TOOL_CALLS,
         tool_calls: [{ ...toolCall, args: '' }],
         auth: authURL,
-        expires_at: Date.now() + Time.TWO_MINUTES,
+        expires_at: Date.now() + Time.TEN_MINUTES,
       },
     };
     const eventData = { event: GraphEvents.ON_RUN_STEP_DELTA, data };
@@ -121,8 +128,13 @@ function createOAuthStart({ flowId, flowManager, callback }) {
    * @returns {Promise<boolean>} Returns true to indicate the event was sent successfully.
    */
   return async function (authURL) {
+    logger.debug('[MCP OAuth] createOAuthStart callback invoked', {
+      flowId,
+      hasAuthURL: !!authURL,
+      hasCallback: !!callback,
+    });
     await flowManager.createFlowWithHandler(flowId, 'oauth_login', async () => {
-      callback?.(authURL);
+      await callback?.(authURL);
       logger.debug('Sent OAuth login request to client');
       return true;
     });
@@ -175,14 +187,14 @@ function createAbortHandler({ userId, serverName, toolName, flowManager }) {
 
 /**
  * @param {Object} params
- * @param {() => void} params.runStepEmitter
- * @param {(authURL: string) => void} params.runStepDeltaEmitter
- * @returns {(authURL: string) => void}
+ * @param {() => Promise<void>} params.runStepEmitter
+ * @param {(authURL: string) => Promise<void>} params.runStepDeltaEmitter
+ * @returns {(authURL: string) => Promise<void>}
  */
 function createOAuthCallback({ runStepEmitter, runStepDeltaEmitter }) {
-  return function (authURL) {
-    runStepEmitter();
-    runStepDeltaEmitter(authURL);
+  return async function (authURL) {
+    await runStepEmitter();
+    await runStepDeltaEmitter(authURL);
   };
 }
 
@@ -489,12 +501,24 @@ function createToolInstance({
 
       const { args: _args, stepId, ...toolCall } = config.toolCall ?? {};
       const flowId = `${serverName}:oauth_login:${config.metadata.thread_id}:${config.metadata.run_id}`;
+      const runId = config.metadata?.run_id ?? Constants.USE_PRELIM_RESPONSE_MESSAGE_ID;
+      const stepIndex = config.metadata?.index ?? 0;
+      const runStepToolCall = { ...toolCall, name: normalizedToolKey };
+      const runStepEmitter = createRunStepEmitter({
+        res,
+        runId,
+        stepId,
+        toolCall: runStepToolCall,
+        index: stepIndex,
+        streamId,
+      });
       const runStepDeltaEmitter = createRunStepDeltaEmitter({
         res,
         stepId,
-        toolCall,
+        toolCall: runStepToolCall,
         streamId,
       });
+      const oauthCallback = createOAuthCallback({ runStepEmitter, runStepDeltaEmitter });
       const oauthStart = isHeadless
         ? async (authURL) => {
             throw new Error(
@@ -505,14 +529,14 @@ function createToolInstance({
         : createOAuthStart({
             flowId,
             flowManager,
-            callback: runStepDeltaEmitter,
+            callback: oauthCallback,
           });
       const oauthEnd = isHeadless
         ? async () => {}
         : createOAuthEnd({
             res,
             stepId,
-            toolCall,
+            toolCall: runStepToolCall,
             streamId,
           });
 

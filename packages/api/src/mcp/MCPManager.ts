@@ -178,49 +178,81 @@ export class MCPManager extends UserConnectionManager {
   }
 
   /**
-   * Get instructions for MCP servers
-   * @param serverNames Optional array of server names. If not provided or empty, returns all servers.
-   * @returns Object mapping server names to their instructions
+   * Get context for MCP servers (instructions, title, description).
+   * Includes servers that have any of: serverInstructions, title, or description.
+   * @param serverNames Optional array of server names. If not provided, returns all servers with context.
+   * @returns Object mapping server names to their context
    */
-  private async getInstructions(serverNames?: string[]): Promise<Record<string, string>> {
-    const instructions: Record<string, string> = {};
+  private async getServerContext(
+    serverNames?: string[],
+  ): Promise<
+    Record<string, { instructions?: string; title?: string; description?: string }>
+  > {
     const configs = await MCPServersRegistry.getInstance().getAllServerConfigs();
+    const context: Record<string, { instructions?: string; title?: string; description?: string }> =
+      {};
+
     for (const [serverName, config] of Object.entries(configs)) {
-      if (config.serverInstructions != null) {
-        instructions[serverName] = config.serverInstructions as string;
+      const hasInstructions = config.serverInstructions != null;
+      const hasTitle = typeof config.title === 'string' && config.title.trim() !== '';
+      const hasDescription =
+        typeof config.description === 'string' && config.description.trim() !== '';
+      if (!hasInstructions && !hasTitle && !hasDescription) {
+        continue;
       }
+
+      const entry: { instructions?: string; title?: string; description?: string } = {};
+      if (hasInstructions) {
+        entry.instructions = config.serverInstructions as string;
+      }
+      if (hasTitle) {
+        entry.title = config.title!.trim();
+      }
+      if (hasDescription) {
+        entry.description = config.description!.trim();
+      }
+      context[serverName] = entry;
     }
-    if (!serverNames) return instructions;
-    return pick(instructions, serverNames);
+
+    if (!serverNames) return context;
+    return pick(context, serverNames);
   }
 
   /**
-   * Format MCP server instructions for injection into context
-   * @param serverNames Optional array of server names to include. If not provided, includes all servers.
+   * Format MCP server instructions for injection into context.
+   * Includes server name, display title (if different), description, and instructions.
+   * @param serverNames Optional array of server names to include. If not provided, includes all servers with context.
    * @returns Formatted instructions string ready for context injection
    */
   public async formatInstructionsForContext(serverNames?: string[]): Promise<string> {
-    /** Instructions for specified servers or all stored instructions */
-    const instructionsToInclude = await this.getInstructions(serverNames);
+    const serverContext = await this.getServerContext(serverNames);
 
-    if (Object.keys(instructionsToInclude).length === 0) {
+    if (Object.keys(serverContext).length === 0) {
       return '';
     }
 
-    // Format instructions for context injection
-    const formattedInstructions = Object.entries(instructionsToInclude)
-      .map(([serverName, instructions]) => {
-        return `## ${serverName} MCP Server Instructions
-
-${instructions}`;
+    const formattedSections = Object.entries(serverContext)
+      .map(([serverName, ctx]) => {
+        const lines: string[] = [`## ${serverName} MCP Server`];
+        if (ctx.title && ctx.title !== serverName) {
+          lines.push(`Display name: ${ctx.title}`);
+        }
+        if (ctx.description) {
+          lines.push(ctx.description);
+        }
+        if (ctx.instructions) {
+          lines.push('', ctx.instructions);
+        }
+        return lines.join('\n').trim();
       })
+      .filter(Boolean)
       .join('\n\n');
 
     return `# MCP Server Instructions
 
 The following MCP servers are available with their specific instructions:
 
-${formattedInstructions}
+${formattedSections}
 
 Please follow these instructions when using tools from the respective MCP servers.`;
   }

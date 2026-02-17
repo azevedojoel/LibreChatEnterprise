@@ -222,10 +222,49 @@ describe('MCPManager', () => {
       const result = await manager.formatInstructionsForContext();
 
       expect(result).toContain('# MCP Server Instructions');
-      expect(result).toContain('## github MCP Server Instructions');
+      expect(result).toContain('## github MCP Server');
       expect(result).toContain('Use GitHub API with care');
-      expect(result).toContain('## files MCP Server Instructions');
+      expect(result).toContain('## files MCP Server');
       expect(result).toContain('Only read/write files in allowed directories');
+    });
+
+    it('should include title and description when present in config', async () => {
+      (mockRegistryInstance.getAllServerConfigs as jest.Mock).mockResolvedValue({
+        github: {
+          type: 'sse',
+          url: 'https://api.github.com',
+          title: 'GitHub Integration',
+          description: 'Access GitHub repositories, commits, and issues.',
+          serverInstructions: 'Use GitHub API with care',
+        },
+      });
+
+      const manager = await MCPManager.createInstance(newMCPServersConfig());
+      const result = await manager.formatInstructionsForContext();
+
+      expect(result).toContain('## github MCP Server');
+      expect(result).toContain('Display name: GitHub Integration');
+      expect(result).toContain('Access GitHub repositories, commits, and issues.');
+      expect(result).toContain('Use GitHub API with care');
+    });
+
+    it('should include servers with only title or description when no instructions', async () => {
+      (mockRegistryInstance.getAllServerConfigs as jest.Mock).mockResolvedValue({
+        customServer: {
+          type: 'stdio',
+          command: 'node',
+          args: ['server.js'],
+          title: 'Custom Tools',
+          description: 'Provides custom automation tools.',
+        },
+      });
+
+      const manager = await MCPManager.createInstance(newMCPServersConfig());
+      const result = await manager.formatInstructionsForContext();
+
+      expect(result).toContain('## customServer MCP Server');
+      expect(result).toContain('Display name: Custom Tools');
+      expect(result).toContain('Provides custom automation tools.');
     });
 
     it('should filter instructions by server names when provided', async () => {
@@ -252,9 +291,9 @@ describe('MCPManager', () => {
       const manager = await MCPManager.createInstance(newMCPServersConfig());
       const result = await manager.formatInstructionsForContext(['github', 'database']);
 
-      expect(result).toContain('## github MCP Server Instructions');
+      expect(result).toContain('## github MCP Server');
       expect(result).toContain('Use GitHub API with care');
-      expect(result).toContain('## database MCP Server Instructions');
+      expect(result).toContain('## database MCP Server');
       expect(result).toContain('Be careful with database operations');
       expect(result).not.toContain('files');
       expect(result).not.toContain('Only read/write files in allowed directories');
@@ -283,7 +322,7 @@ describe('MCPManager', () => {
       const manager = await MCPManager.createInstance(newMCPServersConfig());
       const result = await manager.formatInstructionsForContext();
 
-      expect(result).toContain('## github MCP Server Instructions');
+      expect(result).toContain('## github MCP Server');
       expect(result).toContain('Use GitHub API with care');
       expect(result).not.toContain('files');
       expect(result).not.toContain('database');
