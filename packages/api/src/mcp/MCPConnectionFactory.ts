@@ -14,6 +14,9 @@ import { processMCPEnv } from '~/utils';
 
 const MCP_OAUTH_TOKEN_PLACEHOLDER = '{{LIBRECHAT_MCP_OAUTH_ACCESS_TOKEN}}';
 
+/** Marker in headless oauthStart throw - when present, propagate so captureOAuthUrl can extract the URL */
+const HEADLESS_OAUTH_URL_MARKER = 'To authenticate, open this URL in your browser';
+
 function injectMCPOAuthTokenIntoConfig(
   config: t.MCPOptions,
   accessToken: string,
@@ -443,7 +446,20 @@ export class MCPConnectionFactory {
       }
 
       // Normal OAuth handling - wait for completion
-      const result = await this.handleOAuthRequired();
+      let result: Awaited<ReturnType<typeof this.handleOAuthRequired>>;
+      try {
+        result = await this.handleOAuthRequired();
+      } catch (oauthError) {
+        if (
+          oauthError instanceof Error &&
+          oauthError.message.includes(HEADLESS_OAUTH_URL_MARKER)
+        ) {
+          logger.warn(`${this.logPrefix} OAuth failed (headless), emitting oauthFailed with URL`);
+          connection.emit('oauthFailed', oauthError);
+          return;
+        }
+        throw oauthError;
+      }
 
       if (result?.tokens && this.tokenMethods?.createToken) {
         try {
@@ -608,6 +624,18 @@ export class MCPConnectionFactory {
         this.serverConfig.oauth,
       );
 
+      /**
+       * Store the flow BEFORE calling oauthStart. When oauthStart throws (e.g. headless
+       * inbound email), the flow is already in the store so the OAuth callback can find it
+       * when the user clicks the link in the email.
+       */
+      const flowPromise = this.flowManager.createFlow(
+        newFlowId,
+        'mcp_oauth',
+        flowMetadata as FlowMetadata,
+        this.signal,
+      );
+
       if (typeof this.oauthStart === 'function') {
         logger.info(`${this.logPrefix} OAuth flow started, issued authorization URL to user`);
         await this.oauthStart(authorizationUrl);
@@ -617,26 +645,19 @@ export class MCPConnectionFactory {
         );
       }
 
-      /** When returnOnOAuth, store the flow so the callback can find it, then throw */
+      /** When returnOnOAuth, flow is already stored; throw so caller can surface URL to user */
       if (this.returnOnOAuth) {
-        this.flowManager
-          .createFlow(newFlowId, 'mcp_oauth', flowMetadata as FlowMetadata, this.signal)
-          .catch((err) =>
-            logger.warn(
-              `${this.logPrefix} OAuth flow promise rejected (expected when user completes via callback)`,
-              err?.message,
-            ),
-          );
+        flowPromise.catch((err) =>
+          logger.warn(
+            `${this.logPrefix} OAuth flow promise rejected (expected when user completes via callback)`,
+            err?.message,
+          ),
+        );
         throw new Error('OAuth flow initiated - return early');
       }
 
-      /** Tokens from the new flow */
-      const tokens = await this.flowManager.createFlow(
-        newFlowId,
-        'mcp_oauth',
-        flowMetadata as FlowMetadata,
-        this.signal,
-      );
+      /** Tokens from the new flow (callback will complete it) */
+      const tokens = await flowPromise;
       if (typeof this.oauthEnd === 'function') {
         await this.oauthEnd();
       }
@@ -653,6 +674,12 @@ export class MCPConnectionFactory {
       };
     } catch (error) {
       if (error instanceof Error && error.message === 'OAuth flow initiated - return early') {
+        throw error;
+      }
+      if (
+        error instanceof Error &&
+        error.message.includes(HEADLESS_OAUTH_URL_MARKER)
+      ) {
         throw error;
       }
       logger.error(`${this.logPrefix} Failed to complete OAuth flow for ${this.serverName}`, error);

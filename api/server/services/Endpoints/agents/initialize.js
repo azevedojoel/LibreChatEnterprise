@@ -147,6 +147,25 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
       return result;
     },
     toolEndCallback,
+    captureOAuthUrl: (url) => {
+      const arr = req._headlessOAuthUrls;
+      logger.info('[captureOAuthUrl] OAuth URL captured', {
+        urlLength: url?.length ?? 0,
+        urlPreview: url ? `${url.slice(0, 80)}...` : '(empty)',
+        hasHeadlessArray: Array.isArray(arr),
+        arrayLengthBefore: arr?.length ?? 0,
+      });
+      if (Array.isArray(arr)) {
+        arr.push(url);
+        logger.info('[captureOAuthUrl] URL pushed to capturedOAuthUrls', {
+          arrayLengthAfter: arr.length,
+        });
+      } else {
+        logger.warn(
+          '[captureOAuthUrl] req._headlessOAuthUrls not set - URL not captured for email',
+        );
+      }
+    },
   };
 
   const eventHandlers = getDefaultHandlers({

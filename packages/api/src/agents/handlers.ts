@@ -172,19 +172,32 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
               const error = toolError as Error;
               logger.error(`[ON_TOOL_EXECUTE] Tool ${tc.name} error:`, error);
               const errorMessage = error.message ?? '';
-              if (captureOAuthUrl && errorMessage.includes(HEADLESS_OAUTH_URL_MARKER)) {
+              let messageForModel = errorMessage;
+              const hasOAuthMarker = errorMessage.includes(HEADLESS_OAUTH_URL_MARKER);
+              logger.info(`[ON_TOOL_EXECUTE] OAuth check for ${tc.name}`, {
+                hasCaptureOAuthUrl: !!captureOAuthUrl,
+                hasOAuthMarker,
+                errorMessagePreview: errorMessage.slice(0, 120),
+              });
+              if (captureOAuthUrl && hasOAuthMarker) {
                 const url = errorMessage
                   .slice(errorMessage.indexOf(HEADLESS_OAUTH_URL_MARKER) + HEADLESS_OAUTH_URL_MARKER.length)
                   .trim();
+                logger.info(`[ON_TOOL_EXECUTE] Extracting OAuth URL for email`, {
+                  urlLength: url?.length ?? 0,
+                  urlPreview: url ? `${url.slice(0, 80)}...` : '(empty)',
+                });
                 if (url) {
                   captureOAuthUrl(url);
                 }
+                messageForModel =
+                  'OAuth re-authentication required. The authentication URL has been included in the email for you to complete sign-in.';
               }
               return {
                 toolCallId: tc.id,
                 status: 'error' as const,
                 content: '',
-                errorMessage,
+                errorMessage: messageForModel,
               };
             }
           }),
@@ -192,8 +205,30 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
 
         resolve(results);
       } catch (error) {
-        logger.error('[ON_TOOL_EXECUTE] Fatal error:', error);
-        reject(error as Error);
+        const err = error as Error;
+        const errorMessage = err?.message ?? '';
+        const hasOAuthMarker = errorMessage.includes(HEADLESS_OAUTH_URL_MARKER);
+
+        if (captureOAuthUrl && hasOAuthMarker) {
+          const url = errorMessage
+            .slice(errorMessage.indexOf(HEADLESS_OAUTH_URL_MARKER) + HEADLESS_OAUTH_URL_MARKER.length)
+            .trim();
+          if (url) {
+            captureOAuthUrl(url);
+          }
+          // Resolve with error results so agent gets the "URL included in email" message
+          const results: ToolExecuteResult[] = toolCalls.map((tc) => ({
+            toolCallId: tc.id,
+            status: 'error' as const,
+            content: '',
+            errorMessage:
+              'OAuth re-authentication required. The authentication URL has been included in the email for you to complete sign-in.',
+          }));
+          resolve(results);
+        } else {
+          logger.error('[ON_TOOL_EXECUTE] Fatal error:', err);
+          reject(err);
+        }
       }
     },
   };

@@ -32,7 +32,12 @@ async function getEndpointsConfig(req) {
   logger.info(
     `[getEndpointsConfig] custom endpoints from YAML: ${JSON.stringify(
       Array.isArray(customEndpointsRaw)
-        ? customEndpointsRaw.map((e) => ({ name: e?.name, baseURL: !!e?.baseURL, apiKey: !!e?.apiKey, models: !!e?.models }))
+        ? customEndpointsRaw.map((e) => ({
+            name: e?.name,
+            baseURL: !!e?.baseURL,
+            apiKey: !!e?.apiKey,
+            models: !!e?.models,
+          }))
         : customEndpointsRaw,
     )}`,
   );
@@ -123,7 +128,9 @@ async function getEndpointsConfig(req) {
   }
 
   const endpointsConfig = orderEndpointsConfig(mergedConfig);
-  logger.info(`[getEndpointsConfig] final endpoint keys: ${JSON.stringify(Object.keys(endpointsConfig))}`);
+  logger.info(
+    `[getEndpointsConfig] final endpoint keys: ${JSON.stringify(Object.keys(endpointsConfig))}`,
+  );
 
   await cache.set(CacheKeys.ENDPOINT_CONFIG, endpointsConfig);
   return endpointsConfig;

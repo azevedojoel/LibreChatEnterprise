@@ -24,6 +24,9 @@ import { createSSRFSafeUndiciConnect, resolveHostnameSSRF } from '~/auth';
 import { sanitizeUrlForLogging } from './utils';
 import { mcpConfig } from './mcpConfig';
 
+/** Marker in headless oauthStart throw - when present, propagate so captureOAuthUrl can extract the URL */
+const HEADLESS_OAUTH_URL_MARKER = 'To authenticate, open this URL in your browser';
+
 type FetchLike = (url: string | URL, init?: RequestInit) => Promise<Response>;
 
 function isStdioOptions(options: t.MCPOptions): options is t.StdioOptions {
@@ -759,7 +762,11 @@ export class MCPConnection extends EventEmitter {
             // OAuth failed or timed out
             this.oauthRequired = false;
             logger.error(`${this.getLogPrefix()} OAuth handling failed:`, oauthError);
-            // Re-throw the original authentication error
+            // Propagate headless error (with URL) so captureOAuthUrl can extract it for email
+            const err = oauthError as Error;
+            if (err?.message?.includes(HEADLESS_OAUTH_URL_MARKER)) {
+              throw oauthError;
+            }
             throw error;
           }
         }

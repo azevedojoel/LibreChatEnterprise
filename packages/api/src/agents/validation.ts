@@ -20,7 +20,7 @@ export const agentFileResourceSchema = agentBaseResourceSchema.extend({
   vector_store_ids: z.array(z.string()).optional(),
 });
 
-/** Execute code resource - read_file, edit_file, create_file use conversation-scoped workspace */
+/** Execute code resource - workspace_read_file, workspace_edit_file, workspace_create_file use conversation-scoped workspace */
 export const executeCodeResourceSchema = agentBaseResourceSchema;
 
 /** Tool resources schema matching AgentToolResources interface */

@@ -211,6 +211,7 @@ function createOAuthCallback({ runStepEmitter, runStepDeltaEmitter }) {
  * @returns { Promise<Array<typeof tool | { _call: (toolInput: Object | string) => unknown}>> } An object with `_call` method to execute the tool input.
  */
 async function reconnectServer({
+  req,
   res,
   user,
   index,
@@ -222,7 +223,8 @@ async function reconnectServer({
   logger.debug(
     `[MCP][reconnectServer] serverName: ${serverName}, user: ${user?.id}, hasUserMCPAuthMap: ${!!userMCPAuthMap}`,
   );
-  const isHeadless = !res || typeof res?.write !== 'function';
+  const isHeadless =
+    req?._headlessOAuthUrls != null || !res || typeof res?.write !== 'function';
   const runId = Constants.USE_PRELIM_RESPONSE_MESSAGE_ID;
   const flowId = `${user.id}:${serverName}:${Date.now()}`;
   const flowManager = getFlowStateManager(getLogStores(CacheKeys.FLOWS));
@@ -317,6 +319,7 @@ async function reconnectServer({
  * @returns { Promise<Array<typeof tool | { _call: (toolInput: Object | string) => unknown}>> } An object with `_call` method to execute the tool input.
  */
 async function createMCPTools({
+  req,
   res,
   user,
   index,
@@ -342,6 +345,7 @@ async function createMCPTools({
   }
 
   const result = await reconnectServer({
+    req,
     res,
     user,
     index,
@@ -358,6 +362,7 @@ async function createMCPTools({
   const serverTools = [];
   for (const tool of result.tools) {
     const toolInstance = await createMCPTool({
+      req,
       res,
       user,
       provider,
@@ -392,6 +397,7 @@ async function createMCPTools({
  * @returns { Promise<typeof tool | { _call: (toolInput: Object | string) => unknown}> } An object with `_call` method to execute the tool input.
  */
 async function createMCPTool({
+  req,
   res,
   user,
   index,
@@ -428,6 +434,7 @@ async function createMCPTool({
       `[MCP][${serverName}][${toolName}] Requested tool not found in available tools, re-initializing MCP server.`,
     );
     const result = await reconnectServer({
+      req,
       res,
       user,
       index,
@@ -445,6 +452,7 @@ async function createMCPTool({
   }
 
   return createToolInstance({
+    req,
     res,
     provider,
     toolName,
@@ -458,6 +466,7 @@ const HEADLESS_OAUTH_MESSAGE =
   'This integration requires re-authentication in LibreChat. Please sign in at the LibreChat app and reconnect this service under Settings, then try your request again.';
 
 function createToolInstance({
+  req,
   res,
   toolName,
   serverName,
@@ -465,7 +474,8 @@ function createToolInstance({
   provider: _provider,
   streamId = null,
 }) {
-  const isHeadless = !res || typeof res?.write !== 'function';
+  const isHeadless =
+    req?._headlessOAuthUrls != null || !res || typeof res?.write !== 'function';
   /** @type {LCTool} */
   const { description, parameters } = toolDefinition;
   const isGoogle = _provider === Providers.VERTEXAI || _provider === Providers.GOOGLE;
