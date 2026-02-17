@@ -22,26 +22,24 @@ WORKDIR /app
 
 USER node
 
-COPY --chown=node:node package.json package-lock.json ./
-COPY --chown=node:node api/package.json ./api/package.json
-COPY --chown=node:node client/package.json ./client/package.json
-COPY --chown=node:node packages/data-provider/package.json ./packages/data-provider/package.json
-COPY --chown=node:node packages/data-schemas/package.json ./packages/data-schemas/package.json
-COPY --chown=node:node packages/api/package.json ./packages/api/package.json
+COPY --chown=node:node . .
+
+# Ensure agents submodule is populated (Railway excludes .git, submodule update fails)
+ARG AGENTS_REPO=https://github.com/azevedojoel/agents
+RUN if [ ! -f packages/agents/package.json ]; then \
+    rm -rf packages/agents && mkdir -p packages && \
+    git clone --depth 1 ${AGENTS_REPO} packages/agents; \
+  fi
 
 RUN \
-    # Allow mounting of these files, which have no default
     touch .env ; \
-    # Create directories for the volumes to inherit the correct permissions
     mkdir -p /app/client/public/images /app/logs /app/uploads ; \
     npm config set fetch-retry-maxtimeout 600000 ; \
     npm config set fetch-retries 5 ; \
     npm config set fetch-retry-mintimeout 15000 ; \
     npm ci --no-audit
 
-COPY --chown=node:node . .
-
-# Railway excludes .git from build context - clone submodule directly (git submodule update requires .git)
+# Railway excludes .git from build context - clone MCP submodules directly
 ARG GOOGLE_WORKSPACE_REPO=https://github.com/azevedojoel/workspace.git
 RUN rm -rf mcp-servers/google-workspace && \
     mkdir -p mcp-servers && \
@@ -52,6 +50,8 @@ ARG MS365_MCP_REPO=https://github.com/azevedojoel/ms-365-mcp-server
 RUN rm -rf mcp-servers/ms-365-mcp-server && \
     git clone --depth 1 ${MS365_MCP_REPO} mcp-servers/ms-365-mcp-server
 RUN cd mcp-servers/ms-365-mcp-server && npm install && npm run generate && npm run build
+
+RUN cd packages/agents && npm install && npm run build
 
 RUN \
     # React client build with configurable memory
