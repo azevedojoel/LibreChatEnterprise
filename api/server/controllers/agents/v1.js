@@ -194,7 +194,7 @@ const getAgentHandler = async (req, res, expandProperties = false) => {
     }
 
     if (!expandProperties) {
-      // VIEW permission: Basic agent info only
+      // VIEW permission: Basic agent info only (includes tools for chat input filtering)
       return res.status(200).json({
         _id: agent._id,
         id: agent.id,
@@ -209,6 +209,7 @@ const getAgentHandler = async (req, res, expandProperties = false) => {
         isCollaborative: agent.isCollaborative,
         isPublic: agent.isPublic,
         version: agent.version,
+        tools: agent.tools ?? [],
         // Safe metadata
         createdAt: agent.createdAt,
         updatedAt: agent.updatedAt,
