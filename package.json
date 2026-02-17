@@ -33,6 +33,7 @@
     "ban-user": "node config/ban-user.js",
     "delete-user": "node config/delete-user.js",
     "reset-meili-sync": "node config/reset-meili-sync.js",
+    "init-pgvector-rag": "node scripts/init-pgvector-rag.js",
     "update-banner": "node config/update-banner.js",
     "delete-banner": "node config/delete-banner.js",
     "backend": "cross-env NODE_ENV=production node api/server/index.js",
@@ -132,6 +133,7 @@
     "jest": "^30.2.0",
     "lint-staged": "^15.4.3",
     "patch-package": "^8.0.0",
+    "pg": "^8.18.0",
     "prettier": "^3.5.0",
     "prettier-plugin-tailwindcss": "^0.6.11",
     "typescript-eslint": "^8.24.0"
