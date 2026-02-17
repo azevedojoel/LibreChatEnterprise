@@ -1,11 +1,11 @@
 import { Schema } from 'mongoose';
-import type { IScheduledRun } from '~/types/scheduledAgent';
+import type { IScheduledRun } from '~/types/scheduledPrompt';
 
 const scheduledRunSchema = new Schema<IScheduledRun>(
   {
     scheduleId: {
       type: Schema.Types.ObjectId,
-      ref: 'ScheduledAgent',
+      ref: 'ScheduledPrompt',
       index: true,
       required: true,
     },
@@ -19,6 +19,10 @@ const scheduledRunSchema = new Schema<IScheduledRun>(
       type: String,
       required: true,
       index: true,
+    },
+    prompt: {
+      type: String,
+      default: null,
     },
     runAt: {
       type: Date,

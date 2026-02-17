@@ -27,7 +27,7 @@ import { createMemoryModel } from './memory';
 import { createAccessRoleModel } from './accessRole';
 import { createAclEntryModel } from './aclEntry';
 import { createGroupModel } from './group';
-import { createScheduledAgentModel } from './scheduledAgent';
+import { createScheduledPromptModel } from './scheduledPrompt';
 import { createScheduledRunModel } from './scheduledRun';
 
 /**
@@ -64,7 +64,7 @@ export function createModels(mongoose: typeof import('mongoose')) {
     AccessRole: createAccessRoleModel(mongoose),
     AclEntry: createAclEntryModel(mongoose),
     Group: createGroupModel(mongoose),
-    ScheduledAgent: createScheduledAgentModel(mongoose),
+    ScheduledPrompt: createScheduledPromptModel(mongoose),
     ScheduledRun: createScheduledRunModel(mongoose),
   };
 }

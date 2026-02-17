@@ -216,7 +216,7 @@ export type ScheduledAgentSchedule = {
   userId: string;
   agentId: string;
   name: string;
-  prompt: string;
+  promptGroupId: string | { _id: string; name?: string; command?: string };
   scheduleType: ScheduleType;
   cronExpression?: string | null;
   runAt?: string | null;
@@ -233,9 +233,11 @@ export type ScheduledAgentSchedule = {
 
 export type ScheduledRun = {
   _id: string;
-  scheduleId: string | { _id: string; name: string; agentId: string };
+  scheduleId: string | { _id: string; name: string; agentId: string; promptGroupId?: string | object };
   userId: string;
   conversationId: string;
+  /** Actual merged prompt sent to AI (set when run executes) */
+  prompt?: string | null;
   runAt: string;
   status: ScheduledRunStatus;
   error?: string | null;

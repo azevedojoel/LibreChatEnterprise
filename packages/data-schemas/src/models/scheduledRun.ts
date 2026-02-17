@@ -1,5 +1,5 @@
 import scheduledRunSchema from '~/schema/scheduledRun';
-import type { IScheduledRun } from '~/types/scheduledAgent';
+import type { IScheduledRun } from '~/types/scheduledPrompt';
 
 export function createScheduledRunModel(mongoose: typeof import('mongoose')) {
   return (

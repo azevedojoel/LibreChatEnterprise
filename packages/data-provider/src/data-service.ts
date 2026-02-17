@@ -1032,7 +1032,7 @@ export const listScheduledAgents = (): Promise<q.ScheduledAgentSchedule[]> =>
 export const createScheduledAgent = (data: {
   name: string;
   agentId: string;
-  prompt: string;
+  promptGroupId: string;
   scheduleType: 'recurring' | 'one-off';
   cronExpression?: string;
   runAt?: string;
@@ -1045,7 +1045,7 @@ export const updateScheduledAgent = (
   data: Partial<{
     name: string;
     agentId: string;
-    prompt: string;
+    promptGroupId: string;
     scheduleType: 'recurring' | 'one-off';
     cronExpression: string;
     runAt: string;

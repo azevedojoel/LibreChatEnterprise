@@ -3,11 +3,11 @@ import type { Document, Types } from 'mongoose';
 export type ScheduleType = 'recurring' | 'one-off';
 export type ScheduledRunStatus = 'queued' | 'success' | 'failed' | 'running' | 'pending';
 
-export interface IScheduledAgent extends Document {
+export interface IScheduledPrompt extends Document {
   userId: Types.ObjectId;
   agentId: string;
   name: string;
-  prompt: string;
+  promptGroupId: Types.ObjectId;
   scheduleType: ScheduleType;
   cronExpression?: string;
   runAt?: Date;
@@ -25,6 +25,8 @@ export interface IScheduledRun extends Document {
   scheduleId: Types.ObjectId;
   userId: Types.ObjectId;
   conversationId: string;
+  /** Actual merged prompt sent to AI; set when execution runs */
+  prompt?: string;
   runAt: Date;
   status: ScheduledRunStatus;
   error?: string;

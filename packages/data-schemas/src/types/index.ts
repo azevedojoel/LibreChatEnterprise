@@ -30,5 +30,5 @@ export * from './group';
 export * from './web';
 /* MCP Servers */
 export * from './mcp';
-/* Scheduled Agents */
-export * from './scheduledAgent';
+/* Scheduled Prompts */
+export * from './scheduledPrompt';

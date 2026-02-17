@@ -1,7 +1,7 @@
 import { Schema } from 'mongoose';
-import type { IScheduledAgent } from '~/types/scheduledAgent';
+import type { IScheduledPrompt } from '~/types/scheduledPrompt';
 
-const scheduledAgentSchema = new Schema<IScheduledAgent>(
+const scheduledPromptSchema = new Schema<IScheduledPrompt>(
   {
     userId: {
       type: Schema.Types.ObjectId,
@@ -18,9 +18,11 @@ const scheduledAgentSchema = new Schema<IScheduledAgent>(
       type: String,
       required: true,
     },
-    prompt: {
-      type: String,
+    promptGroupId: {
+      type: Schema.Types.ObjectId,
+      ref: 'PromptGroup',
       required: true,
+      index: true,
     },
     scheduleType: {
       type: String,
@@ -61,11 +63,12 @@ const scheduledAgentSchema = new Schema<IScheduledAgent>(
       default: null,
     },
   },
-  { timestamps: true },
+  { timestamps: true, collection: 'scheduledprompts' },
 );
 
-scheduledAgentSchema.index({ userId: 1, enabled: 1 });
-scheduledAgentSchema.index({ scheduleType: 1, runAt: 1 });
-scheduledAgentSchema.index({ enabled: 1, cronExpression: 1 });
+scheduledPromptSchema.index({ userId: 1, enabled: 1 });
+scheduledPromptSchema.index({ promptGroupId: 1 });
+scheduledPromptSchema.index({ scheduleType: 1, runAt: 1 });
+scheduledPromptSchema.index({ enabled: 1, cronExpression: 1 });
 
-export default scheduledAgentSchema;
+export default scheduledPromptSchema;
