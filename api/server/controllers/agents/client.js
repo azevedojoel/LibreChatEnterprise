@@ -90,11 +90,34 @@ function createTokenCounter(encoding) {
   };
 }
 
+const HEADLESS_OAUTH_URL_MARKER = 'To authenticate, open this URL in your browser';
+
 function logToolError(graph, error, toolId) {
   logAxiosError({
     error,
     message: `[api/server/controllers/agents/client.js #chatCompletion] Tool Error "${toolId}"`,
   });
+}
+
+/**
+ * Returns a TOOL_ERROR handler that logs and optionally captures OAuth URLs for headless (inbound email) flows.
+ * When req._headlessOAuthUrls is set, extracts OAuth URLs from the error and pushes them.
+ */
+function getToolErrorHandler(req) {
+  return function toolErrorHandler(graph, error, toolId) {
+    logToolError(graph, error, toolId);
+    const urls = req?._headlessOAuthUrls;
+    if (Array.isArray(urls)) {
+      const msg = error?.message ?? '';
+      if (msg.includes(HEADLESS_OAUTH_URL_MARKER)) {
+        const idx = msg.indexOf(HEADLESS_OAUTH_URL_MARKER);
+        const url = msg.slice(idx + HEADLESS_OAUTH_URL_MARKER.length).trim();
+        if (url && !urls.includes(url)) {
+          urls.push(url);
+        }
+      }
+    }
+  };
 }
 
 /** Regex pattern to match agent ID suffix (____N) */
@@ -1135,7 +1158,7 @@ class AgentClient extends BaseClient {
         config.configurable.last_agent_id = agents[agents.length - 1].id;
         await run.processStream({ messages }, config, {
           callbacks: {
-            [Callback.TOOL_ERROR]: logToolError,
+            [Callback.TOOL_ERROR]: getToolErrorHandler(this.options.req),
           },
         });
 

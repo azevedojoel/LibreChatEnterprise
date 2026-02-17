@@ -7,11 +7,12 @@ const { logger } = require('@librechat/data-schemas');
  * @param {Object} params
  * @param {string} params.to - Recipient email (From address of inbound)
  * @param {string} params.subject - Subject line (e.g. Re: original subject)
- * @param {string} params.body - Plain text body
+ * @param {string} params.body - Plain text body (TextBody)
+ * @param {string} [params.html] - HTML body (HtmlBody); when provided, both HtmlBody and TextBody are sent
  * @param {string} [params.replyTo] - Reply-To header for correct threading
  * @returns {Promise<{success: boolean, messageId?: string, error?: string}>}
  */
-async function sendInboundReply({ to, subject, body, replyTo }) {
+async function sendInboundReply({ to, subject, body, html, replyTo }) {
   const apiKey = getEnvironmentVariable('POSTMARK_API_KEY');
 
   if (!apiKey) {
@@ -30,6 +31,10 @@ async function sendInboundReply({ to, subject, body, replyTo }) {
     Subject: subject,
     TextBody: body,
   };
+
+  if (html) {
+    payload.HtmlBody = html;
+  }
 
   if (replyTo) {
     payload.ReplyTo = replyTo;

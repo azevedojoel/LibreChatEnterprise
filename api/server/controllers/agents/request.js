@@ -13,50 +13,7 @@ const { disposeClient, clientRegistry, requestDataMap } = require('~/server/clea
 const { handleAbortError } = require('~/server/middleware');
 const { logViolation } = require('~/cache');
 const { saveMessage } = require('~/models');
-
-/**
- * Patches tool_search (and tool_search_mcp_*) parts missing output/progress before save.
- * When tool_search ran (has args) but completion was not persisted, infer completion.
- *
- * Root cause: @librechat/agents createContentAggregator may fail to merge on_run_step_completed
- * into the correct content slot when multiple tools run (e.g. tool_search + gmail). Index resolution
- * uses stepMap.get(stepId) and runStep.index; if the event order or IDs mismatch, tool_search
- * completion is skipped. This patch is the defensive fallback for that persistence gap.
- *
- * @param {object} message - Message object with content array (mutated in place)
- */
-function patchToolSearchBeforeSave(message) {
-  const content = message?.content;
-  if (!content || !Array.isArray(content)) {
-    return;
-  }
-  for (const part of content) {
-    if (part?.type !== 'tool_call' || !part.tool_call) {
-      continue;
-    }
-    const tc = part.tool_call;
-    const isToolSearch =
-      tc.name === Constants.TOOL_SEARCH ||
-      (typeof tc.name === 'string' && tc.name.startsWith('tool_search_mcp_'));
-    if (!isToolSearch) {
-      continue;
-    }
-    const hasOutput = tc.output != null && tc.output !== '';
-    const hasProgress = tc.progress != null && tc.progress >= 1;
-    const hasArgs =
-      tc.args != null &&
-      (typeof tc.args === 'string'
-        ? tc.args.trim() !== ''
-        : Object.keys(tc.args || {}).length > 0);
-    if (!hasOutput && !hasProgress && hasArgs) {
-      tc.progress = 1;
-      tc.output = 'Tools discovered';
-      logger.debug('[AgentController] Patched tool_search before save (missing output/progress)', {
-        toolName: tc.name,
-      });
-    }
-  }
-}
+const { runAgentGeneration, patchToolSearchBeforeSave } = require('./runAgentGeneration');
 
 function createCloseHandler(abortController) {
   return function (manual) {
@@ -231,204 +188,27 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
     // (sync mechanism handles late subscribers)
     const startGeneration = async () => {
       try {
-        // Short timeout as safety net - promise should already be resolved
-        await Promise.race([job.readyPromise, new Promise((resolve) => setTimeout(resolve, 100))]);
-      } catch (waitError) {
-        logger.warn(
-          `[ResumableAgentController] Error waiting for subscriber: ${waitError.message}`,
-        );
-      }
-
-      try {
-        const onStart = (userMsg, respMsgId, _isNewConvo) => {
-          userMessage = userMsg;
-
-          // Store userMessage and responseMessageId upfront for resume capability
-          GenerationJobManager.updateMetadata(streamId, {
-            responseMessageId: respMsgId,
-            userMessage: {
-              messageId: userMsg.messageId,
-              parentMessageId: userMsg.parentMessageId,
-              conversationId: userMsg.conversationId,
-              text: userMsg.text,
-            },
-          });
-
-          GenerationJobManager.emitChunk(streamId, {
-            created: true,
-            message: userMessage,
-            streamId,
-          });
-        };
-
-        const messageOptions = {
-          user: userId,
-          onStart,
-          getReqData,
-          isContinued,
-          isRegenerate,
-          editedContent,
+        await runAgentGeneration({
+          req,
+          userId,
           conversationId,
-          parentMessageId,
-          abortController: job.abortController,
-          overrideParentMessageId,
-          isEdited: !!editedContent,
-          userMCPAuthMap: result.userMCPAuthMap,
-          responseMessageId: editedResponseMessageId,
-          progressOptions: {
-            res: {
-              write: () => true,
-              end: () => {},
-              headersSent: false,
-              writableEnded: false,
-            },
-          },
-        };
-
-        const response = await client.sendMessage(text, messageOptions);
-
-        const messageId = response.messageId;
-        const endpoint = endpointOption.endpoint;
-        response.endpoint = endpoint;
-
-        const databasePromise = response.databasePromise;
-        delete response.databasePromise;
-
-        const { conversation: convoData = {} } = await databasePromise;
-        const conversation = { ...convoData };
-        conversation.title =
-          conversation && !conversation.title ? null : conversation?.title || 'New Chat';
-
-        if (req.body.files && client.options?.attachments) {
-          userMessage.files = [];
-          const messageFiles = new Set(req.body.files.map((file) => file.file_id));
-          for (const attachment of client.options.attachments) {
-            if (messageFiles.has(attachment.file_id)) {
-              userMessage.files.push(sanitizeFileForTransmit(attachment));
-            }
-          }
-          delete userMessage.image_urls;
-        }
-
-        // Check abort state BEFORE calling completeJob (which triggers abort signal for cleanup)
-        const wasAbortedBeforeComplete = job.abortController.signal.aborted;
-        const isNewConvo = !reqConversationId || reqConversationId === 'new';
-        const shouldGenerateTitle =
-          addTitle &&
-          parentMessageId === Constants.NO_PARENT &&
-          isNewConvo &&
-          !wasAbortedBeforeComplete;
-
-        // Save user message BEFORE sending final event to avoid race condition
-        // where client refetch happens before database is updated
-        if (!client.skipSaveUserMessage && userMessage) {
-          await saveMessage(req, userMessage, {
-            context: 'api/server/controllers/agents/request.js - resumable user message',
-          });
-        }
-
-        // CRITICAL: Save response message BEFORE emitting final event.
-        // This prevents race conditions where the client sends a follow-up message
-        // before the response is saved to the database, causing orphaned parentMessageIds.
-        if (client.savedMessageIds && !client.savedMessageIds.has(messageId)) {
-          const toSave = { ...response, user: userId, unfinished: wasAbortedBeforeComplete };
-          patchToolSearchBeforeSave(toSave);
-          await saveMessage(req, toSave, {
-            context: 'api/server/controllers/agents/request.js - resumable response end',
-          });
-        }
-
-        // Check if our job was replaced by a new request before emitting
-        // This prevents stale requests from emitting events to newer jobs
-        const currentJob = await GenerationJobManager.getJob(streamId);
-        const jobWasReplaced = !currentJob || currentJob.createdAt !== jobCreatedAt;
-
-        if (jobWasReplaced) {
-          logger.debug(`[ResumableAgentController] Skipping FINAL emit - job was replaced`, {
-            streamId,
-            originalCreatedAt: jobCreatedAt,
-            currentCreatedAt: currentJob?.createdAt,
-          });
-          // Still decrement pending request since we incremented at start
-          await decrementPendingRequest(userId);
-          return;
-        }
-
-        if (!wasAbortedBeforeComplete) {
-          const finalEvent = {
-            final: true,
-            conversation,
-            title: conversation.title,
-            requestMessage: sanitizeMessageForTransmit(userMessage),
-            responseMessage: { ...response },
-          };
-
-          logger.debug(`[ResumableAgentController] Emitting FINAL event`, {
-            streamId,
-            wasAbortedBeforeComplete,
-            userMessageId: userMessage?.messageId,
-            responseMessageId: response?.messageId,
-            conversationId: conversation?.conversationId,
-          });
-
-          // Diagnostic: verify tool parts in final response have output and progress for tool-call-cancelled fix
-          const content = response?.content ?? [];
-          const toolParts = content.filter((p) => p?.type === 'tool_call' && p?.tool_call);
-          const incompleteToolParts = toolParts.filter((p) => {
-            const tc = p.tool_call;
-            return (tc.output == null || tc.output === '') && (tc.progress == null || tc.progress < 1);
-          });
-          if (incompleteToolParts.length > 0) {
-            logger.debug(`[ResumableAgentController] FINAL has ${incompleteToolParts.length} tool part(s) missing output/progress`, {
-              streamId,
-              toolNames: incompleteToolParts.map((p) => p.tool_call?.name),
-            });
-          }
-
-          await GenerationJobManager.emitDone(streamId, finalEvent);
-          GenerationJobManager.completeJob(streamId);
-          await decrementPendingRequest(userId);
-        } else {
-          const finalEvent = {
-            final: true,
-            conversation,
-            title: conversation.title,
-            requestMessage: sanitizeMessageForTransmit(userMessage),
-            responseMessage: { ...response, unfinished: true },
-          };
-
-          logger.debug(`[ResumableAgentController] Emitting ABORTED FINAL event`, {
-            streamId,
-            wasAbortedBeforeComplete,
-            userMessageId: userMessage?.messageId,
-            responseMessageId: response?.messageId,
-            conversationId: conversation?.conversationId,
-          });
-
-          await GenerationJobManager.emitDone(streamId, finalEvent);
-          GenerationJobManager.completeJob(streamId, 'Request aborted');
-          await decrementPendingRequest(userId);
-        }
-
-        if (shouldGenerateTitle) {
-          addTitle(req, {
+          streamId,
+          endpointOption,
+          job,
+          result,
+          options: {
             text,
-            response: { ...response },
-            client,
-          })
-            .catch((err) => {
-              logger.error('[ResumableAgentController] Error in title generation', err);
-            })
-            .finally(() => {
-              if (client) {
-                disposeClient(client);
-              }
-            });
-        } else {
-          if (client) {
-            disposeClient(client);
-          }
-        }
+            isContinued,
+            isRegenerate,
+            editedContent,
+            parentMessageId,
+            overrideParentMessageId,
+            editedResponseMessageId,
+            reqConversationId,
+            addTitle,
+            jobCreatedAt,
+          },
+        });
       } catch (error) {
         // Check if this was an abort (not a real error)
         const wasAborted = job.abortController.signal.aborted || error.message?.includes('abort');
