@@ -1,5 +1,5 @@
 import { ToolMessage, AIMessage, HumanMessage } from '@langchain/core/messages';
-import { extractDiscoveredToolsFromHistory } from './run';
+import { extractDiscoveredToolsFromHistory, getToolsSentToModel } from './run';
 
 describe('extractDiscoveredToolsFromHistory', () => {
   it('extracts tool names from tool_search JSON output', () => {
@@ -56,6 +56,28 @@ describe('extractDiscoveredToolsFromHistory', () => {
         content: '[{"sha": "abc123"}]',
         tool_call_id: 'call_1',
         name: 'list_commits_mcp_github',
+      }),
+    ];
+
+    const discovered = extractDiscoveredToolsFromHistory(messages);
+
+    expect(discovered.size).toBe(0);
+  });
+
+  it('ignores tool_search_mcp_* messages (upstream uses single tool_search only)', () => {
+    const toolSearchOutput = JSON.stringify({
+      found: 2,
+      tools: [
+        { name: 'list_commits_mcp_github', score: 1.0 },
+        { name: 'search_code_mcp_github', score: 0.9 },
+      ],
+    });
+
+    const messages = [
+      new ToolMessage({
+        content: toolSearchOutput,
+        tool_call_id: 'call_1',
+        name: 'tool_search_mcp_GitHub',
       }),
     ];
 
@@ -129,5 +151,132 @@ describe('extractDiscoveredToolsFromHistory', () => {
 
     // Should handle gracefully
     expect(discovered.size).toBe(0);
+  });
+});
+
+describe('getToolsSentToModel', () => {
+  it('returns tool names from toolDefinitions for each agent', () => {
+    const agents = [
+      {
+        id: 'agent-1',
+        toolDefinitions: [{ name: 'web_search' }, { name: 'file_search' }],
+        hasDeferredTools: false,
+      },
+    ];
+    const result = getToolsSentToModel({ agents });
+    expect(result.size).toBe(1);
+    expect(result.get('agent-1')).toEqual(['web_search', 'file_search']);
+  });
+
+  it('merges discoveredTools when agent has hasDeferredTools', () => {
+    const toolSearchOutput = JSON.stringify({
+      found: 1,
+      tools: [{ name: 'discovered_mcp_tool', score: 1.0 }],
+    });
+    const messages = [
+      new AIMessage({
+        content: '',
+        tool_calls: [{ id: 'call_1', name: 'tool_search', args: {} }],
+      }),
+      new ToolMessage({
+        content: toolSearchOutput,
+        tool_call_id: 'call_1',
+        name: 'tool_search',
+      }),
+    ];
+    const mockRegistry = new Map();
+    mockRegistry.set('discovered_mcp_tool', { name: 'discovered_mcp_tool' });
+    const agents = [
+      {
+        id: 'agent-1',
+        toolDefinitions: [{ name: 'web_search' }],
+        hasDeferredTools: true,
+        toolRegistry: mockRegistry,
+      },
+    ];
+    const result = getToolsSentToModel({ agents, messages });
+    expect(result.get('agent-1')).toContain('web_search');
+    expect(result.get('agent-1')).toContain('discovered_mcp_tool');
+    expect(result.get('agent-1').length).toBe(2);
+  });
+
+  it('returns per-agent tool sets for multi-agent', () => {
+    const agents = [
+      {
+        id: 'agent-a',
+        toolDefinitions: [{ name: 'web_search' }],
+        hasDeferredTools: false,
+      },
+      {
+        id: 'agent-b',
+        toolDefinitions: [{ name: 'file_search' }, { name: 'execute_code' }],
+        hasDeferredTools: false,
+      },
+    ];
+    const result = getToolsSentToModel({ agents });
+    expect(result.get('agent-a')).toEqual(['web_search']);
+    expect(result.get('agent-b')).toEqual(['file_search', 'execute_code']);
+  });
+
+  it('returns empty array for agent with no toolDefinitions', () => {
+    const agents = [{ id: 'agent-1', toolDefinitions: [], hasDeferredTools: false }];
+    const result = getToolsSentToModel({ agents });
+    expect(result.get('agent-1')).toEqual([]);
+  });
+
+  it('excludes deferred MCP tools unless discovered (mirrors AgentContext binding)', () => {
+    const agents = [
+      {
+        id: 'agent-1',
+        toolDefinitions: [
+          { name: 'tool_search', allowed_callers: ['direct'] },
+          { name: 'list_mail_mcp_Microsoft', defer_loading: true, allowed_callers: ['direct'] },
+          { name: 'list_calendar_mcp_Microsoft', defer_loading: true, allowed_callers: ['direct'] },
+        ],
+        hasDeferredTools: true,
+        toolRegistry: new Map([
+          ['list_mail_mcp_Microsoft', { name: 'list_mail_mcp_Microsoft', defer_loading: true }],
+          ['list_calendar_mcp_Microsoft', { name: 'list_calendar_mcp_Microsoft', defer_loading: true }],
+        ]),
+      },
+    ];
+    const result = getToolsSentToModel({ agents });
+    expect(result.get('agent-1')).toEqual(['tool_search']);
+    expect(result.get('agent-1')).not.toContain('list_mail_mcp_Microsoft');
+    expect(result.get('agent-1')).not.toContain('list_calendar_mcp_Microsoft');
+  });
+
+  it('includes deferred tools when discovered in message history', () => {
+    const toolSearchOutput = JSON.stringify({
+      found: 1,
+      tools: [{ name: 'list_mail_mcp_Microsoft', score: 1.0 }],
+    });
+    const messages = [
+      new AIMessage({
+        content: '',
+        tool_calls: [{ id: 'call_1', name: 'tool_search', args: {} }],
+      }),
+      new ToolMessage({
+        content: toolSearchOutput,
+        tool_call_id: 'call_1',
+        name: 'tool_search',
+      }),
+    ];
+    const mockRegistry = new Map();
+    mockRegistry.set('list_mail_mcp_Microsoft', { name: 'list_mail_mcp_Microsoft', defer_loading: true });
+    const agents = [
+      {
+        id: 'agent-1',
+        toolDefinitions: [
+          { name: 'tool_search', allowed_callers: ['direct'] },
+          { name: 'list_mail_mcp_Microsoft', defer_loading: true, allowed_callers: ['direct'] },
+        ],
+        hasDeferredTools: true,
+        toolRegistry: mockRegistry,
+      },
+    ];
+    const result = getToolsSentToModel({ agents, messages });
+    expect(result.get('agent-1')).toContain('tool_search');
+    expect(result.get('agent-1')).toContain('list_mail_mcp_Microsoft');
   });
 });

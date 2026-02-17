@@ -17,9 +17,11 @@ const {
   GenerationJobManager,
   isActionDomainAllowed,
   buildWebSearchContext,
+  buildToolSearchContext,
   buildImageToolContext,
   buildToolClassification,
   getToolDefinition,
+  isToolSearchTool,
 } = require('@librechat/api');
 const {
   Time,
@@ -565,6 +567,7 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
       tool === Tools.read_file ||
       tool === Tools.edit_file ||
       tool === Tools.create_file ||
+      tool === Tools.delete_file ||
       tool === Tools.list_files ||
       tool === Tools.search_files ||
       tool === Tools.glob_files
@@ -823,6 +826,10 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
 
   if (hasWebSearch) {
     toolContextMap[Tools.web_search] = buildWebSearchContext();
+  }
+
+  if (hasDeferredTools) {
+    toolContextMap[Constants.TOOL_SEARCH] = buildToolSearchContext();
   }
 
   if (hasExecuteCode) {
@@ -1453,7 +1460,10 @@ async function loadToolsForExecution({
   const allLoadedTools = [];
   const configurable = { userMCPAuthMap };
 
-  const isToolSearch = toolNames.includes(AgentConstants.TOOL_SEARCH);
+  const isToolSearchVariant = (n) =>
+    isToolSearchTool(n) || (typeof n === 'string' && n.startsWith('tool_search_mcp_'));
+  const toolSearchToolNames = toolNames.filter(isToolSearchVariant);
+  const isToolSearch = toolSearchToolNames.length > 0;
   const isPTC = toolNames.includes(AgentConstants.PROGRAMMATIC_TOOL_CALLING);
 
   logger.debug(
@@ -1465,6 +1475,7 @@ async function loadToolsForExecution({
       mode: 'local',
       toolRegistry,
     });
+    toolSearchTool.name = Constants.TOOL_SEARCH;
     allLoadedTools.push(toolSearchTool);
     configurable.toolRegistry = toolRegistry;
   }
@@ -1474,8 +1485,8 @@ async function loadToolsForExecution({
   }
 
   const specialToolNames = new Set([
-    AgentConstants.TOOL_SEARCH,
     AgentConstants.PROGRAMMATIC_TOOL_CALLING,
+    ...toolSearchToolNames,
   ]);
 
   let ptcOrchestratedToolNames = [];

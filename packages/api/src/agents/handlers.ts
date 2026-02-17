@@ -1,5 +1,6 @@
 import { logger } from '@librechat/data-schemas';
 import { GraphEvents, Constants } from '@librechat/agents';
+import { isToolSearchTool } from '~/tools/classification';
 import type {
   LCTool,
   EventHandler,
@@ -73,6 +74,16 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
           toolMap.set('code_interpreter', executeCodeTool);
         }
 
+        // Alias: tool_search_mcp_* (stale from cache/history) -> tool_search
+        const toolSearchTool = toolMap.get('tool_search');
+        if (toolSearchTool) {
+          for (const tc of toolCalls) {
+            if (typeof tc.name === 'string' && tc.name.startsWith('tool_search_mcp_')) {
+              toolMap.set(tc.name, toolSearchTool);
+            }
+          }
+        }
+
         const mergedConfigurable = { ...configurable, ...toolConfigurable };
 
         const results: ToolExecuteResult[] = await Promise.all(
@@ -118,7 +129,7 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
                   const toolDefs: LCTool[] = Array.from(toolRegistry.values()).filter(
                     (t) =>
                       t.name !== Constants.PROGRAMMATIC_TOOL_CALLING &&
-                      t.name !== Constants.TOOL_SEARCH,
+                      !isToolSearchTool(t.name),
                   );
                   toolCallConfig.toolDefs = toolDefs;
                   toolCallConfig.toolMap = ptcToolMap ?? toolMap;
