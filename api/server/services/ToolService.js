@@ -367,13 +367,25 @@ async function processRequiredActions(client, requiredActions) {
     }
 
     const handleToolError = (error) => {
-      logger.error(
-        `tool_call_id: ${currentAction.toolCallId} | Error processing tool ${currentAction.tool}`,
-        error,
-      );
+      const msg = error?.message ?? '';
+      const isUserCancelledAuth =
+        msg.includes('User cancelled') || msg.includes('User cancelled OAuth flow');
+      const output = isUserCancelledAuth
+        ? 'User declined to authenticate.'
+        : `Error processing tool ${currentAction.tool}: ${redactMessage(error.message, 256)}`;
+      if (!isUserCancelledAuth) {
+        logger.error(
+          `tool_call_id: ${currentAction.toolCallId} | Error processing tool ${currentAction.tool}`,
+          error,
+        );
+      } else {
+        logger.info(
+          `tool_call_id: ${currentAction.toolCallId} | User declined OAuth for ${currentAction.tool}`,
+        );
+      }
       return {
         tool_call_id: currentAction.toolCallId,
-        output: `Error processing tool ${currentAction.tool}: ${redactMessage(error.message, 256)}`,
+        output,
       };
     };
 
