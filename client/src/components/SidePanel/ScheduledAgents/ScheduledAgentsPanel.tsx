@@ -358,8 +358,11 @@ export default function ScheduledAgentsPanel() {
                       {schedule.name}
                     </p>
                     <p className="truncate text-xs text-text-secondary">
-                      {resolvedAgentsMap[schedule.agentId] ?? schedule.agentId} •{' '}
-                      {schedule.scheduleType}
+                      {resolvedAgentsMap[schedule.agentId] ?? schedule.agentId}
+                      {typeof schedule.promptGroupId === 'object' && schedule.promptGroupId
+                        ? ` • ${schedule.promptGroupId.command ? `/${schedule.promptGroupId.command}` : schedule.promptGroupId.name}`
+                        : ''}{' '}
+                      • {schedule.scheduleType}
                     </p>
                     <p className="truncate text-xs text-text-secondary">
                       {getScheduleDescription(schedule)}
@@ -427,7 +430,7 @@ export default function ScheduledAgentsPanel() {
                 const payload = {
                   name: data.name,
                   agentId: data.agentId,
-                  prompt: data.prompt,
+                  promptGroupId: data.promptGroupId,
                   scheduleType: data.scheduleType,
                   ...(data.scheduleType === 'recurring'
                     ? { cronExpression: data.cronExpression }

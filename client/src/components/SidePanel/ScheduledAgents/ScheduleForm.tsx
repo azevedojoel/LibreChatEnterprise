@@ -11,6 +11,7 @@ const US_TIMEZONES: { value: string; label: string }[] = [
 ];
 import type { ScheduledAgentSchedule } from 'librechat-data-provider';
 import type { Agent } from 'librechat-data-provider';
+import { useGetAllPromptGroups } from '~/data-provider';
 import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
 import ToolPicker from './ToolPicker';
@@ -19,7 +20,7 @@ import SimpleRecurrencePicker from './SimpleRecurrencePicker';
 export type ScheduleFormValues = {
   name: string;
   agentId: string;
-  prompt: string;
+  promptGroupId: string;
   scheduleType: 'recurring' | 'one-off';
   cronExpression: string;
   runAt: string;
@@ -39,6 +40,7 @@ export default function ScheduleForm({ agents, schedule, onClose, onSubmit, isSu
   const localize = useLocalize();
   const { showToast } = useToastContext();
   const isEdit = !!schedule;
+  const { data: promptGroups = [] } = useGetAllPromptGroups();
 
   const {
     register,
@@ -52,7 +54,7 @@ export default function ScheduleForm({ agents, schedule, onClose, onSubmit, isSu
     defaultValues: {
       name: '',
       agentId: '',
-      prompt: '',
+      promptGroupId: '',
       scheduleType: 'recurring',
       cronExpression: '',
       runAt: '',
@@ -66,11 +68,18 @@ export default function ScheduleForm({ agents, schedule, onClose, onSubmit, isSu
 
   useEffect(() => {
     if (schedule) {
-      const validTimezone =
-        US_TIMEZONES.some((tz) => tz.value === schedule.timezone) ? schedule.timezone : 'UTC';
+      const validTimezone: string =
+        schedule.timezone && US_TIMEZONES.some((tz) => tz.value === schedule.timezone)
+          ? schedule.timezone
+          : 'UTC';
       setValue('name', schedule.name);
       setValue('agentId', schedule.agentId);
-      setValue('prompt', schedule.prompt);
+      setValue(
+        'promptGroupId',
+        typeof schedule.promptGroupId === 'object' && schedule.promptGroupId?._id
+          ? schedule.promptGroupId._id
+          : (typeof schedule.promptGroupId === 'string' ? schedule.promptGroupId : '') ?? '',
+      );
       setValue('scheduleType', schedule.scheduleType);
       setValue('cronExpression', schedule.cronExpression ?? '');
       setValue('runAt', schedule.runAt ? new Date(schedule.runAt).toISOString().slice(0, 16) : '');
@@ -135,16 +144,21 @@ export default function ScheduleForm({ agents, schedule, onClose, onSubmit, isSu
           <Label htmlFor="schedule-prompt">
             {localize('com_sidepanel_scheduled_agents_prompt')}
           </Label>
-          <textarea
+          <select
             id="schedule-prompt"
-            {...register('prompt', { required: true })}
-            rows={3}
-            placeholder={localize('com_sidepanel_scheduled_agents_prompt_placeholder')}
+            {...register('promptGroupId', { required: true })}
             className={cn(
-              'mt-1 flex w-full rounded-md border border-border-medium bg-transparent px-3 py-2 text-sm',
+              'mt-1 flex h-9 w-full rounded-md border border-border-medium bg-transparent px-3 py-1 text-sm',
             )}
-          />
-          {errors.prompt && (
+          >
+            <option value="">{localize('com_ui_select')}</option>
+            {promptGroups.map((g) => (
+              <option key={g._id} value={g._id}>
+                {g.command ? `/${g.command} - ${g.name}` : g.name}
+              </option>
+            ))}
+          </select>
+          {errors.promptGroupId && (
             <p className="mt-0.5 text-xs text-red-600">{localize('com_ui_required')}</p>
           )}
         </div>

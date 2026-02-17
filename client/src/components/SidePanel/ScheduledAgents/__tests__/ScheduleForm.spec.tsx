@@ -25,6 +25,12 @@ jest.mock('~/hooks', () => ({
   useLocalize: jest.fn().mockReturnValue((key: string) => key),
 }));
 
+jest.mock('~/data-provider', () => ({
+  useGetAllPromptGroups: jest.fn().mockReturnValue({
+    data: [{ _id: 'pg-1', name: 'Hello', command: '' }],
+  }),
+}));
+
 const mockAgents = [
   { id: 'agent-1', name: 'Agent One' },
   { id: 'agent-2', name: 'Agent Two' },
@@ -43,7 +49,7 @@ describe('ScheduleForm', () => {
       _id: 'sched-1',
       name: 'My Schedule',
       agentId: 'agent-1',
-      prompt: 'Hello',
+      promptGroupId: 'pg-1',
       scheduleType: 'recurring' as const,
       cronExpression: '0 0 * * *',
       runAt: null,
@@ -71,7 +77,7 @@ describe('ScheduleForm', () => {
       _id: 'sched-1',
       name: 'My Schedule',
       agentId: 'agent-1',
-      prompt: 'Hello',
+      promptGroupId: 'pg-1',
       scheduleType: 'recurring' as const,
       cronExpression: '0 0 * * *',
       runAt: null,

@@ -129,10 +129,22 @@ describe('useStepHandler', () => {
   });
 
   beforeEach(() => {
+    jest.useFakeTimers();
     jest.clearAllMocks();
     mockLastAnnouncementTimeRef.current = 0;
     mockGetMessages.mockReturnValue([]);
   });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  /** Advance timers so throttled delta updates flush to setMessages */
+  const flushThrottledUpdates = () => {
+    act(() => {
+      jest.advanceTimersByTime(100);
+    });
+  };
 
   describe('initialization', () => {
     it('should return stepHandler, clearStepMaps, and syncStepMessage functions', () => {
@@ -248,6 +260,7 @@ describe('useStepHandler', () => {
         result.current.stepHandler({ event: 'on_run_step', data: runStep }, submission);
       });
 
+      flushThrottledUpdates();
       expect(mockSetMessages).toHaveBeenCalled();
       const lastCall = mockSetMessages.mock.calls[mockSetMessages.mock.calls.length - 1][0];
       const responseMsg = lastCall.find((m: TMessage) => !m.isCreatedByUser);
@@ -382,6 +395,7 @@ describe('useStepHandler', () => {
         result.current.stepHandler({ event: 'on_message_delta', data: messageDelta }, submission);
       });
 
+      flushThrottledUpdates();
       expect(mockSetMessages).toHaveBeenCalled();
       const lastCall = mockSetMessages.mock.calls[mockSetMessages.mock.calls.length - 1][0];
       const responseMsg = lastCall[lastCall.length - 1];
@@ -430,6 +444,7 @@ describe('useStepHandler', () => {
         );
       });
 
+      flushThrottledUpdates();
       const lastCall = mockSetMessages.mock.calls[mockSetMessages.mock.calls.length - 1][0];
       const responseMsg = lastCall[lastCall.length - 1];
       expect(responseMsg.content).toContainEqual(
@@ -490,6 +505,7 @@ describe('useStepHandler', () => {
         );
       });
 
+      flushThrottledUpdates();
       expect(mockSetMessages).toHaveBeenCalled();
       const lastCall = mockSetMessages.mock.calls[mockSetMessages.mock.calls.length - 1][0];
       const responseMsg = lastCall[lastCall.length - 1];
@@ -541,6 +557,7 @@ describe('useStepHandler', () => {
         );
       });
 
+      flushThrottledUpdates();
       const lastCall = mockSetMessages.mock.calls[mockSetMessages.mock.calls.length - 1][0];
       const responseMsg = lastCall[lastCall.length - 1];
       expect(responseMsg.content).toContainEqual(
@@ -577,6 +594,7 @@ describe('useStepHandler', () => {
         result.current.stepHandler({ event: 'on_run_step_delta', data: runStepDelta }, submission);
       });
 
+      flushThrottledUpdates();
       expect(mockSetMessages).toHaveBeenCalled();
     });
 
@@ -628,6 +646,7 @@ describe('useStepHandler', () => {
         result.current.stepHandler({ event: 'on_run_step_delta', data: runStepDelta }, submission);
       });
 
+      flushThrottledUpdates();
       expect(mockSetMessages).toHaveBeenCalled();
       const lastCall = mockSetMessages.mock.calls[mockSetMessages.mock.calls.length - 1][0];
       const responseMsg = lastCall.find((m: TMessage) => !m.isCreatedByUser);
@@ -718,7 +737,7 @@ describe('useStepHandler', () => {
       });
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        'No run step or runId found for completed tool call event',
+        '[useStepHandler] on_run_step_completed: index resolution failed',
         expect.objectContaining({
           stepId: 'nonexistent-step',
           toolCallId: 'tool-call-1',
@@ -843,6 +862,7 @@ describe('useStepHandler', () => {
         );
       });
 
+      flushThrottledUpdates();
       const lastCall = mockSetMessages.mock.calls[mockSetMessages.mock.calls.length - 1][0];
       const responseMsg = lastCall[lastCall.length - 1];
       expect(responseMsg.content).toContainEqual(
@@ -973,6 +993,7 @@ describe('useStepHandler', () => {
         result.current.stepHandler({ event: 'on_run_step', data: runStep }, submission);
       });
 
+      flushThrottledUpdates();
       expect(mockSetMessages).toHaveBeenCalled();
       const lastCall = mockSetMessages.mock.calls[mockSetMessages.mock.calls.length - 1][0];
       const responseMsg = lastCall.find((m: TMessage) => !m.isCreatedByUser);
