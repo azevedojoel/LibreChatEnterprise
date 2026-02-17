@@ -51,9 +51,18 @@ const queriesEnabled = atom<boolean>({
   default: true,
 });
 
+const chatBadges = atomWithLocalStorage<Array<{ id: string }>>('chatBadges', [
+  // Agent tool badges - when adding new badges, add to useChatBadges.ts as last item
+  { id: 'web_search' },
+  { id: 'execute_code' },
+  { id: 'file_search' },
+  { id: 'artifacts' },
+]);
+
 export default {
   hideBannerHint,
   messageAttachmentsMap,
   conversationAttachmentsSelector,
   queriesEnabled,
+  chatBadges,
 };

@@ -2,12 +2,13 @@ import { memo, useRef, useMemo, useEffect, useState, useCallback } from 'react';
 import { useWatch } from 'react-hook-form';
 import { TextareaAutosize } from '@librechat/client';
 import { useRecoilState, useRecoilValue } from 'recoil';
-import { Constants, isAssistantsEndpoint } from 'librechat-data-provider';
+import { Constants, isAssistantsEndpoint, isAgentsEndpoint } from 'librechat-data-provider';
 import {
   useChatContext,
   useChatFormContext,
   useAddedChatContext,
   useAssistantsMapContext,
+  BadgeRowProvider,
 } from '~/Providers';
 import {
   useTextarea,
@@ -31,6 +32,7 @@ import StreamAudio from './StreamAudio';
 import StopButton from './StopButton';
 import SendButton from './SendButton';
 import Mention from './Mention';
+import BadgeRow from './BadgeRow';
 import store from '~/store';
 
 const ChatForm = memo(({ index = 0 }: { index?: number }) => {
@@ -288,6 +290,19 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
               <div className={`${isRTL ? 'mr-2' : 'ml-2'}`}>
                 <AttachFileChat conversation={conversation} disableInputs={disableInputs} />
               </div>
+              {isAgentsEndpoint(endpoint) && (
+                <BadgeRowProvider conversationId={conversationId} isSubmitting={isSubmitting}>
+                  <BadgeRow
+                    showEphemeralBadges={true}
+                    conversationId={conversationId}
+                    isSubmitting={isSubmitting}
+                    isInChat={
+                      Array.isArray(conversation?.messages) && (conversation.messages?.length ?? 0) >= 1
+                    }
+                    disabled={disableInputs}
+                  />
+                </BadgeRowProvider>
+              )}
               <div className="mx-auto flex" />
               {SpeechToText && (
                 <AudioRecorder
