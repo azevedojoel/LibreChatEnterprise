@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pencil, PlugZap, SlidersHorizontal, RefreshCw, X, Trash2 } from 'lucide-react';
+import { Pencil, PlugZap, SlidersHorizontal, RefreshCw, X, Trash2, Unplug } from 'lucide-react';
 import { Spinner, TooltipAnchor } from '@librechat/client';
 import type { MCPServerStatus } from 'librechat-data-provider';
 import { useLocalize } from '~/hooks';
@@ -12,12 +12,14 @@ interface MCPCardActionsProps {
   canCancel: boolean;
   hasCustomUserVars: boolean;
   canEdit: boolean;
+  canDelete?: boolean;
   editButtonRef?: React.RefObject<HTMLDivElement>;
   onEditClick: (e: React.MouseEvent) => void;
   onConfigClick: (e: React.MouseEvent) => void;
   onInitialize: () => void;
   onCancel: (e: React.MouseEvent) => void;
   onRevoke?: () => void;
+  onDelete?: () => void;
 }
 
 /**
@@ -27,7 +29,8 @@ interface MCPCardActionsProps {
  * - Pencil: Edit server definition (Settings panel only)
  * - PlugZap: Connect/Authenticate (for disconnected/error servers)
  * - SlidersHorizontal: Configure custom variables (for connected servers with vars)
- * - Trash2: Revoke OAuth access (for connected OAuth servers)
+ * - Unplug: Revoke OAuth access (for OAuth servers)
+ * - Trash2: Delete server (for user-created DB servers)
  * - RefreshCw: Reconnect/Refresh (for connected servers)
  * - Spinner: Loading state (with X on hover for cancel)
  */
@@ -38,12 +41,14 @@ export default function MCPCardActions({
   canCancel,
   hasCustomUserVars,
   canEdit,
+  canDelete,
   editButtonRef,
   onEditClick,
   onConfigClick,
   onInitialize,
   onCancel,
   onRevoke,
+  onDelete,
 }: MCPCardActionsProps) {
   const localize = useLocalize();
 
@@ -166,8 +171,8 @@ export default function MCPCardActions({
         </TooltipAnchor>
       )}
 
-      {/* Revoke button - for OAuth servers (available regardless of connection state) */}
-      {serverStatus?.requiresOAuth && onRevoke && (
+      {/* Revoke button - for OAuth servers only when connected (has tokens to revoke) */}
+      {serverStatus?.requiresOAuth && serverStatus?.connectionState === 'connected' && onRevoke && (
         <TooltipAnchor
           description={localize('com_ui_revoke')}
           side="top"
@@ -175,6 +180,20 @@ export default function MCPCardActions({
           aria-label={localize('com_ui_revoke')}
           role="button"
           onClick={onRevoke}
+        >
+          <Unplug className="size-3.5" aria-hidden="true" />
+        </TooltipAnchor>
+      )}
+
+      {/* Delete server button - for user-created (DB) servers only */}
+      {canDelete && onDelete && (
+        <TooltipAnchor
+          description={localize('com_ui_delete_mcp_server')}
+          side="top"
+          className={cn(buttonBaseClass, 'text-red-500 hover:text-red-600')}
+          aria-label={localize('com_ui_delete_mcp_server_name', { 0: serverName })}
+          role="button"
+          onClick={onDelete}
         >
           <Trash2 className="size-3.5" aria-hidden="true" />
         </TooltipAnchor>

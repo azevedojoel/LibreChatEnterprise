@@ -6,7 +6,6 @@ import type { VerifyToolAuthResponse } from 'librechat-data-provider';
 import type { UseQueryOptions } from '@tanstack/react-query';
 import { useVerifyAgentToolAuth } from '~/data-provider';
 import { setTimestamp } from '~/utils/timestamps';
-import useLocalStorage from '~/hooks/useLocalStorageAlt';
 import { ephemeralAgentByConvoId } from '~/store';
 
 type ToolValue = boolean | string;
@@ -74,8 +73,6 @@ export function useToolToggle({
     }
   }, [ephemeralAgent, toolKey, storageKey]);
 
-  const [isPinned, setIsPinned] = useLocalStorage<boolean>(`${localStorageKey}pinned`, false);
-
   const handleChange = useCallback(
     ({ e, value }: { e?: React.ChangeEvent<HTMLInputElement>; value: ToolValue }) => {
       if (isAuthenticated !== undefined && !isAuthenticated && setIsDialogOpen) {
@@ -112,7 +109,5 @@ export function useToolToggle({
     debouncedChange,
     setEphemeralAgent,
     authData: authQuery?.data,
-    isPinned,
-    setIsPinned,
   };
 }
