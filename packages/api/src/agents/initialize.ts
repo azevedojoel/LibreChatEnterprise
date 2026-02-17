@@ -387,6 +387,13 @@ export async function initializeAgent(
       user: req.user ? (req.user as unknown as TUser) : null,
     });
   }
+  if (process.env.APPEND_CURRENT_DATETIME === 'true') {
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const timeStr = now.toTimeString().split(' ')[0];
+    const datetimePrefix = `Current date and time: ${dateStr} ${timeStr}\n`;
+    agent.instructions = agent.instructions ? `${datetimePrefix}${agent.instructions}` : datetimePrefix.trim();
+  }
 
   /** Per-chat override: use ephemeralAgent.artifacts when set (from Tools dropdown toggle) */
   const ephemeralAgent = (req as { body?: { ephemeralAgent?: { artifacts?: string } } })?.body

@@ -50,7 +50,10 @@ const createRunBody = ({
 
   let systemInstructions = '';
 
-  if (endpointOption.assistant?.append_current_datetime) {
+  const shouldAppendDatetime =
+    process.env.APPEND_CURRENT_DATETIME === 'true' ||
+    endpointOption.assistant?.append_current_datetime;
+  if (shouldAppendDatetime) {
     const dateStr = getDateStr(clientTimestamp);
     const timeStr = getTimeStr(clientTimestamp);
     systemInstructions = `Current date and time: ${dateStr} ${timeStr}\n`;
