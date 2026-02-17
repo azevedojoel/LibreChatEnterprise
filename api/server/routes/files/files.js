@@ -28,7 +28,7 @@ const { hasAccessToFilesViaAgent } = require('~/server/services/Files');
 const { getFiles, batchUpdateFiles } = require('~/models');
 const { cleanFileName } = require('~/server/utils/files');
 const { getAssistant } = require('~/models/Assistant');
-const { getAgent } = require('~/models/Agent');
+const { getAgent, removeAgentResourceFiles } = require('~/models/Agent');
 const { getLogStores } = require('~/cache');
 const { Readable } = require('stream');
 
@@ -162,6 +162,22 @@ router.delete('/', async (req, res) => {
       }
     }
 
+    /* Handle agent unlinking when files don't exist in DB (orphans) - must run before early return */
+    if (req.body.agent_id && req.body.tool_resource && dbFiles.length === 0) {
+      const agent = await getAgent({ id: req.body.agent_id });
+      if (agent) {
+        const toolResourceFiles = agent.tool_resources?.[req.body.tool_resource]?.file_ids ?? [];
+        const agentFiles = files
+          .filter((f) => toolResourceFiles.includes(f.file_id))
+          .map((f) => ({ tool_resource: req.body.tool_resource, file_id: f.file_id }));
+        if (agentFiles.length > 0) {
+          await removeAgentResourceFiles({ agent_id: req.body.agent_id, files: agentFiles });
+        }
+      }
+      res.status(200).json({ message: 'File associations removed successfully from agent' });
+      return;
+    }
+
     if (nonOwnedFiles.length === 0) {
       await processDeleteRequest({ req, files: ownedFiles });
       logger.debug(
@@ -203,20 +219,6 @@ router.delete('/', async (req, res) => {
         message: 'You can only delete files you have access to',
         unauthorizedFiles: unauthorizedFiles.map((f) => f.file_id),
       });
-    }
-
-    /* Handle agent unlinking even if no valid files to delete */
-    if (req.body.agent_id && req.body.tool_resource && dbFiles.length === 0) {
-      const agent = await getAgent({
-        id: req.body.agent_id,
-      });
-
-      const toolResourceFiles = agent.tool_resources?.[req.body.tool_resource]?.file_ids ?? [];
-      const agentFiles = files.filter((f) => toolResourceFiles.includes(f.file_id));
-
-      await processDeleteRequest({ req, files: agentFiles });
-      res.status(200).json({ message: 'File associations removed successfully from agent' });
-      return;
     }
 
     /* Handle assistant unlinking even if no valid files to delete */
