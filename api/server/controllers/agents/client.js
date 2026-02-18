@@ -1235,8 +1235,18 @@ class AgentClient extends BaseClient {
    * @param {string} params.conversationId
    */
   async titleConvo({ text, abortController }) {
-    if (!this.run) {
-      throw new Error('Run not initialized');
+    const run = this.run;
+    if (!run) {
+      logger.debug(
+        '[api/server/controllers/agents/client.js #titleConvo] Run not initialized, skipping title generation',
+      );
+      return;
+    }
+    if (!this.options?.req) {
+      logger.debug(
+        '[api/server/controllers/agents/client.js #titleConvo] Options disposed, skipping title generation',
+      );
+      return;
     }
     const { handleLLMEnd, collected: collectedMetadata } = createMetadataAggregator();
     const { req, agent } = this.options;
@@ -1372,7 +1382,7 @@ class AgentClient extends BaseClient {
     }
 
     try {
-      const titleResult = await this.run.generateTitle({
+      const titleResult = await run.generateTitle({
         provider,
         clientOptions,
         inputText: text,

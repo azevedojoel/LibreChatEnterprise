@@ -255,7 +255,7 @@ async function runAgentGeneration({
     await decrementPendingRequest(userId);
 
     if (shouldGenerateTitle) {
-      addTitle(req, {
+      await addTitle(req, {
         text,
         response: { ...response },
         client,
