@@ -62,7 +62,7 @@ router.get('/', async function (req, res) {
     /** @type {TStartupConfig} */
     const payload = {
       appVersion: process.env.APP_VERSION || rootPackageJson.version,
-      appTitle: process.env.APP_TITLE || 'LibreChat',
+      appTitle: process.env.APP_TITLE || 'Daily Thread',
       socialLogins: appConfig?.registration?.socialLogins ?? defaultSocialLogins,
       discordLoginEnabled: !!process.env.DISCORD_CLIENT_ID && !!process.env.DISCORD_CLIENT_SECRET,
       facebookLoginEnabled:

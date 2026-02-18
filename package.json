@@ -1,6 +1,6 @@
 {
-  "name": "LibreChat",
-  "version": "v1.0.1",
+  "name": "DailyThread",
+  "version": "v1.0.2",
   "description": "",
   "workspaces": [
     "api",

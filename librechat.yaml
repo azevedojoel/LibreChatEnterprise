@@ -16,7 +16,7 @@ imageOutputType: png
 
 # Interface configuration
 interface:
-  customWelcome: 'Welcome to LibreChat! Enjoy your experience.'
+  customWelcome: 'Daily Thread'
   fileSearch: true
   endpointsMenu: true
   modelSelect: true
@@ -44,6 +44,11 @@ interface:
     users: true
     groups: true
     roles: true
+  workflows: true
+  # Show expandable tool input/output (JSON). Set false for business-facing UIs.
+  toolCallDetails: false
+  # Spacing of tool call rows: 'normal' | 'compact'
+  toolCallSpacing: compact
   marketplace:
     use: true
   remoteAgents:
@@ -167,7 +172,8 @@ mcpServers:
   #   url: "https://mcp.hubspot.com"
   #   serverInstructions: true
   #   timeout: 45000
-  #   initTimeout: 150000
+  #   initTimeout: 150000   # Connection establishment timeout for slow-starting servers
+  #   oauthTimeout: 60000  # How long to wait for user to complete OAuth (default 60s)
   #   startup: false
   #   oauth:
   #     authorization_url: https://mcp.hubspot.com/oauth/authorize
@@ -177,7 +183,29 @@ mcpServers:
   #     scope: ""
   #     token_endpoint_auth_methods_supported: ["client_secret_post"]
   #     code_challenge_methods_supported: ["S256"]
+  HubSpot:
+    oauthTimeout: 30000
+    initTimeout: 150000
+    type: stdio
+    command: node
+    args:
+      - ./mcp-servers/hubspot-mcp-server/dist/index.js
+    startup: false
+    iconPath: /assets/hubspot.svg
+    outputFormatter: token-optimized
+    oauth:
+      authorization_url: https://app.hubspot.com/oauth/authorize
+      token_url: https://api.hubapi.com/oauth/v1/token
+      client_id: '${HUBSPOT_CLIENT_ID}'
+      client_secret: '${HUBSPOT_CLIENT_SECRET}'
+      scope: "crm.objects.contacts.read crm.objects.contacts.write crm.objects.companies.read crm.objects.companies.write crm.objects.deals.read crm.objects.deals.write crm.objects.custom.read crm.objects.custom.write crm.schemas.contacts.read crm.schemas.companies.read crm.schemas.deals.read tickets oauth"
+      token_endpoint_auth_methods_supported: ["client_secret_post"]
+      redirect_uri: "http://localhost:3080/api/mcp/HubSpot/oauth/callback"
+    env:
+      HUBSPOT_ACCESS_TOKEN: "{{LIBRECHAT_MCP_OAUTH_ACCESS_TOKEN}}"
   Google:
+    oauthTimeout: 30000
+    initTimeout: 150000
     type: stdio
     command: node
     args:
@@ -196,6 +224,8 @@ mcpServers:
       GOOGLE_ACCESS_TOKEN: "{{LIBRECHAT_MCP_OAUTH_ACCESS_TOKEN}}"
       WORKSPACE_CLIENT_ID: '${GOOGLE_WORKSPACE_CLIENT_ID}'
   Microsoft:
+    oauthTimeout: 30000
+    initTimeout: 150000
     type: stdio
     command: node
     args:
