@@ -2,10 +2,41 @@
  * Tests for scheduled agents controller - createSchedule, updateSchedule, runSchedule with selectedTools
  */
 const mockExecuteScheduledAgent = jest.fn();
+const mockListSchedulesForUser = jest.fn();
+const mockListRunsForUser = jest.fn();
+
+jest.mock('@librechat/api', () => ({
+  generateCheckAccess: () => (req, res, next) => next(),
+  cacheConfig: {},
+}), { virtual: true });
 
 jest.mock('~/server/services/ScheduledAgents/executeAgent', () => ({
   executeScheduledAgent: (...args) => mockExecuteScheduledAgent(...args),
 }));
+
+jest.mock('~/server/services/ScheduledAgents/schedulingService', () => {
+  const actual = jest.requireActual('~/server/services/ScheduledAgents/schedulingService');
+  return {
+    ...actual,
+    listSchedulesForUser: (...args) => mockListSchedulesForUser(...args),
+    listRunsForUser: (...args) => mockListRunsForUser(...args),
+    runScheduleForUser: jest.fn().mockImplementation(async (userId, scheduleId) => {
+      const dbModels = require('~/db/models');
+      const chain = dbModels.ScheduledPrompt.findOne({ _id: scheduleId, userId });
+      const schedule = chain?.lean ? await chain.lean() : null;
+      if (!schedule) return { success: false, error: 'Schedule not found' };
+      mockExecuteScheduledAgent({
+        runId: 'run-1',
+        scheduleId: schedule._id?.toString?.() ?? scheduleId,
+        userId: schedule.userId?.toString?.() ?? userId,
+        agentId: schedule.agentId,
+        conversationId: 'conv-1',
+        selectedTools: schedule.selectedTools,
+      });
+      return { success: true, runId: 'run-1', status: 'queued', conversationId: 'conv-1' };
+    }),
+  };
+});
 
 jest.mock('~/db/models', () => {
   const mockSave = jest.fn().mockResolvedValue(undefined);
@@ -45,6 +76,7 @@ jest.mock('~/db/models', () => {
       findOne: jest.fn().mockReturnValue({
         populate: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(null) }),
       }),
+      create: jest.fn().mockResolvedValue({ _id: { toString: () => 'run-1' } }),
     },
     createMockSchedule,
   };
@@ -74,8 +106,12 @@ jest.mock('~/server/services/PermissionService', () => ({
   checkPermission: jest.fn().mockResolvedValue(true),
 }));
 
+jest.mock('~/models/Role', () => ({
+  getRoleByName: jest.fn().mockResolvedValue({ _id: 'role-1', name: 'USER' }),
+}));
+
 const dbModels = require('~/db/models');
-const { createSchedule, updateSchedule, runSchedule } = require('../scheduledAgents');
+const { createSchedule, updateSchedule, runSchedule, listSchedules, listRuns } = require('../scheduledAgents');
 
 describe('scheduledAgents controller - selectedTools', () => {
   const mockReq = (overrides = {}) => ({
@@ -97,6 +133,58 @@ describe('scheduledAgents controller - selectedTools', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockExecuteScheduledAgent.mockResolvedValue({ success: true, conversationId: 'conv-1' });
+    mockListSchedulesForUser.mockResolvedValue([]);
+    mockListRunsForUser.mockResolvedValue([]);
+  });
+
+  describe('listSchedules', () => {
+    it('should pass promptGroupId to schedulingService when provided in query', async () => {
+      mockListSchedulesForUser.mockResolvedValue([{ _id: 'sched-1', promptGroupId: 'pg-1' }]);
+
+      const req = mockReq({ query: { promptGroupId: 'pg-1' } });
+      const res = mockRes();
+
+      await listSchedules(req, res);
+
+      expect(mockListSchedulesForUser).toHaveBeenCalledWith('user-1', { promptGroupId: 'pg-1' });
+      expect(res.json).toHaveBeenCalledWith([{ _id: 'sched-1', promptGroupId: 'pg-1' }]);
+    });
+
+    it('should not pass promptGroupId when not in query', async () => {
+      const req = mockReq({ query: {} });
+      const res = mockRes();
+
+      await listSchedules(req, res);
+
+      expect(mockListSchedulesForUser).toHaveBeenCalledWith('user-1', {});
+      expect(res.json).toHaveBeenCalledWith([]);
+    });
+  });
+
+  describe('listRuns', () => {
+    it('should pass limit and promptGroupId to schedulingService when provided', async () => {
+      mockListRunsForUser.mockResolvedValue([{ _id: 'run-1', scheduleId: 'sched-1' }]);
+
+      const req = mockReq({ query: { promptGroupId: 'pg-1', limit: '10' } });
+      const res = mockRes();
+
+      await listRuns(req, res);
+
+      expect(mockListRunsForUser).toHaveBeenCalledWith('user-1', {
+        limit: '10',
+        promptGroupId: 'pg-1',
+      });
+      expect(res.json).toHaveBeenCalledWith([{ _id: 'run-1', scheduleId: 'sched-1' }]);
+    });
+
+    it('should pass only limit when promptGroupId is not provided', async () => {
+      const req = mockReq({ query: { limit: '5' } });
+      const res = mockRes();
+
+      await listRuns(req, res);
+
+      expect(mockListRunsForUser).toHaveBeenCalledWith('user-1', { limit: '5' });
+    });
   });
 
   describe('createSchedule', () => {

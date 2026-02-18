@@ -15,6 +15,7 @@ import PromptVariables from './PromptVariables';
 import { PromptVariableGfm } from './Markdown';
 import Description from './Description';
 import Command from './Command';
+import PromptScheduleSection from './PromptScheduleSection';
 
 const PromptDetails = ({ group }: { group?: TPromptGroup }) => {
   const localize = useLocalize();
@@ -74,6 +75,10 @@ const PromptDetails = ({ group }: { group?: TPromptGroup }) => {
           <PromptVariables promptText={mainText} showInfo={false} />
           <Description initialValue={group.oneliner} disabled={true} />
           <Command initialValue={group.command} disabled={true} />
+          <PromptScheduleSection
+            promptGroupId={group._id ?? ''}
+            promptGroupName={group.name ?? ''}
+          />
         </div>
       </div>
     </div>

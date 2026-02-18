@@ -63,7 +63,8 @@ const checkAgentAccess = generateCheckAccess({
  */
 async function listSchedules(req, res) {
   try {
-    const schedules = await listSchedulesForUser(req.user.id);
+    const opts = req.query.promptGroupId ? { promptGroupId: req.query.promptGroupId } : {};
+    const schedules = await listSchedulesForUser(req.user.id, opts);
     res.json(schedules);
   } catch (error) {
     logger.error('[ScheduledAgents] listSchedules error:', error);
@@ -209,7 +210,11 @@ async function runSchedule(req, res) {
  */
 async function listRuns(req, res) {
   try {
-    const runs = await listRunsForUser(req.user.id, { limit: req.query.limit });
+    const opts = { limit: req.query.limit };
+    if (req.query.promptGroupId) {
+      opts.promptGroupId = req.query.promptGroupId;
+    }
+    const runs = await listRunsForUser(req.user.id, opts);
     res.json(runs);
   } catch (error) {
     logger.error('[ScheduledAgents] listRuns error:', error);

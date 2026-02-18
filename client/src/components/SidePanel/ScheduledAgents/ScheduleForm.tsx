@@ -34,9 +34,18 @@ type Props = {
   onClose: () => void;
   onSubmit: (data: ScheduleFormValues) => void;
   isSubmitting: boolean;
+  /** When set, prompt is fixed to this group - hide prompt selector and use this ID */
+  fixedPromptGroupId?: string;
 };
 
-export default function ScheduleForm({ agents, schedule, onClose, onSubmit, isSubmitting }: Props) {
+export default function ScheduleForm({
+  agents,
+  schedule,
+  onClose,
+  onSubmit,
+  isSubmitting,
+  fixedPromptGroupId,
+}: Props) {
   const localize = useLocalize();
   const { showToast } = useToastContext();
   const isEdit = !!schedule;
@@ -54,7 +63,7 @@ export default function ScheduleForm({ agents, schedule, onClose, onSubmit, isSu
     defaultValues: {
       name: '',
       agentId: '',
-      promptGroupId: '',
+      promptGroupId: fixedPromptGroupId ?? '',
       scheduleType: 'recurring',
       cronExpression: '',
       runAt: '',
@@ -65,6 +74,12 @@ export default function ScheduleForm({ agents, schedule, onClose, onSubmit, isSu
 
   const scheduleType = watch('scheduleType');
   const cronExpression = watch('cronExpression');
+
+  useEffect(() => {
+    if (fixedPromptGroupId) {
+      setValue('promptGroupId', fixedPromptGroupId);
+    }
+  }, [fixedPromptGroupId, setValue]);
 
   useEffect(() => {
     if (schedule) {
@@ -140,28 +155,30 @@ export default function ScheduleForm({ agents, schedule, onClose, onSubmit, isSu
             <p className="mt-0.5 text-xs text-red-600">{localize('com_ui_required')}</p>
           )}
         </div>
-        <div>
-          <Label htmlFor="schedule-prompt">
-            {localize('com_sidepanel_scheduled_agents_prompt')}
-          </Label>
-          <select
-            id="schedule-prompt"
-            {...register('promptGroupId', { required: true })}
-            className={cn(
-              'mt-1 flex h-9 w-full rounded-md border border-border-medium bg-transparent px-3 py-1 text-sm',
+        {!fixedPromptGroupId && (
+          <div>
+            <Label htmlFor="schedule-prompt">
+              {localize('com_sidepanel_scheduled_agents_prompt')}
+            </Label>
+            <select
+              id="schedule-prompt"
+              {...register('promptGroupId', { required: !fixedPromptGroupId })}
+              className={cn(
+                'mt-1 flex h-9 w-full rounded-md border border-border-medium bg-transparent px-3 py-1 text-sm',
+              )}
+            >
+              <option value="">{localize('com_ui_select')}</option>
+              {promptGroups.map((g) => (
+                <option key={g._id} value={g._id}>
+                  {g.command ? `/${g.command} - ${g.name}` : g.name}
+                </option>
+              ))}
+            </select>
+            {errors.promptGroupId && (
+              <p className="mt-0.5 text-xs text-red-600">{localize('com_ui_required')}</p>
             )}
-          >
-            <option value="">{localize('com_ui_select')}</option>
-            {promptGroups.map((g) => (
-              <option key={g._id} value={g._id}>
-                {g.command ? `/${g.command} - ${g.name}` : g.name}
-              </option>
-            ))}
-          </select>
-          {errors.promptGroupId && (
-            <p className="mt-0.5 text-xs text-red-600">{localize('com_ui_required')}</p>
-          )}
-        </div>
+          </div>
+        )}
         <div>
           <Label>{localize('com_sidepanel_scheduled_agents_schedule_type')}</Label>
           <div className="mt-1 flex gap-4">

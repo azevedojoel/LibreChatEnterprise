@@ -50,10 +50,16 @@ function computeNextRunAt(schedule) {
 
 /**
  * @param {string} userId - User ID (string)
+ * @param {Object} [opts]
+ * @param {string} [opts.promptGroupId] - Filter schedules by prompt group ID
  * @returns {Promise<Object[]>} List of schedules with nextRunAt
  */
-async function listSchedulesForUser(userId) {
-  const schedules = await ScheduledPrompt.find({ userId })
+async function listSchedulesForUser(userId, opts = {}) {
+  const query = { userId };
+  if (opts.promptGroupId) {
+    query.promptGroupId = opts.promptGroupId;
+  }
+  const schedules = await ScheduledPrompt.find(query)
     .populate('promptGroupId', 'name command')
     .sort({ createdAt: -1 })
     .lean();
@@ -200,11 +206,21 @@ async function runScheduleForUser(userId, scheduleId) {
  * @param {string} userId - User ID
  * @param {Object} [opts]
  * @param {number} [opts.limit]
+ * @param {string} [opts.promptGroupId] - Filter runs by prompt group ID
  * @returns {Promise<Object[]>} List of runs
  */
 async function listRunsForUser(userId, opts = {}) {
   const limit = Math.min(parseInt(opts.limit, 10) || 25, 100);
-  const runs = await ScheduledRun.find({ userId })
+  const query = { userId };
+  if (opts.promptGroupId) {
+    const scheduleIds = await ScheduledPrompt.find({
+      userId,
+      promptGroupId: opts.promptGroupId,
+    })
+      .distinct('_id');
+    query.scheduleId = { $in: scheduleIds };
+  }
+  const runs = await ScheduledRun.find(query)
     .populate('scheduleId', 'name agentId promptGroupId')
     .sort({ runAt: -1 })
     .limit(limit)

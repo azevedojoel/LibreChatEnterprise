@@ -567,11 +567,13 @@ export const useDeleteAgentApiKeyMutation = (): UseMutationResult<void, unknown,
 
 /* Scheduled Agents */
 export const useGetScheduledAgentsQuery = (
+  opts?: { promptGroupId?: string },
   config?: UseQueryOptions<q.ScheduledAgentSchedule[]>,
 ): QueryObserverResult<q.ScheduledAgentSchedule[]> => {
+  const promptGroupId = opts?.promptGroupId;
   return useQuery<q.ScheduledAgentSchedule[]>(
-    [QueryKeys.scheduledAgents],
-    () => dataService.listScheduledAgents(),
+    [QueryKeys.scheduledAgents, promptGroupId ?? 'all'],
+    () => dataService.listScheduledAgents(promptGroupId ? { promptGroupId } : undefined),
     { refetchOnWindowFocus: false, ...config },
   );
 };
@@ -579,12 +581,19 @@ export const useGetScheduledAgentsQuery = (
 const ACTIVE_RUN_STATUSES = ['queued', 'running'] as const;
 
 export const useGetScheduledAgentRunsQuery = (
-  limit = 25,
+  limitOrOpts: number | { limit?: number; promptGroupId?: string } = 25,
   config?: UseQueryOptions<q.ScheduledRun[]>,
 ): QueryObserverResult<q.ScheduledRun[]> => {
+  const opts =
+    typeof limitOrOpts === 'number'
+      ? { limit: limitOrOpts }
+      : { limit: limitOrOpts.limit ?? 25, promptGroupId: limitOrOpts.promptGroupId };
   return useQuery<q.ScheduledRun[]>(
-    [QueryKeys.scheduledAgentRuns, limit],
-    () => dataService.listScheduledAgentRuns(limit),
+    [QueryKeys.scheduledAgentRuns, opts.limit, opts.promptGroupId ?? 'all'],
+    () =>
+      dataService.listScheduledAgentRuns(
+        opts.promptGroupId ? { limit: opts.limit, promptGroupId: opts.promptGroupId } : { limit: opts.limit },
+      ),
     {
       refetchOnWindowFocus: false,
       refetchInterval: (data) => {

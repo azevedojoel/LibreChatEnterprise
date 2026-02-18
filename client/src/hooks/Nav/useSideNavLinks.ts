@@ -6,8 +6,6 @@ import {
   Settings2,
   ArrowRightToLine,
   MessageSquareQuote,
-  Clock,
-  Loader2,
 } from 'lucide-react';
 import {
   Permissions,
@@ -19,7 +17,6 @@ import {
 } from 'librechat-data-provider';
 import type { TInterfaceConfig, TEndpointsConfig } from 'librechat-data-provider';
 import MCPBuilderPanel from '~/components/SidePanel/MCPBuilder/MCPBuilderPanel';
-import ScheduledAgentsPanel from '~/components/SidePanel/ScheduledAgents/ScheduledAgentsPanel';
 import type { NavLink } from '~/common';
 import AgentPanelSwitch from '~/components/SidePanel/Agents/AgentPanelSwitch';
 import BookmarkPanel from '~/components/SidePanel/Bookmarks/BookmarkPanel';
@@ -28,7 +25,6 @@ import PromptsAccordion from '~/components/Prompts/PromptsAccordion';
 import Parameters from '~/components/SidePanel/Parameters/Panel';
 import { MemoryPanel } from '~/components/SidePanel/Memories';
 import FilesPanel from '~/components/SidePanel/Files/Panel';
-import { useGetScheduledAgentRunsQuery } from '~/data-provider';
 import { useHasAccess, useMCPServerManager } from '~/hooks';
 
 export default function useSideNavLinks({
@@ -79,34 +75,6 @@ export default function useSideNavLinks({
     permission: Permissions.CREATE,
   });
   const { availableMCPServers } = useMCPServerManager();
-  const { data: runs = [] } = useGetScheduledAgentRunsQuery(25);
-
-  const scheduledAgentsStatusBadge = useMemo(() => {
-    if (!runs.length) return null;
-    const hasActive = runs.some(
-      (r) => r.status === 'queued' || r.status === 'running',
-    );
-    const lastRun = runs[0];
-    if (hasActive) {
-      return React.createElement(Loader2, {
-        className: 'h-3 w-3 shrink-0 animate-spin text-blue-500',
-        'aria-hidden': true,
-      });
-    }
-    if (lastRun?.status === 'success') {
-      return React.createElement('span', {
-        className: 'h-1.5 w-1.5 shrink-0 rounded-full bg-green-500',
-        'aria-hidden': true,
-      });
-    }
-    if (lastRun?.status === 'failed') {
-      return React.createElement('span', {
-        className: 'h-1.5 w-1.5 shrink-0 rounded-full bg-red-500',
-        'aria-hidden': true,
-      });
-    }
-    return null;
-  }, [runs]);
 
   const Links = useMemo(() => {
     const links: NavLink[] = [];
@@ -198,21 +166,6 @@ export default function useSideNavLinks({
     }
 
     if (
-      endpointsConfig?.[EModelEndpoint.agents] &&
-      hasAccessToAgents &&
-      (interfaceConfig.scheduledAgents !== false)
-    ) {
-      links.push({
-        title: 'com_sidepanel_scheduled_agents',
-        label: '',
-        icon: Clock,
-        id: 'scheduled-agents',
-        Component: ScheduledAgentsPanel,
-        badge: scheduledAgentsStatusBadge,
-      });
-    }
-
-    if (
       (hasAccessToUseMCPSettings && availableMCPServers && availableMCPServers.length > 0) ||
       hasAccessToCreateMCP
     ) {
@@ -244,14 +197,12 @@ export default function useSideNavLinks({
     hasAccessToMemories,
     hasAccessToReadMemories,
     interfaceConfig.parameters,
-    interfaceConfig.scheduledAgents,
     endpointType,
     hasAccessToBookmarks,
     availableMCPServers,
     hasAccessToUseMCPSettings,
     hasAccessToCreateMCP,
     hidePanel,
-    scheduledAgentsStatusBadge,
   ]);
 
   return Links;

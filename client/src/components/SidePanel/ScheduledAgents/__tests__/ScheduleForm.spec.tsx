@@ -128,4 +128,34 @@ describe('ScheduleForm', () => {
 
     expect(screen.getByTestId('tool-picker')).toBeInTheDocument();
   });
+
+  it('when fixedPromptGroupId is set and schedule is null: hides prompt select and includes promptGroupId in submit', async () => {
+    render(
+      <ScheduleForm
+        agents={mockAgents}
+        schedule={null}
+        onClose={onClose}
+        onSubmit={onSubmit}
+        isSubmitting={false}
+        fixedPromptGroupId="pg-1"
+      />,
+    );
+
+    expect(screen.queryByLabelText('com_sidepanel_scheduled_agents_prompt')).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'com_sidepanel_scheduled_agents_prompt' })).not.toBeInTheDocument();
+    expect(document.getElementById('schedule-prompt')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/com_ui_agent/i), { target: { value: 'agent-1' } });
+    fireEvent.change(screen.getByLabelText(/com_ui_name/i), {
+      target: { value: 'Test Schedule' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'com_ui_create' }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalled();
+    });
+    const submittedData = onSubmit.mock.calls[0][0] as ScheduleFormValues;
+    expect(submittedData.promptGroupId).toBe('pg-1');
+  });
 });

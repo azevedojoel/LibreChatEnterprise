@@ -1026,8 +1026,16 @@ export const updateMemoryPreferences = (preferences: {
   return request.patch(endpoints.memoryPreferences(), preferences);
 };
 
-export const listScheduledAgents = (): Promise<q.ScheduledAgentSchedule[]> =>
-  request.get(endpoints.scheduledAgents());
+export const listScheduledAgents = (opts?: {
+  promptGroupId?: string;
+}): Promise<q.ScheduledAgentSchedule[]> => {
+  const params = new URLSearchParams();
+  if (opts?.promptGroupId) {
+    params.set('promptGroupId', opts.promptGroupId);
+  }
+  const query = params.toString() ? `?${params.toString()}` : '';
+  return request.get(`${endpoints.scheduledAgents()}${query}`);
+};
 
 export const createScheduledAgent = (data: {
   name: string;
@@ -1069,10 +1077,20 @@ export const runScheduledAgent = (
   error?: string;
 }> => request.post(`${endpoints.scheduledAgents()}/${id}/run`);
 
-export const listScheduledAgentRuns = (limit?: number): Promise<q.ScheduledRun[]> =>
-  request.get(
-    limit ? `${endpoints.scheduledAgentRuns()}?limit=${limit}` : endpoints.scheduledAgentRuns(),
-  );
+export const listScheduledAgentRuns = (opts?: {
+  limit?: number;
+  promptGroupId?: string;
+}): Promise<q.ScheduledRun[]> => {
+  const params = new URLSearchParams();
+  if (opts?.limit) {
+    params.set('limit', String(opts.limit));
+  }
+  if (opts?.promptGroupId) {
+    params.set('promptGroupId', opts.promptGroupId);
+  }
+  const query = params.toString() ? `?${params.toString()}` : '';
+  return request.get(`${endpoints.scheduledAgentRuns()}${query}`);
+};
 
 export const getScheduledAgentRun = (id: string): Promise<q.ScheduledRunDetail> =>
   request.get(endpoints.scheduledAgentRun(id));
