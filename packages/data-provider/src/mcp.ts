@@ -20,6 +20,11 @@ const BaseOptionsSchema = z.object({
   iconPath: z.string().optional(),
   timeout: z.number().optional(),
   initTimeout: z.number().optional(),
+  /**
+   * How long (ms) to wait for user to complete OAuth before timing out.
+   * Defaults to 60s. Use initTimeout for slow MCP server startup instead.
+   */
+  oauthTimeout: z.number().optional(),
   /** Controls visibility in chat dropdown menu (MCPSelect) */
   chatMenu: z.boolean().optional(),
   /**
@@ -229,6 +234,7 @@ const omitServerManagedFields = <T extends z.ZodObject<z.ZodRawShape>>(schema: T
     startup: true,
     timeout: true,
     initTimeout: true,
+    oauthTimeout: true,
     chatMenu: true,
     serverInstructions: true,
     requiresOAuth: true,
