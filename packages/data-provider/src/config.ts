@@ -676,6 +676,9 @@ export const interfaceSchema = z
       })
       .optional(),
     scheduledAgents: z.boolean().optional(),
+    workflows: z.boolean().optional(),
+    toolCallDetails: z.boolean().optional(),
+    toolCallSpacing: z.enum(['normal', 'compact']).optional(),
   })
   .default({
     endpointsMenu: true,
@@ -723,6 +726,8 @@ export const interfaceSchema = z
       share: false,
       public: false,
     },
+    toolCallDetails: true,
+    toolCallSpacing: 'normal',
   });
 
 export type TInterfaceConfig = z.infer<typeof interfaceSchema>;
@@ -1727,7 +1732,7 @@ export enum TTSProviders {
 /** Enum for app-wide constants */
 export enum Constants {
   /** Key for the app's version. */
-  VERSION = 'v1.0.1',
+  VERSION = 'v1.0.2',
   /** Key for the Custom Config's version (librechat.yaml). */
   CONFIG_VERSION = '1.3.3',
   /** Standard value for the first message's `parentMessageId` value, to indicate no parent exists. */
