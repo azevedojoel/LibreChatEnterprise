@@ -8,3 +8,6 @@ export { default as DashGroupItem } from './Groups/DashGroupItem';
 export { default as EmptyPromptPreview } from './EmptyPromptPreview';
 export { default as PromptSidePanel } from './Groups/GroupSidePanel';
 export { default as CreatePromptForm } from './Groups/CreatePromptForm';
+export { default as WorkflowEditor } from './Workflows/WorkflowEditor';
+export { default as EmptyWorkflowPreview } from './EmptyWorkflowPreview';
+export { default as CreateWorkflowForm } from './CreateWorkflowForm';

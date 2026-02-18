@@ -3,7 +3,7 @@ import { useSetRecoilState } from 'recoil';
 import { Sidebar } from '@librechat/client';
 import { useLocation } from 'react-router-dom';
 import { SystemRoles } from 'librechat-data-provider';
-import { ArrowLeft, MessageSquareQuote } from 'lucide-react';
+import { ArrowLeft, MessageSquareQuote, GitBranch } from 'lucide-react';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -14,10 +14,12 @@ import {
 import { useLocalize, useCustomLink, useAuthContext } from '~/hooks';
 import AdvancedSwitch from '~/components/Prompts/AdvancedSwitch';
 import AdminSettings from '~/components/Prompts/AdminSettings';
+import { WorkflowsAdminSettings } from '~/components/Workflows';
 import { useDashboardContext } from '~/Providers';
 import store from '~/store';
 
 const promptsPathPattern = /prompts\/(?!new(?:\/|$)).*$/;
+const workflowsPathPattern = /^\/d\/workflows(\/|$)/;
 
 const getConversationId = (prevLocationPath: string) => {
   if (!prevLocationPath || prevLocationPath.includes('/d/')) {
@@ -51,12 +53,21 @@ export default function DashBreadcrumb({
   }, [setPromptsName, setPromptsCategory]);
 
   const chatLinkHandler = useCustomLink('/c/' + lastConversationId, clickCallback);
-  const promptsLinkHandler = useCustomLink('/d/prompts');
 
+  const isWorkflowsPath = useMemo(
+    () => workflowsPathPattern.test(location.pathname),
+    [location.pathname],
+  );
   const isPromptsPath = useMemo(
     () => promptsPathPattern.test(location.pathname),
     [location.pathname],
   );
+
+  const sectionLabel = isWorkflowsPath ? localize('com_ui_workflows') : localize('com_ui_prompts');
+  const sectionHref = isWorkflowsPath ? '/d/workflows' : '/d/prompts';
+  const SectionIcon = isWorkflowsPath ? GitBranch : MessageSquareQuote;
+  const promptsLinkHandler = useCustomLink(sectionHref);
+  const panelId = isWorkflowsPath ? 'workflows-panel' : 'prompts-panel';
 
   return (
     <div className="mr-2 mt-2 flex h-10 items-center justify-between">
@@ -72,7 +83,7 @@ export default function DashBreadcrumb({
                   className="flex h-8 w-8 items-center justify-center rounded-lg border border-border-medium bg-surface-primary text-text-primary transition-all hover:bg-surface-hover"
                   aria-label={localize('com_nav_open_sidebar')}
                   aria-expanded={false}
-                  aria-controls="prompts-panel"
+                  aria-controls={panelId}
                 >
                   <Sidebar className="h-4 w-4" />
                 </button>
@@ -113,19 +124,20 @@ export default function DashBreadcrumb({
         */}
           <BreadcrumbItem className="hover:dark:text-white">
             <BreadcrumbLink
-              href="/d/prompts"
+              href={sectionHref}
               className="flex flex-row items-center gap-1"
               onClick={promptsLinkHandler}
             >
-              <MessageSquareQuote className="h-4 w-4 dark:text-gray-300" aria-hidden="true" />
-              {localize('com_ui_prompts')}
+              <SectionIcon className="h-4 w-4 dark:text-gray-300" aria-hidden="true" />
+              {sectionLabel}
             </BreadcrumbLink>
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
       <div className="flex items-center justify-center gap-2">
         {isPromptsPath && <AdvancedSwitch />}
-        {user?.role === SystemRoles.ADMIN && <AdminSettings />}
+        {user?.role === SystemRoles.ADMIN &&
+          (isWorkflowsPath ? <WorkflowsAdminSettings /> : <AdminSettings />)}
       </div>
     </div>
   );

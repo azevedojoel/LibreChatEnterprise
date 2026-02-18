@@ -2926,3 +2926,39 @@ html {
 .sharepoint-picker-bg {
   background-color: #f5f5f5;
 }
+
+/* ReactFlow controls - visible in dark mode */
+.dark .react-flow__controls {
+  --xy-controls-button-background-color-default: var(--surface-secondary);
+  --xy-controls-button-background-color-hover-default: var(--surface-tertiary);
+  --xy-controls-button-color-default: var(--text-primary);
+  --xy-controls-button-color-hover-default: var(--text-primary);
+  --xy-controls-button-border-color-default: var(--border-light);
+  --xy-controls-box-shadow-default: 0 0 2px 1px rgba(0, 0, 0, 0.3);
+}
+
+.dark .react-flow__controls .react-flow__controls-button {
+  background: var(--surface-secondary) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-light) !important;
+}
+
+.dark .react-flow__controls .react-flow__controls-button:hover {
+  background: var(--surface-tertiary) !important;
+  color: var(--text-primary) !important;
+}
+
+.dark .react-flow__controls .react-flow__controls-button svg {
+  fill: var(--text-primary);
+}
+
+/* ReactFlow nodes - ensure theme variables apply for contrast */
+.react-flow__node {
+  color: var(--text-primary);
+}
+
+.react-flow__node select,
+.react-flow__node input {
+  color: var(--text-primary);
+  background-color: var(--surface-secondary);
+}

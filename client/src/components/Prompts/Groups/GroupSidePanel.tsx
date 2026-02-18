@@ -22,7 +22,6 @@ export default function GroupSidePanel({
   const location = useLocation();
   const localize = useLocalize();
   const isChatRoute = useMemo(() => location.pathname?.startsWith('/c/'), [location.pathname]);
-
   const { promptGroups, groupsQuery, nextPage, prevPage, hasNextPage, hasPreviousPage } =
     usePromptGroupsContext();
 

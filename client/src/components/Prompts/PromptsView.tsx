@@ -12,7 +12,10 @@ import { cn } from '~/utils';
 export default function PromptsView() {
   const params = useParams();
   const navigate = useNavigate();
-  const isDetailView = useMemo(() => !!(params.promptId || params['*'] === 'new'), [params]);
+  const isDetailView = useMemo(
+    () => !!(params.promptId || params['*'] === 'new'),
+    [params],
+  );
   const isSmallerScreen = useMediaQuery('(max-width: 768px)');
   const [panelVisible, setPanelVisible] = useState(!isSmallerScreen);
   const openPanelRef = useRef<HTMLButtonElement>(null);

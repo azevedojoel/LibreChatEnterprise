@@ -22,7 +22,8 @@ export const useAvailableAgentToolsQuery = (): QueryObserverResult<t.TPlugin[]> 
   const queryClient = useQueryClient();
   const endpointsConfig = queryClient.getQueryData<t.TEndpointsConfig>([QueryKeys.endpoints]);
 
-  const enabled = !!endpointsConfig?.[EModelEndpoint.agents];
+  // Run when agents is configured, or when endpoints haven't loaded yet (avoids empty lists during initial load)
+  const enabled = endpointsConfig === undefined || !!endpointsConfig?.[EModelEndpoint.agents];
   return useQuery<t.TPlugin[]>([QueryKeys.tools], () => dataService.getAvailableAgentTools(), {
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
@@ -41,22 +42,22 @@ export const useListAgentsQuery = <TData = t.AgentListResponse>(
   const queryClient = useQueryClient();
   const endpointsConfig = queryClient.getQueryData<t.TEndpointsConfig>([QueryKeys.endpoints]);
 
-  const enabled = !!endpointsConfig?.[EModelEndpoint.agents];
+  // Run when agents is configured, or when endpoints haven't loaded yet (avoids empty lists during initial load)
+  const agentsEnabled =
+    endpointsConfig === undefined || !!endpointsConfig?.[EModelEndpoint.agents];
+  const enabled =
+    config?.enabled !== undefined ? config.enabled && agentsEnabled : agentsEnabled;
   return useQuery<t.AgentListResponse, unknown, TData>(
     [QueryKeys.agents, params],
     () => dataService.listAgents(params),
     {
-      // Example selector to sort them by created_at
-      // select: (res) => {
-      //   return res.data.sort((a, b) => a.created_at - b.created_at);
-      // },
       staleTime: 1000 * 5,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
       refetchOnMount: false,
       retry: false,
       ...config,
-      enabled: config?.enabled !== undefined ? config.enabled && enabled : enabled,
+      enabled,
     },
   );
 };
