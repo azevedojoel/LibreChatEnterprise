@@ -1,5 +1,4 @@
-import { useCallback, useRef, useMemo } from 'react';
-import throttle from 'lodash/throttle';
+import { useCallback, useRef } from 'react';
 import {
   Constants,
   StepTypes,
@@ -18,10 +17,6 @@ import type {
 import type { SetterOrUpdater } from 'recoil';
 import type { AnnounceOptions } from '~/common';
 import { MESSAGE_UPDATE_INTERVAL } from '~/common';
-import { logger } from '~/utils';
-
-/** Throttle interval for delta updates - allows ~12 updates/sec for smooth streaming feel */
-const DELTA_UPDATE_THROTTLE_MS = 80;
 
 type TUseStepHandler = {
   announcePolite: (options: AnnounceOptions) => void;
@@ -65,49 +60,11 @@ export default function useStepHandler({
   announcePolite,
   lastAnnouncementTimeRef,
 }: TUseStepHandler) {
-  /** stepId -> array of tool call IDs (one per parallel tool in that step) */
-  const toolCallIdMap = useRef(new Map<string, string[]>());
+  const toolCallIdMap = useRef(new Map<string, string | undefined>());
   const messageMap = useRef(new Map<string, TMessage>());
   const stepMap = useRef(new Map<string, Agents.RunStep>());
   /** Buffer for deltas that arrive before their corresponding run step */
   const pendingDeltaBuffer = useRef(new Map<string, TStepEvent[]>());
-
-  /**
-   * Flush messageMap updates to setMessages. Used for throttled delta updates
-   * to allow incremental UI renders instead of batching everything into one.
-   * The throttle's setTimeout yields to the event loop (Fix 2: reduce React
-   * batching by deferring updates to a future macrotask).
-   */
-  const flushDeltaUpdates = useCallback(() => {
-    const messages = getMessages();
-    if (!messages?.length) return;
-    let hasUpdates = false;
-    const merged = messages.map((m) => {
-      const mapped = messageMap.current.get(m.messageId);
-      if (mapped) {
-        hasUpdates = true;
-        return mapped;
-      }
-      return m;
-    });
-    if (hasUpdates) {
-      setMessages(merged);
-    }
-  }, [getMessages, setMessages]);
-
-  /**
-   * Throttled flush for delta events. Uses trailing-edge throttle so updates
-   * are batched and flushed ~80ms after the last delta, allowing React to
-   * render intermediate state and creating a smooth streaming feel.
-   */
-  const throttledFlush = useMemo(
-    () =>
-      throttle(flushDeltaUpdates, DELTA_UPDATE_THROTTLE_MS, {
-        leading: false,
-        trailing: true,
-      }),
-    [flushDeltaUpdates],
-  );
 
   /**
    * Calculate content index for a run step.
@@ -359,22 +316,17 @@ export default function useStepHandler({
             updatedMessages = [...updatedMessages, userMessage as TMessage];
           }
 
-          throttledFlush.cancel();
           setMessages([...updatedMessages, response]);
         }
 
-        // Store tool call IDs if present (array for parallel tools)
+        // Store tool call IDs if present
         if (runStep.stepDetails.type === StepTypes.TOOL_CALLS) {
           let updatedResponse = { ...response };
-          const toolCalls = runStep.stepDetails.tool_calls as Agents.ToolCall[];
-          const toolCallIds = toolCalls
-            .map((tc) => ('id' in tc && tc.id ? tc.id : ''))
-            .filter(Boolean);
-          if (toolCallIds.length > 0) {
-            toolCallIdMap.current.set(runStep.id, toolCallIds);
-          }
-          toolCalls.forEach((toolCall, i) => {
+          (runStep.stepDetails.tool_calls as Agents.ToolCall[]).forEach((toolCall) => {
             const toolCallId = toolCall.id ?? '';
+            if ('id' in toolCall && toolCallId) {
+              toolCallIdMap.current.set(runStep.id, toolCallId);
+            }
 
             const contentPart: Agents.MessageContentComplex = {
               type: ContentTypes.TOOL_CALL,
@@ -385,10 +337,10 @@ export default function useStepHandler({
               },
             };
 
-            // Use contentIndex + i so each parallel tool gets its own content slot
+            // Use the pre-calculated contentIndex which handles parallel agent indexing
             updatedResponse = updateContent(
               updatedResponse,
-              contentIndex + i,
+              contentIndex,
               contentPart,
               false,
               getStepMetadata(runStep),
@@ -400,7 +352,6 @@ export default function useStepHandler({
             msg.messageId === responseMessageId ? updatedResponse : msg,
           );
 
-          throttledFlush.cancel();
           setMessages(updatedMessages);
         }
 
@@ -440,8 +391,10 @@ export default function useStepHandler({
           );
           messageMap.current.set(responseMessageId, updatedResponse);
           const currentMessages = getMessages() || [];
-          throttledFlush.cancel();
-          setMessages([...currentMessages.slice(0, -1), updatedResponse]);
+          const updatedMessages = currentMessages.map((msg) =>
+            msg.messageId === responseMessageId ? updatedResponse : msg,
+          );
+          setMessages(updatedMessages);
         }
       } else if (event === 'on_message_delta') {
         const messageDelta = data as Agents.MessageDeltaEvent;
@@ -483,7 +436,11 @@ export default function useStepHandler({
             getStepMetadata(runStep),
           );
           messageMap.current.set(responseMessageId, updatedResponse);
-          throttledFlush();
+          const currentMessages = getMessages() || [];
+          const updatedMessages = currentMessages.map((msg) =>
+            msg.messageId === responseMessageId ? updatedResponse : msg,
+          );
+          setMessages(updatedMessages);
         }
       } else if (event === 'on_reasoning_delta') {
         const reasoningDelta = data as Agents.ReasoningDeltaEvent;
@@ -525,7 +482,11 @@ export default function useStepHandler({
             getStepMetadata(runStep),
           );
           messageMap.current.set(responseMessageId, updatedResponse);
-          throttledFlush();
+          const currentMessages = getMessages() || [];
+          const updatedMessages = currentMessages.map((msg) =>
+            msg.messageId === responseMessageId ? updatedResponse : msg,
+          );
+          setMessages(updatedMessages);
         }
       } else if (event === 'on_run_step_delta') {
         const runStepDelta = data as Agents.RunStepDeltaEvent;
@@ -537,72 +498,11 @@ export default function useStepHandler({
         }
 
         if (!runStep || !responseMessageId) {
-          // Fallback: when delta has auth but step is missing, try to merge auth into a matching tool call
-          if (
-            runStepDelta.delta?.auth != null &&
-            runStepDelta.delta?.tool_calls?.length &&
-            runStepDelta.delta.type === StepTypes.TOOL_CALLS
-          ) {
-            const fallbackMessageId =
-              responseMessageId ||
-              submission?.initialResponse?.messageId ||
-              messages.find((m) => !m.isCreatedByUser)?.messageId;
-            if (fallbackMessageId) {
-              const response =
-                messageMap.current.get(fallbackMessageId) ??
-                messages.find((m) => m.messageId === fallbackMessageId);
-              const content = response?.content ?? [];
-              const toolName = runStepDelta.delta.tool_calls[0]?.name;
-              const contentIndex = content.findIndex(
-                (part) =>
-                  part?.type === ContentTypes.TOOL_CALL &&
-                  (part as { tool_call?: { name?: string } })?.tool_call?.name === toolName &&
-                  !(part as { tool_call?: { auth?: string } })?.tool_call?.auth,
-              );
-              if (contentIndex >= 0) {
-                logger.debug('[MCP OAuth] on_run_step_delta: applying auth via fallback (no step)', {
-                  stepId: runStepDelta.id,
-                  toolName,
-                  contentIndex,
-                });
-                const existingPart = content[contentIndex] as { tool_call?: Record<string, unknown> };
-                const updatedContent = [...content];
-                updatedContent[contentIndex] = {
-                  ...existingPart,
-                  tool_call: {
-                    ...existingPart?.tool_call,
-                    auth: runStepDelta.delta.auth,
-                    expires_at: runStepDelta.delta.expires_at,
-                  },
-                };
-                const updatedResponse = { ...response, content: updatedContent };
-                messageMap.current.set(fallbackMessageId, updatedResponse);
-                const updatedMessages = messages.map((msg) =>
-                  msg.messageId === fallbackMessageId ? updatedResponse : msg,
-                );
-                throttledFlush.cancel();
-                setMessages(updatedMessages);
-                return;
-              }
-            }
-          }
-          logger.debug('[MCP OAuth] on_run_step_delta: buffering (step or responseMessageId missing)', {
-            stepId: runStepDelta.id,
-            hasRunStep: !!runStep,
-            responseMessageId: responseMessageId || 'empty',
-            hasAuth: runStepDelta.delta?.auth != null,
-          });
           const buffer = pendingDeltaBuffer.current.get(runStepDelta.id) ?? [];
           buffer.push({ event: 'on_run_step_delta', data: runStepDelta });
           pendingDeltaBuffer.current.set(runStepDelta.id, buffer);
           return;
         }
-
-        logger.debug('[MCP OAuth] on_run_step_delta: processing', {
-          stepId: runStepDelta.id,
-          responseMessageId,
-          hasAuth: runStepDelta.delta?.auth != null,
-        });
 
         const response = messageMap.current.get(responseMessageId);
         if (
@@ -611,13 +511,9 @@ export default function useStepHandler({
           runStepDelta.delta.tool_calls
         ) {
           let updatedResponse = { ...response };
-          const toolCallIds = toolCallIdMap.current.get(runStepDelta.id) ?? [];
 
-          runStepDelta.delta.tool_calls.forEach((toolCallDelta, i) => {
-            const explicitIndex = (toolCallDelta as { index?: number }).index;
-            const deltaIndex =
-              typeof explicitIndex === 'number' ? explicitIndex : i;
-            const toolCallId = toolCallIds[deltaIndex] ?? toolCallIds[0] ?? '';
+          runStepDelta.delta.tool_calls.forEach((toolCallDelta) => {
+            const toolCallId = toolCallIdMap.current.get(runStepDelta.id) ?? '';
 
             const contentPart: Agents.MessageContentComplex = {
               type: ContentTypes.TOOL_CALL,
@@ -633,9 +529,8 @@ export default function useStepHandler({
               contentPart.tool_call.expires_at = runStepDelta.delta.expires_at;
             }
 
-            // Use delta index when present for parallel tools; fallback to runStep.index
-            const currentIndex =
-              runStep.index + initialContent.length + deltaIndex;
+            // Use server's index, offset by initialContent for edit scenarios
+            const currentIndex = runStep.index + initialContent.length;
             updatedResponse = updateContent(
               updatedResponse,
               currentIndex,
@@ -646,11 +541,16 @@ export default function useStepHandler({
           });
 
           messageMap.current.set(responseMessageId, updatedResponse);
-          throttledFlush();
+          const currentMessages = getMessages() || [];
+          const updatedMessages = currentMessages.map((msg) =>
+            msg.messageId === responseMessageId ? updatedResponse : msg,
+          );
+          setMessages(updatedMessages);
         }
       } else if (event === 'on_run_step_completed') {
         const { result } = data as unknown as { result: Agents.ToolEndEvent };
-        const { id: stepId, index: resultIndex, tool_call: toolCallResult } = result;
+
+        const { id: stepId, tool_call: toolCallResult } = result;
 
         if (!toolCallResult) {
           return;
@@ -663,203 +563,28 @@ export default function useStepHandler({
           parentMessageId = submission?.initialResponse?.parentMessageId ?? '';
         }
 
-        // Fallback when step not in map (e.g. reconnection, event ordering): use result.index
-        // and find response message from initialResponse or last assistant message
-        if (!responseMessageId) {
-          responseMessageId = submission?.initialResponse?.messageId ?? '';
-          if (!responseMessageId) {
-            const lastAssistant = [...messages].reverse().find((m) => !m.isCreatedByUser);
-            responseMessageId = lastAssistant?.messageId ?? '';
-          }
-        }
-
-        let response = messageMap.current.get(responseMessageId);
-        if (!response) {
-          const responseMessage =
-            messages.find((m) => m.messageId === responseMessageId) ??
-            (submission?.initialResponse?.messageId === responseMessageId
-              ? (submission.initialResponse as TMessage)
-              : null);
-          if (responseMessage) {
-            response = {
-              ...responseMessage,
-              parentMessageId: responseMessage.parentMessageId ?? userMessage.messageId,
-              conversationId: responseMessage.conversationId ?? userMessage.conversationId,
-              messageId: responseMessageId,
-              content: responseMessage.content ?? [],
-            };
-            messageMap.current.set(responseMessageId, response);
-          }
-        }
-
-        if (!response) {
+        if (!runStep || !responseMessageId) {
+          console.warn('No run step or runId found for completed tool call event');
           return;
         }
 
-        // Resolve content index: prefer tool_call.id; fallback to name+args; then resultIndex; then runStep.index
-        // (backend may send wrong index for parallel tools, so matching by id is most reliable)
-        let currentIndex: number;
-        const toolCallId = toolCallResult.id ?? '';
-        const content = response.content ?? [];
-        const getToolCall = (p: TMessageContentParts) =>
-          (p?.type === ContentTypes.TOOL_CALL
-            ? (p.tool_call ?? (p[ContentTypes.TOOL_CALL] as Agents.ToolCall))
-            : undefined) as Agents.ToolCall | undefined;
-
-        let indexById = toolCallId
-          ? content.findIndex(
-              (p) =>
-                p?.type === ContentTypes.TOOL_CALL && getToolCall(p)?.id === toolCallId,
-            )
-          : -1;
-        if (indexById < 0 && toolCallResult.name) {
-          const toolCallsWithName = content
-            .map((p, i) => (p?.type === ContentTypes.TOOL_CALL ? { p, i } : null))
-            .filter(
-              (v): v is { p: TMessageContentParts; i: number } =>
-                v != null && getToolCall(v.p)?.name === toolCallResult.name,
-            );
-          const withoutOutput = toolCallsWithName.filter(
-            (v) => !getToolCall(v.p)?.output,
-          );
-          if (withoutOutput.length === 1) {
-            indexById = withoutOutput[0].i;
-          } else if (toolCallsWithName.length === 1) {
-            indexById = toolCallsWithName[0].i;
-          }
-        }
-        if (indexById >= 0) {
-          currentIndex = indexById;
-        } else if (typeof resultIndex === 'number' && resultIndex >= 0) {
-          if (indexById < 0 && toolCallId) {
-            console.warn('[useStepHandler] on_run_step_completed: indexById not found, using resultIndex', {
-              toolCallId,
-              resultIndex,
-              stepId,
-            });
-          }
-          currentIndex = resultIndex + initialContent.length;
-        } else if (runStep != null) {
-          currentIndex = runStep.index + initialContent.length;
-        } else {
-          const pendingCalls = content
-            .map((p, i) =>
-              p?.type === ContentTypes.TOOL_CALL && !getToolCall(p)?.output
-                ? { p, i }
-                : null,
-            )
-            .filter(
-              (v): v is { p: TMessageContentParts; i: number } =>
-                v != null &&
-                (toolCallResult.name == null ||
-                  getToolCall(v.p)?.name === toolCallResult.name),
-            );
-          if (pendingCalls.length === 1) {
-            currentIndex = pendingCalls[0].i;
-          } else {
-            const isToolSearch =
-              toolCallResult.name === 'tool_search' ||
-              (typeof toolCallResult.name === 'string' && toolCallResult.name.startsWith('tool_search_mcp_'));
-            const hasOutput = toolCallResult.output != null && toolCallResult.output !== '';
-            const toolCallsWithoutOutputIndices = content
-              .map((p, i) =>
-                p?.type === ContentTypes.TOOL_CALL && !getToolCall(p)?.output
-                  ? { i, tc: getToolCall(p) }
-                  : null,
-              )
-              .filter((v): v is { i: number; tc: Agents.ToolCall } => v != null);
-            const toolSearchMatches = toolCallsWithoutOutputIndices.filter(
-              (v) =>
-                v.tc?.name === 'tool_search' ||
-                (typeof v.tc?.name === 'string' && v.tc.name.startsWith('tool_search_mcp_')),
-            );
-            if (isToolSearch && hasOutput) {
-              if (toolSearchMatches.length === 1) {
-                currentIndex = toolSearchMatches[0].i;
-              } else if (
-                toolSearchMatches.length > 1 &&
-                toolCallResult.name &&
-                toolSearchMatches.some((m) => m.tc?.name === toolCallResult.name)
-              ) {
-                const exact = toolSearchMatches.find(
-                  (m) => m.tc?.name === toolCallResult.name,
-                );
-                currentIndex = exact ? exact.i : toolSearchMatches[0].i;
-              } else if (toolSearchMatches.length > 0) {
-                currentIndex = toolSearchMatches[0].i;
-                console.warn('[useStepHandler] on_run_step_completed: ambiguous tool_search, using first match', {
-                  stepId,
-                  toolName: toolCallResult.name,
-                  toolSearchMatchesCount: toolSearchMatches.length,
-                });
-              } else {
-                const firstWithoutOutput = toolCallsWithoutOutputIndices[0];
-                if (firstWithoutOutput) {
-                  currentIndex = firstWithoutOutput.i;
-                  console.warn('[useStepHandler] on_run_step_completed: no tool_search match, applying to first tool without output', {
-                    stepId,
-                    toolName: toolCallResult.name,
-                    fallbackIndex: firstWithoutOutput.i,
-                  });
-                } else {
-                  console.warn('[useStepHandler] on_run_step_completed: index resolution failed', {
-                    stepId,
-                    resultIndex,
-                    toolCallId,
-                    toolName: toolCallResult.name,
-                    contentLength: content.length,
-                    toolCallIndicesInContent: content
-                      .map((p, i) =>
-                        p?.type === ContentTypes.TOOL_CALL
-                          ? { i, name: getToolCall(p)?.name, hasOutput: !!getToolCall(p)?.output }
-                          : null,
-                      )
-                      .filter(Boolean),
-                  });
-                  return;
-                }
-              }
-            } else {
-              const firstMatch = pendingCalls[0] ?? toolCallsWithoutOutputIndices[0];
-              if (firstMatch) {
-                currentIndex = firstMatch.i;
-                console.warn('[useStepHandler] on_run_step_completed: using first tool without output as fallback', {
-                  stepId,
-                  toolName: toolCallResult.name,
-                  fallbackIndex: firstMatch.i,
-                });
-              } else {
-                console.warn('[useStepHandler] on_run_step_completed: index resolution failed', {
-                  stepId,
-                  resultIndex,
-                  toolCallId,
-                  toolName: toolCallResult.name,
-                  contentLength: content.length,
-                  pendingCallsCount: pendingCalls.length,
-                  toolCallIndicesInContent: content
-                    .map((p, i) =>
-                      p?.type === ContentTypes.TOOL_CALL
-                        ? { i, name: getToolCall(p)?.name, hasOutput: !!getToolCall(p)?.output }
-                        : null,
-                    )
-                    .filter(Boolean),
-                });
-                return;
-              }
-            }
-          }
-        }
-
+        const response = messageMap.current.get(responseMessageId);
         if (response) {
-          const updatedResponse = updateContent(
-            { ...response },
+          let updatedResponse = { ...response };
+
+          const contentPart: Agents.MessageContentComplex = {
+            type: ContentTypes.TOOL_CALL,
+            tool_call: toolCallResult,
+          };
+
+          // Use server's index, offset by initialContent for edit scenarios
+          const currentIndex = runStep.index + initialContent.length;
+          updatedResponse = updateContent(
+            updatedResponse,
             currentIndex,
-            {
-              type: ContentTypes.TOOL_CALL,
-              tool_call: toolCallResult,
-            },
+            contentPart,
             true,
-            runStep != null ? getStepMetadata(runStep) : undefined,
+            getStepMetadata(runStep),
           );
 
           messageMap.current.set(responseMessageId, updatedResponse);
@@ -867,7 +592,6 @@ export default function useStepHandler({
             msg.messageId === responseMessageId ? updatedResponse : msg,
           );
 
-          throttledFlush.cancel();
           setMessages(updatedMessages);
         }
       }
@@ -878,23 +602,15 @@ export default function useStepHandler({
         stepMap.current.clear();
       };
     },
-    [
-      getMessages,
-      lastAnnouncementTimeRef,
-      announcePolite,
-      setMessages,
-      calculateContentIndex,
-      throttledFlush,
-    ],
+    [getMessages, lastAnnouncementTimeRef, announcePolite, setMessages, calculateContentIndex],
   );
 
   const clearStepMaps = useCallback(() => {
-    throttledFlush.cancel();
     toolCallIdMap.current.clear();
     messageMap.current.clear();
     stepMap.current.clear();
     pendingDeltaBuffer.current.clear();
-  }, [throttledFlush]);
+  }, []);
 
   /**
    * Sync a message into the step handler's messageMap.

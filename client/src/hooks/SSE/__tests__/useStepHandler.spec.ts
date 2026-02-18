@@ -737,17 +737,12 @@ describe('useStepHandler', () => {
       });
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[useStepHandler] on_run_step_completed: index resolution failed',
-        expect.objectContaining({
-          stepId: 'nonexistent-step',
-          toolCallId: 'tool-call-1',
-          toolName: 'test_tool',
-        }),
+        'No run step or runId found for completed tool call event',
       );
       consoleSpy.mockRestore();
     });
 
-    it('should apply tool result via fallback when step not in map but result has index', () => {
+    it('should not apply tool result when step not in map (upstream behavior)', () => {
       const responseMessage = createResponseMessage();
       mockGetMessages.mockReturnValue([responseMessage]);
 
@@ -792,14 +787,8 @@ describe('useStepHandler', () => {
         );
       });
 
-      expect(mockSetMessages).toHaveBeenCalled();
-      const lastCall = mockSetMessages.mock.calls[mockSetMessages.mock.calls.length - 1][0];
-      const responseMsg = lastCall.find((m: TMessage) => !m.isCreatedByUser);
-      const toolCallContent = responseMsg?.content?.find(
-        (c: TMessageContentParts) => c.type === ContentTypes.TOOL_CALL,
-      );
-      expect(toolCallContent?.tool_call?.output).toBe('Tool result output');
-      expect(toolCallContent?.tool_call?.progress).toBe(1);
+      // Upstream does not support fallback when step is not in map - returns early without updating
+      expect(mockSetMessages).not.toHaveBeenCalled();
     });
 
   });
