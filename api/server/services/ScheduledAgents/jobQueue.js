@@ -364,4 +364,5 @@ module.exports = {
   stopWorker,
   isQueueAvailable,
   requireRedisAtStartup,
+  getRedisConnection,
 };

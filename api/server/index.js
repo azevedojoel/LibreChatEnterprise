@@ -30,6 +30,7 @@ const { checkMigrations } = require('./services/start/migration');
 const initializeMCPs = require('./services/initializeMCPs');
 const { startScheduler } = require('./services/ScheduledAgents/scheduler');
 const { startWorker, requireRedisAtStartup } = require('./services/ScheduledAgents/jobQueue');
+const { startWorkflowWorker } = require('./services/ScheduledAgents/workflowJobQueue');
 const { startInboundEmailWorker } = require('./services/InboundEmail/jobQueue');
 const configureSocialLogins = require('./socialLogins');
 const { getAppConfig } = require('./services/Config');
@@ -177,6 +178,7 @@ const startServer = async () => {
 
   app.use('/api/tags', routes.tags);
   app.use('/api/scheduled-agents', routes.scheduledAgents);
+  app.use('/api/workflows', routes.workflows);
   app.use('/api/mcp', routes.mcp);
 
   app.use(ErrorController);
@@ -215,6 +217,7 @@ const startServer = async () => {
     await checkMigrations();
     startScheduler();
     startWorker();
+    startWorkflowWorker();
     startInboundEmailWorker();
 
     // Configure stream services (auto-detects Redis from USE_REDIS env var)

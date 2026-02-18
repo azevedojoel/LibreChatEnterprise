@@ -1,7 +1,8 @@
 const cron = require('node-cron');
 const { logger } = require('@librechat/data-schemas');
-const { ScheduledPrompt } = require('~/db/models');
+const { ScheduledPrompt, WorkflowSchedule } = require('~/db/models');
 const { runScheduleForUser } = require('./schedulingService');
+const { runScheduleForWorkflow } = require('./workflowSchedulingService');
 
 let isLeader = () => Promise.resolve(true);
 
@@ -27,6 +28,7 @@ async function processDueSchedules() {
 
     const now = new Date();
     const oneMinuteAgo = new Date(now.getTime() - 60 * 1000);
+    const twoMinutesAgo = new Date(now.getTime() - 2 * 60 * 1000);
 
     const recurringSchedules = await ScheduledPrompt.find({
       enabled: true,
@@ -48,7 +50,6 @@ async function processDueSchedules() {
       logger.warn('[ScheduledAgents] cron-parser not available, skipping recurring');
     }
     if (cronParser) {
-      const twoMinutesAgo = new Date(now.getTime() - 2 * 60 * 1000);
       for (const s of recurringSchedules) {
         try {
           const interval = cronParser.parseExpression(s.cronExpression, {
@@ -81,6 +82,56 @@ async function processDueSchedules() {
         }
       } catch (err) {
         logger.error(`[ScheduledAgents] Error executing schedule ${schedule._id}:`, err);
+      }
+    }
+
+    // Process due workflow schedules
+    const recurringWorkflowSchedules = await WorkflowSchedule.find({
+      enabled: true,
+      scheduleType: 'recurring',
+      cronExpression: { $exists: true, $ne: null, $ne: '' },
+    }).lean();
+
+    const oneOffWorkflowSchedules = await WorkflowSchedule.find({
+      enabled: true,
+      scheduleType: 'one-off',
+      runAt: { $lte: now },
+    }).lean();
+
+    const dueRecurringWorkflow = [];
+    if (cronParser) {
+      for (const s of recurringWorkflowSchedules) {
+        try {
+          const interval = cronParser.parseExpression(s.cronExpression, {
+            currentDate: twoMinutesAgo,
+            tz: s.timezone || 'UTC',
+          });
+          const next = interval.next().toDate();
+          if (next <= now && next >= oneMinuteAgo) {
+            dueRecurringWorkflow.push(s);
+          }
+        } catch (parseErr) {
+          logger.warn(`[ScheduledAgents] Invalid cron ${s.cronExpression} for workflow schedule ${s._id}`);
+        }
+      }
+    }
+
+    const workflowToRun = [...dueRecurringWorkflow, ...oneOffWorkflowSchedules];
+    for (const schedule of workflowToRun) {
+      try {
+        const result = await runScheduleForWorkflow(
+          schedule.userId.toString(),
+          schedule._id.toString(),
+        );
+        if (result.success && schedule.scheduleType === 'one-off') {
+          await WorkflowSchedule.findByIdAndUpdate(schedule._id, { $set: { enabled: false } });
+        } else if (!result.success) {
+          logger.error(
+            `[ScheduledAgents] Failed to trigger workflow schedule ${schedule._id}: ${result.error || 'unknown'}`,
+          );
+        }
+      } catch (err) {
+        logger.error(`[ScheduledAgents] Error executing workflow schedule ${schedule._id}:`, err);
       }
     }
   } catch (err) {
