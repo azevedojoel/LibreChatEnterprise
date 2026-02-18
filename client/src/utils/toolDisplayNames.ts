@@ -1,14 +1,11 @@
-/**
- * Server-side tool display names for email formatting.
- * Mirrors client TOOL_DISPLAY_NAMES in ToolCall.tsx for consistency.
- */
-const { Constants } = require('librechat-data-provider');
+import { Constants, Tools } from 'librechat-data-provider';
 
-const TOOL_DISPLAY_NAMES = {
-  search_user_files: 'Grepped',
-  workspace_glob_files: 'Globbed',
+/** Friendly display names for tools. Mirrors api/server/utils/toolDisplayNames.js */
+const TOOL_DISPLAY_NAMES: Record<string, string> = {
+  [Tools.search_user_files]: 'Grepped',
+  [Tools.workspace_glob_files]: 'Globbed',
   [Constants.TOOL_SEARCH]: 'Discovery',
-  // Google Tasks tools (underscore: default, dot: --use-dot-names)
+  // Google Tasks tools
   tasks_listTaskLists: 'List Task Lists',
   'tasks.listTaskLists': 'List Task Lists',
   tasks_getTaskList: 'Get Task List',
@@ -63,11 +60,9 @@ const TOOL_DISPLAY_NAMES = {
 };
 
 /**
- * Humanize a tool name: tasks_listTaskLists -> "List Task Lists"
- * @param {string} name - Raw name like tasks_listTaskLists or tasks_listTaskLists_mcp_Google
- * @returns {string}
+ * Humanize a tool name: hubspot_contacts_list -> "Hubspot Contacts List"
  */
-function humanizeToolName(name) {
+export function humanizeToolName(name: string): string {
   if (!name || typeof name !== 'string') return 'Tool';
   return name
     .replace(/_/g, ' ')
@@ -76,14 +71,13 @@ function humanizeToolName(name) {
 }
 
 /**
- * Get friendly display name for a tool. Handles MCP tools (e.g. tasks_listTaskLists_mcp_Google).
- * @param {string} rawName - Tool name from content (e.g. tasks_listTaskLists_mcp_Google)
- * @returns {string} Friendly display name (e.g. "List Task Lists")
+ * Get friendly display name for a tool.
+ * Handles MCP tools (e.g. hubspot_contacts_list_mcp_HubSpot -> "List Contacts").
+ * @param rawName - Tool name or tool_id (e.g. hubspot_contacts_list or hubspot_contacts_list_mcp_HubSpot)
  */
-function getToolDisplayName(rawName) {
+export function getToolDisplayName(rawName: string): string {
   if (!rawName || typeof rawName !== 'string') return 'Tool';
 
-  // Extract function name for MCP tools: tasks_listTaskLists_mcp_Google -> tasks_listTaskLists
   const mcpDelimiter = Constants.mcp_delimiter || '_mcp_';
   const functionName = rawName.includes(mcpDelimiter)
     ? rawName.split(mcpDelimiter)[0] || rawName
@@ -92,7 +86,6 @@ function getToolDisplayName(rawName) {
   const exact = TOOL_DISPLAY_NAMES[functionName];
   if (exact) return exact;
 
-  // tool_search_mcp_Google, tool_search_mcp_GitHub, etc. -> Discovery
   if (
     functionName === Constants.TOOL_SEARCH ||
     (typeof functionName === 'string' && functionName.startsWith('tool_search_mcp_'))
@@ -102,8 +95,3 @@ function getToolDisplayName(rawName) {
 
   return humanizeToolName(functionName);
 }
-
-module.exports = {
-  getToolDisplayName,
-  humanizeToolName,
-};

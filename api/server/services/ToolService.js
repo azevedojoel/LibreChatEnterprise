@@ -942,10 +942,7 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
         parts.push(promptContext);
       }
     } catch (error) {
-      logger.error(
-        '[loadToolDefinitionsWrapper] Error building scheduler prompt context:',
-        error,
-      );
+      logger.error('[loadToolDefinitionsWrapper] Error building scheduler prompt context:', error);
     }
     toolContextMap[Tools.create_schedule] = parts.filter(Boolean).join('\n\n');
   }
