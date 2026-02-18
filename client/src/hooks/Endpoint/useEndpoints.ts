@@ -16,7 +16,7 @@ import type {
 } from 'librechat-data-provider';
 import type { Endpoint } from '~/common';
 import { useGetEndpointsQuery } from '~/data-provider';
-import { mapEndpoints, getIconKey } from '~/utils';
+import { mapEndpoints, getIconKey, getAgentAvatarUrl, getAbsoluteImageUrl } from '~/utils';
 import { useHasAccess } from '~/hooks';
 import { icons } from './Icons';
 
@@ -118,7 +118,7 @@ export const useEndpoints = ({
           return acc;
         }, {});
         result.modelIcons = agents?.reduce((acc, agent) => {
-          acc[agent.id] = agent?.avatar?.filepath;
+          acc[agent.id] = getAgentAvatarUrl(agent) ?? undefined;
           return acc;
         }, {});
       }
@@ -138,7 +138,7 @@ export const useEndpoints = ({
         );
         result.modelIcons = assistants.reduce(
           (acc: Record<string, string | undefined>, assistant: Assistant) => {
-            acc[assistant.id] = assistant.metadata?.avatar;
+            acc[assistant.id] = getAbsoluteImageUrl(assistant.metadata?.avatar) ?? undefined;
             return acc;
           },
           {},
@@ -157,7 +157,7 @@ export const useEndpoints = ({
         );
         result.modelIcons = azureAssistants.reduce(
           (acc: Record<string, string | undefined>, assistant: Assistant) => {
-            acc[assistant.id] = assistant.metadata?.avatar;
+            acc[assistant.id] = getAbsoluteImageUrl(assistant.metadata?.avatar) ?? undefined;
             return acc;
           },
           {},

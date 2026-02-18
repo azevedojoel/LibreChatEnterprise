@@ -22,7 +22,7 @@ import {
   useGetExpandedAgentByIdQuery,
   useUploadAgentAvatarMutation,
 } from '~/data-provider';
-import { createProviderOption, getDefaultAgentFormValues } from '~/utils';
+import { createProviderOption, getDefaultAgentFormValues, getAbsoluteImageUrl } from '~/utils';
 import { useResourcePermissions } from '~/hooks/useResourcePermissions';
 import { useSelectAgent, useLocalize, useAuthContext } from '~/hooks';
 import type { TranslationKeys } from '~/hooks/useLocalize';
@@ -285,7 +285,11 @@ export default function AgentPanel() {
     onSuccess: (updatedAgent) => {
       showToast({ message: localize('com_ui_upload_agent_avatar') });
 
-      setValue('avatar_preview', updatedAgent.avatar?.filepath ?? '', { shouldDirty: false });
+      setValue(
+        'avatar_preview',
+        getAbsoluteImageUrl(updatedAgent.avatar?.filepath) ?? '',
+        { shouldDirty: false },
+      );
       setValue('avatar_file', null, { shouldDirty: false });
       setValue('avatar_action', null, { shouldDirty: false });
 

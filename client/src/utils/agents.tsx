@@ -1,26 +1,41 @@
 import React, { useState, useEffect } from 'react';
 import { Feather } from 'lucide-react';
 import { Skeleton } from '@librechat/client';
+import { apiBaseUrl } from 'librechat-data-provider';
 import type t from 'librechat-data-provider';
 
 /**
+ * Prepend base URL to /images/ paths for subdirectory deployments.
+ * Leaves absolute URLs (http, https, data:) unchanged.
+ */
+export const getAbsoluteImageUrl = (path: string | null | undefined): string | null => {
+  if (!path) return null;
+  if (path.startsWith('http') || path.startsWith('data:')) return path;
+  if (path.startsWith('/images/')) {
+    const base = apiBaseUrl();
+    return `${base}${path}`;
+  }
+  return path;
+};
+
+/**
  * Extracts the avatar URL from an agent's avatar property
- * Handles both string and object formats
+ * Handles both string and object formats.
+ * Prepends base URL for /images/ paths to support subdirectory deployments.
  */
 export const getAgentAvatarUrl = (agent: t.Agent | null | undefined): string | null => {
   if (!agent?.avatar) {
     return null;
   }
 
+  let url: string | null = null;
   if (typeof agent.avatar === 'string') {
-    return agent.avatar;
+    url = agent.avatar;
+  } else if (agent.avatar && typeof agent.avatar === 'object' && 'filepath' in agent.avatar) {
+    url = agent.avatar.filepath;
   }
 
-  if (agent.avatar && typeof agent.avatar === 'object' && 'filepath' in agent.avatar) {
-    return agent.avatar.filepath;
-  }
-
-  return null;
+  return url ? getAbsoluteImageUrl(url) : null;
 };
 
 const LazyAgentAvatar = ({

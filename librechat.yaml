@@ -49,6 +49,8 @@ interface:
   toolCallDetails: false
   # Spacing of tool call rows: 'normal' | 'compact'
   toolCallSpacing: compact
+  # Hide completed tool calls: show during streaming, fade out when done, omit on reload.
+  hideCompletedToolCalls: true
   marketplace:
     use: true
   remoteAgents:
@@ -67,7 +69,7 @@ interface:
         en: 'I understand and I want to continue'
       subLabel:
         en: |
-          LibreChat hasn't reviewed this MCP server. Attackers may attempt to steal your data or trick the model into taking unintended actions.
+          Daily Thread hasn't reviewed this MCP server. Attackers may attempt to steal your data or trick the model into taking unintended actions.
   privacyPolicy:
     externalUrl: 'https://dailythread.ai/privacy-policy'
     openNewTab: true
@@ -75,11 +77,11 @@ interface:
     externalUrl: 'https://dailythread.ai/tos'
     openNewTab: true
     modalAcceptance: true
-    modalTitle: 'Terms of Service for LibreChat'
+    modalTitle: 'Terms of Service for Daily Thread'
     modalContent: |
-      # Terms and Conditions for LibreChat
+      # Terms and Conditions for Daily Thread
       *Effective Date: February 18, 2024*
-      Welcome to LibreChat. By using this service, you agree to our terms and privacy policy.
+      Welcome to Daily Thread. By using this service, you agree to our terms and privacy policy.
 
 # Registration
 registration:

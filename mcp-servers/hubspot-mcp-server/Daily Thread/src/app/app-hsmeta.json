@@ -2,7 +2,7 @@
   "uid": "get_started_app",
   "type": "app",
   "config": {
-    "description": "Daily Thread app for LibreChat HubSpot integration",
+    "description": "Daily Thread HubSpot integration",
     "name": "Daily Thread",
     "distribution": "private",
     "auth": {

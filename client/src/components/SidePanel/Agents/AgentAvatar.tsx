@@ -4,6 +4,7 @@ import { useFormContext, useWatch } from 'react-hook-form';
 import { mergeFileConfig, fileConfig as defaultFileConfig } from 'librechat-data-provider';
 import type { AgentAvatar } from 'librechat-data-provider';
 import type { AgentForm } from '~/common';
+import { getAbsoluteImageUrl } from '~/utils';
 import { AgentAvatarRender, NoImage, AvatarMenu } from './Images';
 import { useGetFileConfig } from '~/data-provider';
 import { useLocalize } from '~/hooks';
@@ -26,8 +27,9 @@ function Avatar({ avatar }: { avatar: AgentAvatar | null }) {
       return;
     }
 
-    if (avatar?.filepath && avatarPreview !== avatar.filepath) {
-      setValue('avatar_preview', avatar.filepath);
+    const displayUrl = getAbsoluteImageUrl(avatar?.filepath);
+    if (avatar?.filepath && avatarPreview !== displayUrl) {
+      setValue('avatar_preview', displayUrl ?? avatar.filepath);
     }
 
     if (!avatar?.filepath && avatarPreview !== '') {

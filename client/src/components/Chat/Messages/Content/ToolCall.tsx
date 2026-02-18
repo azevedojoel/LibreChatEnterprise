@@ -82,6 +82,7 @@ export default function ToolCall({
   output,
   attachments,
   auth,
+  hideCompletedToolCalls = false,
 }: {
   initialProgress: number;
   isLast?: boolean;
@@ -92,6 +93,7 @@ export default function ToolCall({
   attachments?: TAttachment[];
   auth?: string;
   expires_at?: number;
+  hideCompletedToolCalls?: boolean;
 }) {
   const localize = useLocalize();
   const { data: startupConfig } = useGetStartupConfig();
@@ -231,6 +233,20 @@ export default function ToolCall({
   const displayProgress =
     hasOutput || (isToolSearch && wouldBeCancelled) || toolSearchCompletedFallback ? 1 : progress;
 
+  const isCompleted = displayProgress >= 1 || hasOutput;
+  const shouldFadeOut = hideCompletedToolCalls && isCompleted;
+
+  const [isFadingOut, setIsFadingOut] = useState(false);
+  const fadeOutStartedRef = useRef(false);
+  useEffect(() => {
+    if (!shouldFadeOut || fadeOutStartedRef.current) return;
+    fadeOutStartedRef.current = true;
+    const raf = requestAnimationFrame(() => {
+      requestAnimationFrame(() => setIsFadingOut(true));
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [shouldFadeOut]);
+
   const labelWithPattern = useMemo(
     () => (inlinePattern ? `${displayName} '${inlinePattern}'` : displayName),
     [displayName, inlinePattern],
@@ -298,7 +314,7 @@ export default function ToolCall({
     return null;
   }
 
-  return (
+  const toolCallContent = (
     <>
       <div
         className={cn(
@@ -371,4 +387,22 @@ export default function ToolCall({
       {attachments && attachments.length > 0 && <AttachmentGroup attachments={attachments} />}
     </>
   );
+
+  if (shouldFadeOut) {
+    return (
+      <div
+        className={cn(
+          'duration-[600ms] overflow-hidden transition-all ease-out',
+          isFadingOut ? 'pointer-events-none max-h-0 opacity-0' : 'max-h-[80px] opacity-100',
+        )}
+        style={{
+          ...(isFadingOut && { marginTop: 0, marginBottom: 0 }),
+        }}
+      >
+        {toolCallContent}
+      </div>
+    );
+  }
+
+  return toolCallContent;
 }

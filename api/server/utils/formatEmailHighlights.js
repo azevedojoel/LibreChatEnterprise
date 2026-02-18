@@ -121,7 +121,7 @@ function markdownToEmailHtml(md) {
 function formatEmailHtml(contentParts, capturedOAuthUrls = [], options = {}) {
   if (!Array.isArray(contentParts)) contentParts = [];
 
-  const appName = options.appName || process.env.APP_TITLE || 'LibreChat';
+  const appName = options.appName || process.env.APP_TITLE || 'Daily Thread';
   const parts = [];
 
   /* Header */

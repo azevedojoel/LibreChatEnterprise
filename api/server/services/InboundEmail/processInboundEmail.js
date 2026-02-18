@@ -280,7 +280,7 @@ async function processInboundEmail(payload) {
 
     const contentParts = response?.content ?? [];
     const { html: emailHtml, text: emailText } = formatEmailContent(contentParts, capturedOAuthUrls, {
-      appName: process.env.APP_TITLE || 'LibreChat',
+      appName: process.env.APP_TITLE || 'Daily Thread',
       agentName: agent?.name,
       userMessage: messageText,
     });
@@ -325,7 +325,7 @@ async function processInboundEmail(payload) {
       [{ type: 'text', text: errorMessage }],
       capturedOAuthUrls,
       {
-        appName: process.env.APP_TITLE || 'LibreChat',
+        appName: process.env.APP_TITLE || 'Daily Thread',
         agentName: agent?.name,
         userMessage: messageText,
       },
