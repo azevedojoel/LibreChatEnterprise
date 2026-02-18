@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { Constants } from 'librechat-data-provider';
 import { ChevronDown, Clock, Code2 } from 'lucide-react';
@@ -14,6 +14,7 @@ import {
   OGDialogTrigger,
   AccordionContent,
   OGDialogTemplate,
+  FilterInput,
 } from '@librechat/client';
 import type { AgentForm, MCPServerInfo } from '~/common';
 import {
@@ -53,6 +54,7 @@ export default function MCPTool({ serverInfo }: { serverInfo?: MCPServerInfo }) 
   const [isFocused, setIsFocused] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
   const [accordionValue, setAccordionValue] = useState<string>('');
+  const [toolFilter, setToolFilter] = useState('');
 
   if (!serverInfo) {
     return null;
@@ -60,6 +62,25 @@ export default function MCPTool({ serverInfo }: { serverInfo?: MCPServerInfo }) 
 
   const currentServerName = serverInfo.serverName;
   const tools = serverInfo.tools || [];
+
+  const filteredTools = useMemo(() => {
+    if (!toolFilter.trim()) {
+      return tools;
+    }
+    const q = toolFilter.toLowerCase();
+    return tools.filter(
+      (tool) =>
+        tool.metadata?.name?.toLowerCase().includes(q) ||
+        tool.metadata?.description?.toLowerCase().includes(q) ||
+        tool.tool_id?.toLowerCase().includes(q),
+    );
+  }, [tools, toolFilter]);
+
+  useEffect(() => {
+    if (accordionValue !== currentServerName) {
+      setToolFilter('');
+    }
+  }, [accordionValue, currentServerName]);
 
   const getSelectedTools = () => {
     const formTools = getValues('tools') || [];
@@ -333,21 +354,41 @@ export default function MCPTool({ serverInfo }: { serverInfo?: MCPServerInfo }) 
           </div>
 
           <AccordionContent className="relative ml-1 pt-1 before:absolute before:bottom-2 before:left-0 before:top-0 before:w-0.5 before:bg-border-medium">
-            <div className="space-y-1">
-              {tools.map((tool) => (
-                <MCPToolItem
-                  key={tool.tool_id}
-                  tool={tool}
-                  isSelected={selectedTools.includes(tool.tool_id)}
-                  isDeferred={deferredToolsEnabled && isToolDeferred(tool.tool_id)}
-                  isProgrammatic={programmaticToolsEnabled && isToolProgrammatic(tool.tool_id)}
-                  deferredToolsEnabled={deferredToolsEnabled}
-                  programmaticToolsEnabled={programmaticToolsEnabled}
-                  onToggleSelect={() => toggleToolSelect(tool.tool_id)}
-                  onToggleDefer={() => toggleToolDefer(tool.tool_id)}
-                  onToggleProgrammatic={() => toggleToolProgrammatic(tool.tool_id)}
-                />
-              ))}
+            <div className="mb-2">
+              <FilterInput
+                inputId={`mcp-tool-filter-${currentServerName}`}
+                label={localize('com_ui_filter_mcp_tools')}
+                value={toolFilter}
+                onChange={(e) => setToolFilter(e.target.value)}
+                containerClassName="w-full"
+              />
+            </div>
+            <div
+              className={cn(
+                'space-y-1',
+                filteredTools.length > 5 && 'max-h-48 overflow-y-auto pr-1',
+              )}
+            >
+              {filteredTools.length === 0 ? (
+                <p className="py-2 text-sm text-text-secondary">
+                  {localize('com_ui_no_tools_match')}
+                </p>
+              ) : (
+                filteredTools.map((tool) => (
+                  <MCPToolItem
+                    key={tool.tool_id}
+                    tool={tool}
+                    isSelected={selectedTools.includes(tool.tool_id)}
+                    isDeferred={deferredToolsEnabled && isToolDeferred(tool.tool_id)}
+                    isProgrammatic={programmaticToolsEnabled && isToolProgrammatic(tool.tool_id)}
+                    deferredToolsEnabled={deferredToolsEnabled}
+                    programmaticToolsEnabled={programmaticToolsEnabled}
+                    onToggleSelect={() => toggleToolSelect(tool.tool_id)}
+                    onToggleDefer={() => toggleToolDefer(tool.tool_id)}
+                    onToggleProgrammatic={() => toggleToolProgrammatic(tool.tool_id)}
+                  />
+                ))
+              )}
             </div>
           </AccordionContent>
         </AccordionItem>

@@ -121,12 +121,13 @@ function BadgeRow({
         />
       ))}
       {selectedMCPServers.length > 0 && (
-        <div className="flex items-center pl-1">
+        <div className="flex items-center gap-1.5 rounded-lg border border-border-medium px-2 py-1">
           <StackedMCPIcons
             selectedServers={selectedMCPServers}
             maxIcons={3}
             iconSize="xs"
             variant="muted"
+            spaced
           />
         </div>
       )}

@@ -108,17 +108,6 @@ const ContentParts = memo(function ContentParts({
     return null;
   }
 
-  // Sequential parts for rendering (no grouping - each tool call shows output directly)
-  const sequentialParts = useMemo(() => {
-    const parts: PartWithIndex[] = [];
-    content?.forEach((part, idx) => {
-      if (part) {
-        parts.push({ part, idx });
-      }
-    });
-    return parts;
-  }, [content]);
-
   // Edit mode: render editable text parts
   if (edit === true && enterEdit && setSiblingIdx) {
     return (
@@ -179,6 +168,13 @@ const ContentParts = memo(function ContentParts({
   }
 
   // Sequential content: render parts in order (90% of cases)
+  const sequentialParts: PartWithIndex[] = [];
+  content.forEach((part, idx) => {
+    if (part) {
+      sequentialParts.push({ part, idx });
+    }
+  });
+
   return (
     <SearchContext.Provider value={{ searchResults }}>
       <MemoryArtifacts attachments={attachments} />
@@ -188,13 +184,7 @@ const ContentParts = memo(function ContentParts({
           <EmptyText />
         </Container>
       )}
-      {sequentialParts.map(({ part, idx }, i) =>
-        renderPart(
-          part,
-          idx,
-          i === sequentialParts.length - 1 && idx === lastContentIdx,
-        ),
-      )}
+      {sequentialParts.map(({ part, idx }) => renderPart(part, idx, idx === lastContentIdx))}
     </SearchContext.Provider>
   );
 });

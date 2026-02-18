@@ -36,9 +36,37 @@ const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
   'tasks.clearCompletedTasks': 'Clear Completed Tasks',
   tasks_moveTask: 'Move Task',
   'tasks.moveTask': 'Move Task',
+  // HubSpot tools
+  hubspot_contacts_list: 'List Contacts',
+  hubspot_contacts_get: 'Get Contact',
+  hubspot_contacts_search: 'Search Contacts',
+  hubspot_contacts_create: 'Create Contact',
+  hubspot_contacts_update: 'Update Contact',
+  hubspot_companies_list: 'List Companies',
+  hubspot_companies_get: 'Get Company',
+  hubspot_companies_search: 'Search Companies',
+  hubspot_companies_create: 'Create Company',
+  hubspot_companies_update: 'Update Company',
+  hubspot_deals_list: 'List Deals',
+  hubspot_deals_get: 'Get Deal',
+  hubspot_deals_search: 'Search Deals',
+  hubspot_deals_create: 'Create Deal',
+  hubspot_deals_update: 'Update Deal',
+  hubspot_tickets_list: 'List Tickets',
+  hubspot_tickets_get: 'Get Ticket',
+  hubspot_tickets_search: 'Search Tickets',
+  hubspot_tickets_create: 'Create Ticket',
+  hubspot_tickets_update: 'Update Ticket',
+  hubspot_list_associations: 'List Associations',
+  hubspot_create_association: 'Create Association',
+  hubspot_create_note: 'Create Note',
+  hubspot_create_task: 'Create Task',
+  hubspot_get_engagement: 'Get Engagement',
+  hubspot_auth_clear: 'Clear Auth',
 };
 import type { TAttachment } from 'librechat-data-provider';
 import { useLocalize, useProgress } from '~/hooks';
+import { useGetStartupConfig } from '~/data-provider';
 import { AttachmentGroup } from './Parts';
 import ToolCallInfo from './ToolCallInfo';
 import ProgressText from './ProgressText';
@@ -66,6 +94,12 @@ export default function ToolCall({
   expires_at?: number;
 }) {
   const localize = useLocalize();
+  const { data: startupConfig } = useGetStartupConfig();
+  const interfaceConfig = startupConfig?.interface as
+    | { toolCallDetails?: boolean; toolCallSpacing?: 'normal' | 'compact' }
+    | undefined;
+  const toolCallDetails = interfaceConfig?.toolCallDetails !== false;
+  const isCompactSpacing = interfaceConfig?.toolCallSpacing === 'compact';
   const [showInfo, setShowInfo] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const [contentHeight, setContentHeight] = useState<number | undefined>(0);
@@ -142,7 +176,7 @@ export default function ToolCall({
     name === Constants.TOOL_SEARCH ||
     (typeof name === 'string' && name.startsWith('tool_search_mcp_'));
   /** tool_search always shows expandable content so users can see query and results */
-  const canExpand = hasInfo || isToolSearch;
+  const canExpand = toolCallDetails && (hasInfo || isToolSearch);
   const hasOutput = output != null && output !== '';
   const hasArgs =
     (typeof _args === 'string' && _args.trim() !== '') ||
@@ -211,13 +245,10 @@ export default function ToolCall({
     if (function_name === Tools.search_user_files || function_name === Tools.workspace_glob_files || isTasksTool) {
       return labelWithPattern;
     }
-    if (isMCPToolCall === true) {
-      return localize('com_assistants_completed_function', { 0: labelWithPattern });
-    }
     if (domain != null && domain && domain.length !== Constants.ENCODED_DOMAIN_LENGTH) {
-      return localize('com_assistants_completed_action', { 0: domain });
+      return domain;
     }
-    return localize('com_assistants_completed_function', { 0: labelWithPattern });
+    return labelWithPattern;
   };
 
   useLayoutEffect(() => {
@@ -269,27 +300,29 @@ export default function ToolCall({
 
   return (
     <>
-      <div className="relative my-2.5 flex h-5 shrink-0 items-center gap-2.5">
+      <div
+        className={cn(
+          'relative flex h-5 shrink-0 items-center',
+          isCompactSpacing ? 'my-0.5 gap-1' : 'my-1 gap-1.5',
+        )}
+      >
         <ProgressText
           muted
           progress={displayProgress}
-          onClick={() => setShowInfo((prev) => !prev)}
-          inProgressText={
-            labelWithPattern
-              ? localize('com_assistants_running_var', { 0: labelWithPattern })
-              : localize('com_assistants_running_action')
-          }
+          onClick={undefined}
+          inProgressText={labelWithPattern || localize('com_assistants_running_action')}
           authText={
             !cancelled && authDomain.length > 0 ? localize('com_ui_requires_auth') : undefined
           }
           finishedText={getFinishedText()}
-          hasInput={canExpand}
+          hasInput={false}
           isExpanded={showInfo}
           error={cancelled}
         />
       </div>
+      {false && (
       <div
-        className="relative pl-4"
+        className={cn('relative', isCompactSpacing ? 'pl-2' : 'pl-4')}
         style={{
           height: showInfo ? contentHeight : 0,
           overflow: 'hidden',
@@ -331,6 +364,7 @@ export default function ToolCall({
           </div>
         </div>
       </div>
+      )}
       {auth != null && auth && displayProgress < 1 && !cancelled && (
         <AuthCTA auth={auth} name={name} />
       )}

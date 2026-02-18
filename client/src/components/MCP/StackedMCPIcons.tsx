@@ -9,6 +9,8 @@ interface StackedMCPIconsProps {
   maxIcons?: number;
   iconSize?: 'xs' | 'sm' | 'md';
   variant?: 'default' | 'submenu' | 'muted';
+  /** When true, icons have spacing between them instead of overlapping */
+  spaced?: boolean;
 }
 
 const sizeConfig = {
@@ -52,6 +54,7 @@ export default function StackedMCPIcons({
   maxIcons = 3,
   iconSize = 'md',
   variant = 'default',
+  spaced = false,
 }: StackedMCPIconsProps) {
   const { icons, overflowCount } = useMemo(
     () => getSelectedServerIcons(selectedServers, maxIcons),
@@ -71,7 +74,10 @@ export default function StackedMCPIcons({
   const colors = variantConfig[variant];
 
   return (
-    <div className="flex items-center" aria-hidden="true">
+    <div
+      className={cn('flex items-center', spaced ? 'gap-1' : '')}
+      aria-hidden="true"
+    >
       {icons.map((icon, index) => (
         <div
           key={icon.key}
@@ -81,7 +87,7 @@ export default function StackedMCPIcons({
             colors.border,
             colors.bg,
             sizes.container,
-            index > 0 && sizes.overlap,
+            !spaced && index > 0 && sizes.overlap,
           )}
           style={{ zIndex: icons.length - index }}
         >
@@ -105,7 +111,7 @@ export default function StackedMCPIcons({
           className={cn(
             'relative flex items-center justify-center rounded-full border text-[10px] font-medium',
             sizes.container,
-            sizes.overlap,
+            !spaced && sizes.overlap,
             colors.border,
             colors.bg,
             colors.iconColor,

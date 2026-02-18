@@ -155,14 +155,19 @@ export default function SimpleRecurrencePicker({ value, onChange }: Props) {
 
   const timeValue = `${String(state.hour).padStart(2, '0')}:${String(state.minute).padStart(2, '0')}`;
 
+  const fieldStyles =
+    'h-9 w-full rounded-lg border border-border-medium bg-background px-3 py-1 text-sm text-text-primary';
+
   return (
-    <div className="mt-1 space-y-3 rounded-md border border-border-medium bg-surface-primary p-3">
-      <div>
-        <Label className="text-xs">{localize('com_sidepanel_scheduled_agents_frequency')}</Label>
+    <div className="space-y-3 rounded-lg border border-border-medium p-3">
+      <div className="space-y-1">
+        <Label className="text-sm font-medium">
+          {localize('com_sidepanel_scheduled_agents_frequency')}
+        </Label>
         <select
           value={state.frequency}
           onChange={(e) => setFrequency(e.target.value as Frequency)}
-          className="mt-1 flex h-9 w-full rounded-md border border-border-medium bg-transparent px-3 py-1 text-sm"
+          className={fieldStyles}
         >
           <option value="daily">{localize('com_sidepanel_scheduled_agents_daily')}</option>
           <option value="weekdays">{localize('com_sidepanel_scheduled_agents_weekdays')}</option>
@@ -173,8 +178,10 @@ export default function SimpleRecurrencePicker({ value, onChange }: Props) {
       </div>
 
       {state.frequency !== 'custom' && (
-        <div>
-          <Label className="text-xs">{localize('com_sidepanel_scheduled_agents_at')}</Label>
+        <div className="space-y-1">
+          <Label className="text-sm font-medium">
+            {localize('com_sidepanel_scheduled_agents_at')}
+          </Label>
           <Input
             type="time"
             value={timeValue}
@@ -182,23 +189,25 @@ export default function SimpleRecurrencePicker({ value, onChange }: Props) {
               const [h, m] = e.target.value.split(':').map(Number);
               setTime(h, m);
             }}
-            className="mt-1"
+            className={fieldStyles}
           />
         </div>
       )}
 
       {state.frequency === 'weekly' && (
-        <div>
-          <Label className="text-xs">{localize('com_sidepanel_scheduled_agents_on_days')}</Label>
-          <div className="mt-1 flex flex-wrap gap-2">
+        <div className="space-y-1">
+          <Label className="text-sm font-medium">
+            {localize('com_sidepanel_scheduled_agents_on_days')}
+          </Label>
+          <div className="flex flex-wrap gap-2">
             {WEEKDAYS.map(({ value: d, short }) => (
               <label
                 key={d}
                 className={cn(
-                  'flex cursor-pointer items-center gap-1 rounded border px-2 py-1 text-xs',
+                  'flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-sm',
                   state.weekDays.includes(d)
-                    ? 'border-surface-submit bg-surface-submit/20 text-text-primary'
-                    : 'border-border-medium',
+                    ? 'border-primary bg-primary/10 text-foreground'
+                    : 'border-border-medium bg-background text-text-primary',
                 )}
               >
                 <input
@@ -215,12 +224,14 @@ export default function SimpleRecurrencePicker({ value, onChange }: Props) {
       )}
 
       {state.frequency === 'monthly' && (
-        <div>
-          <Label className="text-xs">{localize('com_sidepanel_scheduled_agents_on_day_of_month')}</Label>
+        <div className="space-y-1">
+          <Label className="text-sm font-medium">
+            {localize('com_sidepanel_scheduled_agents_on_day_of_month')}
+          </Label>
           <select
             value={state.monthDay}
             onChange={(e) => setMonthDay(parseInt(e.target.value, 10))}
-            className="mt-1 flex h-9 w-full rounded-md border border-border-medium bg-transparent px-3 py-1 text-sm"
+            className={fieldStyles}
           >
             {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
               <option key={d} value={d}>
@@ -232,16 +243,18 @@ export default function SimpleRecurrencePicker({ value, onChange }: Props) {
       )}
 
       {state.frequency === 'custom' && (
-        <div>
-          <Label className="text-xs">{localize('com_sidepanel_scheduled_agents_custom_cron')}</Label>
+        <div className="space-y-1">
+          <Label className="text-sm font-medium">
+            {localize('com_sidepanel_scheduled_agents_custom_cron')}
+          </Label>
           <Input
             type="text"
             value={state.customCron}
             onChange={(e) => setCustomCron(e.target.value)}
             placeholder="0 9 * * *"
-            className="mt-1 font-mono text-sm"
+            className={cn(fieldStyles, 'font-mono')}
           />
-          <p className="mt-0.5 text-xs text-text-secondary">
+          <p className="text-xs text-muted-foreground">
             {localize('com_sidepanel_scheduled_agents_cron_placeholder')}
           </p>
         </div>

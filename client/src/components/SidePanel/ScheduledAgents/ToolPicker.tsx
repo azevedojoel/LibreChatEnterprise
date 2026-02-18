@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { Constants } from 'librechat-data-provider';
 import { EModelEndpoint } from 'librechat-data-provider';
 import { FilterInput, Label } from '@librechat/client';
@@ -158,41 +159,48 @@ export default function ToolPicker({ agentId, selectedTools, onChange }: Props) 
     return null;
   }
 
+  const currentMode = isAll ? 'all' : isNone ? 'none' : 'custom';
+
   return (
     <div className="space-y-2">
       <Label>Tools for scheduled run</Label>
-      <div className="flex flex-wrap gap-2">
-        <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="radio"
-            name="tool-mode"
-            checked={isAll}
-            onChange={() => handleModeChange('all')}
-            className="rounded"
-          />
-          <span className="text-sm">Use all agent tools</span>
-        </label>
-        <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="radio"
-            name="tool-mode"
-            checked={isNone}
-            onChange={() => handleModeChange('none')}
-            className="rounded"
-          />
-          <span className="text-sm">No tools</span>
-        </label>
-        <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="radio"
-            name="tool-mode"
-            checked={isCustom}
-            onChange={() => handleModeChange('custom')}
-            className="rounded"
-          />
-          <span className="text-sm">Custom selection</span>
-        </label>
-      </div>
+      <ToggleGroup.Root
+        type="single"
+        value={currentMode}
+        onValueChange={(v) => v && handleModeChange(v as 'all' | 'none' | 'custom')}
+        className="inline-flex rounded-md border border-border-medium bg-surface-primary p-0.5"
+      >
+        <ToggleGroup.Item
+          value="all"
+          className={cn(
+            'rounded px-2 py-1 text-xs font-medium transition-colors',
+            'data-[state=on]:bg-surface-tertiary data-[state=on]:text-text-primary',
+            'data-[state=off]:text-text-secondary hover:text-text-primary',
+          )}
+        >
+          All
+        </ToggleGroup.Item>
+        <ToggleGroup.Item
+          value="none"
+          className={cn(
+            'rounded px-2 py-1 text-xs font-medium transition-colors',
+            'data-[state=on]:bg-surface-tertiary data-[state=on]:text-text-primary',
+            'data-[state=off]:text-text-secondary hover:text-text-primary',
+          )}
+        >
+          None
+        </ToggleGroup.Item>
+        <ToggleGroup.Item
+          value="custom"
+          className={cn(
+            'rounded px-2 py-1 text-xs font-medium transition-colors',
+            'data-[state=on]:bg-surface-tertiary data-[state=on]:text-text-primary',
+            'data-[state=off]:text-text-secondary hover:text-text-primary',
+          )}
+        >
+          Custom
+        </ToggleGroup.Item>
+      </ToggleGroup.Root>
 
       {isCustom && (
         <div className="space-y-2 rounded-md border border-border-medium bg-surface-primary p-2">

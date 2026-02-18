@@ -11,7 +11,7 @@ import {
 } from '@librechat/client';
 import type { AgentToolType } from 'librechat-data-provider';
 import { useLocalize } from '~/hooks';
-import { cn } from '~/utils';
+import { cn, getToolDisplayName } from '~/utils';
 
 interface MCPToolItemProps {
   tool: AgentToolType;
@@ -51,6 +51,7 @@ export default function MCPToolItem({
 }: MCPToolItemProps) {
   const localize = useLocalize();
   const hasOptions = isDeferred || isProgrammatic;
+  const displayName = getToolDisplayName(tool.metadata?.name ?? tool.tool_id ?? '');
 
   return (
     <div
@@ -76,10 +77,10 @@ export default function MCPToolItem({
         }}
         onClick={(e) => e.stopPropagation()}
         className="relative mr-2 inline-flex h-4 w-4 shrink-0 cursor-pointer rounded border border-border-medium transition-[border-color] duration-200 hover:border-border-heavy focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
-        aria-label={tool.metadata.name}
+        aria-label={displayName}
       />
       <span className="text-token-text-primary min-w-0 flex-1 select-none truncate">
-        {tool.metadata.name}
+        {displayName}
       </span>
       <div className="ml-2 flex shrink-0 items-center gap-1.5">
         {isDeferred && <Clock className="h-3.5 w-3.5 text-amber-500" aria-hidden="true" />}
