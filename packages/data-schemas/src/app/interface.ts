@@ -55,6 +55,8 @@ export async function loadDefaultInterface({
     fileCitations: interfaceConfig?.fileCitations,
     peoplePicker: interfaceConfig?.peoplePicker,
     marketplace: interfaceConfig?.marketplace,
+    toolCallDetails: interfaceConfig?.toolCallDetails,
+    toolCallSpacing: interfaceConfig?.toolCallSpacing,
   });
 
   return loadedInterface;

@@ -32,3 +32,5 @@ export * from './web';
 export * from './mcp';
 /* Scheduled Prompts */
 export * from './scheduledPrompt';
+/* Workflows */
+export * from './workflow';

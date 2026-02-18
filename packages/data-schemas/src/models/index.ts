@@ -29,6 +29,9 @@ import { createAclEntryModel } from './aclEntry';
 import { createGroupModel } from './group';
 import { createScheduledPromptModel } from './scheduledPrompt';
 import { createScheduledRunModel } from './scheduledRun';
+import { createWorkflowModel } from './workflow';
+import { createWorkflowRunModel } from './workflowRun';
+import { createWorkflowScheduleModel } from './workflowSchedule';
 
 /**
  * Creates all database models for all collections
@@ -66,5 +69,8 @@ export function createModels(mongoose: typeof import('mongoose')) {
     Group: createGroupModel(mongoose),
     ScheduledPrompt: createScheduledPromptModel(mongoose),
     ScheduledRun: createScheduledRunModel(mongoose),
+    Workflow: createWorkflowModel(mongoose),
+    WorkflowRun: createWorkflowRunModel(mongoose),
+    WorkflowSchedule: createWorkflowScheduleModel(mongoose),
   };
 }
