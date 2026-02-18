@@ -1,0 +1,30 @@
+{
+  "name": "@librechat/hubspot-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for HubSpot CRM API integration",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "hubspot-mcp-server": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx src/index.ts"
+  },
+  "keywords": ["hubspot", "mcp", "crm"],
+  "license": "MIT",
+  "dependencies": {
+    "@hubspot/api-client": "^13.4.0",
+    "@modelcontextprotocol/sdk": "^1.25.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.15",
+    "tsup": "^8.5.0",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
