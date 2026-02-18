@@ -91,6 +91,7 @@ async function uploadVectors({ req, file, file_id, entity_id, storageMetadata })
         accept: 'application/json',
         ...formHeaders,
       },
+      timeout: 120000, // 2 min - embedding can be slow for larger files
     });
 
     const responseData = response.data;

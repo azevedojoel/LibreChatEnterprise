@@ -200,7 +200,6 @@ mcpServers:
       client_secret: '${HUBSPOT_CLIENT_SECRET}'
       scope: "crm.objects.contacts.read crm.objects.contacts.write crm.objects.companies.read crm.objects.companies.write crm.objects.deals.read crm.objects.deals.write crm.objects.custom.read crm.objects.custom.write crm.schemas.contacts.read crm.schemas.companies.read crm.schemas.deals.read tickets oauth"
       token_endpoint_auth_methods_supported: ["client_secret_post"]
-      redirect_uri: "http://localhost:3080/api/mcp/HubSpot/oauth/callback"
     env:
       HUBSPOT_ACCESS_TOKEN: "{{LIBRECHAT_MCP_OAUTH_ACCESS_TOKEN}}"
   Google:
