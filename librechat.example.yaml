@@ -107,8 +107,6 @@ interface:
   # toolCallDetails: true
   # Spacing of tool call rows: 'normal' | 'compact'
   # toolCallSpacing: normal
-  # Hide completed tool calls: show during streaming, fade out when done, omit on reload.
-  # hideCompletedToolCalls: false
   # MCP Servers configuration example
   # mcpServers:
     # Controls user permissions for MCP (Model Context Protocol) server management

@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react';
+import { useSetAtom } from 'jotai';
 import {
   Constants,
   StepTypes,
@@ -6,6 +7,7 @@ import {
   ToolCallTypes,
   getNonEmptyValue,
 } from 'librechat-data-provider';
+import { pendingToolOAuthAtom } from '~/store/toolOAuth';
 import type {
   Agents,
   TMessage,
@@ -60,6 +62,7 @@ export default function useStepHandler({
   announcePolite,
   lastAnnouncementTimeRef,
 }: TUseStepHandler) {
+  const setPendingOAuth = useSetAtom(pendingToolOAuthAtom);
   const toolCallIdMap = useRef(new Map<string, string | undefined>());
   const messageMap = useRef(new Map<string, TMessage>());
   const stepMap = useRef(new Map<string, Agents.RunStep>());
@@ -490,6 +493,31 @@ export default function useStepHandler({
         }
       } else if (event === 'on_run_step_delta') {
         const runStepDelta = data as Agents.RunStepDeltaEvent;
+        // Show OAuth overlay immediately when auth URL arrives - do not wait for content merge
+        const authURL = runStepDelta.delta.auth ?? runStepDelta.delta.tool_calls?.[0]?.auth;
+        if (authURL && runStepDelta.delta.tool_calls?.[0]) {
+          const toolName = runStepDelta.delta.tool_calls[0].name ?? '';
+          const hasMCPDelimiter = toolName.includes(Constants.mcp_delimiter);
+          const serverName = hasMCPDelimiter
+            ? (toolName.split(Constants.mcp_delimiter).pop() ?? '')
+            : '';
+          try {
+            const url = new URL(authURL);
+            const redirectUri = url.searchParams.get('redirect_uri') || '';
+            const actionMatch = redirectUri.match(/\/api\/actions\/([^/]+)\/oauth\/callback/);
+            const actionId = actionMatch?.[1];
+            setPendingOAuth({
+              auth: authURL,
+              name: toolName,
+              serverName,
+              authDomain: url.hostname,
+              isMCP: hasMCPDelimiter,
+              actionId,
+            });
+          } catch {
+            /* invalid URL - skip */
+          }
+        }
         const runStep = stepMap.current.get(runStepDelta.id);
         let responseMessageId = runStep?.runId ?? '';
         if (responseMessageId === Constants.USE_PRELIM_RESPONSE_MESSAGE_ID) {
@@ -524,9 +552,12 @@ export default function useStepHandler({
               },
             };
 
-            if (runStepDelta.delta.auth != null) {
-              contentPart.tool_call.auth = runStepDelta.delta.auth;
-              contentPart.tool_call.expires_at = runStepDelta.delta.expires_at;
+            // Auth can be on delta (MCP OAuth) or on each tool_call
+            const auth = runStepDelta.delta.auth ?? toolCallDelta.auth;
+            const expiresAt = runStepDelta.delta.expires_at ?? toolCallDelta.expires_at;
+            if (auth != null) {
+              contentPart.tool_call.auth = auth;
+              contentPart.tool_call.expires_at = expiresAt;
             }
 
             // Use server's index, offset by initialContent for edit scenarios
@@ -602,7 +633,14 @@ export default function useStepHandler({
         stepMap.current.clear();
       };
     },
-    [getMessages, lastAnnouncementTimeRef, announcePolite, setMessages, calculateContentIndex],
+    [
+      getMessages,
+      lastAnnouncementTimeRef,
+      announcePolite,
+      setMessages,
+      calculateContentIndex,
+      setPendingOAuth,
+    ],
   );
 
   const clearStepMaps = useCallback(() => {

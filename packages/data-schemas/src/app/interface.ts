@@ -57,7 +57,6 @@ export async function loadDefaultInterface({
     marketplace: interfaceConfig?.marketplace,
     toolCallDetails: interfaceConfig?.toolCallDetails,
     toolCallSpacing: interfaceConfig?.toolCallSpacing,
-    hideCompletedToolCalls: interfaceConfig?.hideCompletedToolCalls,
   });
 
   return loadedInterface;

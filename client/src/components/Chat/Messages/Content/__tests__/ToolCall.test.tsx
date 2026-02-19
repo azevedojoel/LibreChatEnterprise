@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { RecoilRoot } from 'recoil';
 import { Tools } from 'librechat-data-provider';
 import ToolCall from '../ToolCall';
+import ToolOAuthOverlay from '~/components/Chat/ToolOAuthOverlay';
 
 // Mock dependencies
 jest.mock('~/hooks', () => ({
@@ -14,6 +15,8 @@ jest.mock('~/hooks', () => ({
       com_assistants_running_var: `Running ${values?.[0]}`,
       com_assistants_running_action: 'Running action',
       com_ui_sign_in_to_domain: `Sign in to ${values?.[0]}`,
+      com_ui_continue_oauth: 'Continue with OAuth',
+      com_ui_cancel: 'Cancel',
       com_ui_cancelled: 'Cancelled',
       com_ui_requires_auth: 'Requires authentication',
       com_assistants_allow_sites_you_trust: 'Only allow sites you trust',
@@ -251,21 +254,25 @@ describe('ToolCall', () => {
   });
 
   describe('authentication flow', () => {
-    it('should show sign-in button when auth URL is provided', () => {
+    it('should show sign-in overlay when auth URL is provided', () => {
       const originalOpen = window.open;
       window.open = jest.fn();
 
       renderWithRecoil(
-        <ToolCall
-          {...mockProps}
-          output={null}
-          initialProgress={0.5} // Less than 1 so it's not complete
-          auth="https://auth.example.com"
-          isSubmitting={true} // Should be submitting for auth to show
-        />,
+        <>
+          <ToolCall
+            {...mockProps}
+            output={null}
+            name="hubspot_contacts_list__HubSpot"
+            initialProgress={0.5} // Less than 1 so it's not complete
+            auth="https://auth.example.com"
+            isSubmitting={true} // Should be submitting for auth to show
+          />
+          <ToolOAuthOverlay />
+        </>,
       );
 
-      const signInButton = screen.getByText('Sign in to auth.example.com');
+      const signInButton = screen.getByText('Continue with OAuth');
       expect(signInButton).toBeInTheDocument();
 
       fireEvent.click(signInButton);
@@ -296,31 +303,37 @@ describe('ToolCall', () => {
       expect(props.pendingAuth).toBe(true);
     });
 
-    it('should not show auth section when cancelled', () => {
+    it('should not show auth overlay when cancelled', () => {
       renderWithRecoil(
-        <ToolCall
-          {...mockProps}
-          output={null}
-          auth="https://auth.example.com"
-          initialProgress={0.5}
-          isSubmitting={false}
-        />,
+        <>
+          <ToolCall
+            {...mockProps}
+            output={null}
+            auth="https://auth.example.com"
+            initialProgress={0.5}
+            isSubmitting={false}
+          />
+          <ToolOAuthOverlay />
+        </>,
       );
 
-      expect(screen.queryByText('Sign in to auth.example.com')).not.toBeInTheDocument();
+      expect(screen.queryByText('Continue with OAuth')).not.toBeInTheDocument();
     });
 
-    it('should not show auth section when progress is complete', () => {
+    it('should not show auth overlay when progress is complete', () => {
       renderWithRecoil(
-        <ToolCall
-          {...mockProps}
-          auth="https://auth.example.com"
-          initialProgress={1}
-          isSubmitting={false}
-        />,
+        <>
+          <ToolCall
+            {...mockProps}
+            auth="https://auth.example.com"
+            initialProgress={1}
+            isSubmitting={false}
+          />
+          <ToolOAuthOverlay />
+        </>,
       );
 
-      expect(screen.queryByText('Sign in to auth.example.com')).not.toBeInTheDocument();
+      expect(screen.queryByText('Continue with OAuth')).not.toBeInTheDocument();
     });
   });
 

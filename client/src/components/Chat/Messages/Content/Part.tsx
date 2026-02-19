@@ -26,19 +26,10 @@ type PartProps = {
   showCursor: boolean;
   isCreatedByUser: boolean;
   attachments?: TAttachment[];
-  hideCompletedToolCalls?: boolean;
 };
 
 const Part = memo(
-  ({
-    part,
-    isSubmitting,
-    attachments,
-    isLast,
-    showCursor,
-    isCreatedByUser,
-    hideCompletedToolCalls = false,
-  }: PartProps) => {
+  ({ part, isSubmitting, attachments, isLast, showCursor, isCreatedByUser }: PartProps) => {
     if (!part) {
       return null;
     }
@@ -171,7 +162,6 @@ const Part = memo(
             auth={toolCall.auth}
             expires_at={toolCall.expires_at}
             isLast={isLast}
-            hideCompletedToolCalls={hideCompletedToolCalls}
           />
         );
       } else if (toolCall.type === ToolCallTypes.CODE_INTERPRETER) {
@@ -221,7 +211,6 @@ const Part = memo(
             name={toolCall.function.name}
             output={toolCall.function.output}
             isLast={isLast}
-            hideCompletedToolCalls={hideCompletedToolCalls}
           />
         );
       }

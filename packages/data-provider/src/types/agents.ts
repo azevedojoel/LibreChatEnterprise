@@ -157,6 +157,12 @@ export namespace Agents {
     index?: number;
 
     type?: 'tool_call_chunk';
+
+    /** OAuth URL - set by MCP/Action services when user must sign in */
+    auth?: string;
+
+    /** Unix timestamp when auth URL expires */
+    expires_at?: number;
   };
 
   /** Event names are of the format: on_[runnable_type]_(start|stream|end).

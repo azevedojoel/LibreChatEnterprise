@@ -1,10 +1,13 @@
 import { useMemo, useState, useEffect, useRef, useLayoutEffect } from 'react';
+import { useSetAtom } from 'jotai';
 import {
   Constants,
   Tools,
   actionDelimiter,
   actionDomainSeparator,
 } from 'librechat-data-provider';
+
+import { pendingToolOAuthAtom } from '~/store/toolOAuth';
 
 /** Friendly display names for built-in tools */
 const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
@@ -70,7 +73,6 @@ import { useGetStartupConfig } from '~/data-provider';
 import { AttachmentGroup } from './Parts';
 import ToolCallInfo from './ToolCallInfo';
 import ProgressText from './ProgressText';
-import AuthCTA from './AuthCTA';
 import { logger, cn } from '~/utils';
 
 export default function ToolCall({
@@ -82,7 +84,6 @@ export default function ToolCall({
   output,
   attachments,
   auth,
-  hideCompletedToolCalls = false,
 }: {
   initialProgress: number;
   isLast?: boolean;
@@ -93,14 +94,12 @@ export default function ToolCall({
   attachments?: TAttachment[];
   auth?: string;
   expires_at?: number;
-  hideCompletedToolCalls?: boolean;
 }) {
   const localize = useLocalize();
   const { data: startupConfig } = useGetStartupConfig();
   const interfaceConfig = startupConfig?.interface as
-    | { toolCallDetails?: boolean; toolCallSpacing?: 'normal' | 'compact' }
+    | { toolCallSpacing?: 'normal' | 'compact' }
     | undefined;
-  const toolCallDetails = interfaceConfig?.toolCallDetails !== false;
   const isCompactSpacing = interfaceConfig?.toolCallSpacing === 'compact';
   const [showInfo, setShowInfo] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -170,15 +169,16 @@ export default function ToolCall({
     }
   }, [_args]) as string | undefined;
 
-  const hasInfo = useMemo(
-    () => (args?.length ?? 0) > 0 || (output?.length ?? 0) > 0,
-    [args, output],
-  );
   const isToolSearch =
     name === Constants.TOOL_SEARCH ||
     (typeof name === 'string' && name.startsWith('tool_search_mcp_'));
-  /** tool_search always shows expandable content so users can see query and results */
-  const canExpand = toolCallDetails && (hasInfo || isToolSearch);
+  const hasInfo = useMemo(
+    () =>
+      (args?.length ?? 0) > 0 ||
+      (output?.length ?? 0) > 0 ||
+      isToolSearch,
+    [args, output, isToolSearch],
+  );
   const hasOutput = output != null && output !== '';
   const hasArgs =
     (typeof _args === 'string' && _args.trim() !== '') ||
@@ -201,6 +201,20 @@ export default function ToolCall({
       return '';
     }
   }, [auth]);
+
+  const actionId = useMemo(() => {
+    if (!auth || isMCPToolCall) return undefined;
+    try {
+      const url = new URL(auth);
+      const redirectUri = url.searchParams.get('redirect_uri') || '';
+      const match = redirectUri.match(/\/api\/actions\/([^/]+)\/oauth\/callback/);
+      return match?.[1];
+    } catch {
+      return undefined;
+    }
+  }, [auth, isMCPToolCall]);
+
+  const setPendingOAuth = useSetAtom(pendingToolOAuthAtom);
 
   const progress = useProgress(initialProgress);
 
@@ -233,19 +247,20 @@ export default function ToolCall({
   const displayProgress =
     hasOutput || (isToolSearch && wouldBeCancelled) || toolSearchCompletedFallback ? 1 : progress;
 
-  const isCompleted = displayProgress >= 1 || hasOutput;
-  const shouldFadeOut = hideCompletedToolCalls && isCompleted;
-
-  const [isFadingOut, setIsFadingOut] = useState(false);
-  const fadeOutStartedRef = useRef(false);
   useEffect(() => {
-    if (!shouldFadeOut || fadeOutStartedRef.current) return;
-    fadeOutStartedRef.current = true;
-    const raf = requestAnimationFrame(() => {
-      requestAnimationFrame(() => setIsFadingOut(true));
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [shouldFadeOut]);
+    if (auth && authDomain && displayProgress < 1 && !cancelled) {
+      setPendingOAuth({
+        auth,
+        name,
+        serverName: mcpServerName,
+        authDomain,
+        isMCP: isMCPToolCall,
+        actionId: actionId,
+      });
+      return () => setPendingOAuth(null);
+    }
+    setPendingOAuth(null);
+  }, [auth, authDomain, displayProgress, cancelled, name, mcpServerName, isMCPToolCall, actionId, setPendingOAuth]);
 
   const labelWithPattern = useMemo(
     () => (inlinePattern ? `${displayName} '${inlinePattern}'` : displayName),
@@ -314,7 +329,7 @@ export default function ToolCall({
     return null;
   }
 
-  const toolCallContent = (
+  return (
     <>
       <div
         className={cn(
@@ -325,18 +340,17 @@ export default function ToolCall({
         <ProgressText
           muted
           progress={displayProgress}
-          onClick={undefined}
+          onClick={() => setShowInfo((prev) => !prev)}
           inProgressText={labelWithPattern || localize('com_assistants_running_action')}
           authText={
             !cancelled && authDomain.length > 0 ? localize('com_ui_requires_auth') : undefined
           }
           finishedText={getFinishedText()}
-          hasInput={false}
+          hasInput={hasInfo}
           isExpanded={showInfo}
           error={cancelled}
         />
       </div>
-      {false && (
       <div
         className={cn('relative', isCompactSpacing ? 'pl-2' : 'pl-4')}
         style={{
@@ -365,7 +379,7 @@ export default function ToolCall({
           }}
         >
           <div ref={contentRef}>
-            {showInfo && canExpand && (
+            {showInfo && hasInfo && (
               <ToolCallInfo
                 key="tool-call-info"
                 input={args ?? ''}
@@ -380,29 +394,7 @@ export default function ToolCall({
           </div>
         </div>
       </div>
-      )}
-      {auth != null && auth && displayProgress < 1 && !cancelled && (
-        <AuthCTA auth={auth} name={name} />
-      )}
       {attachments && attachments.length > 0 && <AttachmentGroup attachments={attachments} />}
     </>
   );
-
-  if (shouldFadeOut) {
-    return (
-      <div
-        className={cn(
-          'duration-[600ms] overflow-hidden transition-all ease-out',
-          isFadingOut ? 'pointer-events-none max-h-0 opacity-0' : 'max-h-[80px] opacity-100',
-        )}
-        style={{
-          ...(isFadingOut && { marginTop: 0, marginBottom: 0 }),
-        }}
-      >
-        {toolCallContent}
-      </div>
-    );
-  }
-
-  return toolCallContent;
 }

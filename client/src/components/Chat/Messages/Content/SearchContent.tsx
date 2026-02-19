@@ -1,4 +1,4 @@
-import { Suspense, useMemo, useCallback } from 'react';
+import { Suspense, useMemo } from 'react';
 import { useRecoilValue } from 'recoil';
 import { DelayedRender } from '@librechat/client';
 import { ContentTypes } from 'librechat-data-provider';
@@ -9,7 +9,6 @@ import type {
   SearchResultData,
   TMessageContentParts,
 } from 'librechat-data-provider';
-import { useGetStartupConfig } from '~/data-provider';
 import { UnfinishedMessage } from './MessageContent';
 import Sources from '~/components/Web/Sources';
 import { cn, mapAttachments } from '~/utils';
@@ -17,7 +16,6 @@ import { SearchContext } from '~/Providers';
 import MarkdownLite from './MarkdownLite';
 import store from '~/store';
 import Part from './Part';
-import { isCompletedGenericToolCall } from './ContentParts';
 
 const SearchContent = ({
   message,
@@ -30,30 +28,20 @@ const SearchContent = ({
 }) => {
   const enableUserMsgMarkdown = useRecoilValue(store.enableUserMsgMarkdown);
   const { messageId } = message;
-  const { data: startupConfig } = useGetStartupConfig();
-  const hideCompletedToolCalls =
-    (startupConfig?.interface as { hideCompletedToolCalls?: boolean } | undefined)
-      ?.hideCompletedToolCalls ?? false;
 
   const attachmentMap = useMemo(() => mapAttachments(attachments ?? []), [attachments]);
 
-  const shouldShowPart = useCallback(
-    (part: TMessageContentParts | undefined) => {
-      if (!part) return false;
-      if (!hideCompletedToolCalls) return true;
-      return !isCompletedGenericToolCall(part);
-    },
-    [hideCompletedToolCalls],
-  );
-
   if (Array.isArray(message.content) && message.content.length > 0) {
-    const displayContent = message.content.filter(
-      (part): part is TMessageContentParts => !!part && shouldShowPart(part),
-    );
     return (
       <SearchContext.Provider value={{ searchResults }}>
         <Sources />
-        {displayContent.map((part: TMessageContentParts, idx: number) => {
+        {message.content
+          .filter((part: TMessageContentParts | undefined) => part)
+          .map((part: TMessageContentParts | undefined, idx: number) => {
+            if (!part) {
+              return null;
+            }
+
             const toolCallId =
               (part?.[ContentTypes.TOOL_CALL] as Agents.ToolCall | undefined)?.id ?? '';
             const attachments = attachmentMap[toolCallId];
@@ -65,7 +53,6 @@ const SearchContent = ({
                 isCreatedByUser={message.isCreatedByUser}
                 attachments={attachments}
                 part={part}
-                hideCompletedToolCalls={hideCompletedToolCalls}
               />
             );
           })}

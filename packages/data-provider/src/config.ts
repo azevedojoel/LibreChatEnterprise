@@ -679,7 +679,6 @@ export const interfaceSchema = z
     workflows: z.boolean().optional(),
     toolCallDetails: z.boolean().optional(),
     toolCallSpacing: z.enum(['normal', 'compact']).optional(),
-    hideCompletedToolCalls: z.boolean().optional(),
   })
   .default({
     endpointsMenu: true,
@@ -729,7 +728,6 @@ export const interfaceSchema = z
     },
     toolCallDetails: true,
     toolCallSpacing: 'normal',
-    hideCompletedToolCalls: false,
   });
 
 export type TInterfaceConfig = z.infer<typeof interfaceSchema>;
