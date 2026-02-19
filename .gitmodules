@@ -7,3 +7,6 @@
 [submodule "packages/agents"]
 	path = packages/agents
 	url = https://github.com/azevedojoel/agents
+[submodule "mcp-servers/hubspot-mcp-server"]
+	path = mcp-servers/hubspot-mcp-server
+	url = https://github.com/azevedojoel/hubspot-mcp-server.git

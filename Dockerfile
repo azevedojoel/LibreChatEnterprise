@@ -51,6 +51,9 @@ RUN rm -rf mcp-servers/ms-365-mcp-server && \
     git clone --depth 1 ${MS365_MCP_REPO} mcp-servers/ms-365-mcp-server
 RUN cd mcp-servers/ms-365-mcp-server && npm install && npm run generate && npm run build
 
+ARG HUBSPOT_MCP_REPO=https://github.com/azevedojoel/hubspot-mcp-server
+RUN rm -rf mcp-servers/hubspot-mcp-server && \
+    git clone --depth 1 ${HUBSPOT_MCP_REPO} mcp-servers/hubspot-mcp-server
 RUN cd mcp-servers/hubspot-mcp-server && npm install && npm run build
 
 RUN cd packages/agents && npm install && npm run build
