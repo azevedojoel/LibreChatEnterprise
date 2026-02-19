@@ -46,11 +46,9 @@ interface:
     roles: true
   workflows: true
   # Show expandable tool input/output (JSON). Set false for business-facing UIs.
-  toolCallDetails: false
+  toolCallDetails: true
   # Spacing of tool call rows: 'normal' | 'compact'
   toolCallSpacing: compact
-  # Hide completed tool calls: show during streaming, fade out when done, omit on reload.
-  hideCompletedToolCalls: true
   marketplace:
     use: true
   remoteAgents:
@@ -156,35 +154,6 @@ mcpSettings:
 
 # MCP Servers (example - uncomment and configure as needed)
 mcpServers:
-  # hubspot:
-  #   command: npx
-  #   args: ["-y", "@hubspot/mcp-server"]
-  #   oauth:
-  #     authorization_url: https://app.hubspot.com/oauth/authorize
-  #     token_url: https://api.hubspot.com/oauth/v1/token
-  #     client_id: "${HUBSPOT_MCP_CLIENT_ID}"
-  #     client_secret: "${HUBSPOT_MCP_CLIENT_SECRET}"
-  #     scope: "crm.objects.contacts.write oauth crm.objects.contacts.read"
-  #     token_endpoint_auth_methods_supported: ["client_secret_post"]
-  #     redirect_uri: "http://localhost:3080/api/mcp/hubspot/oauth/callback"
-  #   env:
-  #     PRIVATE_APP_ACCESS_TOKEN: "{{LIBRECHAT_MCP_OAUTH_ACCESS_TOKEN}}"
-  # hubspot:
-  #   type: streamable-http
-  #   url: "https://mcp.hubspot.com"
-  #   serverInstructions: true
-  #   timeout: 45000
-  #   initTimeout: 150000   # Connection establishment timeout for slow-starting servers
-  #   oauthTimeout: 60000  # How long to wait for user to complete OAuth (default 60s)
-  #   startup: false
-  #   oauth:
-  #     authorization_url: https://mcp.hubspot.com/oauth/authorize
-  #     token_url: https://mcp.hubspot.com/oauth/v3/token
-  #     client_id: "${HUBSPOT_MCP_CLIENT_ID}"
-  #     client_secret: "${HUBSPOT_MCP_CLIENT_SECRET}"
-  #     scope: ""
-  #     token_endpoint_auth_methods_supported: ["client_secret_post"]
-  #     code_challenge_methods_supported: ["S256"]
   HubSpot:
     oauthTimeout: 30000
     initTimeout: 150000
@@ -202,6 +171,7 @@ mcpServers:
       client_secret: '${HUBSPOT_CLIENT_SECRET}'
       scope: "crm.objects.contacts.read crm.objects.contacts.write crm.objects.companies.read crm.objects.companies.write crm.objects.deals.read crm.objects.deals.write crm.objects.custom.read crm.objects.custom.write crm.schemas.contacts.read crm.schemas.companies.read crm.schemas.deals.read tickets oauth"
       token_endpoint_auth_methods_supported: ["client_secret_post"]
+      redirect_uri: "http://localhost:3080/api/mcp/HubSpot/oauth/callback"
     env:
       HUBSPOT_ACCESS_TOKEN: "{{LIBRECHAT_MCP_OAUTH_ACCESS_TOKEN}}"
   Google:
@@ -221,6 +191,9 @@ mcpServers:
       client_id: '${GOOGLE_WORKSPACE_CLIENT_ID}'
       client_secret: '${GOOGLE_WORKSPACE_CLIENT_SECRET}'
       scope: "https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/chat.spaces https://www.googleapis.com/auth/chat.messages https://www.googleapis.com/auth/chat.memberships https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.labels https://www.googleapis.com/auth/directory.readonly https://www.googleapis.com/auth/contacts https://www.googleapis.com/auth/presentations https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/tasks"
+      additional_auth_params:
+        access_type: offline
+        prompt: consent
     env:
       GOOGLE_ACCESS_TOKEN: "{{LIBRECHAT_MCP_OAUTH_ACCESS_TOKEN}}"
       WORKSPACE_CLIENT_ID: '${GOOGLE_WORKSPACE_CLIENT_ID}'

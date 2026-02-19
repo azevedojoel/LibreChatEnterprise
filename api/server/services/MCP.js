@@ -63,14 +63,15 @@ function createRunStepDeltaEmitter({ res, stepId, toolCall, streamId = null }) {
       hasStreamId: !!streamId,
       toolCallName: toolCall?.name,
     });
+    const expiresAt = Date.now() + Time.TEN_MINUTES;
     /** @type {{ id: string; delta: AgentToolCallDelta }} */
     const data = {
       id: stepId,
       delta: {
         type: StepTypes.TOOL_CALLS,
-        tool_calls: [{ ...toolCall, args: '' }],
+        tool_calls: [{ ...toolCall, args: '', auth: authURL, expires_at: expiresAt }],
         auth: authURL,
-        expires_at: Date.now() + Time.TEN_MINUTES,
+        expires_at: expiresAt,
       },
     };
     const eventData = { event: GraphEvents.ON_RUN_STEP_DELTA, data };
@@ -607,7 +608,7 @@ function createToolInstance({
 
       if (isOAuthError) {
         throw new Error(
-          `[MCP][${serverName}][${toolName}] OAuth authentication required. Please check the server logs for the authentication URL.`,
+          `The ${serverName} integration requires the user to sign in. A sign-in prompt should appear - please ask the user to complete it, then retry this tool.`,
         );
       }
 

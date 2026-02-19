@@ -173,7 +173,14 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
               logger.error(`[ON_TOOL_EXECUTE] Tool ${tc.name} error:`, error);
               const errorMessage = error.message ?? '';
               let messageForModel = errorMessage;
-              const hasOAuthMarker = errorMessage.includes(HEADLESS_OAUTH_URL_MARKER);
+              const isUserCancelled =
+                errorMessage.includes('User cancelled') ||
+                errorMessage.includes('does not want to authenticate');
+              if (isUserCancelled) {
+                messageForModel =
+                  'User cancelled authentication and does not want to proceed. Do not retry this integration.';
+              }
+              const hasOAuthMarker = !isUserCancelled && errorMessage.includes(HEADLESS_OAUTH_URL_MARKER);
               logger.info(`[ON_TOOL_EXECUTE] OAuth check for ${tc.name}`, {
                 hasCaptureOAuthUrl: !!captureOAuthUrl,
                 hasOAuthMarker,

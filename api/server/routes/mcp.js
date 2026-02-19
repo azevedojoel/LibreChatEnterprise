@@ -422,7 +422,11 @@ router.post('/oauth/cancel/:serverName', requireJwtAuth, async (req, res) => {
       });
     }
 
-    await flowManager.failFlow(flowId, 'mcp_oauth', 'User cancelled OAuth flow');
+    await flowManager.failFlow(
+      flowId,
+      'mcp_oauth',
+      'User cancelled OAuth. User does not want to authenticate or retry this integration.',
+    );
 
     logger.info(`[MCP OAuth Cancel] Successfully cancelled OAuth flow for ${serverName}`);
 

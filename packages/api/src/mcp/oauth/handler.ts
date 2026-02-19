@@ -390,8 +390,8 @@ export class MCPOAuthHandler {
         );
         if (looksLikePlaceholder) {
           logger.warn(
-            `[MCPOAuth][${serverName}] client_id appears to be an unresolved env placeholder (contains \$\{). ` +
-              `Check GOOGLE_WORKSPACE_CLIENT_ID is set in .env and librechat.yaml uses \${GOOGLE_WORKSPACE_CLIENT_ID}`,
+            `[MCPOAuth][${serverName}] client_id appears to be an unresolved env placeholder (contains ${'${'}). ` +
+              `Check that the OAuth client_id env variable for ${serverName} is set in .env and referenced correctly in librechat.yaml`,
           );
         }
 
@@ -466,6 +466,20 @@ export class MCPOAuthHandler {
         /** Add state parameter with flowId to the authorization URL */
         authorizationUrl.searchParams.set('state', flowId);
         logger.debug(`[MCPOAuth] Added state parameter to authorization URL`);
+
+        /** Apply any provider-specific auth params (e.g. access_type=offline for refresh tokens) */
+        const additionalParams = (config as { additional_auth_params?: Record<string, string> })
+          .additional_auth_params;
+        if (additionalParams && Object.keys(additionalParams).length > 0) {
+          for (const [key, value] of Object.entries(additionalParams)) {
+            if (value != null && value !== '') {
+              authorizationUrl.searchParams.set(key, String(value));
+            }
+          }
+          logger.debug(
+            `[MCPOAuth] Added additional_auth_params: ${Object.keys(additionalParams).join(', ')}`,
+          );
+        }
 
         const flowMetadata: MCPOAuthFlowMetadata = {
           serverName,
@@ -545,6 +559,21 @@ export class MCPOAuthHandler {
         /** Add state parameter with flowId to the authorization URL */
         authorizationUrl.searchParams.set('state', flowId);
         logger.debug(`[MCPOAuth] Added state parameter to authorization URL`);
+
+        /** Apply any provider-specific auth params from config */
+        const discoveryAdditionalParams = (
+          config as { additional_auth_params?: Record<string, string> }
+        )?.additional_auth_params;
+        if (discoveryAdditionalParams && Object.keys(discoveryAdditionalParams).length > 0) {
+          for (const [key, value] of Object.entries(discoveryAdditionalParams)) {
+            if (value != null && value !== '') {
+              authorizationUrl.searchParams.set(key, String(value));
+            }
+          }
+          logger.debug(
+            `[MCPOAuth] Added additional_auth_params: ${Object.keys(discoveryAdditionalParams).join(', ')}`,
+          );
+        }
 
         if (resourceMetadata?.resource != null && resourceMetadata.resource) {
           authorizationUrl.searchParams.set('resource', resourceMetadata.resource);
@@ -634,10 +663,10 @@ export class MCPOAuthHandler {
         resource = undefined;
       }
 
-      const redirectUri =
-        metadata.clientInfo.redirect_uris?.[0] || this.getDefaultRedirectUri();
+      const redirectUri = metadata.clientInfo.redirect_uris?.[0] || this.getDefaultRedirectUri();
       const cid = metadata.clientInfo.client_id;
-      const cidMasked = cid && cid.length > 12 ? `${cid.slice(0, 8)}...${cid.slice(-4)}` : '(short)';
+      const cidMasked =
+        cid && cid.length > 12 ? `${cid.slice(0, 8)}...${cid.slice(-4)}` : '(short)';
 
       logger.info(
         `[MCPOAuth][complete] Exchanging code for tokens: flowId=${flowId}, redirect_uri=${redirectUri}, client_id=${cidMasked}`,

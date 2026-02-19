@@ -355,12 +355,16 @@ export class MCPTokenStorage {
           return newTokens;
         } catch (refreshError) {
           logger.error(`${logPrefix} Failed to refresh tokens`, refreshError);
-          // Check if it's an unauthorized_client error (refresh not supported)
           const errorMessage =
             refreshError instanceof Error ? refreshError.message : String(refreshError);
-          if (errorMessage.includes('unauthorized_client')) {
-            logger.info(
-              `${logPrefix} Server does not support refresh tokens for this client. New authentication required.`,
+          // Unrecoverable: new OAuth won't help (wrong client id, invalid config, etc.)
+          if (
+            /BAD_CLIENT_ID|invalid_client|unauthorized_client|invalid_request.*client/i.test(
+              errorMessage,
+            )
+          ) {
+            throw new Error(
+              `OAuth token refresh failed: ${errorMessage}. Integration may need to be reconfigured.`,
             );
           }
           return null;
@@ -396,6 +400,11 @@ export class MCPTokenStorage {
       return tokens;
     } catch (error) {
       logger.error(`${logPrefix} Failed to retrieve tokens`, error);
+      // Rethrow unrecoverable errors (e.g. BAD_CLIENT_ID) so caller can surface to user
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes('Integration may need to be reconfigured')) {
+        throw error;
+      }
       return null;
     }
   }

@@ -74,6 +74,8 @@ const BaseOptionsSchema = z.object({
       revocation_endpoint: z.string().url().optional(),
       /** OAuth revocation endpoint authentication methods supported (optional - can be auto-discovered) */
       revocation_endpoint_auth_methods_supported: z.array(z.string()).optional(),
+      /** Extra query params to append to the authorization URL (e.g. access_type=offline, prompt=consent for Google) */
+      additional_auth_params: z.record(z.string()).optional(),
     })
     .optional(),
   /** Custom headers to send with OAuth requests (registration, discovery, token exchange, etc.) */

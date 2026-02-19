@@ -374,9 +374,9 @@ async function processRequiredActions(client, requiredActions) {
     const handleToolError = (error) => {
       const msg = error?.message ?? '';
       const isUserCancelledAuth =
-        msg.includes('User cancelled') || msg.includes('User cancelled OAuth flow');
+        msg.includes('User cancelled') || msg.includes('does not want to authenticate');
       const output = isUserCancelledAuth
-        ? 'User declined to authenticate.'
+        ? 'User cancelled authentication and does not want to proceed. Do not retry this integration.'
         : `Error processing tool ${currentAction.tool}: ${redactMessage(error.message, 256)}`;
       if (!isUserCancelledAuth) {
         logger.error(

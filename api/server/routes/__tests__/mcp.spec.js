@@ -917,7 +917,7 @@ describe('MCP Routes', () => {
       expect(mockFlowManager.failFlow).toHaveBeenCalledWith(
         'test-user-id:test-server',
         'mcp_oauth',
-        'User cancelled OAuth flow',
+        'User cancelled OAuth. User does not want to authenticate or retry this integration.',
       );
     });
 

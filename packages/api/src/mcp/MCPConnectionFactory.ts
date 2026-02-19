@@ -9,7 +9,7 @@ import type * as t from './types';
 import { MCPTokenStorage, MCPOAuthHandler } from '~/mcp/oauth';
 import { sanitizeUrlForLogging } from './utils';
 import { withTimeout } from '~/utils/promise';
-import { MCPConnection } from './connection';
+import { MCPConnection, OAUTH_HANDLING_TIMEOUT } from './connection';
 import { processMCPEnv } from '~/utils';
 
 const MCP_OAUTH_TOKEN_PLACEHOLDER = '{{LIBRECHAT_MCP_OAUTH_ACCESS_TOKEN}}';
@@ -269,7 +269,26 @@ export class MCPConnectionFactory {
 
   /** Creates the base MCP connection with OAuth tokens */
   protected async createConnection(): Promise<MCPConnection> {
-    let oauthTokens = this.useOAuth ? await this.getOAuthTokens() : null;
+    let oauthTokens: MCPOAuthTokens | null = null;
+    if (this.useOAuth) {
+      // Pre-flight: if access token exists but is expired, require re-auth immediately (don't try refresh)
+      const accessTokenData = this.tokenMethods?.findToken
+        ? await this.tokenMethods.findToken({
+            userId: this.userId!,
+            identifier: `mcp:${this.serverName}`,
+          })
+        : null;
+      const isExpired =
+        accessTokenData?.expiresAt && new Date() >= new Date(accessTokenData.expiresAt);
+      if (isExpired) {
+        logger.info(`${this.logPrefix} Access token expired, requiring re-authentication`);
+        const flowId = MCPOAuthHandler.generateFlowId(this.userId!, this.serverName);
+        await this.flowManager?.deleteFlow?.(flowId, 'mcp_get_tokens');
+        // oauthTokens stays null - will trigger handleOAuthRequired branch
+      } else {
+        oauthTokens = await this.getOAuthTokens();
+      }
+    }
 
     // Stdio: no 401 trigger - run OAuth proactively when tokens missing
     if (
@@ -364,6 +383,11 @@ export class MCPConnectionFactory {
       return tokens;
     } catch (error) {
       logger.debug(`${this.logPrefix} No existing tokens found or error loading tokens`, error);
+      // Rethrow unrecoverable errors (e.g. BAD_CLIENT_ID) so createConnection can fail fast
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes('Integration may need to be reconfigured')) {
+        throw error;
+      }
       return null;
     }
   }
@@ -656,8 +680,13 @@ export class MCPConnectionFactory {
         throw new Error('OAuth flow initiated - return early');
       }
 
-      /** Tokens from the new flow (callback will complete it) */
-      const tokens = await flowPromise;
+      /** Tokens from the new flow (callback will complete it).
+       * Wrap with timeout so we don't hang indefinitely if user never completes OAuth. */
+      const tokens = await withTimeout(
+        flowPromise,
+        OAUTH_HANDLING_TIMEOUT,
+        `OAuth authentication timed out after ${OAUTH_HANDLING_TIMEOUT / 1000}s. Please reconnect the integration and try again.`,
+      );
       if (typeof this.oauthEnd === 'function') {
         await this.oauthEnd();
       }

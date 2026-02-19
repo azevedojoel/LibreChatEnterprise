@@ -75,7 +75,7 @@ const DEFAULT_TIMEOUT = 60000;
 /** SSE connections through proxies may need longer initial handshake time */
 const SSE_CONNECT_TIMEOUT = 120000;
 /** How long to wait for user to complete OAuth before timing out (separate from initTimeout for server startup) */
-const OAUTH_HANDLING_TIMEOUT = 60000;
+export const OAUTH_HANDLING_TIMEOUT = 60000;
 
 /**
  * Headers for SSE connections.
