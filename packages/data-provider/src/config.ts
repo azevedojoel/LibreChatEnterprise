@@ -1464,6 +1464,14 @@ export enum CacheKeys {
    * Key for admin panel OAuth exchange codes (one-time-use, short TTL).
    */
   ADMIN_OAUTH_EXCHANGE = 'ADMIN_OAUTH_EXCHANGE',
+  /**
+   * Key for MCP OAuth reauth tokens (single-use, 5-15 min TTL, for headless/email flows).
+   */
+  MCP_REAUTH_TOKENS = 'MCP_REAUTH_TOKENS',
+  /**
+   * Key for MCP OAuth confirm tokens (short-lived, for post-callback confirmation).
+   */
+  MCP_OAUTH_CONFIRM = 'MCP_OAUTH_CONFIRM',
 }
 
 /**

@@ -250,6 +250,7 @@ async function processInboundEmail(payload) {
   try {
     const job = await GenerationJobManager.createJob(streamId, senderUserId, conversationId);
     syntheticReq._resumableStreamId = streamId;
+    syntheticReq._headlessOAuthUrls = capturedOAuthUrls;
 
     const result = await initializeClient({
       req: syntheticReq,
@@ -294,7 +295,10 @@ async function processInboundEmail(payload) {
     emailHtmlBody = emailHtml || null;
     if (!emailBody || emailBody === '(No response content)') {
       emailBody = '(No response content)';
-      emailHtmlBody = null;
+      // Preserve HTML when we have OAuth links so the sign-in button is included
+      if (capturedOAuthUrls.length === 0) {
+        emailHtmlBody = null;
+      }
     }
 
     const { saveConvo } = require('~/models/Conversation');
@@ -315,14 +319,19 @@ async function processInboundEmail(payload) {
     );
   } catch (err) {
     logger.error('[InboundEmail] Run failed', err);
-    const errorMessage =
+    const baseUrl = process.env.DOMAIN_CLIENT || process.env.DOMAIN_SERVER || 'http://localhost:3080';
+    let errorContent =
       'We encountered an error while processing your request.\n\nPlease try again or contact support if the issue persists.';
+    if (capturedOAuthUrls.length === 0 && /oauth|auth|reconnect|integration|authenticate/i.test(String(err?.message))) {
+      errorContent += `\n\nIf an integration needs re-authentication, sign in at ${baseUrl} and reconnect it under Settings.`;
+      capturedOAuthUrls.push(baseUrl);
+    }
     logger.info('[InboundEmail] Error path - capturedOAuthUrls', {
       capturedOAuthUrlsLength: capturedOAuthUrls.length,
       capturedOAuthUrlsPreview: capturedOAuthUrls.map((u) => u?.slice(0, 80) ?? ''),
     });
     const { html: errorHtml, text: errorText } = formatEmailContent(
-      [{ type: 'text', text: errorMessage }],
+      [{ type: 'text', text: errorContent }],
       capturedOAuthUrls,
       {
         appName: process.env.APP_TITLE || 'Daily Thread',

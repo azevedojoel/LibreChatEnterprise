@@ -60,6 +60,7 @@ const { manifestToolMap, toolkits } = require('~/app/clients/tools/manifest');
 const { createOnSearchResults } = require('~/server/services/Tools/search');
 const { loadAuthValues } = require('~/server/services/Tools/credentials');
 const { reinitMCPServer } = require('~/server/services/Tools/mcp');
+const { createReauthToken, buildReauthLink } = require('~/server/utils/mcpReauthToken');
 const { recordUsage } = require('~/server/services/Threads');
 const { loadTools } = require('~/app/clients/tools/util');
 const { redactMessage } = require('~/config/parsers');
@@ -769,19 +770,34 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
 
   if (pendingOAuthServers.size > 0 && (res || streamId)) {
     const serverNames = Array.from(pendingOAuthServers);
+    const isHeadless = Array.isArray(req._headlessOAuthUrls);
     logger.info(
-      `[Tool Definitions] OAuth required for ${serverNames.length} server(s): ${serverNames.join(', ')}. Emitting events and waiting.`,
+      `[Tool Definitions] OAuth required for ${serverNames.length} server(s): ${serverNames.join(', ')}. ${isHeadless ? 'Headless mode: capturing link for email.' : 'Emitting events and waiting.'}`,
     );
 
     const oauthWaitPromises = serverNames.map(async (serverName) => {
       try {
+        const oauthStart = isHeadless
+          ? async () => {
+              const reauthToken = await createReauthToken({
+                userId: req.user.id,
+                serverName,
+              });
+              const appLink = buildReauthLink(reauthToken);
+              if (Array.isArray(req._headlessOAuthUrls)) {
+                req._headlessOAuthUrls.push(appLink);
+                logger.info(`[Tool Definitions] Headless: captured reauth link for ${serverName}`);
+              }
+            }
+          : createOAuthEmitter(serverName);
+
         const result = await reinitMCPServer({
           user: req.user,
           serverName,
           userMCPAuthMap,
           flowManager,
-          returnOnOAuth: false,
-          oauthStart: createOAuthEmitter(serverName),
+          returnOnOAuth: isHeadless,
+          oauthStart,
           connectionTimeout: Time.TWO_MINUTES,
         });
 

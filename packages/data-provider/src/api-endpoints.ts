@@ -181,6 +181,8 @@ export const cancelMCPOAuth = (serverName: string) => {
   return `${BASE_URL}/api/mcp/oauth/cancel/${serverName}`;
 };
 
+export const mcpOAuthConfirm = () => `${BASE_URL}/api/mcp/oauth/confirm`;
+
 export const mcpOAuthBind = (serverName: string) => `${BASE_URL}/api/mcp/${serverName}/oauth/bind`;
 
 export const actionOAuthBind = (actionId: string) =>

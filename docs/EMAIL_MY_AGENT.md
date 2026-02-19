@@ -166,6 +166,18 @@ Defined in [api/server/services/InboundEmail/processEmailAttachments.js](api/ser
 
 ---
 
+## 10.1 Email Deliverability and OAuth Links
+
+When agents use OAuth integrations (e.g. MCP servers), re-authentication links may be included in reply emails. For security and deliverability:
+
+- **SPF, DKIM, DMARC**: Configure these DNS records for your sending domain (e.g. `MAILGUN_DOMAIN` or the domain in `POSTMARK_FROM`). Postmark/Mailgun provide setup guides. Proper configuration improves deliverability and recipient trust.
+- **Canonical domain**: Use your canonical production domain in `DOMAIN_CLIENT` and `DOMAIN_SERVER` for all links in emails (e.g. OAuth reauth links). Avoid subdomains or aliases that could confuse users.
+- **No URL shorteners**: Never use bit.ly, tinyurl, or similar services for links in emails. All links must be full URLs to your application domain.
+
+OAuth reauth links are single-use, short-lived (30 minutes), and bound to the user and connector. They route through your app (`/api/mcp/reauth`) rather than exposing raw OAuth URLs in email.
+
+---
+
 ## 11. Troubleshooting
 
 | Issue | Cause | Action |

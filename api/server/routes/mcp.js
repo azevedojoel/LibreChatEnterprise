@@ -12,7 +12,9 @@ const {
   createSafeUser,
   MCPOAuthHandler,
   MCPTokenStorage,
+  processMCPEnv,
   setOAuthSession,
+  setOAuthSessionCookie,
   getUserMCPAuthMap,
   validateOAuthCsrf,
   OAUTH_CSRF_COOKIE,
@@ -45,10 +47,181 @@ const { reinitMCPServer } = require('~/server/services/Tools/mcp');
 const { findPluginAuthsByKeys } = require('~/models');
 const { getRoleByName } = require('~/models/Role');
 const { getLogStores } = require('~/cache');
+const {
+  consumeReauthToken,
+} = require('~/server/utils/mcpReauthToken');
+const { logOAuthAudit, OAuthAuditEvents } = require('~/server/utils/auditLog');
+const crypto = require('crypto');
 
 const router = Router();
 
 const OAUTH_CSRF_COOKIE_PATH = '/api/mcp';
+
+/**
+ * MCP OAuth reauth - unauthenticated route for headless/email flows.
+ * Validates single-use reauth token, sets session cookie, initiates OAuth, redirects to provider.
+ * @route GET /api/mcp/reauth?token=...
+ */
+router.get('/reauth', async (req, res) => {
+  const basePath = getBasePath();
+  try {
+    const { token } = req.query;
+    if (!token || typeof token !== 'string') {
+      logger.warn('[MCP Reauth] Missing token');
+      return res.redirect(`${basePath}/oauth/error?error=missing_reauth_token`);
+    }
+
+    const payload = await consumeReauthToken(token.trim());
+    if (!payload) {
+      logOAuthAudit({
+        event: OAuthAuditEvents.MCP_OAUTH_REAUTH_REQUESTED,
+        result: 'error',
+        error: 'invalid_or_expired_token',
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+      return res.redirect(`${basePath}/oauth/error?error=invalid_or_expired_reauth_token`);
+    }
+
+    const { userId, serverName } = payload;
+    logOAuthAudit({
+      event: OAuthAuditEvents.MCP_OAUTH_REAUTH_REQUESTED,
+      userId,
+      serverName,
+      result: 'success',
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+    setOAuthSessionCookie(res, userId);
+
+    const flowsCache = getLogStores(CacheKeys.FLOWS);
+    const flowManager = getFlowStateManager(flowsCache);
+    const oauthHeaders = await getOAuthHeaders(serverName, userId);
+
+    let serverConfig = await getMCPServersRegistry().getServerConfig(serverName, userId);
+    // Resolve ${GOOGLE_WORKSPACE_CLIENT_ID} etc. - registry returns raw YAML config
+    if (serverConfig) {
+      serverConfig = processMCPEnv({ options: serverConfig }) ?? serverConfig;
+    }
+    const oauthConfig = serverConfig?.oauth;
+    // For stdio OAuth servers (Google, Microsoft), url is absent - derive from oauth config
+    const serverUrl =
+      serverConfig?.url ??
+      oauthConfig?.token_url ??
+      oauthConfig?.authorization_url ??
+      '';
+    if (
+      !serverUrl ||
+      !oauthConfig?.authorization_url ||
+      !oauthConfig?.token_url ||
+      !oauthConfig?.client_id
+    ) {
+      logger.error('[MCP Reauth] Missing server URL or OAuth config', { serverName });
+      return res.redirect(`${basePath}/oauth/error?error=invalid_server_config`);
+    }
+
+    const { authorizationUrl, flowId: oauthFlowId, flowMetadata } =
+      await MCPOAuthHandler.initiateOAuthFlow(
+        serverName,
+        serverUrl,
+        userId,
+        oauthHeaders,
+        oauthConfig,
+      );
+
+    // If MCP/InboundEmail already created a PENDING flow, update its metadata with our new
+    // codeVerifier. Deleting would cause MCP's monitorFlow to see "flow not found" and crash.
+    const existingFlow = await flowManager.getFlowState(oauthFlowId, 'mcp_oauth');
+    const canUpdate = typeof flowManager.updateFlowMetadata === 'function';
+    if (existingFlow?.status === 'PENDING' && canUpdate) {
+      await flowManager.updateFlowMetadata(oauthFlowId, 'mcp_oauth', flowMetadata);
+    } else {
+      if (existingFlow?.status === 'PENDING' && !canUpdate) {
+        logger.warn(
+          '[MCP Reauth] updateFlowMetadata not available, falling back to delete+create - run npm run build:api',
+        );
+      }
+      await flowManager.deleteFlow(oauthFlowId, 'mcp_oauth');
+      const createFlowPromise = flowManager
+        .createFlow(oauthFlowId, 'mcp_oauth', flowMetadata)
+        .catch((err) => {
+          logger.warn('[MCP Reauth] Failed to create flow state', err);
+        });
+      // createFlow has 250ms dedup delay before keyv.set; ensure flow state is persisted before redirect
+      await Promise.race([
+        createFlowPromise,
+        new Promise((resolve) => setTimeout(resolve, 400)),
+      ]).catch(() => {});
+    }
+
+    logOAuthAudit({
+      event: OAuthAuditEvents.MCP_OAUTH_INITIATE,
+      userId,
+      serverName,
+      result: 'success',
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+      extra: { source: 'reauth' },
+    });
+    setOAuthCsrfCookie(res, oauthFlowId, OAUTH_CSRF_COOKIE_PATH);
+    res.redirect(authorizationUrl);
+  } catch (error) {
+    logOAuthAudit({
+      event: OAuthAuditEvents.MCP_OAUTH_INITIATE,
+      result: 'error',
+      error: error?.message,
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+      extra: { source: 'reauth' },
+    });
+    logger.error('[MCP Reauth] Error', error);
+    res.redirect(`${basePath}/oauth/error?error=reauth_failed`);
+  }
+});
+
+/**
+ * OAuth confirmation - validates confirm token and returns success redirect URL.
+ * Called by the confirm page when user clicks "Confirm" to finalize connection.
+ * @route POST /api/mcp/oauth/confirm
+ */
+router.post('/oauth/confirm', async (req, res) => {
+  const basePath = getBasePath();
+  try {
+    const { token } = req.body || {};
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({ error: 'missing_token' });
+    }
+
+    const confirmCache = getLogStores(CacheKeys.MCP_OAUTH_CONFIRM);
+    const payload = await confirmCache.get(token.trim());
+    if (!payload) {
+      return res.status(400).json({ error: 'invalid_or_expired_token' });
+    }
+    await confirmCache.delete(token.trim());
+
+    logOAuthAudit({
+      event: OAuthAuditEvents.MCP_OAUTH_CONFIRM,
+      userId: payload.userId,
+      serverName: payload.serverName,
+      result: 'success',
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+
+    const redirectUrl = `${basePath}/oauth/success?serverName=${encodeURIComponent(payload.serverName)}`;
+    res.json({ redirectUrl });
+  } catch (error) {
+    logOAuthAudit({
+      event: OAuthAuditEvents.MCP_OAUTH_CONFIRM,
+      result: 'error',
+      error: error?.message,
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+    logger.error('[MCP OAuth] Confirm error', error);
+    res.status(500).json({ error: 'confirm_failed' });
+  }
+});
 
 /**
  * Get all MCP tools available to the user
@@ -100,11 +273,26 @@ router.get('/:serverName/oauth/initiate', requireJwtAuth, setOAuthSession, async
       oauthConfig,
     );
 
-    logger.debug('[MCP OAuth] OAuth flow initiated', { oauthFlowId, authorizationUrl });
-
+    logOAuthAudit({
+      event: OAuthAuditEvents.MCP_OAUTH_INITIATE,
+      userId: user.id,
+      serverName,
+      result: 'success',
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    });
     setOAuthCsrfCookie(res, oauthFlowId, OAUTH_CSRF_COOKIE_PATH);
     res.redirect(authorizationUrl);
   } catch (error) {
+    logOAuthAudit({
+      event: OAuthAuditEvents.MCP_OAUTH_INITIATE,
+      userId: req.user?.id,
+      serverName: req.params.serverName,
+      result: 'error',
+      error: error?.message,
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    });
     logger.error('[MCP OAuth] Failed to initiate OAuth', error);
     res.status(500).json({ error: 'Failed to initiate OAuth' });
   }
@@ -128,6 +316,14 @@ router.get('/:serverName/oauth/callback', async (req, res) => {
     });
 
     if (oauthError) {
+      logOAuthAudit({
+        event: OAuthAuditEvents.MCP_OAUTH_CALLBACK_ERROR,
+        serverName,
+        result: 'error',
+        error: String(oauthError),
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+      });
       logger.error('[MCP OAuth] OAuth error received', { error: oauthError });
       return res.redirect(
         `${basePath}/oauth/error?error=${encodeURIComponent(String(oauthError))}`,
@@ -201,6 +397,14 @@ router.get('/:serverName/oauth/callback', async (req, res) => {
     logger.debug('[MCP OAuth] Completing OAuth flow');
     const oauthHeaders = await getOAuthHeaders(serverName, flowState.userId);
     const tokens = await MCPOAuthHandler.completeOAuthFlow(flowId, code, flowManager, oauthHeaders);
+    logOAuthAudit({
+      event: OAuthAuditEvents.MCP_OAUTH_CALLBACK_SUCCESS,
+      userId: flowState.userId,
+      serverName,
+      result: 'success',
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    });
     logger.info('[MCP OAuth] OAuth flow completed, tokens received in callback route');
 
     /** Persist tokens immediately so reconnection uses fresh credentials */
@@ -288,10 +492,25 @@ router.get('/:serverName/oauth/callback', async (req, res) => {
       await flowManager.completeFlow(toolFlowId, 'mcp_oauth', tokens);
     }
 
-    /** Redirect to success page with flowId and serverName */
-    const redirectUrl = `${basePath}/oauth/success?serverName=${encodeURIComponent(serverName)}`;
-    res.redirect(redirectUrl);
+    /** Create short-lived confirm token and redirect to confirmation page */
+    const confirmToken = crypto.randomBytes(32).toString('base64url');
+    const confirmCache = getLogStores(CacheKeys.MCP_OAUTH_CONFIRM);
+    await confirmCache.set(
+      confirmToken,
+      { serverName, userId: flowState.userId, flowId },
+      5 * 60 * 1000,
+    );
+    const confirmUrl = `${basePath}/oauth/confirm?token=${confirmToken}&serverName=${encodeURIComponent(serverName)}`;
+    res.redirect(confirmUrl);
   } catch (error) {
+    logOAuthAudit({
+      event: OAuthAuditEvents.MCP_OAUTH_CALLBACK_ERROR,
+      serverName: req.params.serverName,
+      result: 'error',
+      error: error?.message,
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    });
     logger.error('[MCP OAuth] OAuth callback error', error);
     res.redirect(`${basePath}/oauth/error?error=callback_failed`);
   }

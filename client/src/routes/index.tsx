@@ -10,7 +10,7 @@ import {
 } from '~/components/Auth';
 import { MarketplaceProvider } from '~/components/Agents/MarketplaceContext';
 import AgentMarketplace from '~/components/Agents/Marketplace';
-import { OAuthSuccess, OAuthError } from '~/components/OAuth';
+import { OAuthSuccess, OAuthError, OAuthConfirm } from '~/components/OAuth';
 import { AuthContextProvider } from '~/hooks/AuthContext';
 import RouteErrorBoundary from './RouteErrorBoundary';
 import StartupLayout from './Layouts/Startup';
@@ -49,6 +49,10 @@ export const router = createBrowserRouter(
         {
           path: 'error',
           element: <OAuthError />,
+        },
+        {
+          path: 'confirm',
+          element: <OAuthConfirm />,
         },
       ],
     },

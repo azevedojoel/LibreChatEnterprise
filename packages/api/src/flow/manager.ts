@@ -387,6 +387,27 @@ export class FlowStateManager<T = unknown> {
   }
 
   /**
+   * Updates the metadata of an existing flow without changing status.
+   * Used by reauth to refresh codeVerifier when MCP flow already exists (PENDING).
+   */
+  async updateFlowMetadata(
+    flowId: string,
+    type: string,
+    metadata: FlowMetadata,
+  ): Promise<boolean> {
+    const flowKey = this.getFlowKey(flowId, type);
+    const flowState = (await this.keyv.get(flowKey)) as FlowState<T> | undefined;
+    if (!flowState) return false;
+    await this.keyv.set(
+      flowKey,
+      { ...flowState, metadata },
+      this.ttl,
+    );
+    logger.debug(`[${flowKey}] Flow metadata updated`);
+    return true;
+  }
+
+  /**
    * Deletes a flow state
    */
   async deleteFlow(flowId: string, type: string): Promise<boolean> {

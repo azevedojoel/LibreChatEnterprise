@@ -1,11 +1,6 @@
 const { logger, webSearchKeys } = require('@librechat/data-schemas');
-const { Tools, CacheKeys, Constants, FileSources } = require('librechat-data-provider');
-const {
-  MCPOAuthHandler,
-  MCPTokenStorage,
-  normalizeHttpError,
-  extractWebSearchEnvVars,
-} = require('@librechat/api');
+const { Tools, Constants, FileSources } = require('librechat-data-provider');
+const { normalizeHttpError, extractWebSearchEnvVars } = require('@librechat/api');
 const {
   deleteAllUserSessions,
   deleteAllSharedLinks,
@@ -35,16 +30,15 @@ const {
 } = require('~/db/models');
 const { updateUserPluginAuth, deleteUserPluginAuth } = require('~/server/services/PluginService');
 const { verifyEmail, resendVerificationEmail } = require('~/server/services/AuthService');
-const { getMCPManager, getFlowStateManager, getMCPServersRegistry } = require('~/config');
+const { getMCPManager } = require('~/config');
 const { invalidateCachedTools } = require('~/server/services/Config/getCachedTools');
+const { uninstallOAuthMCP } = require('~/server/services/MCP/oauthUninstall');
 const { needsRefresh, getNewS3URL } = require('~/server/services/Files/S3/crud');
 const { processDeleteRequest } = require('~/server/services/Files/process');
 const { getAppConfig } = require('~/server/services/Config');
 const { deleteToolCalls } = require('~/models/ToolCall');
 const { deleteUserPrompts } = require('~/models/Prompt');
 const { deleteUserAgents } = require('~/models/Agent');
-const { getLogStores } = require('~/cache');
-
 const getUserController = async (req, res) => {
   const appConfig = await getAppConfig({ role: req.user?.role });
   /** @type {IUser} */
@@ -181,7 +175,7 @@ const updateUserPluginsController = async (req, res) => {
         }
         try {
           // if the MCP server uses OAuth, perform a full cleanup and token revocation
-          await maybeUninstallOAuthMCP(user.id, pluginKey, appConfig);
+          await uninstallOAuthMCP(user.id, pluginKey, appConfig);
         } catch (error) {
           logger.error(
             `[updateUserPluginsController] Error uninstalling OAuth MCP for ${pluginKey}:`,
@@ -306,108 +300,6 @@ const resendVerificationController = async (req, res) => {
     logger.error('[verifyEmailController]', e);
     return res.status(500).json({ message: 'Something went wrong.' });
   }
-};
-
-/**
- * OAuth MCP specific uninstall logic
- */
-const maybeUninstallOAuthMCP = async (userId, pluginKey, appConfig) => {
-  if (!pluginKey.startsWith(Constants.mcp_prefix)) {
-    // this is not an MCP server, so nothing to do here
-    return;
-  }
-
-  const serverName = pluginKey.replace(Constants.mcp_prefix, '');
-  const serverConfig =
-    (await getMCPServersRegistry().getServerConfig(serverName, userId)) ??
-    appConfig?.mcpServers?.[serverName];
-  const oauthServers = await getMCPServersRegistry().getOAuthServers(userId);
-  if (!oauthServers.has(serverName)) {
-    // this server does not use OAuth, so nothing to do here as well
-    return;
-  }
-
-  // 1. get client info used for revocation (client id, secret)
-  const clientTokenData = await MCPTokenStorage.getClientInfoAndMetadata({
-    userId,
-    serverName,
-    findToken,
-  });
-  if (clientTokenData == null) {
-    return;
-  }
-  const { clientInfo, clientMetadata } = clientTokenData;
-
-  // 2. get decrypted tokens before deletion
-  const tokens = await MCPTokenStorage.getTokens({
-    userId,
-    serverName,
-    findToken,
-  });
-
-  // 3. revoke OAuth tokens at the provider
-  const revocationEndpoint =
-    serverConfig.oauth?.revocation_endpoint ?? clientMetadata.revocation_endpoint;
-  const revocationEndpointAuthMethodsSupported =
-    serverConfig.oauth?.revocation_endpoint_auth_methods_supported ??
-    clientMetadata.revocation_endpoint_auth_methods_supported;
-  const oauthHeaders = serverConfig.oauth_headers ?? {};
-
-  if (tokens?.access_token) {
-    try {
-      await MCPOAuthHandler.revokeOAuthToken(
-        serverName,
-        tokens.access_token,
-        'access',
-        {
-          serverUrl: serverConfig.url,
-          clientId: clientInfo.client_id,
-          clientSecret: clientInfo.client_secret ?? '',
-          revocationEndpoint,
-          revocationEndpointAuthMethodsSupported,
-        },
-        oauthHeaders,
-      );
-    } catch (error) {
-      logger.error(`Error revoking OAuth access token for ${serverName}:`, error);
-    }
-  }
-
-  if (tokens?.refresh_token) {
-    try {
-      await MCPOAuthHandler.revokeOAuthToken(
-        serverName,
-        tokens.refresh_token,
-        'refresh',
-        {
-          serverUrl: serverConfig.url,
-          clientId: clientInfo.client_id,
-          clientSecret: clientInfo.client_secret ?? '',
-          revocationEndpoint,
-          revocationEndpointAuthMethodsSupported,
-        },
-        oauthHeaders,
-      );
-    } catch (error) {
-      logger.error(`Error revoking OAuth refresh token for ${serverName}:`, error);
-    }
-  }
-
-  // 4. delete tokens from the DB after revocation attempts
-  await MCPTokenStorage.deleteUserTokens({
-    userId,
-    serverName,
-    deleteToken: async (filter) => {
-      await Token.deleteOne(filter);
-    },
-  });
-
-  // 5. clear the flow state for the OAuth tokens
-  const flowsCache = getLogStores(CacheKeys.FLOWS);
-  const flowManager = getFlowStateManager(flowsCache);
-  const flowId = MCPOAuthHandler.generateFlowId(userId, serverName);
-  await flowManager.deleteFlow(flowId, 'mcp_get_tokens');
-  await flowManager.deleteFlow(flowId, 'mcp_oauth');
 };
 
 module.exports = {

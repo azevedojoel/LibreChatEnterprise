@@ -32,6 +32,11 @@ const { getGraphApiToken } = require('./GraphTokenService');
 const { reinitMCPServer } = require('./Tools/mcp');
 const { getAppConfig } = require('./Config');
 const { getLogStores } = require('~/cache');
+const {
+  createReauthToken,
+  buildReauthLink,
+} = require('~/server/utils/mcpReauthToken');
+const { disablePermanentlyFailedServer } = require('./MCP/disablePermanentlyFailedServer');
 
 function isEmptyObjectSchema(jsonSchema) {
   return (
@@ -254,9 +259,14 @@ async function reconnectServer({
   try {
     const oauthStart = isHeadless
       ? async (authURL) => {
+          const reauthToken = await createReauthToken({
+            userId: user.id,
+            serverName,
+          });
+          const appLink = buildReauthLink(reauthToken);
           throw new Error(
             HEADLESS_OAUTH_MESSAGE +
-              (authURL ? `\n\nTo authenticate, open this URL in your browser:\n${authURL}` : ''),
+              (appLink ? `\n\nTo authenticate, open this URL in your browser:\n${appLink}` : ''),
           );
         }
       : (() => {
@@ -532,9 +542,21 @@ function createToolInstance({
       const oauthCallback = createOAuthCallback({ runStepEmitter, runStepDeltaEmitter });
       const oauthStart = isHeadless
         ? async (authURL) => {
+            const uid = config?.configurable?.user?.id || config?.configurable?.user_id;
+            if (!uid) {
+              throw new Error(
+                HEADLESS_OAUTH_MESSAGE +
+                  (authURL ? `\n\nTo authenticate, open this URL in your browser:\n${authURL}` : ''),
+              );
+            }
+            const reauthToken = await createReauthToken({
+              userId: uid,
+              serverName,
+            });
+            const appLink = buildReauthLink(reauthToken);
             throw new Error(
               HEADLESS_OAUTH_MESSAGE +
-                (authURL ? `\n\nTo authenticate, open this URL in your browser:\n${authURL}` : ''),
+                (appLink ? `\n\nTo authenticate, open this URL in your browser:\n${appLink}` : ''),
             );
           }
         : createOAuthStart({
@@ -597,6 +619,19 @@ function createToolInstance({
       /** Headless OAuth message - pass through for agent to relay to user */
       if (error?.message?.startsWith(HEADLESS_OAUTH_MESSAGE)) {
         throw error;
+      }
+
+      /** Permanent failure (e.g. BAD_CLIENT_ID, invalid OAuth config) - auto-disable and inform user */
+      if (error?.message?.includes('Integration may need to be reconfigured')) {
+        disablePermanentlyFailedServer(userId, serverName).catch((disableErr) =>
+          logger.error(
+            `[MCP][${serverName}][User: ${userId}] Error auto-disabling permanently failed server:`,
+            disableErr,
+          ),
+        );
+        throw new Error(
+          `The ${serverName} integration could not be recovered and has been disabled. Please reconnect it under Settings if you want to use it again.`,
+        );
       }
 
       /** OAuth error, provide a helpful message */

@@ -137,12 +137,15 @@ function formatEmailHtml(contentParts, capturedOAuthUrls = [], options = {}) {
 
   if (capturedOAuthUrls.length > 0) {
     const btnBg = '#10a37f';
+    const appNameForLabel = options.appName || process.env.APP_TITLE || 'LibreChat';
     contentBlocks.push(`<p style="margin: 0 0 8px 0; color: ${STYLES.textMuted}; font-size: 13px;">A required integration needs authentication:</p>`);
     for (const url of capturedOAuthUrls) {
-      let label = 'Authenticate';
+      let label = `Sign in via ${appNameForLabel}`;
       try {
         const u = new URL(url);
-        label = `Sign in to ${u.hostname}`;
+        if (!u.pathname.includes('/api/mcp/reauth')) {
+          label = `Sign in to ${u.hostname}`;
+        }
       } catch {
         /* keep default */
       }
@@ -251,11 +254,14 @@ function formatEmailText(contentParts, capturedOAuthUrls = [], options = {}) {
   const parts = [];
 
   if (capturedOAuthUrls.length > 0) {
+    const appNameForLabel = options.appName || process.env.APP_TITLE || 'LibreChat';
     for (const url of capturedOAuthUrls) {
-      let label = 'Authenticate';
+      let label = `Sign in via ${appNameForLabel}`;
       try {
         const u = new URL(url);
-        label = `Sign in to ${u.hostname}`;
+        if (!u.pathname.includes('/api/mcp/reauth')) {
+          label = `Sign in to ${u.hostname}`;
+        }
       } catch {
         /* keep default */
       }

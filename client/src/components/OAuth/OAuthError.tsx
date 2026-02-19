@@ -29,6 +29,17 @@ export default function OAuthError() {
           localize('com_ui_oauth_error_callback_failed') ||
           'Authentication callback failed. Please try again.'
         );
+      case 'missing_reauth_token':
+      case 'invalid_or_expired_reauth_token':
+        return (
+          localize('com_ui_oauth_error_reauth_token') ||
+          'The authentication link is invalid or has expired. Please request a new one.'
+        );
+      case 'csrf_validation_failed':
+        return (
+          localize('com_ui_oauth_error_csrf') ||
+          'Security validation failed. Please try again.'
+        );
       default:
         return localize('com_ui_oauth_error_generic') || error.replace(/_/g, ' ');
     }

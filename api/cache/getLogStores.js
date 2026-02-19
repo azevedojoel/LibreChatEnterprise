@@ -56,6 +56,14 @@ const namespaces = {
     CacheKeys.ADMIN_OAUTH_EXCHANGE,
     Time.THIRTY_SECONDS,
   ),
+  [CacheKeys.MCP_REAUTH_TOKENS]: standardCache(
+    CacheKeys.MCP_REAUTH_TOKENS,
+    Time.THIRTY_MINUTES,
+  ),
+  [CacheKeys.MCP_OAUTH_CONFIRM]: standardCache(
+    CacheKeys.MCP_OAUTH_CONFIRM,
+    Time.FIVE_MINUTES,
+  ),
 };
 
 /**

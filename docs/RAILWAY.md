@@ -87,19 +87,20 @@ Without Redis, scheduled agent "run now" uses fire-and-forget and jobs may be lo
 
 ## Google Workspace MCP (OAuth)
 
-If you use the Google Workspace MCP server (`mcpServers.google-workspace` in `librechat.yaml`), you must:
+If you use the Google Workspace MCP server in `librechat.yaml`, you must:
 
 1. Set `GOOGLE_WORKSPACE_CLIENT_ID` and `GOOGLE_WORKSPACE_CLIENT_SECRET` in Railway variables.
 2. In [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials → your OAuth client:
    - Add this exact URL to **Authorized redirect URIs**:
      ```
-     https://YOUR-RAILWAY-URL/api/mcp/google-workspace/oauth/callback
+     https://YOUR-RAILWAY-URL/api/mcp/SERVER_KEY/oauth/callback
      ```
    - Replace `YOUR-RAILWAY-URL` with your actual domain (e.g. `your-app.up.railway.app` or your custom domain).
+   - Replace `SERVER_KEY` with the exact key from your `mcpServers` section in `librechat.yaml` (e.g. `Google`, `google-workspace`, etc.). The path segment must match the config key.
 
 ## Microsoft 365 MCP (OAuth)
 
-If you use the Microsoft 365 MCP server (`mcpServers.ms-365` in `librechat.yaml`), you must:
+If you use the Microsoft 365 MCP server in `librechat.yaml`, you must:
 
 1. Set `MS365_MCP_CLIENT_ID` and `MS365_MCP_CLIENT_SECRET` in Railway variables.
 2. In [Azure Portal](https://portal.azure.com) → Azure Active Directory → App registrations → New registration:
@@ -107,23 +108,25 @@ If you use the Microsoft 365 MCP server (`mcpServers.ms-365` in `librechat.yaml`
    - Under Authentication → Add a platform → Web:
      - Add this exact URL to **Redirect URIs**:
        ```
-       https://YOUR-RAILWAY-URL/api/mcp/ms-365/oauth/callback
+       https://YOUR-RAILWAY-URL/api/mcp/SERVER_KEY/oauth/callback
        ```
      - Replace `YOUR-RAILWAY-URL` with your actual domain (e.g. `your-app.up.railway.app` or your custom domain).
+     - Replace `SERVER_KEY` with the exact key from your `mcpServers` section in `librechat.yaml` (e.g. `Microsoft`, `ms-365`, etc.).
    - Under API permissions → Add Microsoft Graph delegated permissions for the scopes used in `librechat.yaml` (e.g. User.Read, Mail.ReadWrite, Calendars.ReadWrite, Files.ReadWrite, etc.)
    - Create a client secret under Certificates & secrets and use it as `MS365_MCP_CLIENT_SECRET`.
 
 ## HubSpot MCP (OAuth)
 
-If you use the HubSpot MCP server (`mcpServers.HubSpot` in `librechat.yaml`), you must:
+If you use the HubSpot MCP server in `librechat.yaml`, you must:
 
 1. Set `HUBSPOT_CLIENT_ID` and `HUBSPOT_CLIENT_SECRET` in Railway variables.
 2. In [HubSpot Developer Portal](https://developers.hubspot.com/) → your app → Auth:
    - Add this exact URL to **Redirect URIs**:
      ```
-     https://YOUR-RAILWAY-URL/api/mcp/HubSpot/oauth/callback
+     https://YOUR-RAILWAY-URL/api/mcp/SERVER_KEY/oauth/callback
      ```
    - Replace `YOUR-RAILWAY-URL` with your actual domain (e.g. `your-app.up.railway.app` or your custom domain).
+   - Replace `SERVER_KEY` with the exact key from your `mcpServers` section in `librechat.yaml` (e.g. `HubSpot`).
 
 ## allowedDomains (librechat.yaml)
 
