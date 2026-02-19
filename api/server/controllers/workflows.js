@@ -11,8 +11,15 @@ const { getRoleByName } = require('~/models/Role');
 const { getAgent } = require('~/models/Agent');
 const { checkPermission } = require('~/server/services/PermissionService');
 const { getPromptGroup } = require('~/models/Prompt');
+const { v4 } = require('uuid');
 const { Workflow, WorkflowRun } = require('~/db/models');
-const { executeWorkflow } = require('~/server/services/ScheduledAgents/executeWorkflow');
+const {
+  enqueueWorkflowRun,
+  isQueueAvailable,
+  runWorkflowSerialized,
+  removeWorkflowRun,
+} = require('~/server/services/ScheduledAgents/workflowJobQueue');
+const abortRegistry = require('~/server/services/ScheduledAgents/abortRegistry');
 const {
   listSchedulesForWorkflow,
   createScheduleForWorkflow,
@@ -263,17 +270,40 @@ async function runWorkflow(req, res) {
       });
     }
 
-    const effectiveUserId = req.user.role === SystemRoles.ADMIN ? workflow.userId : req.user.id;
-    const result = await executeWorkflow({
+    const effectiveUserId =
+      req.user.role === SystemRoles.ADMIN ? workflow.userId : req.user.id;
+    const conversationId = v4();
+    const runAt = new Date();
+
+    const run = await WorkflowRun.create({
       workflowId: req.params.id,
       userId: effectiveUserId,
+      conversationId,
+      runAt,
+      status: 'queued',
     });
+    const runId = run._id.toString();
 
-    if (!result.success) {
-      return res.status(500).json({ error: result.error || 'Workflow run failed' });
+    const payload = {
+      runId,
+      workflowId: req.params.id,
+      userId: effectiveUserId.toString(),
+    };
+
+    if (isQueueAvailable()) {
+      await enqueueWorkflowRun(runId, payload);
+    } else {
+      logger.warn(
+        '[Workflows] Redis not available; running in background. Jobs may be lost on restart.',
+      );
+      runWorkflowSerialized(runId, payload).catch(() => {});
     }
 
-    res.status(201).json({ run: result.run, conversationId: result.conversationId });
+    res.status(201).json({
+      runId,
+      status: 'queued',
+      conversationId,
+    });
   } catch (error) {
     logger.error('[Workflows] runWorkflow error:', error);
     res.status(500).json({ error: 'Failed to run workflow' });
@@ -449,6 +479,71 @@ async function runWorkflowSchedule(req, res) {
   }
 }
 
+const WORKFLOW_ABORT_PREFIX = 'workflow_';
+
+async function cancelWorkflowRun(req, res) {
+  try {
+    const workflow = await Workflow.findOne(getWorkflowFilter(req, req.params.id));
+    if (!workflow) {
+      return res.status(404).json({ error: 'Workflow not found' });
+    }
+
+    const runQuery = { _id: req.params.runId, workflowId: req.params.id };
+    if (req.user.role !== SystemRoles.ADMIN) {
+      runQuery.userId = req.user.id;
+    }
+    const run = await WorkflowRun.findOne(runQuery).lean();
+    if (!run) {
+      return res.status(404).json({ error: 'Run not found' });
+    }
+
+    const runId = run._id.toString();
+
+    if (run.status === 'success' || run.status === 'failed') {
+      return res.status(204).send();
+    }
+
+    if (run.status === 'queued') {
+      const result = await removeWorkflowRun(runId);
+      if (result.removed) {
+        await WorkflowRun.findByIdAndUpdate(runId, {
+          $set: { status: 'failed', error: 'Cancelled by user' },
+        });
+        return res.json({ success: true, cancelled: true });
+      }
+      if (result.error === 'Job is being processed') {
+        const aborted = abortRegistry.abort(`${WORKFLOW_ABORT_PREFIX}${runId}`);
+        await WorkflowRun.findByIdAndUpdate(runId, {
+          $set: { status: 'failed', error: 'Cancelled by user' },
+        });
+        return res.json({
+          success: true,
+          cancelled: aborted,
+          ...(aborted ? {} : { message: 'Run is starting; it will stop once processing begins' }),
+        });
+      }
+      return res.status(400).json({ error: result.error || 'Failed to cancel run' });
+    }
+
+    if (run.status === 'running') {
+      const aborted = abortRegistry.abort(`${WORKFLOW_ABORT_PREFIX}${runId}`);
+      await WorkflowRun.findByIdAndUpdate(runId, {
+        $set: { status: 'failed', error: 'Cancelled by user' },
+      });
+      return res.json({
+        success: true,
+        cancelled: aborted,
+        ...(aborted ? {} : { message: 'Run not found in active workers; it may have completed' }),
+      });
+    }
+
+    return res.status(400).json({ error: 'Cannot cancel run in current state' });
+  } catch (error) {
+    logger.error('[Workflows] cancelWorkflowRun error:', error);
+    res.status(500).json({ error: 'Failed to cancel run' });
+  }
+}
+
 module.exports = {
   checkWorkflowAccess,
   checkAgentAccess,
@@ -459,6 +554,7 @@ module.exports = {
   deleteWorkflow,
   runWorkflow,
   listWorkflowRuns,
+  cancelWorkflowRun,
   listWorkflowSchedules,
   createWorkflowSchedule,
   updateWorkflowSchedule,

@@ -9,6 +9,7 @@ const {
   deleteWorkflow,
   runWorkflow,
   listWorkflowRuns,
+  cancelWorkflowRun,
   listWorkflowSchedules,
   createWorkflowSchedule,
   updateWorkflowSchedule,
@@ -25,6 +26,7 @@ router.use(checkAgentAccess);
 
 router.get('/', listWorkflows);
 router.get('/:id/runs', listWorkflowRuns);
+router.post('/:id/runs/:runId/cancel', cancelWorkflowRun);
 router.get('/:id/schedules', listWorkflowSchedules);
 router.post('/:id/schedules', createWorkflowSchedule);
 router.patch('/:id/schedules/:scheduleId', updateWorkflowSchedule);

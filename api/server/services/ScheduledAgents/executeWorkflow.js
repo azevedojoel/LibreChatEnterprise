@@ -20,8 +20,10 @@ const { resolveScheduledPrompt } = require('./resolvePrompt');
 const { topologicalSort } = require('./topologicalSort');
 const { saveMessage } = require('~/models');
 const { ResourceType, PermissionBits } = require('librechat-data-provider');
+const abortRegistry = require('./abortRegistry');
 
 const ContentTypes = { TOOL_CALL: 'tool_call' };
+const WORKFLOW_ABORT_PREFIX = 'workflow_';
 
 /**
  * Extend resolveScheduledPrompt with {{PREV_OUTPUT}} and {{STEP_N_OUTPUT}} for workflow steps.
@@ -178,6 +180,12 @@ async function executeWorkflow({ workflowId, userId, runId: existingRunId }) {
     let parentMessageId = null;
     let pendingInstructionsForNextStep = null;
 
+    const runAbortController = new AbortController();
+    if (existingRunId) {
+      abortRegistry.register(`${WORKFLOW_ABORT_PREFIX}${existingRunId}`, runAbortController);
+    }
+
+    try {
     for (let i = 0; i < sortedIds.length; i++) {
       const nodeId = sortedIds[i];
       const node = nodeMap.get(nodeId);
@@ -185,11 +193,16 @@ async function executeWorkflow({ workflowId, userId, runId: existingRunId }) {
 
       const { promptGroupId, agentId } = node;
 
+      const agent = await getAgent({ id: agentId });
+      if (!agent) {
+        throw new Error(`Agent not found: ${agentId}`);
+      }
+
       const agentCheck = await checkPermission({
         userId,
         role: user.role,
         resourceType: ResourceType.AGENT,
-        resourceId: agentId,
+        resourceId: agent._id,
         requiredPermission: PermissionBits.VIEW,
       });
       if (!agentCheck) {
@@ -224,11 +237,6 @@ async function executeWorkflow({ workflowId, userId, runId: existingRunId }) {
 
       const textToSend = pendingInstructionsForNextStep ?? resolvedPrompt;
       pendingInstructionsForNextStep = null;
-
-      const agent = await getAgent({ id: agentId });
-      if (!agent) {
-        throw new Error(`Agent not found: ${agentId}`);
-      }
 
       const parsedBody = {
         endpoint: EModelEndpoint.agents,
@@ -281,11 +289,10 @@ async function executeWorkflow({ workflowId, userId, runId: existingRunId }) {
 
       mockReq.body.endpointOption = endpointOption;
 
-      const abortController = new AbortController();
       const { client } = await initializeClient({
         req: mockReq,
         res: noopRes,
-        signal: abortController.signal,
+        signal: runAbortController.signal,
         endpointOption,
       });
 
@@ -302,12 +309,13 @@ async function executeWorkflow({ workflowId, userId, runId: existingRunId }) {
         editedContent: null,
         conversationId,
         parentMessageId,
-        abortController,
+        abortController: runAbortController,
         overrideParentMessageId: null,
         isEdited: false,
         userMCPAuthMap: null,
         responseMessageId: null,
         progressOptions: { res: noopRes },
+        isWorkflowTriggered: true,
       };
 
       const response = await client.sendMessage(textToSend, messageOptions);
@@ -373,6 +381,11 @@ async function executeWorkflow({ workflowId, userId, runId: existingRunId }) {
         }
       }
     }
+    } finally {
+      if (existingRunId) {
+        abortRegistry.unregister(`${WORKFLOW_ABORT_PREFIX}${existingRunId}`);
+      }
+    }
 
     await WorkflowRun.findByIdAndUpdate(workflowRunDoc._id, {
       $set: { status: 'success' },
@@ -400,7 +413,10 @@ async function executeWorkflow({ workflowId, userId, runId: existingRunId }) {
     const run = await WorkflowRun.findById(workflowRunDoc._id).lean();
     return { success: true, conversationId, run };
   } catch (error) {
-    const errorMessage = error?.message || String(error);
+    const isAbortError =
+      error?.name === 'AbortError' ||
+      (typeof error?.message === 'string' && error.message.toLowerCase().includes('abort'));
+    const errorMessage = isAbortError ? 'Cancelled by user' : (error?.message || String(error));
     logger.error(
       `[Workflow] Run failed: workflowId=${workflowId} userId=${userId} error=${errorMessage}`,
     );

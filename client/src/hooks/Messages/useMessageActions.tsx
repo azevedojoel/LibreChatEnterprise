@@ -102,6 +102,9 @@ export default function useMessageActions(props: TMessageActions) {
 
   const messageLabel = useMemo(() => {
     if (message?.isCreatedByUser === true) {
+      if (message?.metadata?.workflowTriggered === true) {
+        return localize('com_ui_workflow_triggered');
+      }
       return UsernameDisplay ? (user?.name ?? '') || user?.username : localize('com_user_message');
     } else if (agent) {
       return agent.name ?? 'Assistant';
@@ -110,7 +113,7 @@ export default function useMessageActions(props: TMessageActions) {
     } else {
       return message?.sender;
     }
-  }, [message, agent, assistant, UsernameDisplay, user, localize]);
+  }, [message, message?.metadata?.workflowTriggered, agent, assistant, UsernameDisplay, user, localize]);
 
   const feedbackMutation = useUpdateFeedbackMutation(
     conversation?.conversationId || '',

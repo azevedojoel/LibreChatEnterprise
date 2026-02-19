@@ -53,6 +53,9 @@ export default function SearchMessage({ message }: Pick<TMessageProps, 'message'
 
   const messageLabel = useMemo(() => {
     if (message?.isCreatedByUser) {
+      if (message?.metadata?.workflowTriggered === true) {
+        return localize('com_ui_workflow_triggered');
+      }
       return UsernameDisplay
         ? (user?.name ?? '') || (user?.username ?? '')
         : localize('com_user_message');
@@ -60,6 +63,7 @@ export default function SearchMessage({ message }: Pick<TMessageProps, 'message'
     return message?.sender ?? '';
   }, [
     message?.isCreatedByUser,
+    message?.metadata?.workflowTriggered,
     message?.sender,
     UsernameDisplay,
     user?.name,

@@ -1135,6 +1135,12 @@ export const getWorkflowRuns = (
 ): Promise<q.TWorkflowRun[]> =>
   request.get(endpoints.workflowRuns(workflowId, limit));
 
+export const cancelWorkflowRun = (
+  workflowId: string,
+  runId: string,
+): Promise<{ success: boolean; cancelled?: boolean }> =>
+  request.post(endpoints.workflowRunCancel(workflowId, runId));
+
 export const getWorkflowSchedules = (
   workflowId: string,
 ): Promise<q.TWorkflowSchedule[]> =>

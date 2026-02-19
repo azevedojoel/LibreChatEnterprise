@@ -388,6 +388,8 @@ export const workflow = (id: string) => `${workflows()}/${id}`;
 export const workflowRuns = (workflowId: string, limit?: number) =>
   `${workflow(workflowId)}/runs${limit != null ? `?limit=${limit}` : ''}`;
 export const workflowRun = (workflowId: string) => `${workflow(workflowId)}/run`;
+export const workflowRunCancel = (workflowId: string, runId: string) =>
+  `${workflow(workflowId)}/runs/${runId}/cancel`;
 export const workflowSchedules = (workflowId: string) => `${workflow(workflowId)}/schedules`;
 export const workflowSchedule = (workflowId: string, scheduleId: string) =>
   `${workflowSchedules(workflowId)}/${scheduleId}`;

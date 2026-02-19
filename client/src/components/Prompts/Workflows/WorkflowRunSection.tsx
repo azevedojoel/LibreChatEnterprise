@@ -1,13 +1,14 @@
 import { useCallback } from 'react';
 import { useRecoilValue } from 'recoil';
 import { useQueryClient } from '@tanstack/react-query';
-import { Play, ExternalLink, Loader2 } from 'lucide-react';
+import { Play, ExternalLink, Loader2, Square } from 'lucide-react';
 import { Button, useToastContext } from '@librechat/client';
 import { QueryKeys, DynamicQueryKeys } from 'librechat-data-provider';
 import type { TWorkflowRun, TConversation } from 'librechat-data-provider';
 import {
   useGetWorkflowRunsQuery,
   useRunWorkflowMutation,
+  useCancelWorkflowRunMutation,
 } from '~/data-provider';
 import { useLocalize, useNavigateToConvo } from '~/hooks';
 import { cn } from '~/utils';
@@ -71,6 +72,25 @@ export default function WorkflowRunSection({
     { enabled: !!workflowId },
   );
   const runMutation = useRunWorkflowMutation();
+  const cancelRunMutation = useCancelWorkflowRunMutation();
+
+  const handleCancelRun = useCallback(
+    (runId: string) => {
+      cancelRunMutation.mutate(
+        { workflowId, runId },
+        {
+          onSuccess: () => {
+            showToast({ message: localize('com_ui_success'), status: 'success' });
+          },
+          onError: (err: unknown) => {
+            const msg = err instanceof Error ? err.message : localize('com_ui_error');
+            showToast({ message: msg, status: 'error' });
+          },
+        },
+      );
+    },
+    [workflowId, cancelRunMutation, showToast, localize],
+  );
 
   const handleRunNow = useCallback(() => {
     if (!canRunOrSchedule) {
@@ -182,16 +202,39 @@ export default function WorkflowRunSection({
                   </div>
                   <StatusBadge status={run.status} />
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 shrink-0 px-1.5"
-                  onClick={() => handleViewRun(run)}
-                  disabled={!run.conversationId}
-                  aria-label={localize('com_ui_workflows_view_run')}
-                >
-                  <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-                </Button>
+                <div className="flex shrink-0 items-center gap-1">
+                  {(run.status === 'queued' || run.status === 'running') && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 shrink-0 px-1.5"
+                      onClick={() => handleCancelRun(run._id)}
+                      disabled={
+                        cancelRunMutation.isLoading &&
+                        cancelRunMutation.variables?.runId === run._id
+                      }
+                      aria-label={localize('com_nav_stop_generating')}
+                      title={localize('com_nav_stop_generating')}
+                    >
+                      {cancelRunMutation.isLoading &&
+                      cancelRunMutation.variables?.runId === run._id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <Square className="h-3 w-3" aria-hidden="true" fill="currentColor" />
+                      )}
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 shrink-0 px-1.5"
+                    onClick={() => handleViewRun(run)}
+                    disabled={!run.conversationId}
+                    aria-label={localize('com_ui_workflows_view_run')}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                  </Button>
+                </div>
               </div>
             ))
           )}

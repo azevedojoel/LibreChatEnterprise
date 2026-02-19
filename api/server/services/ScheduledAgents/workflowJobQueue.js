@@ -2,7 +2,7 @@
  * Workflow job queue - enqueues workflow runs for scheduled execution.
  * Reuses Redis connection from the main job queue; uses a separate queue name.
  */
-const { Queue, Worker } = require('bullmq');
+const { Queue, Worker, Job } = require('bullmq');
 const { logger } = require('@librechat/data-schemas');
 const { cacheConfig } = require('@librechat/api');
 const { executeWorkflow } = require('./executeWorkflow');
@@ -74,6 +74,39 @@ function getWorkflowQueue() {
 
 function isQueueAvailable() {
   return !!getRedisConnection();
+}
+
+/**
+ * Remove a queued workflow run from the BullMQ queue.
+ * Fails if the job is already being processed (active).
+ * @param {string} runId - WorkflowRun _id (used as jobId)
+ * @returns {Promise<{ removed: boolean; error?: string }>}
+ */
+async function removeWorkflowRun(runId) {
+  const q = getWorkflowQueue();
+  if (!q) {
+    return { removed: false, error: 'Queue unavailable' };
+  }
+  try {
+    const job = await Job.fromId(q, runId);
+    if (!job) {
+      return { removed: false, error: 'Job not found' };
+    }
+    const state = await job.getState();
+    if (state === 'active') {
+      return { removed: false, error: 'Job is being processed' };
+    }
+    await job.remove();
+    logger.debug(`[WorkflowScheduling] Job removed: runId=${runId}`);
+    return { removed: true };
+  } catch (err) {
+    const errMsg = err?.message || String(err);
+    if (errMsg.includes('being processed') || errMsg.includes('active')) {
+      return { removed: false, error: 'Job is being processed' };
+    }
+    logger.error(`[WorkflowScheduling] Failed to remove job runId=${runId}:`, err);
+    return { removed: false, error: errMsg };
+  }
 }
 
 function startWorkflowWorker() {
@@ -154,6 +187,7 @@ async function runWorkflowSerialized(runId, payload) {
 module.exports = {
   enqueueWorkflowRun,
   isQueueAvailable,
+  removeWorkflowRun,
   startWorkflowWorker,
   stopWorkflowWorker,
   runWorkflowSerialized,

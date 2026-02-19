@@ -45,7 +45,10 @@ export default function Message(props: TMessageProps) {
   const name = useMemo(() => {
     let result = '';
     if (isCreatedByUser === true) {
-      result = localize('com_user_message');
+      result =
+        message?.metadata?.workflowTriggered === true
+          ? localize('com_ui_workflow_triggered')
+          : localize('com_user_message');
     } else if (assistant) {
       result = assistant.name ?? localize('com_ui_assistant');
     } else if (agent) {
@@ -53,7 +56,7 @@ export default function Message(props: TMessageProps) {
     }
 
     return result;
-  }, [assistant, agent, isCreatedByUser, localize]);
+  }, [assistant, agent, isCreatedByUser, message?.metadata?.workflowTriggered, localize]);
 
   const iconData: TMessageIcon = useMemo(
     () => ({

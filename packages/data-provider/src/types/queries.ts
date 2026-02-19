@@ -292,7 +292,8 @@ export type TWorkflowRun = {
 };
 
 export type RunWorkflowResponse = {
-  run: TWorkflowRun;
+  runId: string;
+  status: string;
   conversationId: string;
 };
 

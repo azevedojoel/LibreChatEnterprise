@@ -764,6 +764,22 @@ export const useGetWorkflowRunsQuery = (
   );
 };
 
+export const useCancelWorkflowRunMutation = (): UseMutationResult<
+  { success: boolean; cancelled?: boolean },
+  unknown,
+  { workflowId: string; runId: string }
+> => {
+  const queryClient = useQueryClient();
+  return useMutation(
+    ({ workflowId, runId }) => dataService.cancelWorkflowRun(workflowId, runId),
+    {
+      onSuccess: (_, variables) => {
+        queryClient.invalidateQueries(DynamicQueryKeys.workflowRuns(variables.workflowId));
+      },
+    },
+  );
+};
+
 export const useRunWorkflowMutation = (): UseMutationResult<
   q.RunWorkflowResponse,
   unknown,

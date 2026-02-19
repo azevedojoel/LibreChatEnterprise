@@ -11,4 +11,5 @@ export {
   useDeleteWorkflowScheduleMutation,
   useRunWorkflowMutation,
   useRunWorkflowScheduleMutation,
+  useCancelWorkflowRunMutation,
 } from 'librechat-data-provider/react-query';
