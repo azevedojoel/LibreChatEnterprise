@@ -43,8 +43,7 @@ function patchToolSearchBeforeSave(message) {
         : Object.keys(tc.args || {}).length > 0);
     if (!hasOutput && !hasProgress && hasArgs) {
       tc.progress = 1;
-      tc.output = 'Tools discovered';
-      logger.debug('[runAgentGeneration] Patched tool_search before save (missing output/progress)', {
+      logger.debug('[runAgentGeneration] Patched tool_search progress (missing output)', {
         toolName: tc.name,
       });
     }
