@@ -133,29 +133,8 @@ function formatEmailHtml(contentParts, capturedOAuthUrls = [], options = {}) {
   </tr>
 </table>`);
 
-  /* Content card - OAuth buttons first (in conversation flow), then agent content */
+  /* Content card - agent content first, then OAuth button(s) centered below */
   const contentBlocks = [];
-
-  if (uniqueUrls.length > 0) {
-    const btnBg = '#10a37f';
-    const appNameForLabel = options.appName || process.env.APP_TITLE || 'LibreChat';
-    contentBlocks.push(`<p style="margin: 0 0 8px 0; color: ${STYLES.textMuted}; font-size: 13px;">A required integration needs authentication:</p>`);
-    for (const url of uniqueUrls) {
-      let label = `Sign in via ${appNameForLabel}`;
-      try {
-        const u = new URL(url);
-        if (!u.pathname.includes('/api/mcp/reauth')) {
-          label = `Sign in to ${u.hostname}`;
-        }
-      } catch {
-        /* keep default */
-      }
-      contentBlocks.push(`
-<div style="margin: 12px 0;">
-  <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 10px 20px; background: ${btnBg}; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; border-radius: 8px;">${escapeHtml(label)}</a>
-</div>`);
-    }
-  }
 
   for (const part of contentParts) {
     if (!part) continue;
@@ -182,6 +161,29 @@ function formatEmailHtml(contentParts, capturedOAuthUrls = [], options = {}) {
         `<span style="display: inline-block; margin: 2px 4px 2px 0; padding: 4px 10px; background: ${STYLES.pillBg}; color: ${STYLES.textMuted}; border-radius: 6px; font-size: 13px;">${escapeHtml(displayName)}</span>`,
       );
     }
+  }
+
+  if (uniqueUrls.length > 0) {
+    const btnBg = '#10a37f';
+    const appNameForLabel = options.appName || process.env.APP_TITLE || 'LibreChat';
+    const btnHtml = uniqueUrls
+      .map((url) => {
+        let label = `Sign in via ${appNameForLabel}`;
+        try {
+          const u = new URL(url);
+          if (!u.pathname.includes('/api/mcp/reauth')) {
+            label = `Sign in to ${u.hostname}`;
+          }
+        } catch {
+          /* keep default */
+        }
+        return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 10px 20px; background: ${btnBg}; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; border-radius: 8px;">${escapeHtml(label)}</a>`;
+      })
+      .join(' ');
+    contentBlocks.push(`
+<div style="margin: 20px 0; text-align: center;">
+  ${btnHtml}
+</div>`);
   }
 
   parts.push(`
@@ -255,6 +257,22 @@ function formatEmailText(contentParts, capturedOAuthUrls = [], options = {}) {
 
   const parts = [];
 
+  for (const part of contentParts) {
+    if (!part) continue;
+
+    if ((part.type === 'text' || part.type === ContentTypes.TEXT) && part.text) {
+      const text = typeof part.text === 'string' ? part.text : part.text?.value ?? '';
+      if (text.trim()) parts.push(text.trim());
+    } else if (part.type === 'reasoning' || part.type === 'think') {
+      const reasoning = part.text ?? part.think ?? part.content ?? '';
+      const str = typeof reasoning === 'string' ? reasoning : JSON.stringify(reasoning);
+      if (str.trim()) parts.push(`--- ${str.trim().slice(0, 300)}${str.length > 300 ? '...' : ''} ---`);
+    } else if ((part.type === 'tool_call' || part.type === ContentTypes.TOOL_CALL) && part.tool_call) {
+      const name = part.tool_call.name ?? part.tool_call.function?.name ?? 'unknown';
+      parts.push(`[${getToolDisplayName(name)}]`);
+    }
+  }
+
   if (uniqueUrls.length > 0) {
     const appNameForLabel = options.appName || process.env.APP_TITLE || 'LibreChat';
     for (const url of uniqueUrls) {
@@ -270,22 +288,6 @@ function formatEmailText(contentParts, capturedOAuthUrls = [], options = {}) {
       parts.push(`${label}: ${url}`);
     }
     parts.push('');
-  }
-
-  for (const part of contentParts) {
-    if (!part) continue;
-
-    if ((part.type === 'text' || part.type === ContentTypes.TEXT) && part.text) {
-      const text = typeof part.text === 'string' ? part.text : part.text?.value ?? '';
-      if (text.trim()) parts.push(text.trim());
-    } else if (part.type === 'reasoning' || part.type === 'think') {
-      const reasoning = part.text ?? part.think ?? part.content ?? '';
-      const str = typeof reasoning === 'string' ? reasoning : JSON.stringify(reasoning);
-      if (str.trim()) parts.push(`--- ${str.trim().slice(0, 300)}${str.length > 300 ? '...' : ''} ---`);
-    } else if ((part.type === 'tool_call' || part.type === ContentTypes.TOOL_CALL) && part.tool_call) {
-      const name = part.tool_call.name ?? part.tool_call.function?.name ?? 'unknown';
-      parts.push(`[${getToolDisplayName(name)}]`);
-    }
   }
 
   const userMessage = options.userMessage;

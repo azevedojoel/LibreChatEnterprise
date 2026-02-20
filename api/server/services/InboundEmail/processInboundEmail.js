@@ -251,6 +251,8 @@ async function processInboundEmail(payload) {
     const job = await GenerationJobManager.createJob(streamId, senderUserId, conversationId);
     syntheticReq._resumableStreamId = streamId;
     syntheticReq._headlessOAuthUrls = capturedOAuthUrls;
+    /** Tracks MCP servers we've already captured a URL for (deduplicates per-server) */
+    syntheticReq._headlessOAuthServers = new Set();
 
     const result = await initializeClient({
       req: syntheticReq,
