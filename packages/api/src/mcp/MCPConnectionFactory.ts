@@ -9,7 +9,7 @@ import type * as t from './types';
 import { MCPTokenStorage, MCPOAuthHandler } from '~/mcp/oauth';
 import { sanitizeUrlForLogging } from './utils';
 import { withTimeout } from '~/utils/promise';
-import { MCPConnection, OAUTH_HANDLING_TIMEOUT } from './connection';
+import { MCPConnection } from './connection';
 import { processMCPEnv } from '~/utils';
 
 const MCP_OAUTH_TOKEN_PLACEHOLDER = '{{LIBRECHAT_MCP_OAUTH_ACCESS_TOKEN}}';
@@ -474,15 +474,14 @@ export class MCPConnectionFactory {
       try {
         result = await this.handleOAuthRequired();
       } catch (oauthError) {
-        if (
-          oauthError instanceof Error &&
-          oauthError.message.includes(HEADLESS_OAUTH_URL_MARKER)
-        ) {
+        const err = oauthError instanceof Error ? oauthError : new Error(String(oauthError));
+        if (err.message.includes(HEADLESS_OAUTH_URL_MARKER)) {
           logger.warn(`${this.logPrefix} OAuth failed (headless), emitting oauthFailed with URL`);
-          connection.emit('oauthFailed', oauthError);
-          return;
+        } else {
+          logger.warn(`${this.logPrefix} OAuth failed or cancelled, emitting oauthFailed`, err.message);
         }
-        throw oauthError;
+        connection.emit('oauthFailed', err);
+        return;
       }
 
       if (result?.tokens && this.tokenMethods?.createToken) {
@@ -681,11 +680,12 @@ export class MCPConnectionFactory {
       }
 
       /** Tokens from the new flow (callback will complete it).
-       * Wrap with timeout so we don't hang indefinitely if user never completes OAuth. */
+       * Timeout prevents indefinite hangs if user never completes OAuth. UI overlay is independent. */
+      const OAUTH_FLOW_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
       const tokens = await withTimeout(
         flowPromise,
-        OAUTH_HANDLING_TIMEOUT,
-        `OAuth authentication timed out after ${OAUTH_HANDLING_TIMEOUT / 1000}s. Please reconnect the integration and try again.`,
+        OAUTH_FLOW_TIMEOUT_MS,
+        `OAuth authentication timed out after ${OAUTH_FLOW_TIMEOUT_MS / 1000}s. Please reconnect the integration and try again.`,
       );
       if (typeof this.oauthEnd === 'function') {
         await this.oauthEnd();

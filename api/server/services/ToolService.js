@@ -779,6 +779,11 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
       try {
         const oauthStart = isHeadless
           ? async () => {
+              const servers = req._headlessOAuthServers;
+              if (servers?.has(serverName)) {
+                logger.info(`[Tool Definitions] Headless: skipping duplicate reauth link for ${serverName}`);
+                return;
+              }
               const reauthToken = await createReauthToken({
                 userId: req.user.id,
                 serverName,
@@ -786,6 +791,9 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
               const appLink = buildReauthLink(reauthToken);
               if (Array.isArray(req._headlessOAuthUrls)) {
                 req._headlessOAuthUrls.push(appLink);
+                if (servers) {
+                  servers.add(serverName);
+                }
                 logger.info(`[Tool Definitions] Headless: captured reauth link for ${serverName}`);
               }
             }

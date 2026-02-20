@@ -70,6 +70,8 @@ const BaseOptionsSchema = z.object({
       code_challenge_methods_supported: z.array(z.string()).optional(),
       /** Skip code challenge validation and force S256 (useful for providers like AWS Cognito that support S256 but don't advertise it) */
       skip_code_challenge_check: z.boolean().optional(),
+      /** Disable PKCE entirely (for providers that do not support it) */
+      skip_pkce: z.boolean().optional(),
       /** OAuth revocation endpoint (optional - can be auto-discovered) */
       revocation_endpoint: z.string().url().optional(),
       /** OAuth revocation endpoint authentication methods supported (optional - can be auto-discovered) */

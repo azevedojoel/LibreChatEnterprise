@@ -47,7 +47,7 @@ export interface ToolExecuteOptions {
   /** Callback to process tool artifacts (code output files, file citations, etc.) */
   toolEndCallback?: ToolEndCallback;
   /** Callback to capture OAuth URL when headless OAuth error occurs (e.g., inbound email) */
-  captureOAuthUrl?: (url: string) => void;
+  captureOAuthUrl?: (url: string, options?: { serverName?: string }) => void;
 }
 
 /**
@@ -190,12 +190,17 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
                 const url = errorMessage
                   .slice(errorMessage.indexOf(HEADLESS_OAUTH_URL_MARKER) + HEADLESS_OAUTH_URL_MARKER.length)
                   .trim();
+                const serverName =
+                  typeof tc.name === 'string' && tc.name.includes(Constants.mcp_delimiter)
+                    ? tc.name.split(Constants.mcp_delimiter).pop() ?? undefined
+                    : undefined;
                 logger.info(`[ON_TOOL_EXECUTE] Extracting OAuth URL for email`, {
                   urlLength: url?.length ?? 0,
                   urlPreview: url ? `${url.slice(0, 80)}...` : '(empty)',
+                  serverName,
                 });
                 if (url) {
-                  captureOAuthUrl(url);
+                  captureOAuthUrl(url, { serverName });
                 }
                 messageForModel =
                   'OAuth re-authentication required. The authentication URL has been included in the email for you to complete sign-in.';
@@ -220,8 +225,12 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
           const url = errorMessage
             .slice(errorMessage.indexOf(HEADLESS_OAUTH_URL_MARKER) + HEADLESS_OAUTH_URL_MARKER.length)
             .trim();
+          const serverName =
+            toolCalls.length > 0 && typeof toolCalls[0].name === 'string' && toolCalls[0].name.includes(Constants.mcp_delimiter)
+              ? toolCalls[0].name.split(Constants.mcp_delimiter).pop() ?? undefined
+              : undefined;
           if (url) {
-            captureOAuthUrl(url);
+            captureOAuthUrl(url, { serverName });
           }
           // Resolve with error results so agent gets the "URL included in email" message
           const results: ToolExecuteResult[] = toolCalls.map((tc) => ({

@@ -147,17 +147,28 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
       return result;
     },
     toolEndCallback,
-    captureOAuthUrl: (url) => {
+    captureOAuthUrl: (url, options = {}) => {
       const arr = req._headlessOAuthUrls;
-      logger.info('[captureOAuthUrl] OAuth URL captured', {
-        urlLength: url?.length ?? 0,
-        urlPreview: url ? `${url.slice(0, 80)}...` : '(empty)',
-        hasHeadlessArray: Array.isArray(arr),
-        arrayLengthBefore: arr?.length ?? 0,
-      });
+      const serverName = options?.serverName;
+      const servers = req._headlessOAuthServers;
+
       if (Array.isArray(arr)) {
+        const skipDupe =
+          serverName && servers?.has(serverName);
+        if (skipDupe) {
+          logger.info('[captureOAuthUrl] Skipping duplicate URL for server', {
+            serverName,
+          });
+          return;
+        }
         arr.push(url);
-        logger.info('[captureOAuthUrl] URL pushed to capturedOAuthUrls', {
+        if (serverName && servers) {
+          servers.add(serverName);
+        }
+        logger.info('[captureOAuthUrl] OAuth URL captured', {
+          urlLength: url?.length ?? 0,
+          urlPreview: url ? `${url.slice(0, 80)}...` : '(empty)',
+          serverName,
           arrayLengthAfter: arr.length,
         });
       } else {
