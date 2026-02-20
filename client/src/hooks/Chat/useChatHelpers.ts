@@ -45,7 +45,8 @@ export default function useChatHelpers(index = 0, paramId?: string) {
   const setMessages = useCallback(
     (messages: TMessage[]) => {
       queryClient.setQueryData<TMessage[]>([QueryKeys.messages, queryParam], messages);
-      if (queryParam === 'new' && conversationId && conversationId !== 'new') {
+      // Ensure conversationId key is also updated when it differs (e.g. new convo gets real ID during stream)
+      if (conversationId && conversationId !== queryParam) {
         queryClient.setQueryData<TMessage[]>([QueryKeys.messages, conversationId], messages);
       }
     },

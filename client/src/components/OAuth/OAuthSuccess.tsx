@@ -2,12 +2,19 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useLocalize } from '~/hooks';
 import { OAUTH_COMPLETE_TYPE } from '~/hooks/useOAuthCompleteListener';
+import { broadcastMCPOAuthComplete } from '~/hooks/useMCPOAuthBroadcastListener';
 
 export default function OAuthSuccess() {
   const localize = useLocalize();
   const [searchParams] = useSearchParams();
   const [secondsLeft, setSecondsLeft] = useState(3);
   const serverName = searchParams.get('serverName');
+  const actionId = searchParams.get('actionId');
+
+  // Broadcast so opener can dismiss overlay (works with noopener; postMessage does not)
+  useEffect(() => {
+    broadcastMCPOAuthComplete(serverName ?? undefined, actionId ?? undefined);
+  }, [serverName, actionId]);
 
   useEffect(() => {
     const countdown = setInterval(() => {

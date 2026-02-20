@@ -28,7 +28,6 @@ describe('useStepHandler', () => {
   const mockGetMessages = jest.fn();
   const mockAnnouncePolite = jest.fn();
   const mockLastAnnouncementTimeRef = { current: 0 };
-
   const createHookParams = () => ({
     setMessages: mockSetMessages,
     getMessages: mockGetMessages,

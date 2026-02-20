@@ -59,10 +59,26 @@ const chatBadges = atomWithLocalStorage<Array<{ id: string }>>('chatBadges', [
   { id: 'artifacts' },
 ]);
 
+/** Pending OAuth for MCP or Action tools - overlay shows Sign-in/Cancel (bypasses cache update delay) */
+export interface PendingMCPOAuth {
+  authUrl: string;
+  toolName: string;
+  /** MCP server name - for MCP tools */
+  serverName?: string;
+  /** Action ID - for Action tools (Custom Actions with OAuth) */
+  actionId?: string;
+}
+
+export const pendingMCPOAuthAtom = atom<PendingMCPOAuth | null>({
+  key: 'pendingMCPOAuth',
+  default: null,
+});
+
 export default {
   hideBannerHint,
   messageAttachmentsMap,
   conversationAttachmentsSelector,
   queriesEnabled,
   chatBadges,
+  pendingMCPOAuthAtom,
 };

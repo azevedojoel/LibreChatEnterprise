@@ -253,13 +253,19 @@ const Conversations: FC<ConversationsProps> = ({
     }
   }, [cache, containerRef]);
 
-  // Clear cache when favorites change
+  // Clear cache when favorites change or when List first appears (e.g., after search closes)
   useEffect(() => {
     const frameId = requestAnimationFrame(() => {
       clearFavoritesCache();
     });
     return () => cancelAnimationFrame(frameId);
-  }, [favorites.length, isFavoritesLoading, clearFavoritesCache]);
+  }, [
+    favorites.length,
+    isFavoritesLoading,
+    shouldShowFavorites,
+    isSearchLoading,
+    clearFavoritesCache,
+  ]);
 
   const rowRenderer = useCallback(
     ({ index, key, parent, style }) => {
@@ -339,9 +345,16 @@ const Conversations: FC<ConversationsProps> = ({
     ],
   );
 
+  const FAVORITES_ROW_MIN_HEIGHT = 100;
   const getRowHeight = useCallback(
-    ({ index }: { index: number }) => cache.getHeight(index, 0),
-    [cache],
+    ({ index }: { index: number }) => {
+      const height = cache.getHeight(index, 0);
+      if (index === 0 && shouldShowFavorites && !cache.has(0, 0)) {
+        return Math.max(height, FAVORITES_ROW_MIN_HEIGHT);
+      }
+      return height;
+    },
+    [cache, shouldShowFavorites],
   );
 
   const throttledLoadMore = useMemo(

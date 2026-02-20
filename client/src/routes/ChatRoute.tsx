@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { Spinner } from '@librechat/client';
 import { useParams } from 'react-router-dom';
-import { useRecoilCallback, useRecoilValue } from 'recoil';
+import { useRecoilCallback, useRecoilValue, useSetRecoilState } from 'recoil';
 import { Constants, EModelEndpoint } from 'librechat-data-provider';
 import { useGetModelsQuery } from 'librechat-data-provider/react-query';
 import type { TPreset } from 'librechat-data-provider';
@@ -17,6 +17,7 @@ import store from '~/store';
 export default function ChatRoute() {
   const { data: startupConfig } = useGetStartupConfig();
   const { isAuthenticated, user, roles } = useAuthRedirect();
+  const setPendingMCPOAuth = useSetRecoilState(store.pendingMCPOAuthAtom);
 
   const defaultTemporaryChat = useRecoilValue(temporaryStore.defaultTemporaryChat);
   const setIsTemporary = useRecoilCallback(
@@ -56,6 +57,11 @@ export default function ChatRoute() {
       setIsTemporary(false);
     }
   }, [conversationId, isTemporaryChat, setIsTemporary, defaultTemporaryChat]);
+
+  // Clear MCP OAuth overlay when switching conversations
+  useEffect(() => {
+    setPendingMCPOAuth(null);
+  }, [conversationId, setPendingMCPOAuth]);
 
   /** This effect is mainly for the first conversation state change on first load of the page.
    *  Adjusting this may have unintended consequences on the conversation state.

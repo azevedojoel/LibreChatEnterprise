@@ -1,5 +1,5 @@
 import { memo, useMemo, useCallback } from 'react';
-import { ContentTypes } from 'librechat-data-provider';
+import { ContentTypes, Constants } from 'librechat-data-provider';
 import type {
   TMessageContentParts,
   SearchResultData,
@@ -58,6 +58,25 @@ const ContentParts = memo(function ContentParts({
   const attachmentMap = useMemo(() => mapAttachments(attachments ?? []), [attachments]);
   const effectiveIsSubmitting = isLatestMessage ? isSubmitting : false;
 
+  /** Extract MCP server name from a tool call part that has auth (for deduplicating auth buttons) */
+  const getAuthServerFromPart = useCallback((p: TMessageContentParts | undefined): string | null => {
+    if (!p || p.type !== ContentTypes.TOOL_CALL) return null;
+    const tc = (p as { tool_call?: Agents.ToolCall }).tool_call ?? (p as Record<string, unknown>)[ContentTypes.TOOL_CALL] as Agents.ToolCall | undefined;
+    if (!tc?.auth) return null;
+    const toolName = tc.name ?? '';
+    if (typeof toolName === 'string' && toolName.includes(Constants.mcp_delimiter)) {
+      return toolName.split(Constants.mcp_delimiter).pop() ?? null;
+    }
+    try {
+      const url = new URL(tc.auth);
+      const redirectUri = url.searchParams.get('redirect_uri') || '';
+      const match = redirectUri.match(/\/api\/mcp\/([^/]+)\/oauth\/callback/);
+      return match?.[1] ?? null;
+    } catch {
+      return null;
+    }
+  }, []);
+
   /**
    * Render a single content part with proper context.
    */
@@ -65,6 +84,14 @@ const ContentParts = memo(function ContentParts({
     (part: TMessageContentParts, idx: number, isLastPart: boolean) => {
       const toolCallId = (part?.[ContentTypes.TOOL_CALL] as Agents.ToolCall | undefined)?.id ?? '';
       const partAttachments = attachmentMap[toolCallId];
+
+      const currentServer = getAuthServerFromPart(part);
+      const priorHasSameServer =
+        currentServer != null &&
+        content
+          .slice(0, idx)
+          .some((p) => getAuthServerFromPart(p) === currentServer);
+      const showAuthButton = currentServer == null || !priorHasSameServer;
 
       return (
         <MessageContext.Provider
@@ -87,6 +114,7 @@ const ContentParts = memo(function ContentParts({
             isCreatedByUser={isCreatedByUser}
             isLast={isLastPart}
             showCursor={isLastPart && isLast}
+            showAuthButton={showAuthButton}
           />
         </MessageContext.Provider>
       );
@@ -96,6 +124,7 @@ const ContentParts = memo(function ContentParts({
       content,
       conversationId,
       effectiveIsSubmitting,
+      getAuthServerFromPart,
       isCreatedByUser,
       isLast,
       isLatestMessage,

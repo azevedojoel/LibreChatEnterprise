@@ -7,12 +7,18 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Toast, ThemeProvider, ToastProvider } from '@librechat/client';
 import { QueryClient, QueryClientProvider, QueryCache } from '@tanstack/react-query';
-import { ScreenshotProvider, useApiErrorBoundary } from './hooks';
+import { ScreenshotProvider, useApiErrorBoundary, useMCPOAuthBroadcastListener } from './hooks';
 import WakeLockManager from '~/components/System/WakeLockManager';
 import { getThemeFromEnv } from './utils/getThemeFromEnv';
 import { initializeFontSize } from '~/store/fontSize';
 import { LiveAnnouncer } from '~/a11y';
+import { MCPOAuthOverlay } from '~/components/OAuth';
 import { router } from './routes';
+
+function MCPOAuthBroadcastListener() {
+  useMCPOAuthBroadcastListener();
+  return null;
+}
 
 const App = () => {
   const { setError } = useApiErrorBoundary();
@@ -62,6 +68,8 @@ const App = () => {
               <ToastProvider>
                 <DndProvider backend={HTML5Backend}>
                   <RouterProvider router={router} />
+                  <MCPOAuthBroadcastListener />
+                  <MCPOAuthOverlay />
                   <WakeLockManager />
                   <ReactQueryDevtools initialIsOpen={false} position="top-right" />
                   <Toast />

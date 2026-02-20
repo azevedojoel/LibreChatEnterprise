@@ -395,12 +395,20 @@ export class MCPOAuthHandler {
           );
         }
 
+        const emptyCodeChallenge =
+          Array.isArray(config?.code_challenge_methods_supported) &&
+          config.code_challenge_methods_supported.length === 0;
+        const skipPkce =
+          (config as { skip_pkce?: boolean })?.skip_pkce === true || emptyCodeChallenge;
         const skipCodeChallengeCheck =
           config?.skip_code_challenge_check === true ||
           process.env.MCP_SKIP_CODE_CHALLENGE_CHECK === 'true';
         let codeChallengeMethodsSupported: string[];
 
-        if (config?.code_challenge_methods_supported !== undefined) {
+        if (skipPkce) {
+          codeChallengeMethodsSupported = [];
+          logger.info(`[MCPOAuth][${serverName}] PKCE disabled (provider does not support it)`);
+        } else if (config?.code_challenge_methods_supported !== undefined && !emptyCodeChallenge) {
           codeChallengeMethodsSupported = config.code_challenge_methods_supported;
         } else if (skipCodeChallengeCheck) {
           codeChallengeMethodsSupported = ['S256', 'plain'];
@@ -450,16 +458,60 @@ export class MCPOAuthHandler {
         const clientInfo: OAuthClientInformation = {
           client_id: config.client_id,
           client_secret: config.client_secret,
-          redirect_uris: [config.redirect_uri || this.getDefaultRedirectUri(serverName)],
+          redirect_uris: [redirectUri],
           scope: config.scope,
           token_endpoint_auth_method: tokenEndpointAuthMethod,
         };
+
+        if (skipPkce) {
+          /** Build auth URL manually - MCP SDK rejects empty code_challenge_methods and throws.
+           * Uses manual query string so scope gets %20 for spaces (providers that expect this format).
+           * searchParams.set() would use + for spaces, which some providers reject. */
+          const scope = config.scope!.replace(/\s+/g, ' ').trim();
+          const params = new URLSearchParams();
+          params.append('response_type', 'code');
+          params.append('client_id', config.client_id!);
+          params.append('redirect_uri', redirectUri);
+          params.append('scope', scope);
+          params.append('state', flowId);
+
+          const additionalParams = (config as { additional_auth_params?: Record<string, string> })
+            .additional_auth_params;
+          if (additionalParams && Object.keys(additionalParams).length > 0) {
+            for (const [key, value] of Object.entries(additionalParams)) {
+              if (value != null && value !== '') {
+                params.append(key, String(value));
+              }
+            }
+          }
+          // Use %20 for spaces - URLSearchParams uses + by default, some providers require %20
+          const query = params.toString().replace(/\+/g, '%20');
+          const fullAuthUrl = `${config.authorization_url!}?${query}`;
+
+          const flowMetadata: MCPOAuthFlowMetadata = {
+            serverName,
+            userId,
+            serverUrl,
+            state,
+            codeVerifier: undefined,
+            clientInfo,
+            metadata,
+          };
+          logger.debug(
+            `[MCPOAuth][${serverName}] Built auth URL without PKCE: ${sanitizeUrlForLogging(fullAuthUrl)}`,
+          );
+          return {
+            authorizationUrl: fullAuthUrl,
+            flowId,
+            flowMetadata,
+          };
+        }
 
         logger.debug(`[MCPOAuth] Starting authorization with pre-configured settings`);
         const { authorizationUrl, codeVerifier } = await startAuthorization(serverUrl, {
           metadata: metadata as unknown as SDKOAuthMetadata,
           clientInformation: clientInfo,
-          redirectUrl: clientInfo.redirect_uris?.[0] || this.getDefaultRedirectUri(serverName),
+          redirectUrl: redirectUri,
           scope: config.scope,
         });
 
@@ -494,8 +546,12 @@ export class MCPOAuthHandler {
         logger.debug(
           `[MCPOAuth] Authorization URL generated: ${sanitizeUrlForLogging(authorizationUrl.toString())}`,
         );
+        const fullAuthUrl = authorizationUrl.toString();
+        logger.debug(
+          `[MCPOAuth][${serverName}] Full authorization URL: ${fullAuthUrl}`,
+        );
         return {
-          authorizationUrl: authorizationUrl.toString(),
+          authorizationUrl: fullAuthUrl,
           flowId,
           flowMetadata,
         };
@@ -602,12 +658,16 @@ export class MCPOAuthHandler {
         resourceMetadata,
       };
 
+      const fullAuthUrl = authorizationUrl.toString();
       logger.debug(
-        `[MCPOAuth] Authorization URL generated for ${serverName}: ${authorizationUrl.toString()}`,
+        `[MCPOAuth] Authorization URL generated for ${serverName}: ${sanitizeUrlForLogging(fullAuthUrl)}`,
+      );
+      logger.debug(
+        `[MCPOAuth][${serverName}] Full authorization URL: ${fullAuthUrl}`,
       );
 
       const result = {
-        authorizationUrl: authorizationUrl.toString(),
+        authorizationUrl: fullAuthUrl,
         flowId,
         flowMetadata,
       };
@@ -645,7 +705,7 @@ export class MCPOAuthHandler {
       }
 
       const metadata = flowMetadata;
-      if (!metadata.metadata || !metadata.clientInfo || !metadata.codeVerifier) {
+      if (!metadata.metadata || !metadata.clientInfo) {
         throw new Error('Invalid flow metadata');
       }
 
@@ -672,15 +732,19 @@ export class MCPOAuthHandler {
         `[MCPOAuth][complete] Exchanging code for tokens: flowId=${flowId}, redirect_uri=${redirectUri}, client_id=${cidMasked}`,
       );
 
-      const tokens = await exchangeAuthorization(metadata.serverUrl, {
+      const exchangeOptions = {
         redirectUri,
         metadata: metadata.metadata as unknown as SDKOAuthMetadata,
         clientInformation: metadata.clientInfo,
-        codeVerifier: metadata.codeVerifier,
         authorizationCode,
         resource,
         fetchFn: this.createOAuthFetch(oauthHeaders, metadata.clientInfo),
-      });
+        ...(metadata.codeVerifier ? { codeVerifier: metadata.codeVerifier } : {}),
+      };
+      const tokens = await exchangeAuthorization(
+        metadata.serverUrl,
+        exchangeOptions as Parameters<typeof exchangeAuthorization>[1],
+      );
 
       logger.debug('[MCPOAuth] Token exchange successful', {
         flowId,

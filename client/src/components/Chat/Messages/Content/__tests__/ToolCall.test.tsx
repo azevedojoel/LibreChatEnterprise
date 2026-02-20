@@ -3,7 +3,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { RecoilRoot } from 'recoil';
 import { Tools } from 'librechat-data-provider';
 import ToolCall from '../ToolCall';
-import ToolOAuthOverlay from '~/components/Chat/ToolOAuthOverlay';
 
 // Mock dependencies
 jest.mock('~/hooks', () => ({
@@ -14,12 +13,14 @@ jest.mock('~/hooks', () => ({
       com_assistants_completed_action: `Completed action on ${values?.[0]}`,
       com_assistants_running_var: `Running ${values?.[0]}`,
       com_assistants_running_action: 'Running action',
-      com_ui_sign_in_to_domain: `Sign in to ${values?.[0]}`,
+      com_ui_sign_in_to_domain: `Sign in with ${values?.[0]}`,
       com_ui_continue_oauth: 'Continue with OAuth',
       com_ui_cancel: 'Cancel',
       com_ui_cancelled: 'Cancelled',
       com_ui_requires_auth: 'Requires authentication',
-      com_assistants_allow_sites_you_trust: 'Only allow sites you trust',
+      com_ui_connect_account: 'Connect account',
+      com_assistants_allow_sites_you_trust:
+        "We'll open a secure sign-in page. Only connect accounts from services you trust.",
     };
     return translations[key] || key;
   },
@@ -74,6 +75,29 @@ jest.mock('~/utils', () => ({
   cn: (...classes: any[]) => classes.filter(Boolean).join(' '),
 }));
 
+jest.mock('~/data-provider', () => ({
+  ...jest.requireActual('~/data-provider'),
+  useGetStartupConfig: () => ({ data: { interface: {} } }),
+}));
+
+jest.mock('@tanstack/react-query', () => ({
+  ...jest.requireActual('@tanstack/react-query'),
+  useQueryClient: () => ({
+    getQueryData: jest.fn(),
+    setQueryData: jest.fn(),
+    invalidateQueries: jest.fn(),
+  }),
+}));
+
+jest.mock('~/Providers', () => ({
+  ...jest.requireActual('~/Providers'),
+  useMessageContext: () => ({
+    messageId: 'test-msg-id',
+    conversationId: 'test-conv-id',
+    partIndex: 0,
+  }),
+}));
+
 jest.mock('librechat-data-provider', () => ({
   ...jest.requireActual('librechat-data-provider'),
   dataService: {
@@ -116,7 +140,7 @@ describe('ToolCall', () => {
 
       renderWithRecoil(<ToolCall {...mockProps} attachments={attachments} />);
 
-      fireEvent.click(screen.getByText('Completed testFunction'));
+      fireEvent.click(screen.getByText('testFunction'));
 
       const toolCallInfo = screen.getByTestId('tool-call-info');
       expect(toolCallInfo).toBeInTheDocument();
@@ -128,7 +152,7 @@ describe('ToolCall', () => {
     it('should pass empty array when no attachments', () => {
       renderWithRecoil(<ToolCall {...mockProps} />);
 
-      fireEvent.click(screen.getByText('Completed testFunction'));
+      fireEvent.click(screen.getByText('testFunction'));
 
       const toolCallInfo = screen.getByTestId('tool-call-info');
       const attachmentsData = toolCallInfo.getAttribute('data-attachments');
@@ -159,7 +183,7 @@ describe('ToolCall', () => {
 
       renderWithRecoil(<ToolCall {...mockProps} attachments={attachments} />);
 
-      fireEvent.click(screen.getByText('Completed testFunction'));
+      fireEvent.click(screen.getByText('testFunction'));
 
       const toolCallInfo = screen.getByTestId('tool-call-info');
       const attachmentsData = toolCallInfo.getAttribute('data-attachments');
@@ -209,11 +233,11 @@ describe('ToolCall', () => {
       expect(screen.queryByTestId('tool-call-info')).not.toBeInTheDocument();
 
       // Click to open
-      fireEvent.click(screen.getByText('Completed testFunction'));
+      fireEvent.click(screen.getByText('testFunction'));
       expect(screen.getByTestId('tool-call-info')).toBeInTheDocument();
 
       // Click to close
-      fireEvent.click(screen.getByText('Completed testFunction'));
+      fireEvent.click(screen.getByText('testFunction'));
       expect(screen.queryByTestId('tool-call-info')).not.toBeInTheDocument();
     });
 
@@ -239,7 +263,7 @@ describe('ToolCall', () => {
 
       renderWithRecoil(<ToolCall {...propsWithDomain} />);
 
-      fireEvent.click(screen.getByText('Completed action on test.domain.com'));
+      fireEvent.click(screen.getByText('test.domain.com'));
 
       const toolCallInfo = screen.getByTestId('tool-call-info');
       const props = JSON.parse(toolCallInfo.textContent!);
@@ -254,35 +278,19 @@ describe('ToolCall', () => {
   });
 
   describe('authentication flow', () => {
-    it('should show sign-in overlay when auth URL is provided', () => {
-      const originalOpen = window.open;
-      window.open = jest.fn();
-
+    it('should not show inline sign-in button when auth URL is provided (auth is shown in overlay)', () => {
       renderWithRecoil(
-        <>
-          <ToolCall
-            {...mockProps}
-            output={null}
-            name="hubspot_contacts_list__HubSpot"
-            initialProgress={0.5} // Less than 1 so it's not complete
-            auth="https://auth.example.com"
-            isSubmitting={true} // Should be submitting for auth to show
-          />
-          <ToolOAuthOverlay />
-        </>,
+        <ToolCall
+          {...mockProps}
+          output={null}
+          name="get_contacts_mcp_TestServer"
+          initialProgress={0.5} // Less than 1 so it's not complete
+          auth="https://auth.example.com"
+          isSubmitting={true}
+        />,
       );
 
-      const signInButton = screen.getByText('Continue with OAuth');
-      expect(signInButton).toBeInTheDocument();
-
-      fireEvent.click(signInButton);
-      expect(window.open).toHaveBeenCalledWith(
-        'https://auth.example.com',
-        '_blank',
-        'noopener,noreferrer',
-      );
-
-      window.open = originalOpen;
+      expect(screen.queryByText('Sign in to auth.example.com')).not.toBeInTheDocument();
     });
 
     it('should pass pendingAuth as true when auth is pending', () => {
@@ -296,44 +304,38 @@ describe('ToolCall', () => {
         />,
       );
 
-      fireEvent.click(screen.getByText('Completed testFunction'));
+      fireEvent.click(screen.getByText('testFunction'));
 
       const toolCallInfo = screen.getByTestId('tool-call-info');
       const props = JSON.parse(toolCallInfo.textContent!);
       expect(props.pendingAuth).toBe(true);
     });
 
-    it('should not show auth overlay when cancelled', () => {
+    it('should not show inline auth when cancelled', () => {
       renderWithRecoil(
-        <>
-          <ToolCall
-            {...mockProps}
-            output={null}
-            auth="https://auth.example.com"
-            initialProgress={0.5}
-            isSubmitting={false}
-          />
-          <ToolOAuthOverlay />
-        </>,
+        <ToolCall
+          {...mockProps}
+          output={null}
+          auth="https://auth.example.com"
+          initialProgress={0.5}
+          isSubmitting={false}
+        />,
       );
 
-      expect(screen.queryByText('Continue with OAuth')).not.toBeInTheDocument();
+      expect(screen.queryByText('Sign in to auth.example.com')).not.toBeInTheDocument();
     });
 
-    it('should not show auth overlay when progress is complete', () => {
+    it('should not show inline auth when progress is complete', () => {
       renderWithRecoil(
-        <>
-          <ToolCall
-            {...mockProps}
-            auth="https://auth.example.com"
-            initialProgress={1}
-            isSubmitting={false}
-          />
-          <ToolOAuthOverlay />
-        </>,
+        <ToolCall
+          {...mockProps}
+          auth="https://auth.example.com"
+          initialProgress={1}
+          isSubmitting={false}
+        />,
       );
 
-      expect(screen.queryByText('Continue with OAuth')).not.toBeInTheDocument();
+      expect(screen.queryByText('Sign in to auth.example.com')).not.toBeInTheDocument();
     });
   });
 
@@ -341,7 +343,7 @@ describe('ToolCall', () => {
     it('should handle undefined args', () => {
       renderWithRecoil(<ToolCall {...mockProps} args={undefined} />);
 
-      fireEvent.click(screen.getByText('Completed testFunction'));
+      fireEvent.click(screen.getByText('testFunction'));
 
       const toolCallInfo = screen.getByTestId('tool-call-info');
       const props = JSON.parse(toolCallInfo.textContent!);
@@ -351,7 +353,7 @@ describe('ToolCall', () => {
     it('should handle null output', () => {
       renderWithRecoil(<ToolCall {...mockProps} output={null} />);
 
-      fireEvent.click(screen.getByText('Completed testFunction'));
+      fireEvent.click(screen.getByText('testFunction'));
 
       const toolCallInfo = screen.getByTestId('tool-call-info');
       const props = JSON.parse(toolCallInfo.textContent!);
@@ -361,7 +363,7 @@ describe('ToolCall', () => {
     it('should handle missing domain', () => {
       renderWithRecoil(<ToolCall {...mockProps} domain={undefined} authDomain={undefined} />);
 
-      fireEvent.click(screen.getByText('Completed testFunction'));
+      fireEvent.click(screen.getByText('testFunction'));
 
       const toolCallInfo = screen.getByTestId('tool-call-info');
       const props = JSON.parse(toolCallInfo.textContent!);
@@ -392,7 +394,7 @@ describe('ToolCall', () => {
 
       renderWithRecoil(<ToolCall {...mockProps} attachments={complexAttachments} />);
 
-      fireEvent.click(screen.getByText('Completed testFunction'));
+      fireEvent.click(screen.getByText('testFunction'));
 
       const toolCallInfo = screen.getByTestId('tool-call-info');
       const attachmentsData = toolCallInfo.getAttribute('data-attachments');

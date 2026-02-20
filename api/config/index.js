@@ -20,8 +20,8 @@ let flowManager = null;
 function getFlowStateManager(flowsCache) {
   if (!flowManager) {
     flowManager = new FlowStateManager(flowsCache, {
-      // 10 min TTL allows users adequate time to complete OAuth (e.g. find inline link, authorize)
-      ttl: Time.TEN_MINUTES,
+      // 24h TTL so OAuth flows wait indefinitely for user to choose Auth or Cancel (no timeout)
+      ttl: Time.ONE_DAY,
     });
   }
   return flowManager;

@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import { useSetAtom } from 'jotai';
+import { v4 } from 'uuid';
 import {
   Constants,
   StepTypes,
@@ -7,7 +7,6 @@ import {
   ToolCallTypes,
   getNonEmptyValue,
 } from 'librechat-data-provider';
-import { pendingToolOAuthAtom } from '~/store/toolOAuth';
 import type {
   Agents,
   TMessage,
@@ -27,6 +26,10 @@ type TUseStepHandler = {
   /** @deprecated - isSubmitting should be derived from submission state */
   setIsSubmitting?: SetterOrUpdater<boolean>;
   lastAnnouncementTimeRef: React.MutableRefObject<number>;
+  /** Called when MCP OAuth auth is merged - used to show overlay immediately */
+  onAuthMerged?: (authUrl: string, toolName: string) => void;
+  /** Called when a tool completes - clears overlay if it was the auth tool (pass tool name to verify) */
+  onAuthCleared?: (completedToolName?: string) => void;
 };
 
 type TStepEvent = {
@@ -61,8 +64,9 @@ export default function useStepHandler({
   getMessages,
   announcePolite,
   lastAnnouncementTimeRef,
+  onAuthMerged,
+  onAuthCleared,
 }: TUseStepHandler) {
-  const setPendingOAuth = useSetAtom(pendingToolOAuthAtom);
   const toolCallIdMap = useRef(new Map<string, string | undefined>());
   const messageMap = useRef(new Map<string, TMessage>());
   const stepMap = useRef(new Map<string, Agents.RunStep>());
@@ -195,13 +199,21 @@ export default function useStepHandler({
       const id = getNonEmptyValue([contentPart.tool_call.id, existingToolCall?.id]) ?? '';
       const name = getNonEmptyValue([contentPart.tool_call.name, existingToolCall?.name]) ?? '';
 
+      // Preserve auth/expires_at from either source - auth deltas may arrive separately
+      const auth = getNonEmptyValue([
+        contentPart.tool_call.auth,
+        existingToolCall?.auth,
+      ]) as string | undefined;
+      const expires_at =
+        contentPart.tool_call.expires_at ?? existingToolCall?.expires_at;
+
       const newToolCall: Agents.ToolCall & PartMetadata = {
         id,
         name,
         args,
         type: ToolCallTypes.TOOL_CALL,
-        auth: contentPart.tool_call.auth,
-        expires_at: contentPart.tool_call.expires_at,
+        ...(auth != null && { auth }),
+        ...(expires_at != null && { expires_at }),
       };
 
       if (finalUpdate) {
@@ -493,31 +505,6 @@ export default function useStepHandler({
         }
       } else if (event === 'on_run_step_delta') {
         const runStepDelta = data as Agents.RunStepDeltaEvent;
-        // Show OAuth overlay immediately when auth URL arrives - do not wait for content merge
-        const authURL = runStepDelta.delta.auth ?? runStepDelta.delta.tool_calls?.[0]?.auth;
-        if (authURL && runStepDelta.delta.tool_calls?.[0]) {
-          const toolName = runStepDelta.delta.tool_calls[0].name ?? '';
-          const hasMCPDelimiter = toolName.includes(Constants.mcp_delimiter);
-          const serverName = hasMCPDelimiter
-            ? (toolName.split(Constants.mcp_delimiter).pop() ?? '')
-            : '';
-          try {
-            const url = new URL(authURL);
-            const redirectUri = url.searchParams.get('redirect_uri') || '';
-            const actionMatch = redirectUri.match(/\/api\/actions\/([^/]+)\/oauth\/callback/);
-            const actionId = actionMatch?.[1];
-            setPendingOAuth({
-              auth: authURL,
-              name: toolName,
-              serverName,
-              authDomain: url.hostname,
-              isMCP: hasMCPDelimiter,
-              actionId,
-            });
-          } catch {
-            /* invalid URL - skip */
-          }
-        }
         const runStep = stepMap.current.get(runStepDelta.id);
         let responseMessageId = runStep?.runId ?? '';
         if (responseMessageId === Constants.USE_PRELIM_RESPONSE_MESSAGE_ID) {
@@ -539,9 +526,12 @@ export default function useStepHandler({
           runStepDelta.delta.tool_calls
         ) {
           let updatedResponse = { ...response };
+          const content = updatedResponse.content ?? [];
 
           runStepDelta.delta.tool_calls.forEach((toolCallDelta) => {
-            const toolCallId = toolCallIdMap.current.get(runStepDelta.id) ?? '';
+            // Prefer delta's id (map overwrites for multi-tool steps)
+            const toolCallId =
+              toolCallDelta.id ?? toolCallIdMap.current.get(runStepDelta.id) ?? '';
 
             const contentPart: Agents.MessageContentComplex = {
               type: ContentTypes.TOOL_CALL,
@@ -558,10 +548,93 @@ export default function useStepHandler({
             if (auth != null) {
               contentPart.tool_call.auth = auth;
               contentPart.tool_call.expires_at = expiresAt;
+              const toolNameForAuth =
+                toolCallDelta.name ??
+                (runStep.stepDetails.type === StepTypes.TOOL_CALLS
+                  ? (runStep.stepDetails.tool_calls as Agents.ToolCall[])?.find(
+                      (tc) => tc.id === toolCallId,
+                    )?.name ?? ''
+                  : '');
+              onAuthMerged?.(auth, toolNameForAuth);
             }
 
-            // Use server's index, offset by initialContent for edit scenarios
-            const currentIndex = runStep.index + initialContent.length;
+            // Resolve content index: runStep.index can misalign when think/text parts
+            // are interleaved. For auth deltas, find the matching tool call by id/name.
+            let currentIndex = runStep.index + initialContent.length;
+            const deltaName = toolCallDelta.name ?? '';
+            if (auth != null || toolCallId) {
+              const foundIdx = content.findIndex((part) => {
+                const tc = part?.tool_call ?? (part as { tool_call?: Agents.ToolCall })?.tool_call;
+                if (!tc) return false;
+                return (
+                  (toolCallId && tc.id === toolCallId) ||
+                  (deltaName && tc.name === deltaName) ||
+                  (deltaName && tc.name?.includes(deltaName)) ||
+                  (deltaName && deltaName.includes(tc.name ?? ''))
+                );
+              });
+              if (foundIdx >= 0) {
+                currentIndex = foundIdx;
+              } else if (auth != null) {
+                // Auth delta but no matching tool call - update or append.
+                // Ensure we have the full MCP tool name (e.g. tasks_listTaskLists_mcp_Google)
+                let appendedName = deltaName;
+                if (!appendedName && runStep.stepDetails.type === StepTypes.TOOL_CALLS) {
+                  const stepCalls = runStep.stepDetails.tool_calls as Agents.ToolCall[];
+                  const match = stepCalls?.find((tc) => tc.id === toolCallId);
+                  appendedName = match?.name ?? '';
+                }
+                onAuthMerged?.(auth, appendedName);
+
+                // Before appending, verify we don't already have this tool (avoids duplicate IDs)
+                const matchPart = (part: TMessageContentParts | undefined) => {
+                  const tc =
+                    part?.tool_call ?? (part as { tool_call?: Agents.ToolCall })?.tool_call;
+                  if (!tc) return false;
+                  return (
+                    (toolCallId && tc.id === toolCallId) ||
+                    (appendedName && (tc.name === appendedName || tc.name?.includes(appendedName)))
+                  );
+                };
+                const existingIdx = content.findIndex((part) => matchPart(part));
+                if (existingIdx >= 0) {
+                  currentIndex = existingIdx;
+                  updatedResponse = updateContent(
+                    updatedResponse,
+                    currentIndex,
+                    contentPart,
+                    false,
+                    getStepMetadata(runStep),
+                  );
+                  // Skip the updateContent at end of forEach - state is set below loop
+                  return;
+                } else {
+                  // Only append if truly no match; use unique id when empty
+                  const safeId = toolCallId || `toolu_${v4()}`;
+                  const newPart: Agents.MessageContentComplex = {
+                    type: ContentTypes.TOOL_CALL,
+                    tool_call: {
+                      id: safeId,
+                      name: appendedName,
+                      args: toolCallDelta.args ?? '',
+                      type: ToolCallTypes.TOOL_CALL,
+                      auth,
+                      expires_at: expiresAt ?? undefined,
+                    },
+                  };
+                  const newContent = [...content, newPart];
+                  updatedResponse = { ...updatedResponse, content: newContent };
+                  messageMap.current.set(responseMessageId, updatedResponse);
+                  const currentMessages = getMessages() ?? [];
+                  setMessages(
+                    currentMessages.map((msg) =>
+                      msg.messageId === responseMessageId ? updatedResponse : msg,
+                    ),
+                  );
+                  return; // skip updateContent, we already updated
+                }
+              }
+            }
             updatedResponse = updateContent(
               updatedResponse,
               currentIndex,
@@ -586,6 +659,8 @@ export default function useStepHandler({
         if (!toolCallResult) {
           return;
         }
+
+        onAuthCleared?.(toolCallResult.name);
 
         const runStep = stepMap.current.get(stepId);
         let responseMessageId = runStep?.runId ?? '';
@@ -639,7 +714,8 @@ export default function useStepHandler({
       announcePolite,
       setMessages,
       calculateContentIndex,
-      setPendingOAuth,
+      onAuthMerged,
+      onAuthCleared,
     ],
   );
 

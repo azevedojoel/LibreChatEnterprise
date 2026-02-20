@@ -14,7 +14,7 @@ const { Token } = require('~/db/models');
 /**
  * OAuth MCP specific uninstall logic - revoke tokens at provider, delete from DB, clear flow state.
  * @param {string} userId - User ID
- * @param {string} pluginKey - Plugin key (e.g. mcp_HubSpot)
+ * @param {string} pluginKey - Plugin key (e.g. mcp_Google)
  * @param {Object} [appConfig] - App config for server config fallback
  */
 async function uninstallOAuthMCP(userId, pluginKey, appConfig = {}) {

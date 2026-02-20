@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useLocalize } from '~/hooks';
 import { request, mcpOAuthConfirm } from 'librechat-data-provider';
+import { broadcastMCPOAuthComplete } from '~/hooks/useMCPOAuthBroadcastListener';
 
 export default function OAuthConfirm() {
   const localize = useLocalize();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
   const serverName = searchParams.get('serverName') || '';
+  const actionId = searchParams.get('actionId') || undefined;
   const [isConfirming, setIsConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,6 +21,7 @@ export default function OAuthConfirm() {
       const response = await request.post(mcpOAuthConfirm(), { token });
       const data = response?.data ?? response;
       if (data?.redirectUrl) {
+        broadcastMCPOAuthComplete(serverName || undefined, actionId);
         window.location.href = data.redirectUrl;
         return;
       }

@@ -1,13 +1,13 @@
 import { useMemo, useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { useSetAtom } from 'jotai';
+import { useSetRecoilState } from 'recoil';
 import {
   Constants,
+  ContentTypes,
   Tools,
   actionDelimiter,
   actionDomainSeparator,
 } from 'librechat-data-provider';
-
-import { pendingToolOAuthAtom } from '~/store/toolOAuth';
+import store from '~/store';
 
 /** Friendly display names for built-in tools */
 const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
@@ -39,33 +39,6 @@ const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
   'tasks.clearCompletedTasks': 'Clearing Completed Google Tasks',
   tasks_moveTask: 'Moving Google Task',
   'tasks.moveTask': 'Moving Google Task',
-  // HubSpot tools
-  hubspot_contacts_list: 'Listing HubSpot Contacts',
-  hubspot_contacts_get: 'Getting HubSpot Contact',
-  hubspot_contacts_search: 'Searching HubSpot Contacts',
-  hubspot_contacts_create: 'Creating HubSpot Contact',
-  hubspot_contacts_update: 'Updating HubSpot Contact',
-  hubspot_companies_list: 'Listing HubSpot Companies',
-  hubspot_companies_get: 'Getting HubSpot Company',
-  hubspot_companies_search: 'Searching HubSpot Companies',
-  hubspot_companies_create: 'Creating HubSpot Company',
-  hubspot_companies_update: 'Updating HubSpot Company',
-  hubspot_deals_list: 'Listing HubSpot Deals',
-  hubspot_deals_get: 'Getting HubSpot Deal',
-  hubspot_deals_search: 'Searching HubSpot Deals',
-  hubspot_deals_create: 'Creating HubSpot Deal',
-  hubspot_deals_update: 'Updating HubSpot Deal',
-  hubspot_tickets_list: 'Listing HubSpot Tickets',
-  hubspot_tickets_get: 'Getting HubSpot Ticket',
-  hubspot_tickets_search: 'Searching HubSpot Tickets',
-  hubspot_tickets_create: 'Creating HubSpot Ticket',
-  hubspot_tickets_update: 'Updating HubSpot Ticket',
-  hubspot_list_associations: 'Listing HubSpot Associations',
-  hubspot_create_association: 'Creating HubSpot Association',
-  hubspot_create_note: 'Creating HubSpot Note',
-  hubspot_create_task: 'Creating HubSpot Task',
-  hubspot_get_engagement: 'Getting HubSpot Engagement',
-  hubspot_auth_clear: 'Clearing HubSpot Auth',
 };
 import type { TAttachment } from 'librechat-data-provider';
 import { useLocalize, useProgress } from '~/hooks';
@@ -84,6 +57,7 @@ export default function ToolCall({
   output,
   attachments,
   auth,
+  showAuthButton = true,
 }: {
   initialProgress: number;
   isLast?: boolean;
@@ -94,9 +68,13 @@ export default function ToolCall({
   attachments?: TAttachment[];
   auth?: string;
   expires_at?: number;
+  /** When false, hide the inline auth button (first tool per server shows it) */
+  showAuthButton?: boolean;
 }) {
   const localize = useLocalize();
+  const setPendingMCPOAuth = useSetRecoilState(store.pendingMCPOAuthAtom);
   const { data: startupConfig } = useGetStartupConfig();
+
   const interfaceConfig = startupConfig?.interface as
     | { toolCallSpacing?: 'normal' | 'compact' }
     | undefined;
@@ -180,6 +158,20 @@ export default function ToolCall({
     [args, output, isToolSearch],
   );
   const hasOutput = output != null && output !== '';
+
+  const resolvedServerName = useMemo(() => {
+    if (mcpServerName) return mcpServerName;
+    if (!auth) return '';
+    try {
+      const url = new URL(auth);
+      const redirectUri = url.searchParams.get('redirect_uri') || '';
+      const match = redirectUri.match(/\/api\/mcp\/([^/]+)\/oauth\/callback/);
+      return match?.[1] || '';
+    } catch {
+      return '';
+    }
+  }, [auth, mcpServerName]);
+
   const hasArgs =
     (typeof _args === 'string' && _args.trim() !== '') ||
     (typeof _args === 'object' && _args != null && Object.keys(_args).length > 0);
@@ -214,7 +206,22 @@ export default function ToolCall({
     }
   }, [auth, isMCPToolCall]);
 
-  const setPendingOAuth = useSetAtom(pendingToolOAuthAtom);
+  // When loading a conversation from API after refresh, the overlay atom is reset.
+  // Set it when we render a tool that has auth and no output (still pending).
+  const needsAuth = (resolvedServerName || actionId) && auth && !hasOutput;
+  useEffect(() => {
+    if (!showAuthButton || !needsAuth) {
+      // Clear overlay if this tool was the one that set it (e.g. tool completed, hasOutput became true)
+      setPendingMCPOAuth((prev) => (prev?.toolName === name ? null : prev));
+      return;
+    }
+    setPendingMCPOAuth({
+      authUrl: auth,
+      toolName: name,
+      ...(resolvedServerName && { serverName: resolvedServerName }),
+      ...(actionId && { actionId }),
+    });
+  }, [showAuthButton, auth, hasOutput, resolvedServerName, actionId, name, setPendingMCPOAuth, needsAuth]);
 
   const progress = useProgress(initialProgress);
 
@@ -246,21 +253,6 @@ export default function ToolCall({
   const cancelled = isToolSearch ? false : wouldBeCancelled;
   const displayProgress =
     hasOutput || (isToolSearch && wouldBeCancelled) || toolSearchCompletedFallback ? 1 : progress;
-
-  useEffect(() => {
-    if (auth && authDomain && displayProgress < 1 && !cancelled) {
-      setPendingOAuth({
-        auth,
-        name,
-        serverName: mcpServerName,
-        authDomain,
-        isMCP: isMCPToolCall,
-        actionId: actionId,
-      });
-      return () => setPendingOAuth(null);
-    }
-    setPendingOAuth(null);
-  }, [auth, authDomain, displayProgress, cancelled, name, mcpServerName, isMCPToolCall, actionId, setPendingOAuth]);
 
   const labelWithPattern = useMemo(
     () => (inlinePattern ? `${displayName} '${inlinePattern}'` : displayName),
@@ -333,23 +325,48 @@ export default function ToolCall({
     <>
       <div
         className={cn(
-          'relative flex h-5 shrink-0 items-center',
-          isCompactSpacing ? 'my-0.5 gap-1' : 'my-1 gap-1.5',
+          'relative flex flex-col gap-1',
+          isCompactSpacing ? 'my-0.5' : 'my-1',
         )}
       >
-        <ProgressText
-          muted
-          progress={displayProgress}
-          onClick={() => setShowInfo((prev) => !prev)}
-          inProgressText={labelWithPattern || localize('com_assistants_running_action')}
-          authText={
-            !cancelled && authDomain.length > 0 ? localize('com_ui_requires_auth') : undefined
-          }
-          finishedText={getFinishedText()}
-          hasInput={hasInfo}
-          isExpanded={showInfo}
-          error={cancelled}
-        />
+        <div
+          className={cn(
+            'flex h-5 shrink-0 items-center',
+            isCompactSpacing ? 'gap-1' : 'gap-1.5',
+          )}
+        >
+          <ProgressText
+            muted
+            progress={displayProgress}
+            onClick={() => setShowInfo((prev) => !prev)}
+            inProgressText={labelWithPattern || localize('com_assistants_running_action')}
+            authText={
+              !cancelled && authDomain.length > 0 ? localize('com_ui_requires_auth') : undefined
+            }
+            finishedText={getFinishedText()}
+            hasInput={hasInfo}
+            isExpanded={showInfo}
+            error={cancelled}
+          />
+        </div>
+        {showAuthButton && needsAuth && (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={() =>
+                setPendingMCPOAuth({
+                  authUrl: auth,
+                  toolName: name,
+                  ...(resolvedServerName && { serverName: resolvedServerName }),
+                  ...(actionId && { actionId }),
+                })
+              }
+              className="text-link inline-flex items-center rounded-md border border-border-medium px-2.5 py-1 text-sm hover:bg-surface-secondary hover:underline"
+            >
+              {localize('com_ui_connect_account') || 'Connect account'}
+            </button>
+          </div>
+        )}
       </div>
       <div
         className={cn('relative', isCompactSpacing ? 'pl-2' : 'pl-4')}

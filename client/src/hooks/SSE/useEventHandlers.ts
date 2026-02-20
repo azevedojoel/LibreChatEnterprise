@@ -183,6 +183,7 @@ export default function useEventHandlers({
   const { announcePolite } = useLiveAnnouncer();
   const applyAgentTemplate = useApplyAgentTemplate();
   const setAbortScroll = useSetRecoilState(store.abortScroll);
+  const setPendingMCPOAuth = useSetRecoilState(store.pendingMCPOAuthAtom);
   const navigate = useNavigate();
   const location = useLocation();
   const agentsMap = useAgentsMapContext();
@@ -226,11 +227,72 @@ export default function useEventHandlers({
     ],
   );
 
+  const onAuthMerged = useCallback(
+    (authUrl: string, toolName: string) => {
+      let serverName = '';
+      let actionId = '';
+
+      if (typeof toolName === 'string' && toolName.includes(Constants.mcp_delimiter)) {
+        const parts = toolName.split(Constants.mcp_delimiter);
+        serverName = parts.pop() || '';
+      }
+      if (authUrl) {
+        try {
+          const url = new URL(authUrl);
+          const redirectUri = url.searchParams.get('redirect_uri') || '';
+          if (!serverName) {
+            const mcpMatch = redirectUri.match(/\/api\/mcp\/([^/]+)\/oauth\/callback/);
+            serverName = mcpMatch?.[1] || '';
+          }
+          const actionMatch = redirectUri.match(/\/api\/actions\/([^/]+)\/oauth\/callback/);
+          actionId = actionMatch?.[1] || '';
+        } catch {
+          /* ignore */
+        }
+      }
+
+      if (serverName) {
+        setPendingMCPOAuth({ authUrl, toolName, serverName });
+      } else if (actionId) {
+        setPendingMCPOAuth({ authUrl, toolName, actionId });
+      }
+    },
+    [setPendingMCPOAuth],
+  );
+
+  const onAuthCleared = useCallback(
+    (completedToolName?: string) => {
+      setPendingMCPOAuth((prev) => {
+        if (!prev) return null;
+        if (!completedToolName) return null;
+        const exactMatch = prev.toolName === completedToolName;
+        const includesServer =
+          prev.serverName &&
+          (completedToolName.includes(prev.serverName) ||
+            completedToolName.includes(Constants.mcp_delimiter + prev.serverName));
+        const extractedServer = completedToolName.includes(Constants.mcp_delimiter)
+          ? completedToolName.split(Constants.mcp_delimiter).pop()
+          : undefined;
+        const serverMatch =
+          prev.serverName &&
+          extractedServer != null &&
+          prev.serverName.toLowerCase() === extractedServer.toLowerCase();
+        const actionMatch =
+          prev.actionId && completedToolName.includes(prev.actionId);
+        const matches = exactMatch || includesServer || serverMatch || actionMatch;
+        return matches ? null : prev;
+      });
+    },
+    [setPendingMCPOAuth],
+  );
+
   const { stepHandler, clearStepMaps, syncStepMessage } = useStepHandler({
     setMessages,
     getMessages,
     announcePolite,
     lastAnnouncementTimeRef,
+    onAuthMerged,
+    onAuthCleared,
   });
   const attachmentHandler = useAttachmentHandler(queryClient);
 
@@ -752,6 +814,7 @@ export default function useEventHandlers({
 
   const errorHandler = useCallback(
     ({ data, submission }: { data?: TResData; submission: EventSubmission }) => {
+      setPendingMCPOAuth(null); // Clear overlay so user is not stuck on error
       const { messages, userMessage, initialResponse } = submission;
       setCompleted((prev) => new Set(prev.add(initialResponse.messageId)));
 
@@ -848,6 +911,7 @@ export default function useEventHandlers({
       setIsSubmitting,
       getMessages,
       queryClient,
+      setPendingMCPOAuth,
     ],
   );
 
