@@ -102,18 +102,32 @@ function logToolError(graph, error, toolId) {
 /**
  * Returns a TOOL_ERROR handler that logs and optionally captures OAuth URLs for headless (inbound email) flows.
  * When req._headlessOAuthUrls is set, extracts OAuth URLs from the error and pushes them.
+ * Uses _headlessOAuthServers to deduplicate per MCP server (same logic as captureOAuthUrl).
  */
 function getToolErrorHandler(req) {
   return function toolErrorHandler(graph, error, toolId) {
     logToolError(graph, error, toolId);
     const urls = req?._headlessOAuthUrls;
+    const servers = req?._headlessOAuthServers;
     if (Array.isArray(urls)) {
       const msg = error?.message ?? '';
       if (msg.includes(HEADLESS_OAUTH_URL_MARKER)) {
         const idx = msg.indexOf(HEADLESS_OAUTH_URL_MARKER);
         const url = msg.slice(idx + HEADLESS_OAUTH_URL_MARKER.length).trim();
-        if (url && !urls.includes(url)) {
+        if (!url) return;
+
+        // Dedupe by server - same logic as captureOAuthUrl
+        let serverName = null;
+        if (typeof toolId === 'string' && toolId.includes(Constants.mcp_delimiter)) {
+          serverName = toolId.split(Constants.mcp_delimiter).pop() || null;
+        }
+        if (serverName && servers?.has(serverName)) {
+          logger.info('[toolErrorHandler] Skipping duplicate URL for server', { serverName });
+          return;
+        }
+        if (!urls.includes(url)) {
           urls.push(url);
+          if (serverName && servers) servers.add(serverName);
         }
       }
     }

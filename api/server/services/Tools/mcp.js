@@ -4,6 +4,7 @@ const { findToken, createToken, updateToken, deleteTokens } = require('~/models'
 const { updateMCPServerTools } = require('~/server/services/Config');
 const { getMCPManager, getFlowStateManager } = require('~/config');
 const { getLogStores } = require('~/cache');
+const { removeMCPFromUserAgents } = require('~/server/services/MCP/disablePermanentlyFailedServer');
 
 /**
  * Reinitializes an MCP server connection and discovers available tools.
@@ -74,6 +75,20 @@ async function reinitMCPServer({
       logger.info(
         `[MCP Reinitialize] OAuth state - oauthRequired: ${oauthRequired}, oauthUrl: ${oauthUrl ? 'present' : 'null'}`,
       );
+
+      // MCP config removed (e.g. deleted from librechat.yaml) – remove from agents and clean up
+      if (
+        user?.id &&
+        err?.message?.includes('Configuration for server') &&
+        err?.message?.includes('not found')
+      ) {
+        removeMCPFromUserAgents(user.id, serverName).catch((cleanupErr) =>
+          logger.error(
+            `[MCP Reinitialize] Error removing orphaned MCP ${serverName} from agents:`,
+            cleanupErr,
+          ),
+        );
+      }
 
       const isOAuthError =
         err.message?.includes('OAuth') ||
