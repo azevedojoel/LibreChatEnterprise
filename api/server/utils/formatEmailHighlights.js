@@ -120,6 +120,7 @@ function markdownToEmailHtml(md) {
  */
 function formatEmailHtml(contentParts, capturedOAuthUrls = [], options = {}) {
   if (!Array.isArray(contentParts)) contentParts = [];
+  const uniqueUrls = [...new Set(capturedOAuthUrls)];
 
   const appName = options.appName || process.env.APP_TITLE || 'Daily Thread';
   const parts = [];
@@ -135,11 +136,11 @@ function formatEmailHtml(contentParts, capturedOAuthUrls = [], options = {}) {
   /* Content card - OAuth buttons first (in conversation flow), then agent content */
   const contentBlocks = [];
 
-  if (capturedOAuthUrls.length > 0) {
+  if (uniqueUrls.length > 0) {
     const btnBg = '#10a37f';
     const appNameForLabel = options.appName || process.env.APP_TITLE || 'LibreChat';
     contentBlocks.push(`<p style="margin: 0 0 8px 0; color: ${STYLES.textMuted}; font-size: 13px;">A required integration needs authentication:</p>`);
-    for (const url of capturedOAuthUrls) {
+    for (const url of uniqueUrls) {
       let label = `Sign in via ${appNameForLabel}`;
       try {
         const u = new URL(url);
@@ -218,7 +219,7 @@ ${contentBlocks.join('\n')}
 </table>`);
   }
 
-  if (contentBlocks.length === 0 && capturedOAuthUrls.length === 0) return '';
+  if (contentBlocks.length === 0 && uniqueUrls.length === 0) return '';
 
   return `
 <!DOCTYPE html>
@@ -250,12 +251,13 @@ ${parts.join('\n')}
  */
 function formatEmailText(contentParts, capturedOAuthUrls = [], options = {}) {
   if (!Array.isArray(contentParts)) contentParts = [];
+  const uniqueUrls = [...new Set(capturedOAuthUrls)];
 
   const parts = [];
 
-  if (capturedOAuthUrls.length > 0) {
+  if (uniqueUrls.length > 0) {
     const appNameForLabel = options.appName || process.env.APP_TITLE || 'LibreChat';
-    for (const url of capturedOAuthUrls) {
+    for (const url of uniqueUrls) {
       let label = `Sign in via ${appNameForLabel}`;
       try {
         const u = new URL(url);
