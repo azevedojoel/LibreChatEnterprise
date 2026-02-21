@@ -10,15 +10,17 @@ import {
   useToastContext,
 } from '@librechat/client';
 import { Mail, Pencil, Plus, Trash2 } from 'lucide-react';
+import MultiConvoAdminSettings from './MultiConvoAdminSettings';
+import PresetsAdminSettings from './PresetsAdminSettings';
+import EndpointsMenuAdminSettings from './EndpointsMenuAdminSettings';
 import {
   useGetAdminUsersQuery,
   useCreateAdminUserMutation,
   useUpdateAdminUserMutation,
   useDeleteAdminUserMutation,
-  useSendAdminPasswordResetEmailMutation,
-  useGetStartupConfig,
+  useSendAdminPasswordResetMutation,
 } from '~/data-provider';
-import type { TAdminUser, TAdminUserCreateRequest, TAdminUserUpdateRequest } from 'librechat-data-provider';
+import type { TAdminUser } from 'librechat-data-provider';
 import { useLocalize, useAuthContext } from '~/hooks';
 import { cn } from '~/utils';
 
@@ -35,11 +37,9 @@ function UserManagement() {
   const [editUser, setEditUser] = useState<TAdminUser | null>(null);
   const [deleteUser, setDeleteUser] = useState<TAdminUser | null>(null);
 
-  const { data: startupConfig } = useGetStartupConfig();
-  const balanceEnabled = !!startupConfig?.balance?.enabled;
 
   const { data, isLoading } = useGetAdminUsersQuery(
-    { limit: PAGE_SIZE, page, q: search || undefined },
+    { limit: PAGE_SIZE, page: page + 1, search: search || undefined },
     { enabled: !!currentUser },
   );
 
@@ -76,7 +76,7 @@ function UserManagement() {
     },
   });
 
-  const sendResetEmailMutation = useSendAdminPasswordResetEmailMutation({
+  const sendResetEmailMutation = useSendAdminPasswordResetMutation({
     onSuccess: () => {
       showToast({ message: localize('com_ui_reset_email_sent'), status: 'success' });
     },
@@ -91,22 +91,22 @@ function UserManagement() {
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   const handleCreate = useCallback(
-    (payload: TAdminUserCreateRequest) => {
+    (payload: { email: string; name?: string; username?: string; password?: string; role?: string; emailVerified?: boolean }) => {
       createMutation.mutate(payload);
     },
     [createMutation],
   );
 
   const handleUpdate = useCallback(
-    (userId: string, payload: TAdminUserUpdateRequest) => {
-      updateMutation.mutate({ userId, payload });
+    (userId: string, payload: { email?: string; name?: string; username?: string; role?: string; emailVerified?: boolean }) => {
+      updateMutation.mutate({ userId, data: payload });
     },
     [updateMutation],
   );
 
   const handleDeleteConfirm = useCallback(() => {
     if (deleteUser) {
-      deleteMutation.mutate(deleteUser.id);
+      deleteMutation.mutate(deleteUser.id ?? deleteUser._id ?? '');
     }
   }, [deleteUser, deleteMutation]);
 
@@ -125,14 +125,19 @@ function UserManagement() {
             className="max-w-sm"
           />
         </div>
-        <Button
-          onClick={() => setCreateOpen(true)}
-          className="gap-2"
-          aria-label={localize('com_ui_create_user')}
-        >
-          <Plus className="size-5" />
-          {localize('com_ui_create_user')}
-        </Button>
+        <div className="flex items-center gap-2">
+          <MultiConvoAdminSettings />
+          <PresetsAdminSettings />
+          <EndpointsMenuAdminSettings />
+          <Button
+            onClick={() => setCreateOpen(true)}
+            className="gap-2"
+            aria-label={localize('com_ui_create_user')}
+          >
+            <Plus className="size-5" />
+            {localize('com_ui_create_user')}
+          </Button>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-border-medium">
@@ -152,34 +157,26 @@ function UserManagement() {
                 <th className="px-5 py-3 font-medium">{localize('com_ui_user_name')}</th>
                 <th className="px-5 py-3 font-medium">{localize('com_ui_user_role')}</th>
                 <th className="px-5 py-3 font-medium">{localize('com_ui_user_provider')}</th>
-                {balanceEnabled && (
-                  <th className="px-5 py-3 font-medium">{localize('com_ui_user_credits')}</th>
-                )}
                 <th className="px-5 py-3 font-medium text-right">{localize('com_ui_actions')}</th>
               </tr>
             </thead>
             <tbody>
               {users.map((user) => (
                 <tr
-                  key={user.id}
+                  key={user.id ?? user._id ?? user.email}
                   className="border-b border-border-light last:border-b-0 hover:bg-surface-secondary/50"
                 >
                   <td className="px-5 py-3">{user.email}</td>
                   <td className="px-5 py-3">{user.name || '-'}</td>
                   <td className="px-5 py-3">{user.role}</td>
                   <td className="px-5 py-3">{user.provider || 'local'}</td>
-                  {balanceEnabled && (
-                    <td className="px-5 py-3">
-                      {typeof user.tokenCredits === 'number' ? user.tokenCredits.toLocaleString() : '0'}
-                    </td>
-                  )}
                   <td className="px-5 py-3 text-right">
                     <div className="flex justify-end gap-1">
                       {user.provider === 'local' && (
                         <Button
                           variant="ghost"
-                          onClick={() => sendResetEmailMutation.mutate(user.id)}
-                          disabled={sendResetEmailMutation.isLoading && sendResetEmailMutation.variables === user.id}
+                          onClick={() => sendResetEmailMutation.mutate(user.id ?? user._id ?? '')}
+                          disabled={sendResetEmailMutation.isLoading}
                           aria-label={localize('com_ui_send_reset_email')}
                           title={localize('com_ui_send_reset_email_tooltip')}
                         >
@@ -196,7 +193,7 @@ function UserManagement() {
                       <Button
                         variant="ghost"
                         onClick={() => setDeleteUser(user)}
-                        disabled={user.id === currentUser?.id}
+                        disabled={(user.id ?? user._id) === currentUser?.id}
                         className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
                         aria-label={localize('com_ui_delete_user')}
                       >
@@ -244,14 +241,13 @@ function UserManagement() {
       {/* Edit User Dialog */}
       {editUser && (
         <EditUserDialog
-          key={editUser.id}
+          key={editUser.id ?? editUser._id}
           user={editUser}
           open={!!editUser}
           onOpenChange={(open) => !open && setEditUser(null)}
-          onSubmit={(payload) => handleUpdate(editUser.id, payload)}
+          onSubmit={(payload) => handleUpdate(editUser.id ?? editUser._id ?? '', payload)}
           isLoading={updateMutation.isLoading}
-          balanceEnabled={balanceEnabled}
-          isEditingSelf={editUser.id === currentUser?.id}
+          isEditingSelf={(editUser.id ?? editUser._id) === currentUser?.id}
         />
       )}
 
@@ -304,7 +300,7 @@ function CreateUserDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: TAdminUserCreateRequest) => void;
+  onSubmit: (data: { email: string; name?: string; username?: string; password?: string; role?: string }) => void;
   isLoading: boolean;
 }) {
   const localize = useLocalize();
@@ -313,7 +309,6 @@ function CreateUserDialog({
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState(SystemRoles.USER);
-  const [emailVerified, setEmailVerified] = useState(true);
   const [generatePassword, setGeneratePassword] = useState(false);
 
   const handleGeneratePassword = () => {
@@ -333,7 +328,6 @@ function CreateUserDialog({
       username: username.trim() || undefined,
       password: finalPassword,
       role,
-      emailVerified,
     });
   };
 
@@ -403,16 +397,6 @@ function CreateUserDialog({
                 <option value={SystemRoles.ADMIN}>{SystemRoles.ADMIN}</option>
               </select>
             </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="emailVerified"
-                checked={emailVerified}
-                onChange={(e) => setEmailVerified(e.target.checked)}
-                className="rounded border-border-medium"
-              />
-              <Label htmlFor="emailVerified">{localize('com_ui_email_verified')}</Label>
-            </div>
           </div>
         }
         buttons={
@@ -435,32 +419,27 @@ function EditUserDialog({
   onOpenChange,
   onSubmit,
   isLoading,
-  balanceEnabled,
   isEditingSelf,
 }: {
   user: TAdminUser;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: TAdminUserUpdateRequest) => void;
+  onSubmit: (data: { email?: string; name?: string; username?: string; role?: string; emailVerified?: boolean }) => void;
   isLoading: boolean;
-  balanceEnabled?: boolean;
   isEditingSelf?: boolean;
 }) {
   const localize = useLocalize();
   const [email, setEmail] = useState(user.email);
   const [name, setName] = useState(user.name || '');
   const [username, setUsername] = useState(user.username || '');
-  const [role, setRole] = useState(user.role);
+  const [role, setRole] = useState(user.role ?? SystemRoles.USER);
   const [emailVerified, setEmailVerified] = useState(user.emailVerified ?? true);
-  const [tokenCredits, setTokenCredits] = useState(
-    typeof user.tokenCredits === 'number' ? String(user.tokenCredits) : '0',
-  );
 
   const handleSubmit = () => {
     if (!email?.trim() || !email.includes('@')) {
       return;
     }
-    const payload: TAdminUserUpdateRequest = {
+    const payload: { email?: string; name?: string; username?: string; role?: string; emailVerified?: boolean } = {
       name: name.trim() || undefined,
       username: username.trim() || undefined,
       emailVerified,
@@ -468,12 +447,6 @@ function EditUserDialog({
     if (!isEditingSelf) {
       payload.email = email.trim().toLowerCase();
       payload.role = role;
-    }
-    if (balanceEnabled) {
-      const credits = parseInt(tokenCredits, 10);
-      if (!isNaN(credits) && credits >= 0) {
-        payload.tokenCredits = credits;
-      }
     }
     onSubmit(payload);
   };
@@ -541,19 +514,6 @@ function EditUserDialog({
               />
               <Label htmlFor="editEmailVerified">{localize('com_ui_email_verified')}</Label>
             </div>
-            {balanceEnabled && (
-              <div>
-                <Label className="text-text-primary">{localize('com_ui_user_credits')}</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={tokenCredits}
-                  onChange={(e) => setTokenCredits(e.target.value)}
-                  placeholder="0"
-                  className="mt-1 w-full"
-                />
-              </div>
-            )}
           </div>
         }
         buttons={

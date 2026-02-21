@@ -353,6 +353,15 @@ export const updateRemoteAgentsPermissions = (roleName: string) =>
 export const updateMarketplacePermissions = (roleName: string) =>
   `${getRole(roleName)}/marketplace`;
 
+export const updateMultiConvoPermissions = (roleName: string) =>
+  `${getRole(roleName)}/multi-convo`;
+
+export const updatePresetsPermissions = (roleName: string) =>
+  `${getRole(roleName)}/presets`;
+
+export const updateEndpointsMenuPermissions = (roleName: string) =>
+  `${getRole(roleName)}/endpoints-menu`;
+
 /* Conversation Tags */
 export const conversationTags = (tag?: string) =>
   `${BASE_URL}/api/tags${tag != null && tag ? `/${encodeURIComponent(tag)}` : ''}`;
@@ -384,6 +393,15 @@ export const verifyTwoFactorTemp = () => `${BASE_URL}/api/auth/2fa/verify-temp`;
 /* CRM */
 export const crmProjects = () => `${BASE_URL}/api/crm/projects`;
 export const crmProjectById = (projectId: string) => `${BASE_URL}/api/crm/projects/${projectId}`;
+
+/* Admin Users */
+export const adminUsers = (params?: { search?: string; limit?: number; page?: number }) => {
+  const query = buildQuery(params || {});
+  return `${BASE_URL}/api/admin/users${query}`;
+};
+export const adminUser = (userId: string) => `${BASE_URL}/api/admin/users/${userId}`;
+export const adminUserSendPasswordReset = (userId: string) =>
+  `${adminUser(userId)}/send-password-reset`;
 
 /* Memories */
 export const memories = () => `${BASE_URL}/api/memories`;

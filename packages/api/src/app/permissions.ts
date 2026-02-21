@@ -25,6 +25,10 @@ function hasExplicitConfig(
       return interfaceConfig?.memories !== undefined;
     case PermissionTypes.MULTI_CONVO:
       return interfaceConfig?.multiConvo !== undefined;
+    case PermissionTypes.PRESETS:
+      return interfaceConfig?.presets !== undefined;
+    case PermissionTypes.ENDPOINTS_MENU:
+      return interfaceConfig?.endpointsMenu !== undefined;
     case PermissionTypes.AGENTS:
       return interfaceConfig?.agents !== undefined;
     case PermissionTypes.TEMPORARY_CHAT:
@@ -252,6 +256,20 @@ export async function updateInterfacePermissions({
           loadedInterface.multiConvo,
           defaultPerms[PermissionTypes.MULTI_CONVO]?.[Permissions.USE],
           defaults.multiConvo,
+        ),
+      },
+      [PermissionTypes.PRESETS]: {
+        [Permissions.USE]: getPermissionValue(
+          loadedInterface.presets,
+          defaultPerms[PermissionTypes.PRESETS]?.[Permissions.USE],
+          defaults.presets,
+        ),
+      },
+      [PermissionTypes.ENDPOINTS_MENU]: {
+        [Permissions.USE]: getPermissionValue(
+          loadedInterface.endpointsMenu,
+          defaultPerms[PermissionTypes.ENDPOINTS_MENU]?.[Permissions.USE],
+          defaults.endpointsMenu,
         ),
       },
       [PermissionTypes.AGENTS]: {

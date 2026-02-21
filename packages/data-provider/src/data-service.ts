@@ -933,6 +933,24 @@ export function updateMarketplacePermissions(
   return request.put(endpoints.updateMarketplacePermissions(variables.roleName), variables.updates);
 }
 
+export function updateMultiConvoPermissions(
+  variables: m.UpdateMultiConvoPermVars,
+): Promise<m.UpdatePermResponse> {
+  return request.put(endpoints.updateMultiConvoPermissions(variables.roleName), variables.updates);
+}
+
+export function updatePresetsPermissions(
+  variables: m.UpdatePresetsPermVars,
+): Promise<m.UpdatePermResponse> {
+  return request.put(endpoints.updatePresetsPermissions(variables.roleName), variables.updates);
+}
+
+export function updateEndpointsMenuPermissions(
+  variables: m.UpdateEndpointsMenuPermVars,
+): Promise<m.UpdatePermResponse> {
+  return request.put(endpoints.updateEndpointsMenuPermissions(variables.roleName), variables.updates);
+}
+
 /* Tags */
 export function getConversationTags(): Promise<t.TConversationTagsResponse> {
   return request.get(endpoints.conversationTags());
@@ -1266,3 +1284,40 @@ export interface ActiveJobsResponse {
 export const getActiveJobs = (): Promise<ActiveJobsResponse> => {
   return request.get(endpoints.activeJobs());
 };
+
+/* Admin Users */
+export const listAdminUsers = (
+  params?: q.TAdminUsersListParams,
+): Promise<q.TAdminUsersListResponse> =>
+  request.get(endpoints.adminUsers(params));
+
+export const getAdminUser = (userId: string): Promise<q.TAdminUser> =>
+  request.get(endpoints.adminUser(userId));
+
+export const createAdminUser = (data: {
+  email: string;
+  password?: string;
+  name?: string;
+  username?: string;
+  role?: string;
+}): Promise<q.TAdminUser> => request.post(endpoints.adminUsers(), data);
+
+export const updateAdminUser = (
+  userId: string,
+  data: Partial<{
+    email: string;
+    name: string;
+    username: string;
+    role: string;
+    emailVerified: boolean;
+    password: string;
+  }>,
+): Promise<q.TAdminUser> => request.patch(endpoints.adminUser(userId), data);
+
+export const deleteAdminUser = (userId: string): Promise<{ message: string }> =>
+  request.delete(endpoints.adminUser(userId));
+
+export const sendAdminPasswordReset = (
+  userId: string,
+): Promise<{ message: string; link?: string }> =>
+  request.post(endpoints.adminUserSendPasswordReset(userId));

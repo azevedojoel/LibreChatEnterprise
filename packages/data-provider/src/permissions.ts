@@ -25,6 +25,14 @@ export enum PermissionTypes {
    */
   MULTI_CONVO = 'MULTI_CONVO',
   /**
+   * Type for Presets (model presets) Permissions
+   */
+  PRESETS = 'PRESETS',
+  /**
+   * Type for Endpoints Menu Permissions
+   */
+  ENDPOINTS_MENU = 'ENDPOINTS_MENU',
+  /**
    * Type for Temporary Chat
    */
   TEMPORARY_CHAT = 'TEMPORARY_CHAT',
@@ -116,6 +124,16 @@ export const multiConvoPermissionsSchema = z.object({
 });
 export type TMultiConvoPermissions = z.infer<typeof multiConvoPermissionsSchema>;
 
+export const presetsPermissionsSchema = z.object({
+  [Permissions.USE]: z.boolean().default(true),
+});
+export type TPresetsPermissions = z.infer<typeof presetsPermissionsSchema>;
+
+export const endpointsMenuPermissionsSchema = z.object({
+  [Permissions.USE]: z.boolean().default(true),
+});
+export type TEndpointsMenuPermissions = z.infer<typeof endpointsMenuPermissionsSchema>;
+
 export const temporaryChatPermissionsSchema = z.object({
   [Permissions.USE]: z.boolean().default(true),
 });
@@ -176,6 +194,8 @@ export const permissionsSchema = z.object({
   [PermissionTypes.MEMORIES]: memoryPermissionsSchema,
   [PermissionTypes.AGENTS]: agentPermissionsSchema,
   [PermissionTypes.MULTI_CONVO]: multiConvoPermissionsSchema,
+  [PermissionTypes.PRESETS]: presetsPermissionsSchema,
+  [PermissionTypes.ENDPOINTS_MENU]: endpointsMenuPermissionsSchema,
   [PermissionTypes.TEMPORARY_CHAT]: temporaryChatPermissionsSchema,
   [PermissionTypes.RUN_CODE]: runCodePermissionsSchema,
   [PermissionTypes.WEB_SEARCH]: webSearchPermissionsSchema,

@@ -11,6 +11,8 @@ import {
   webSearchPermissionsSchema,
   fileSearchPermissionsSchema,
   multiConvoPermissionsSchema,
+  presetsPermissionsSchema,
+  endpointsMenuPermissionsSchema,
   mcpServersPermissionsSchema,
   peoplePickerPermissionsSchema,
   remoteAgentsPermissionsSchema,
@@ -66,6 +68,12 @@ const defaultRolesSchema = z.object({
         [Permissions.SHARE_PUBLIC]: z.boolean().default(true),
       }),
       [PermissionTypes.MULTI_CONVO]: multiConvoPermissionsSchema.extend({
+        [Permissions.USE]: z.boolean().default(true),
+      }),
+      [PermissionTypes.PRESETS]: presetsPermissionsSchema.extend({
+        [Permissions.USE]: z.boolean().default(true),
+      }),
+      [PermissionTypes.ENDPOINTS_MENU]: endpointsMenuPermissionsSchema.extend({
         [Permissions.USE]: z.boolean().default(true),
       }),
       [PermissionTypes.TEMPORARY_CHAT]: temporaryChatPermissionsSchema.extend({
@@ -140,6 +148,12 @@ export const roleDefaults = defaultRolesSchema.parse({
       [PermissionTypes.MULTI_CONVO]: {
         [Permissions.USE]: true,
       },
+      [PermissionTypes.PRESETS]: {
+        [Permissions.USE]: true,
+      },
+      [PermissionTypes.ENDPOINTS_MENU]: {
+        [Permissions.USE]: true,
+      },
       [PermissionTypes.TEMPORARY_CHAT]: {
         [Permissions.USE]: true,
       },
@@ -185,6 +199,8 @@ export const roleDefaults = defaultRolesSchema.parse({
       [PermissionTypes.MEMORIES]: {},
       [PermissionTypes.AGENTS]: {},
       [PermissionTypes.MULTI_CONVO]: {},
+      [PermissionTypes.PRESETS]: {},
+      [PermissionTypes.ENDPOINTS_MENU]: {},
       [PermissionTypes.TEMPORARY_CHAT]: {},
       [PermissionTypes.RUN_CODE]: {},
       [PermissionTypes.WEB_SEARCH]: {},

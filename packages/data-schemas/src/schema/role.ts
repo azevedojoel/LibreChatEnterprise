@@ -32,6 +32,12 @@ const rolePermissionsSchema = new Schema(
     [PermissionTypes.MULTI_CONVO]: {
       [Permissions.USE]: { type: Boolean },
     },
+    [PermissionTypes.PRESETS]: {
+      [Permissions.USE]: { type: Boolean },
+    },
+    [PermissionTypes.ENDPOINTS_MENU]: {
+      [Permissions.USE]: { type: Boolean },
+    },
     [PermissionTypes.TEMPORARY_CHAT]: {
       [Permissions.USE]: { type: Boolean },
     },

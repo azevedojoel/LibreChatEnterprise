@@ -4,6 +4,31 @@ import type * as a from '../types/agents';
 import type * as s from '../schemas';
 import type * as t from '../types';
 
+/* Admin Users */
+export type TAdminUser = Partial<t.TUser> & {
+  id?: string;
+  _id?: string;
+  email: string;
+  emailVerified?: boolean;
+  provider?: string;
+  role?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type TAdminUsersListParams = {
+  search?: string;
+  limit?: number;
+  page?: number;
+};
+
+export type TAdminUsersListResponse = {
+  users: TAdminUser[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
 export type Conversation = {
   id: string;
   createdAt: number;

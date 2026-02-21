@@ -331,6 +331,33 @@ export type UpdateMarketplacePermOptions = MutationOptions<
   types.TError | null | undefined
 >;
 
+export type UpdateMultiConvoPermVars = UpdatePermVars<p.TMultiConvoPermissions>;
+
+export type UpdateMultiConvoPermOptions = MutationOptions<
+  UpdatePermResponse,
+  UpdateMultiConvoPermVars,
+  unknown,
+  types.TError | null | undefined
+>;
+
+export type UpdatePresetsPermVars = UpdatePermVars<p.TPresetsPermissions>;
+
+export type UpdatePresetsPermOptions = MutationOptions<
+  UpdatePermResponse,
+  UpdatePresetsPermVars,
+  unknown,
+  types.TError | null | undefined
+>;
+
+export type UpdateEndpointsMenuPermVars = UpdatePermVars<p.TEndpointsMenuPermissions>;
+
+export type UpdateEndpointsMenuPermOptions = MutationOptions<
+  UpdatePermResponse,
+  UpdateEndpointsMenuPermVars,
+  unknown,
+  types.TError | null | undefined
+>;
+
 export type UpdateConversationTagOptions = MutationOptions<
   types.TConversationTag,
   types.TConversationTagRequest

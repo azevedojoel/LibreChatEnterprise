@@ -8,6 +8,9 @@ import {
   marketplacePermissionsSchema,
   peoplePickerPermissionsSchema,
   remoteAgentsPermissionsSchema,
+  multiConvoPermissionsSchema,
+  presetsPermissionsSchema,
+  endpointsMenuPermissionsSchema,
 } from 'librechat-data-provider';
 import type {
   QueryObserverResult,
@@ -271,6 +274,114 @@ export const useUpdateRemoteAgentsPermissionsMutation = (
         const error = args[0];
         if (error != null) {
           console.error('Failed to update remote agents permissions:', error);
+        }
+        if (onError) {
+          onError(...args);
+        }
+      },
+      onMutate,
+    },
+  );
+};
+
+export const useUpdateMultiConvoPermissionsMutation = (
+  options?: t.UpdateMultiConvoPermOptions,
+): UseMutationResult<
+  t.UpdatePermResponse,
+  t.TError | undefined,
+  t.UpdateMultiConvoPermVars,
+  unknown
+> => {
+  const queryClient = useQueryClient();
+  const { onMutate, onSuccess, onError } = options ?? {};
+  return useMutation(
+    (variables) => {
+      multiConvoPermissionsSchema.partial().parse(variables.updates);
+      return dataService.updateMultiConvoPermissions(variables);
+    },
+    {
+      onSuccess: (data, variables, context) => {
+        queryClient.invalidateQueries([QueryKeys.roles, variables.roleName]);
+        if (onSuccess) {
+          onSuccess(data, variables, context);
+        }
+      },
+      onError: (...args) => {
+        const error = args[0];
+        if (error != null) {
+          console.error('Failed to update multi-convo permissions:', error);
+        }
+        if (onError) {
+          onError(...args);
+        }
+      },
+      onMutate,
+    },
+  );
+};
+
+export const useUpdatePresetsPermissionsMutation = (
+  options?: t.UpdatePresetsPermOptions,
+): UseMutationResult<
+  t.UpdatePermResponse,
+  t.TError | undefined,
+  t.UpdatePresetsPermVars,
+  unknown
+> => {
+  const queryClient = useQueryClient();
+  const { onMutate, onSuccess, onError } = options ?? {};
+  return useMutation(
+    (variables) => {
+      presetsPermissionsSchema.partial().parse(variables.updates);
+      return dataService.updatePresetsPermissions(variables);
+    },
+    {
+      onSuccess: (data, variables, context) => {
+        queryClient.invalidateQueries([QueryKeys.roles, variables.roleName]);
+        if (onSuccess) {
+          onSuccess(data, variables, context);
+        }
+      },
+      onError: (...args) => {
+        const error = args[0];
+        if (error != null) {
+          console.error('Failed to update presets permissions:', error);
+        }
+        if (onError) {
+          onError(...args);
+        }
+      },
+      onMutate,
+    },
+  );
+};
+
+export const useUpdateEndpointsMenuPermissionsMutation = (
+  options?: t.UpdateEndpointsMenuPermOptions,
+): UseMutationResult<
+  t.UpdatePermResponse,
+  t.TError | undefined,
+  t.UpdateEndpointsMenuPermVars,
+  unknown
+> => {
+  const queryClient = useQueryClient();
+  const { onMutate, onSuccess, onError } = options ?? {};
+  return useMutation(
+    (variables) => {
+      endpointsMenuPermissionsSchema.partial().parse(variables.updates);
+      return dataService.updateEndpointsMenuPermissions(variables);
+    },
+    {
+      onSuccess: (data, variables, context) => {
+        queryClient.invalidateQueries([QueryKeys.roles, variables.roleName]);
+        if (onSuccess) {
+          onSuccess(data, variables, context);
+        }
+      },
+      onError: (...args) => {
+        const error = args[0];
+        if (error != null) {
+          console.error('Failed to update endpoints menu permissions:', error);
         }
         if (onError) {
           onError(...args);

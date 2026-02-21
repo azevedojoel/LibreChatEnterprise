@@ -69,6 +69,9 @@ export enum QueryKeys {
   scheduledAgentRuns = 'scheduledAgentRuns',
   /* CRM Projects */
   crmProjects = 'crmProjects',
+  /* Admin Users */
+  adminUsers = 'adminUsers',
+  adminUser = 'adminUser',
   /* Workflows */
   workflows = 'workflows',
   workflow = 'workflow',
@@ -109,6 +112,10 @@ export enum MutationKeys {
   deleteAgentAction = 'deleteAgentAction',
   revertAgentVersion = 'revertAgentVersion',
   deleteUser = 'deleteUser',
+  createAdminUser = 'createAdminUser',
+  updateAdminUser = 'updateAdminUser',
+  deleteAdminUser = 'deleteAdminUser',
+  sendAdminPasswordReset = 'sendAdminPasswordReset',
   updateRole = 'updateRole',
   enableTwoFactor = 'enableTwoFactor',
   verifyTwoFactor = 'verifyTwoFactor',

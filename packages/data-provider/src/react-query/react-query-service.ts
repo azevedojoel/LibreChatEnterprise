@@ -880,3 +880,74 @@ export const useRunWorkflowScheduleMutation = (): UseMutationResult<
     },
   );
 };
+
+/* Admin Users */
+export const useGetAdminUsersQuery = (
+  params?: q.TAdminUsersListParams,
+  config?: UseQueryOptions<q.TAdminUsersListResponse>,
+): QueryObserverResult<q.TAdminUsersListResponse> => {
+  return useQuery<q.TAdminUsersListResponse>(
+    [QueryKeys.adminUsers, params],
+    () => dataService.listAdminUsers(params),
+    { refetchOnWindowFocus: false, ...config },
+  );
+};
+
+export const useGetAdminUserQuery = (
+  userId: string,
+  config?: UseQueryOptions<q.TAdminUser>,
+): QueryObserverResult<q.TAdminUser> => {
+  return useQuery<q.TAdminUser>(
+    [QueryKeys.adminUser, userId],
+    () => dataService.getAdminUser(userId),
+    { enabled: !!userId, refetchOnWindowFocus: false, ...config },
+  );
+};
+
+export const useCreateAdminUserMutation = (): UseMutationResult<
+  q.TAdminUser,
+  unknown,
+  Parameters<typeof dataService.createAdminUser>[0]
+> => {
+  const queryClient = useQueryClient();
+  return useMutation(dataService.createAdminUser, {
+    onSuccess: () => {
+      queryClient.invalidateQueries([QueryKeys.adminUsers]);
+    },
+  });
+};
+
+export const useUpdateAdminUserMutation = (): UseMutationResult<
+  q.TAdminUser,
+  unknown,
+  { userId: string; data: Parameters<typeof dataService.updateAdminUser>[1] }
+> => {
+  const queryClient = useQueryClient();
+  return useMutation(({ userId, data }) => dataService.updateAdminUser(userId, data), {
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries([QueryKeys.adminUsers]);
+      queryClient.invalidateQueries([QueryKeys.adminUser, variables.userId]);
+    },
+  });
+};
+
+export const useDeleteAdminUserMutation = (): UseMutationResult<
+  { message: string },
+  unknown,
+  string
+> => {
+  const queryClient = useQueryClient();
+  return useMutation(dataService.deleteAdminUser, {
+    onSuccess: () => {
+      queryClient.invalidateQueries([QueryKeys.adminUsers]);
+    },
+  });
+};
+
+export const useSendAdminPasswordResetMutation = (): UseMutationResult<
+  { message: string; link?: string },
+  unknown,
+  string
+> => {
+  return useMutation(dataService.sendAdminPasswordReset);
+};

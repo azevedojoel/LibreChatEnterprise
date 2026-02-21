@@ -10,6 +10,9 @@ const {
   marketplacePermissionsSchema,
   peoplePickerPermissionsSchema,
   remoteAgentsPermissionsSchema,
+  multiConvoPermissionsSchema,
+  presetsPermissionsSchema,
+  endpointsMenuPermissionsSchema,
 } = require('librechat-data-provider');
 const { checkAdmin, requireJwtAuth } = require('~/server/middleware');
 const { updateRoleByName, getRoleByName } = require('~/models/Role');
@@ -56,6 +59,21 @@ const permissionConfigs = {
     schema: remoteAgentsPermissionsSchema,
     permissionType: PermissionTypes.REMOTE_AGENTS,
     errorMessage: 'Invalid remote agents permissions.',
+  },
+  'multi-convo': {
+    schema: multiConvoPermissionsSchema,
+    permissionType: PermissionTypes.MULTI_CONVO,
+    errorMessage: 'Invalid multi-convo permissions.',
+  },
+  presets: {
+    schema: presetsPermissionsSchema,
+    permissionType: PermissionTypes.PRESETS,
+    errorMessage: 'Invalid presets permissions.',
+  },
+  'endpoints-menu': {
+    schema: endpointsMenuPermissionsSchema,
+    permissionType: PermissionTypes.ENDPOINTS_MENU,
+    errorMessage: 'Invalid endpoints menu permissions.',
   },
 };
 
@@ -171,5 +189,23 @@ router.put('/:roleName/marketplace', checkAdmin, createPermissionUpdateHandler('
  * Update remote agents (API) permissions for a specific role
  */
 router.put('/:roleName/remote-agents', checkAdmin, createPermissionUpdateHandler('remote-agents'));
+
+/**
+ * PUT /api/roles/:roleName/multi-convo
+ * Update multi-convo (add conversation) permissions for a specific role
+ */
+router.put('/:roleName/multi-convo', checkAdmin, createPermissionUpdateHandler('multi-convo'));
+
+/**
+ * PUT /api/roles/:roleName/presets
+ * Update presets permissions for a specific role
+ */
+router.put('/:roleName/presets', checkAdmin, createPermissionUpdateHandler('presets'));
+
+/**
+ * PUT /api/roles/:roleName/endpoints-menu
+ * Update endpoints menu permissions for a specific role
+ */
+router.put('/:roleName/endpoints-menu', checkAdmin, createPermissionUpdateHandler('endpoints-menu'));
 
 module.exports = router;
