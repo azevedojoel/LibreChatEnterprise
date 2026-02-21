@@ -115,7 +115,7 @@ function markdownToEmailHtml(md) {
  * Supports appName/agentName branding in header/footer.
  * @param {Array} contentParts - Ordered content from response.content
  * @param {string[]} [capturedOAuthUrls=[]] - OAuth URLs to include at top
- * @param {Object} [options={}] - Optional { appName, agentName, userMessage }
+ * @param {Object} [options={}] - Optional { appName, agentName, userMessage, fileNames }
  * @returns {string} HTML string
  */
 function formatEmailHtml(contentParts, capturedOAuthUrls = [], options = {}) {
@@ -191,6 +191,20 @@ function formatEmailHtml(contentParts, capturedOAuthUrls = [], options = {}) {
 ${contentBlocks.join('\n')}
 </div>`);
 
+  /* Files referenced (when file_search used) */
+  const fileNames = options.fileNames;
+  if (Array.isArray(fileNames) && fileNames.length > 0) {
+    const fileList = fileNames.map((f) => escapeHtml(String(f))).join(', ');
+    parts.push(`
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top: 16px;">
+  <tr>
+    <td style="font-size: 12px; color: ${STYLES.textMuted};">
+      Files referenced: ${fileList}
+    </td>
+  </tr>
+</table>`);
+  }
+
   /* Footer */
   parts.push(`
 <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid ${STYLES.border};">
@@ -248,7 +262,7 @@ ${parts.join('\n')}
  * Format ordered content parts as plain text.
  * @param {Array} contentParts - Ordered content from response.content
  * @param {string[]} [capturedOAuthUrls=[]] - OAuth URLs to include at top
- * @param {Object} [options={}] - Optional { userMessage }
+ * @param {Object} [options={}] - Optional { userMessage, fileNames }
  * @returns {string} Plain text string
  */
 function formatEmailText(contentParts, capturedOAuthUrls = [], options = {}) {
@@ -290,6 +304,13 @@ function formatEmailText(contentParts, capturedOAuthUrls = [], options = {}) {
     parts.push('');
   }
 
+  /* Files referenced (when file_search used) */
+  const fileNames = options.fileNames;
+  if (Array.isArray(fileNames) && fileNames.length > 0) {
+    const fileList = fileNames.join(', ');
+    parts.push(`Files referenced: ${fileList}`);
+  }
+
   const userMessage = options.userMessage;
   if (userMessage && typeof userMessage === 'string' && userMessage.trim()) {
     const preview = userMessage.trim();
@@ -306,7 +327,7 @@ function formatEmailText(contentParts, capturedOAuthUrls = [], options = {}) {
  * Format ordered content for email. Returns both HTML and plain text.
  * @param {Array} contentParts - Ordered content from response.content
  * @param {string[]} [capturedOAuthUrls=[]] - OAuth URLs to include at top
- * @param {Object} [options={}] - Optional { appName, agentName, userMessage }
+ * @param {Object} [options={}] - Optional { appName, agentName, userMessage, fileNames }
  * @returns {{ html: string, text: string }}
  */
 function formatEmailContent(contentParts, capturedOAuthUrls = [], options = {}) {

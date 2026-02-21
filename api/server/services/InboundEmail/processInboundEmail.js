@@ -286,6 +286,7 @@ async function processInboundEmail(payload) {
       appName: process.env.APP_TITLE || 'Daily Thread',
       agentName: agent?.name,
       userMessage: messageText,
+      fileNames: requestFiles.map((f) => f.filename),
     });
 
     logger.info('[InboundEmail] Building email reply', {
