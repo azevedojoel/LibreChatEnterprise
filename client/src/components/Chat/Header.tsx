@@ -35,6 +35,11 @@ export default function Header() {
     permission: Permissions.USE,
   });
 
+  const hasAccessToPresets = useHasAccess({
+    permissionType: PermissionTypes.PRESETS,
+    permission: Permissions.USE,
+  });
+
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
 
   return (
@@ -65,7 +70,9 @@ export default function Header() {
               )}
             >
               <ModelSelector startupConfig={startupConfig} />
-              {interfaceConfig.presets === true && interfaceConfig.modelSelect && <PresetsMenu />}
+              {interfaceConfig.presets === true &&
+                hasAccessToPresets === true &&
+                interfaceConfig.modelSelect && <PresetsMenu />}
               {hasAccessToBookmarks === true && <BookmarkMenu />}
               {hasAccessToMultiConvo === true && <AddMultiConvo />}
               {isSmallScreen && (

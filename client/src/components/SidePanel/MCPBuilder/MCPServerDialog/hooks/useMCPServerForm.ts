@@ -12,6 +12,7 @@ import { useReinitializeMCPServerMutation } from 'librechat-data-provider/react-
 import type { MCPServerDiscoverResponse } from 'librechat-data-provider';
 import { useToastContext } from '@librechat/client';
 import { useLocalize } from '~/hooks';
+import { openOAuthUrl } from '~/utils';
 import { extractServerNameFromUrl, isValidUrl, normalizeUrl } from '../utils/urlUtils';
 import type { MCPServerDefinition } from '~/hooks';
 
@@ -407,7 +408,7 @@ export function useMCPServerForm({ server, onSuccess, onClose }: UseMCPServerFor
 
       const reinitResponse = await reinitializeMutation.mutateAsync(result.serverName);
       if (reinitResponse.oauthRequired && reinitResponse.oauthUrl) {
-        window.open(reinitResponse.oauthUrl, '_blank', 'noopener,noreferrer');
+        openOAuthUrl(reinitResponse.oauthUrl);
       }
       showToast({ message: localize('com_ui_mcp_server_created'), status: 'success' });
       onSuccess?.(result.serverName, true, { connectFromDiscovery: true });

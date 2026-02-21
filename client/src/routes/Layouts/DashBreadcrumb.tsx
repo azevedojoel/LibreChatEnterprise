@@ -3,7 +3,7 @@ import { useSetRecoilState } from 'recoil';
 import { Sidebar } from '@librechat/client';
 import { useLocation } from 'react-router-dom';
 import { SystemRoles } from 'librechat-data-provider';
-import { ArrowLeft, MessageSquareQuote, GitBranch } from 'lucide-react';
+import { ArrowLeft, MessageSquareQuote, GitBranch, Users } from 'lucide-react';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -20,6 +20,7 @@ import store from '~/store';
 
 const promptsPathPattern = /prompts\/(?!new(?:\/|$)).*$/;
 const workflowsPathPattern = /^\/d\/workflows(\/|$)/;
+const usersPathPattern = /^\/d\/users(\/|$)/;
 
 const getConversationId = (prevLocationPath: string) => {
   if (!prevLocationPath || prevLocationPath.includes('/d/')) {
@@ -62,12 +63,20 @@ export default function DashBreadcrumb({
     () => promptsPathPattern.test(location.pathname),
     [location.pathname],
   );
+  const isUsersPath = useMemo(
+    () => usersPathPattern.test(location.pathname),
+    [location.pathname],
+  );
 
-  const sectionLabel = isWorkflowsPath ? localize('com_ui_workflows') : localize('com_ui_prompts');
-  const sectionHref = isWorkflowsPath ? '/d/workflows' : '/d/prompts';
-  const SectionIcon = isWorkflowsPath ? GitBranch : MessageSquareQuote;
+  const sectionLabel = isUsersPath
+    ? localize('com_nav_user_management')
+    : isWorkflowsPath
+      ? localize('com_ui_workflows')
+      : localize('com_ui_prompts');
+  const sectionHref = isUsersPath ? '/d/users' : isWorkflowsPath ? '/d/workflows' : '/d/prompts';
+  const SectionIcon = isUsersPath ? Users : isWorkflowsPath ? GitBranch : MessageSquareQuote;
   const promptsLinkHandler = useCustomLink(sectionHref);
-  const panelId = isWorkflowsPath ? 'workflows-panel' : 'prompts-panel';
+  const panelId = isUsersPath ? 'users-panel' : isWorkflowsPath ? 'workflows-panel' : 'prompts-panel';
 
   return (
     <div className="mr-2 mt-2 flex h-10 items-center justify-between">
@@ -137,6 +146,7 @@ export default function DashBreadcrumb({
       <div className="flex items-center justify-center gap-2">
         {isPromptsPath && <AdvancedSwitch />}
         {user?.role === SystemRoles.ADMIN &&
+          !isUsersPath &&
           (isWorkflowsPath ? <WorkflowsAdminSettings /> : <AdminSettings />)}
       </div>
     </div>

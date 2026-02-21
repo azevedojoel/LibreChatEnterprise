@@ -12,6 +12,7 @@ import {
 import type { TUpdateUserPlugins, TPlugin, MCPServersResponse } from 'librechat-data-provider';
 import type { ConfigFieldDetail } from '~/common';
 import { useLocalize, useMCPSelect, useMCPConnectionStatus } from '~/hooks';
+import { openOAuthUrl } from '~/utils';
 import { useGetStartupConfig, useMCPServersQuery } from '~/data-provider';
 import { mcpServerInitStatesAtom, getServerInitState } from '~/store/mcp';
 import type { MCPServerInitState } from '~/store/mcp';
@@ -339,7 +340,7 @@ export function useMCPServerManager({
           });
 
           if (autoOpenOAuth) {
-            window.open(response.oauthUrl, '_blank', 'noopener,noreferrer');
+            openOAuthUrl(response.oauthUrl);
           }
 
           startServerPolling(serverName);

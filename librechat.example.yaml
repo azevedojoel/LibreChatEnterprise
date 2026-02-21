@@ -279,6 +279,8 @@ endpoints:
   #   # (optional) Agent Capabilities available to all users. Omit the ones you wish to exclude. Defaults to list below.
   #   # For execute_code: set DISABLE_LOCAL_CODE_EXECUTION=true in multi-tenant deployments until sandboxing is available.
   #   capabilities: ["execute_code", "file_search", "actions", "tools"]
+  #   # (optional) Domain for inbound email addresses (inbound+token@domain). When set, enables copy-to-clipboard for full agent email in the agent panel.
+  #   inboundEmailAddress: inbound.postmarkapp.com
 
   # Anthropic endpoint configuration with Vertex AI support
   # Use this to run Anthropic Claude models through Google Cloud Vertex AI

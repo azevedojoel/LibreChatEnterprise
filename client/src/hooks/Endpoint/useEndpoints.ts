@@ -44,6 +44,11 @@ export const useEndpoints = ({
     permission: Permissions.USE,
   });
 
+  const hasAccessToEndpointsMenu = useHasAccess({
+    permissionType: PermissionTypes.ENDPOINTS_MENU,
+    permission: Permissions.USE,
+  });
+
   const assistants: Assistant[] = useMemo(
     () => Object.values(assistantsMap?.[EModelEndpoint.assistants] ?? {}),
     [assistantsMap],
@@ -55,7 +60,11 @@ export const useEndpoints = ({
   );
 
   const filteredEndpoints = useMemo(() => {
-    if (!interfaceConfig.modelSelect) {
+    if (
+      !interfaceConfig.modelSelect ||
+      !(interfaceConfig.endpointsMenu ?? true) ||
+      !hasAccessToEndpointsMenu
+    ) {
       return [];
     }
     const result: EModelEndpoint[] = [];
@@ -70,7 +79,14 @@ export const useEndpoints = ({
     }
 
     return result;
-  }, [endpoints, hasAgentAccess, includedEndpoints, interfaceConfig.modelSelect]);
+  }, [
+    endpoints,
+    hasAgentAccess,
+    hasAccessToEndpointsMenu,
+    includedEndpoints,
+    interfaceConfig.modelSelect,
+    interfaceConfig.endpointsMenu,
+  ]);
 
   const endpointRequiresUserKey = useCallback(
     (ep: string) => {

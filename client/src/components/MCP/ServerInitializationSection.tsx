@@ -2,6 +2,7 @@ import React from 'react';
 import { RefreshCw, Trash2 } from 'lucide-react';
 import { Button, Spinner } from '@librechat/client';
 import { useLocalize, useMCPServerManager, useMCPConnectionStatus } from '~/hooks';
+import OAuthLink from '~/components/OAuth/OAuthLink';
 
 interface ServerInitializationSectionProps {
   sidePanel?: boolean;
@@ -59,13 +60,9 @@ export default function ServerInitializationSection({
           >
             {localize('com_ui_cancel')}
           </Button>
-          <Button
-            variant="submit"
-            onClick={() => window.open(serverOAuthUrl, '_blank', 'noopener,noreferrer')}
-            className="flex-1"
-          >
+          <OAuthLink href={serverOAuthUrl} variant="submit" className="flex-1">
             {localize('com_ui_continue_oauth')}
-          </Button>
+          </OAuthLink>
         </div>
       </>
     );

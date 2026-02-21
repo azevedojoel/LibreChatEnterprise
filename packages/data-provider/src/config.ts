@@ -296,6 +296,8 @@ export const agentsEndpointSchema = baseEndpointSchema
         .array(z.nativeEnum(AgentCapabilities))
         .optional()
         .default(defaultAgentCapabilities),
+      /** Domain for inbound email addresses (inbound+token@domain). Required for copy-to-clipboard. */
+      inboundEmailAddress: z.string().optional(),
     }),
   )
   .default({

@@ -9,6 +9,7 @@ import {
   CreateWorkflowForm,
 } from '~/components/Prompts';
 import { WorkflowsView } from '~/components/Workflows';
+import { UsersView } from '~/components/Users';
 import DashboardRoute from './Layouts/Dashboard';
 
 const dashboardRoutes = {
@@ -75,6 +76,10 @@ const dashboardRoutes = {
           element: <PromptForm />,
         },
       ],
+    },
+    {
+      path: 'users/*',
+      element: <UsersView />,
     },
     {
       path: 'workflows/*',

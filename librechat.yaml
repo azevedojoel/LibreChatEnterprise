@@ -33,12 +33,12 @@ interface:
   prompts:
     use: true
     create: true
-    share: false
+    share: true
     public: false
   agents:
     use: true
     create: true
-    share: false
+    share: true
     public: false
   peoplePicker:
     users: true
@@ -183,7 +183,6 @@ mcpServers:
     command: node
     args:
       - ./mcp-servers/ms-365-mcp-server/dist/index.js
-      - --toon
       - --org-mode
     startup: false
     iconPath: /assets/microsoft.svg
@@ -329,6 +328,7 @@ endpoints:
       - manage_scheduling
       - manage_crm
       - inbound_email
+    inboundEmailAddress: inbound.postmarkapp.com  # Domain for agent email addresses (inbound+token@domain). Change to your Postmark inbound domain or custom domain.
 
   # Anthropic with Vertex AI (uncomment if using)
   # anthropic:

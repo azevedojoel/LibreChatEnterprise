@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { Settings2 } from 'lucide-react';
 import { TooltipAnchor } from '@librechat/client';
 import { Root, Anchor } from '@radix-ui/react-popover';
-import { isParamEndpoint, getEndpointField, tConvoUpdateSchema } from 'librechat-data-provider';
+import { isParamEndpoint, getEndpointField, tConvoUpdateSchema, PermissionTypes, Permissions } from 'librechat-data-provider';
 import type { TPreset, TInterfaceConfig } from 'librechat-data-provider';
 import { EndpointSettings, SaveAsPresetDialog, AlternativeSettings } from '~/components/Endpoints';
-import { useSetIndexOptions, useLocalize } from '~/hooks';
+import { useSetIndexOptions, useLocalize, useHasAccess } from '~/hooks';
 import { useGetEndpointsQuery } from '~/data-provider';
 import OptionsPopover from './OptionsPopover';
 import PopoverButtons from './PopoverButtons';
@@ -17,6 +17,10 @@ export default function HeaderOptions({
   interfaceConfig?: Partial<TInterfaceConfig>;
 }) {
   const { data: endpointsConfig } = useGetEndpointsQuery();
+  const hasAccessToPresets = useHasAccess({
+    permissionType: PermissionTypes.PRESETS,
+    permission: Permissions.USE,
+  });
 
   const [saveAsDialogShow, setSaveAsDialogShow] = useState<boolean>(false);
   const localize = useLocalize();
@@ -66,7 +70,7 @@ export default function HeaderOptions({
               <OptionsPopover
                 visible={showPopover}
                 saveAsPreset={saveAsPreset}
-                presetsDisabled={!(interfaceConfig.presets ?? false)}
+                presetsDisabled={!(interfaceConfig.presets ?? false) || hasAccessToPresets !== true}
                 PopoverButtons={<PopoverButtons />}
                 closePopover={() => setShowPopover(false)}
               >
@@ -80,7 +84,7 @@ export default function HeaderOptions({
                 </div>
               </OptionsPopover>
             )}
-            {interfaceConfig?.presets === true && (
+            {interfaceConfig?.presets === true && hasAccessToPresets === true && (
               <SaveAsPresetDialog
                 open={saveAsDialogShow}
                 onOpenChange={setSaveAsDialogShow}

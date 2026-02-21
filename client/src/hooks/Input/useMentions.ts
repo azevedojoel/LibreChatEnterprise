@@ -63,6 +63,11 @@ export default function useMentions({
     permission: Permissions.USE,
   });
 
+  const hasAccessToPresets = useHasAccess({
+    permissionType: PermissionTypes.PRESETS,
+    permission: Permissions.USE,
+  });
+
   const agentsMap = useAgentsMapContext();
   const { data: presets } = useGetPresetsQuery();
   const { data: modelsConfig } = useGetModelsQuery();
@@ -217,7 +222,9 @@ export default function useMentions({
       interfaceConfig.modelSelect === true
         ? assistantListMap[EModelEndpoint.azureAssistants] || []
         : []),
-      ...((interfaceConfig.modelSelect === true && interfaceConfig.presets === true
+      ...((interfaceConfig.modelSelect === true &&
+      interfaceConfig.presets === true &&
+      hasAccessToPresets === true
         ? presets
         : []
       )?.map((preset, index) => ({
@@ -250,6 +257,7 @@ export default function useMentions({
     includeAssistants,
     interfaceConfig.presets,
     interfaceConfig.modelSelect,
+    hasAccessToPresets,
   ]);
 
   return {
