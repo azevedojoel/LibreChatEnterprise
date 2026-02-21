@@ -34,3 +34,9 @@ export * from './mcp';
 export * from './scheduledPrompt';
 /* Workflows */
 export * from './workflow';
+/* CRM */
+export * from './contact';
+export * from './organization';
+export * from './deal';
+export * from './activity';
+export * from './pipeline';

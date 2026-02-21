@@ -29,3 +29,9 @@ export { default as scheduledRunSchema } from './scheduledRun';
 export { default as groupSchema } from './group';
 export { default as workflowRunSchema } from './workflowRun';
 export { default as workflowScheduleSchema } from './workflowSchedule';
+/* CRM */
+export { default as contactSchema } from './contact';
+export { default as organizationSchema } from './organization';
+export { default as dealSchema } from './deal';
+export { default as activitySchema } from './activity';
+export { default as pipelineSchema } from './pipeline';

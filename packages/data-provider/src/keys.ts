@@ -67,6 +67,8 @@ export enum QueryKeys {
   /* Scheduled Agents */
   scheduledAgents = 'scheduledAgents',
   scheduledAgentRuns = 'scheduledAgentRuns',
+  /* CRM Projects */
+  crmProjects = 'crmProjects',
   /* Workflows */
   workflows = 'workflows',
   workflow = 'workflow',

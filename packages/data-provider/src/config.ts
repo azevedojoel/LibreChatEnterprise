@@ -188,6 +188,7 @@ export enum AgentCapabilities {
   chain = 'chain',
   ocr = 'ocr',
   manage_scheduling = 'manage_scheduling',
+  manage_crm = 'manage_crm',
   inbound_email = 'inbound_email',
 }
 

@@ -167,3 +167,19 @@ export const useMarketplaceAgentsInfiniteQuery = (
     ...config,
   });
 };
+
+/**
+ * Hook for listing CRM projects
+ */
+export const useListProjectsQuery = (
+  config?: UseQueryOptions<Array<{ _id: string; name: string }>>,
+): QueryObserverResult<Array<{ _id: string; name: string }>> =>
+  useQuery<Array<{ _id: string; name: string }>>(
+    [QueryKeys.crmProjects],
+    () => dataService.listProjects(),
+    {
+      staleTime: 1000 * 60,
+      refetchOnWindowFocus: false,
+      ...config,
+    },
+  );

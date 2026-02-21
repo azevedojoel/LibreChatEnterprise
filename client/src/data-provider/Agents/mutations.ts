@@ -1,5 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { dataService, MutationKeys, PermissionBits, QueryKeys } from 'librechat-data-provider';
+import {
+  dataService,
+  MutationKeys,
+  PermissionBits,
+  QueryKeys,
+} from 'librechat-data-provider';
 import type * as t from 'librechat-data-provider';
 import type { QueryClient, UseMutationResult } from '@tanstack/react-query';
 
@@ -405,4 +410,26 @@ export const useRevertAgentVersionMutation = (
 
 export const invalidateAgentMarketplaceQueries = (queryClient: QueryClient) => {
   queryClient.invalidateQueries([QueryKeys.marketplaceAgents]);
+};
+
+/**
+ * Create a new CRM project
+ */
+export const useCreateProjectMutation = (
+  options?: {
+    onSuccess?: (data: { _id: string; name: string }) => void;
+    onError?: (error: Error) => void;
+  },
+): UseMutationResult<{ _id: string; name: string }, Error, { name: string }> => {
+  const queryClient = useQueryClient();
+  return useMutation(
+    (variables: { name: string }) => dataService.createProject(variables),
+    {
+      onSuccess: (data, variables, context) => {
+        queryClient.invalidateQueries([QueryKeys.crmProjects]);
+        options?.onSuccess?.(data, variables, context);
+      },
+      onError: options?.onError,
+    },
+  );
 };

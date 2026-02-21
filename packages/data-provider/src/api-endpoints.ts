@@ -381,6 +381,10 @@ export const disableTwoFactor = () => `${BASE_URL}/api/auth/2fa/disable`;
 export const regenerateBackupCodes = () => `${BASE_URL}/api/auth/2fa/backup/regenerate`;
 export const verifyTwoFactorTemp = () => `${BASE_URL}/api/auth/2fa/verify-temp`;
 
+/* CRM */
+export const crmProjects = () => `${BASE_URL}/api/crm/projects`;
+export const crmProjectById = (projectId: string) => `${BASE_URL}/api/crm/projects/${projectId}`;
+
 /* Memories */
 export const memories = () => `${BASE_URL}/api/memories`;
 export const scheduledAgents = () => `${BASE_URL}/api/scheduled-agents`;

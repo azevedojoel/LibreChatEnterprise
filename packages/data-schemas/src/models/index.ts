@@ -32,6 +32,11 @@ import { createScheduledRunModel } from './scheduledRun';
 import { createWorkflowModel } from './workflow';
 import { createWorkflowRunModel } from './workflowRun';
 import { createWorkflowScheduleModel } from './workflowSchedule';
+import { createContactModel } from './contact';
+import { createOrganizationModel } from './organization';
+import { createDealModel } from './deal';
+import { createActivityModel } from './activity';
+import { createPipelineModel } from './pipeline';
 
 /**
  * Creates all database models for all collections
@@ -72,5 +77,10 @@ export function createModels(mongoose: typeof import('mongoose')) {
     Workflow: createWorkflowModel(mongoose),
     WorkflowRun: createWorkflowRunModel(mongoose),
     WorkflowSchedule: createWorkflowScheduleModel(mongoose),
+    Contact: createContactModel(mongoose),
+    Organization: createOrganizationModel(mongoose),
+    Deal: createDealModel(mongoose),
+    Activity: createActivityModel(mongoose),
+    Pipeline: createPipelineModel(mongoose),
   };
 }

@@ -505,6 +505,18 @@ export const listAgents = (params: a.AgentListParams): Promise<a.AgentListRespon
   );
 };
 
+export const listProjects = (): Promise<Array<{ _id: string; name: string }>> => {
+  return request.get(endpoints.crmProjects());
+};
+
+export const createProject = (params: { name: string }): Promise<{ _id: string; name: string }> => {
+  return request.post(endpoints.crmProjects(), params);
+};
+
+export const getProject = (projectId: string): Promise<{ _id: string; name: string }> => {
+  return request.get(endpoints.crmProjectById(projectId));
+};
+
 export const revertAgentVersion = ({
   agent_id,
   version_index,

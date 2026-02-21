@@ -969,6 +969,213 @@ const getRunDefinition: ToolRegistryDefinition = {
   toolType: 'builtin',
 };
 
+/** CRM tools - used when agent has manage_crm capability */
+const crmListPipelinesDefinition: ToolRegistryDefinition = {
+  name: 'crm_list_pipelines',
+  description:
+    'List all CRM pipelines for the current project. Returns id, name, stages, isDefault.',
+  schema: { type: 'object', properties: {}, required: [] } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const crmCreateContactDefinition: ToolRegistryDefinition = {
+  name: 'crm_create_contact',
+  description:
+    'Create a new CRM contact. Required: name. Optional: email, phone, tags, source, status (lead|prospect|customer), organizationId.',
+  schema: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'Contact name' },
+      email: { type: 'string', description: 'Contact email' },
+      phone: { type: 'string', description: 'Contact phone' },
+      tags: { type: 'array', items: { type: 'string' }, description: 'Tags' },
+      source: { type: 'string', description: 'Source e.g. inbound_email, manual, agent' },
+      status: {
+        type: 'string',
+        enum: ['lead', 'prospect', 'customer'],
+        description: 'Contact status',
+      },
+      organizationId: { type: 'string', description: 'Organization ID' },
+    },
+    required: ['name'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const crmUpdateContactDefinition: ToolRegistryDefinition = {
+  name: 'crm_update_contact',
+  description:
+    'Update an existing contact. Required: contactId. Optional: name, email, phone, tags, source, status, organizationId.',
+  schema: {
+    type: 'object',
+    properties: {
+      contactId: { type: 'string', description: 'Contact ID' },
+      name: { type: 'string' },
+      email: { type: 'string' },
+      phone: { type: 'string' },
+      tags: { type: 'array', items: { type: 'string' } },
+      source: { type: 'string' },
+      status: { type: 'string', enum: ['lead', 'prospect', 'customer'] },
+      organizationId: { type: 'string' },
+    },
+    required: ['contactId'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const crmGetContactDefinition: ToolRegistryDefinition = {
+  name: 'crm_get_contact',
+  description:
+    'Get a contact by ID, email, or name (fuzzy). Provide contactId, email, OR name.',
+  schema: {
+    type: 'object',
+    properties: {
+      contactId: { type: 'string', description: 'Contact ID' },
+      email: { type: 'string', description: 'Contact email' },
+      name: { type: 'string', description: 'Contact name for fuzzy lookup' },
+    },
+    required: [],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const crmListContactsDefinition: ToolRegistryDefinition = {
+  name: 'crm_list_contacts',
+  description:
+    'List contacts with optional filters. Use noActivitySinceDays to find leads with no follow-up (e.g. 3 for 3 days). Optional: status (lead|prospect|customer), tags, noActivitySinceDays, limit, skip.',
+  schema: {
+    type: 'object',
+    properties: {
+      status: { type: 'string', enum: ['lead', 'prospect', 'customer'] },
+      tags: { type: 'array', items: { type: 'string' } },
+      noActivitySinceDays: {
+        type: 'number',
+        description: 'Contacts with no activity in last N days',
+      },
+      limit: { type: 'number' },
+      skip: { type: 'number' },
+    },
+    required: [],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const crmCreateOrganizationDefinition: ToolRegistryDefinition = {
+  name: 'crm_create_organization',
+  description:
+    'Create an organization (company). Required: name. Optional: domain, metadata.',
+  schema: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'Organization name' },
+      domain: { type: 'string', description: 'Company domain' },
+      metadata: { type: 'object', description: 'Additional metadata' },
+    },
+    required: ['name'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const crmCreateDealDefinition: ToolRegistryDefinition = {
+  name: 'crm_create_deal',
+  description:
+    'Create a deal. Required: pipelineId (or use default), stage. Optional: contactId, organizationId, value, expectedCloseDate (ISO).',
+  schema: {
+    type: 'object',
+    properties: {
+      pipelineId: { type: 'string', description: 'Pipeline ID' },
+      stage: { type: 'string', description: 'Stage name from pipeline' },
+      contactId: { type: 'string' },
+      organizationId: { type: 'string' },
+      value: { type: 'number', description: 'Deal value' },
+      expectedCloseDate: { type: 'string', description: 'ISO date' },
+    },
+    required: ['stage'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const crmUpdateDealDefinition: ToolRegistryDefinition = {
+  name: 'crm_update_deal',
+  description:
+    'Update a deal. Required: dealId. Optional: stage, contactId, organizationId, value, expectedCloseDate.',
+  schema: {
+    type: 'object',
+    properties: {
+      dealId: { type: 'string', description: 'Deal ID' },
+      stage: { type: 'string' },
+      contactId: { type: 'string' },
+      organizationId: { type: 'string' },
+      value: { type: 'number' },
+      expectedCloseDate: { type: 'string' },
+    },
+    required: ['dealId'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const crmListDealsDefinition: ToolRegistryDefinition = {
+  name: 'crm_list_deals',
+  description: 'List deals. Optional: pipelineId, stage, contactId, limit, skip.',
+  schema: {
+    type: 'object',
+    properties: {
+      pipelineId: { type: 'string' },
+      stage: { type: 'string' },
+      contactId: { type: 'string' },
+      limit: { type: 'number' },
+      skip: { type: 'number' },
+    },
+    required: [],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const crmLogActivityDefinition: ToolRegistryDefinition = {
+  name: 'crm_log_activity',
+  description:
+    'Log an activity (e.g. call_logged, email_sent). Required: type, contactId or dealId. Optional: summary, metadata. Types: email_sent, email_received, call_logged, agent_action, doc_matched, stage_change.',
+  schema: {
+    type: 'object',
+    properties: {
+      contactId: { type: 'string' },
+      dealId: { type: 'string' },
+      type: {
+        type: 'string',
+        enum: [
+          'email_sent',
+          'email_received',
+          'call_logged',
+          'agent_action',
+          'doc_matched',
+          'stage_change',
+        ],
+      },
+      summary: { type: 'string' },
+      metadata: { type: 'object' },
+    },
+    required: ['type'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const crmListActivitiesDefinition: ToolRegistryDefinition = {
+  name: 'crm_list_activities',
+  description:
+    'List activities for a contact or deal. Provide contactId OR dealId. Optional: limit, skip.',
+  schema: {
+    type: 'object',
+    properties: {
+      contactId: { type: 'string' },
+      dealId: { type: 'string' },
+      limit: { type: 'number' },
+      skip: { type: 'number' },
+    },
+    required: [],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
 /** Tool definitions from @librechat/agents */
 const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
   workspace_read_file: readFileDefinition,
@@ -985,6 +1192,17 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
   run_schedule: runScheduleDefinition,
   list_runs: listRunsDefinition,
   get_run: getRunDefinition,
+  crm_list_pipelines: crmListPipelinesDefinition,
+  crm_create_contact: crmCreateContactDefinition,
+  crm_update_contact: crmUpdateContactDefinition,
+  crm_get_contact: crmGetContactDefinition,
+  crm_list_contacts: crmListContactsDefinition,
+  crm_create_organization: crmCreateOrganizationDefinition,
+  crm_create_deal: crmCreateDealDefinition,
+  crm_update_deal: crmUpdateDealDefinition,
+  crm_list_deals: crmListDealsDefinition,
+  crm_log_activity: crmLogActivityDefinition,
+  crm_list_activities: crmListActivitiesDefinition,
   [CalculatorToolDefinition.name]: {
     name: CalculatorToolDefinition.name,
     description: CalculatorToolDefinition.description,

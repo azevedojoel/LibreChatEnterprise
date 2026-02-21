@@ -447,6 +447,17 @@ const nativeTools = new Set([
   Tools.run_schedule,
   Tools.list_runs,
   Tools.get_run,
+  Tools.crm_create_contact,
+  Tools.crm_update_contact,
+  Tools.crm_get_contact,
+  Tools.crm_list_contacts,
+  Tools.crm_create_organization,
+  Tools.crm_create_deal,
+  Tools.crm_update_deal,
+  Tools.crm_list_deals,
+  Tools.crm_log_activity,
+  Tools.crm_list_activities,
+  Tools.crm_list_pipelines,
 ]);
 
 /** Checks if a tool name is a known built-in tool */
@@ -526,6 +537,24 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
       Tools.get_run,
     ];
     toolsToFilter = [...new Set([...toolsToFilter, ...schedulingTools])];
+  }
+
+  /** Inject CRM tools when manage_crm is enabled */
+  if (toolsToFilter.includes(AgentCapabilities.manage_crm)) {
+    const crmTools = [
+      Tools.crm_create_contact,
+      Tools.crm_update_contact,
+      Tools.crm_get_contact,
+      Tools.crm_list_contacts,
+      Tools.crm_create_organization,
+      Tools.crm_create_deal,
+      Tools.crm_update_deal,
+      Tools.crm_list_deals,
+      Tools.crm_log_activity,
+      Tools.crm_list_activities,
+      Tools.crm_list_pipelines,
+    ];
+    toolsToFilter = [...new Set([...toolsToFilter, ...crmTools])];
   }
 
   /** Filter by ephemeralAgent (chat badge overrides) */
@@ -610,6 +639,21 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
     ) {
       if (appConfig?.interfaceConfig?.scheduledAgents === false) return false;
       return checkCapability(AgentCapabilities.manage_scheduling);
+    }
+    if (
+      tool === Tools.crm_create_contact ||
+      tool === Tools.crm_update_contact ||
+      tool === Tools.crm_get_contact ||
+      tool === Tools.crm_list_contacts ||
+      tool === Tools.crm_create_organization ||
+      tool === Tools.crm_create_deal ||
+      tool === Tools.crm_update_deal ||
+      tool === Tools.crm_list_deals ||
+      tool === Tools.crm_log_activity ||
+      tool === Tools.crm_list_activities ||
+      tool === Tools.crm_list_pipelines
+    ) {
+      return checkCapability(AgentCapabilities.manage_crm);
     }
     if (!areToolsEnabled && !tool.includes(actionDelimiter)) {
       return false;
@@ -939,6 +983,32 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
     filteredTools.includes(Tools.run_schedule) ||
     filteredTools.includes(Tools.list_runs) ||
     filteredTools.includes(Tools.get_run);
+
+  const hasCRMTools =
+    filteredTools.includes(Tools.crm_list_pipelines) ||
+    filteredTools.includes(Tools.crm_list_contacts) ||
+    filteredTools.includes(Tools.crm_create_contact);
+  if (hasCRMTools && !toolContextMap[Tools.crm_list_pipelines]) {
+    let crmContext =
+      "Use crm_list_pipelines to see available pipelines and stages. For 'leads with no follow-up in N days' or 'contacts who haven't been contacted', use crm_list_contacts with noActivitySinceDays (e.g. noActivitySinceDays: 3). CRM data is scoped to the agent's project.";
+    const projectId = agent?.projectIds?.[0];
+    if (projectId) {
+      try {
+        const { listPipelines } = require('~/server/services/CRM');
+        const pipelines = await listPipelines(projectId.toString?.() ?? projectId);
+        if (pipelines?.length > 0) {
+          const pipelineList = pipelines
+            .map((p) => `  - ${p.name}: stages [${(p.stages || []).join(', ')}]`)
+            .join('\n');
+          crmContext += `\n\n# Pipelines in this project\n${pipelineList}`;
+        }
+      } catch (err) {
+        logger.debug('[loadToolDefinitionsWrapper] Could not load CRM pipelines for context:', err?.message);
+      }
+    }
+    toolContextMap[Tools.crm_list_pipelines] = crmContext;
+  }
+
   if (hasSchedulingTools) {
     const parts = [SCHEDULER_DEFAULT_INSTRUCTIONS];
     if (agent.schedulerTargetAgentIds?.length > 0) {
@@ -1058,6 +1128,36 @@ async function loadAgentTools({
       Tools.workspace_glob_files,
     ];
     toolsToFilter = [...new Set([...toolsToFilter, ...workspaceTools])];
+  }
+
+  if (toolsToFilter.includes(AgentCapabilities.manage_scheduling)) {
+    const schedulingTools = [
+      Tools.list_schedules,
+      Tools.create_schedule,
+      Tools.update_schedule,
+      Tools.delete_schedule,
+      Tools.run_schedule,
+      Tools.list_runs,
+      Tools.get_run,
+    ];
+    toolsToFilter = [...new Set([...toolsToFilter, ...schedulingTools])];
+  }
+
+  if (toolsToFilter.includes(AgentCapabilities.manage_crm)) {
+    const crmTools = [
+      Tools.crm_create_contact,
+      Tools.crm_update_contact,
+      Tools.crm_get_contact,
+      Tools.crm_list_contacts,
+      Tools.crm_create_organization,
+      Tools.crm_create_deal,
+      Tools.crm_update_deal,
+      Tools.crm_list_deals,
+      Tools.crm_log_activity,
+      Tools.crm_list_activities,
+      Tools.crm_list_pipelines,
+    ];
+    toolsToFilter = [...new Set([...toolsToFilter, ...crmTools])];
   }
 
   /** Filter by ephemeralAgent (chat badge overrides) */

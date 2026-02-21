@@ -180,6 +180,7 @@ const startServer = async () => {
   app.use('/api/scheduled-agents', routes.scheduledAgents);
   app.use('/api/workflows', routes.workflows);
   app.use('/api/mcp', routes.mcp);
+  app.use('/api/crm', routes.crm);
 
   app.use(ErrorController);
 

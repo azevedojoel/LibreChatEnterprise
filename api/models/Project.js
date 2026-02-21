@@ -119,9 +119,38 @@ const removeAgentFromAllProjects = async (agentId) => {
   await Project.updateMany({}, { $pull: { agentIds: agentId } });
 };
 
+/**
+ * List all projects with id and name.
+ *
+ * @returns {Promise<Array<{_id: string, name: string}>>} Array of project documents with _id and name.
+ */
+const listProjects = async function () {
+  const projects = await Project.find().select('name').lean();
+  return projects.map((p) => ({ _id: p._id.toString(), name: p.name }));
+};
+
+/**
+ * Create a new project by name.
+ *
+ * @param {string} projectName - The name of the project to create.
+ * @returns {Promise<IMongoProject>} The created project document.
+ */
+const createProject = async function (projectName) {
+  if (!projectName || projectName.trim() === '') {
+    throw new Error('Project name is required');
+  }
+  if (projectName.trim().toLowerCase() === GLOBAL_PROJECT_NAME) {
+    throw new Error('Project name "instance" is reserved');
+  }
+  const project = await Project.create({ name: projectName.trim() });
+  return project.toObject ? project.toObject() : project;
+};
+
 module.exports = {
   getProjectById,
   getProjectByName,
+  listProjects,
+  createProject,
   /* prompts */
   addGroupIdsToProject,
   removeGroupIdsFromProject,

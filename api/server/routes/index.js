@@ -28,6 +28,7 @@ const workflows = require('./workflows');
 const keys = require('./keys');
 const user = require('./user');
 const mcp = require('./mcp');
+const crm = require('./crm');
 
 module.exports = {
   mcp,
@@ -60,4 +61,5 @@ module.exports = {
   accessPermissions,
   scheduledAgents,
   workflows,
+  crm,
 };

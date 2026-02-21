@@ -38,6 +38,17 @@ export enum Tools {
   run_schedule = 'run_schedule',
   list_runs = 'list_runs',
   get_run = 'get_run',
+  crm_create_contact = 'crm_create_contact',
+  crm_update_contact = 'crm_update_contact',
+  crm_get_contact = 'crm_get_contact',
+  crm_list_contacts = 'crm_list_contacts',
+  crm_create_organization = 'crm_create_organization',
+  crm_create_deal = 'crm_create_deal',
+  crm_update_deal = 'crm_update_deal',
+  crm_list_deals = 'crm_list_deals',
+  crm_log_activity = 'crm_log_activity',
+  crm_list_activities = 'crm_list_activities',
+  crm_list_pipelines = 'crm_list_pipelines',
 }
 
 export enum EToolResources {
@@ -320,6 +331,9 @@ export type AgentCreateParams = {
   | 'category'
   | 'support_contact'
   | 'tool_options'
+  | 'schedulerTargetAgentIds'
+  | 'projectIds'
+  | 'inboundEmailToken'
 >;
 
 export type AgentUpdateParams = {
