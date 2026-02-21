@@ -25,6 +25,7 @@ jest.mock('~/hooks', () => ({
     return translations[key] || key;
   },
   useProgress: (initialProgress: number) => (initialProgress >= 1 ? 1 : initialProgress),
+  useMCPConnectionStatus: () => ({ connectionStatus: {} }),
 }));
 
 jest.mock('~/components/Chat/Messages/Content/MessageContent', () => ({

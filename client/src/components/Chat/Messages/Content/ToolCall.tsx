@@ -41,7 +41,7 @@ const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
   'tasks.moveTask': 'Moving Google Task',
 };
 import type { TAttachment } from 'librechat-data-provider';
-import { useLocalize, useProgress } from '~/hooks';
+import { useLocalize, useProgress, useMCPConnectionStatus } from '~/hooks';
 import { useGetStartupConfig } from '~/data-provider';
 import { AttachmentGroup } from './Parts';
 import ToolCallInfo from './ToolCallInfo';
@@ -68,7 +68,7 @@ export default function ToolCall({
   attachments?: TAttachment[];
   auth?: string;
   expires_at?: number;
-  /** When false, hide the inline auth button (first tool per server shows it) */
+  /** When false, do not set the OAuth overlay (first tool per server in message shows it) */
   showAuthButton?: boolean;
 }) {
   const localize = useLocalize();
@@ -172,6 +172,13 @@ export default function ToolCall({
     }
   }, [auth, mcpServerName]);
 
+  const { connectionStatus } = useMCPConnectionStatus({
+    enabled: !!(mcpServerName || auth),
+  });
+  const isServerConnected =
+    !!resolvedServerName &&
+    connectionStatus?.[resolvedServerName]?.connectionState === 'connected';
+
   const hasArgs =
     (typeof _args === 'string' && _args.trim() !== '') ||
     (typeof _args === 'object' && _args != null && Object.keys(_args).length > 0);
@@ -208,25 +215,44 @@ export default function ToolCall({
 
   // When loading a conversation from API after refresh, the overlay atom is reset.
   // Set it when we render a tool that has auth and no output (still pending).
-  const needsAuth = (resolvedServerName || actionId) && auth && !hasOutput;
+  // Only auto-show during active submission; skip for historical messages to avoid repeated prompts.
+  // Skip when server is already connected (MCP) to avoid overlay after user completed OAuth.
+  const needsAuth =
+    (resolvedServerName || actionId) &&
+    auth &&
+    !hasOutput &&
+    !isServerConnected;
   useEffect(() => {
     if (!showAuthButton || !needsAuth) {
       // Clear overlay if this tool was the one that set it (e.g. tool completed, hasOutput became true)
       setPendingMCPOAuth((prev) => (prev?.toolName === name ? null : prev));
       return;
     }
+    // Only auto-show overlay during active submission, not when loading history
+    if (!isSubmitting) return;
     setPendingMCPOAuth({
       authUrl: auth,
       toolName: name,
       ...(resolvedServerName && { serverName: resolvedServerName }),
       ...(actionId && { actionId }),
     });
-  }, [showAuthButton, auth, hasOutput, resolvedServerName, actionId, name, setPendingMCPOAuth, needsAuth]);
+  }, [
+    showAuthButton,
+    auth,
+    hasOutput,
+    resolvedServerName,
+    actionId,
+    name,
+    setPendingMCPOAuth,
+    needsAuth,
+    isSubmitting,
+  ]);
 
   const progress = useProgress(initialProgress);
 
-  // Grace period: when stream ends (isSubmitting=false) before output arrives, avoid false
-  // "Cancelled" due to race with on_run_step_completed. Wait 3s for completion event.
+  // Grace period: when stream ends (isSubmitting=false) before output arrives during live streaming,
+  // avoid false "Cancelled" due to race with on_run_step_completed. Wait 3s for completion event.
+  // For loaded messages (!isSubmitting from mount), treat incomplete tools as cancelled immediately.
   const [gracePeriodActive, setGracePeriodActive] = useState(false);
   const gracePeriodStartedRef = useRef(false);
   const prevIsSubmittingRef = useRef(isSubmitting);
@@ -246,13 +272,20 @@ export default function ToolCall({
     prevIsSubmittingRef.current = isSubmitting;
   }, [isSubmitting, hasOutput, progress]);
 
-  // Never show cancelled when we have successful output; show error state for tool errors;
-  // show cancelled only when stream ended without completion and no output, and grace period expired
+  // Never show cancelled when we have successful output; show error state for tool errors.
+  // For loaded messages (!isSubmitting), incomplete tools are cancelled immediately (no grace period).
+  // During live streaming, cancel only after grace period expires.
   const wouldBeCancelled =
     error === true || (hasOutput ? false : !isSubmitting && progress < 1 && !gracePeriodActive);
   const cancelled = isToolSearch ? false : wouldBeCancelled;
+  // When cancelled, use displayProgress=1 so we show "Cancelled" state (no spinner)
   const displayProgress =
-    hasOutput || (isToolSearch && wouldBeCancelled) || toolSearchCompletedFallback ? 1 : progress;
+    hasOutput ||
+    (isToolSearch && wouldBeCancelled) ||
+    toolSearchCompletedFallback ||
+    cancelled
+      ? 1
+      : progress;
 
   const labelWithPattern = useMemo(
     () => (inlinePattern ? `${displayName} '${inlinePattern}'` : displayName),
@@ -349,24 +382,6 @@ export default function ToolCall({
             error={cancelled}
           />
         </div>
-        {showAuthButton && needsAuth && (
-          <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={() =>
-                setPendingMCPOAuth({
-                  authUrl: auth,
-                  toolName: name,
-                  ...(resolvedServerName && { serverName: resolvedServerName }),
-                  ...(actionId && { actionId }),
-                })
-              }
-              className="text-link inline-flex items-center rounded-md border border-border-medium px-2.5 py-1 text-sm hover:bg-surface-secondary hover:underline"
-            >
-              {localize('com_ui_connect_account') || 'Connect account'}
-            </button>
-          </div>
-        )}
       </div>
       <div
         className={cn('relative', isCompactSpacing ? 'pl-2' : 'pl-4')}

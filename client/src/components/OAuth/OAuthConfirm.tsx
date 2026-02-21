@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useLocalize } from '~/hooks';
 import { request, mcpOAuthConfirm } from 'librechat-data-provider';
 import { broadcastMCPOAuthComplete } from '~/hooks/useMCPOAuthBroadcastListener';
+import { getOAuthRedirectUrl } from '~/utils';
 
 export default function OAuthConfirm() {
   const localize = useLocalize();
@@ -45,7 +46,13 @@ export default function OAuthConfirm() {
               'The confirmation link is invalid or has expired. Please try the authentication process again.'}
           </p>
           <button
-            onClick={() => window.close()}
+            onClick={() => {
+              if (window.opener) {
+                window.close();
+              } else {
+                window.location.href = getOAuthRedirectUrl();
+              }
+            }}
             className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
           >
             {localize('com_ui_close_window') || 'Close Window'}
@@ -88,7 +95,13 @@ export default function OAuthConfirm() {
               : localize('com_ui_oauth_confirm_button') || 'Confirm'}
           </button>
           <button
-            onClick={() => window.close()}
+            onClick={() => {
+              if (window.opener) {
+                window.close();
+              } else {
+                window.location.href = getOAuthRedirectUrl();
+              }
+            }}
             className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
             {localize('com_ui_cancel') || 'Cancel'}

@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRecoilValue, useSetRecoilState } from 'recoil';
 import { Button } from '@librechat/client';
 import { TriangleAlert } from 'lucide-react';
@@ -6,10 +6,12 @@ import { dataService } from 'librechat-data-provider';
 import { useLocalize } from '~/hooks';
 import { logger } from '~/utils';
 import { pendingMCPOAuthAtom, type PendingMCPOAuth } from '~/store/misc';
+import OAuthLink from './OAuthLink';
 
 function OverlayContent({ pending }: { pending: PendingMCPOAuth }) {
   const localize = useLocalize();
   const setPendingMCPOAuth = useSetRecoilState(pendingMCPOAuthAtom);
+  const [bindReady, setBindReady] = useState(false);
 
   const authDomain = (() => {
     try {
@@ -19,18 +21,21 @@ function OverlayContent({ pending }: { pending: PendingMCPOAuth }) {
     }
   })();
 
-  const handleSignIn = useCallback(async () => {
+  // Fire bind when overlay appears so CSRF cookie is ready before user clicks the link
+  useEffect(() => {
     if (!pending.authUrl) return;
-    try {
-      if (pending.actionId) {
-        await dataService.bindActionOAuth(pending.actionId);
-      } else if (pending.serverName) {
-        await dataService.bindMCPOAuth(pending.serverName);
-      }
-    } catch (e) {
-      logger.error('Failed to bind OAuth CSRF cookie', e);
-    }
-    window.open(pending.authUrl, '_blank', 'noopener,noreferrer');
+    setBindReady(false);
+    const bind = pending.actionId
+      ? dataService.bindActionOAuth(pending.actionId)
+      : pending.serverName
+        ? dataService.bindMCPOAuth(pending.serverName)
+        : Promise.resolve();
+    bind
+      .then(() => setBindReady(true))
+      .catch((e) => {
+        logger.error('Failed to bind OAuth CSRF cookie', e);
+        setBindReady(true); // Allow click anyway; callback may fail
+      });
   }, [pending.authUrl, pending.serverName, pending.actionId]);
 
   const handleCancel = useCallback(async () => {
@@ -76,16 +81,16 @@ function OverlayContent({ pending }: { pending: PendingMCPOAuth }) {
           `To continue with ${pending.serverName || pending.actionId || authDomain} please sign in.`}
       </p>
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-        <Button
-          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl px-4 py-2 text-sm font-medium sm:shrink-0"
+        <OAuthLink
+          href={pending.authUrl}
+          disabled={!bindReady}
           variant="default"
-          rel="noopener noreferrer"
-          onClick={handleSignIn}
+          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl px-4 py-2 text-sm font-medium sm:shrink-0"
         >
           {localize('com_ui_sign_in_to_domain', {
             0: pending.serverName || pending.actionId || authDomain,
           })}
-        </Button>
+        </OAuthLink>
         {pending.serverName && (
           <Button
             variant="outline"
@@ -95,13 +100,16 @@ function OverlayContent({ pending }: { pending: PendingMCPOAuth }) {
             {localize('com_ui_cancel')}
           </Button>
         )}
-        <Button
-          variant="ghost"
-          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary sm:shrink-0"
-          onClick={() => setPendingMCPOAuth(null)}
-        >
-          {localize('com_ui_close') || 'Close'}
-        </Button>
+        {/* Hide Close for MCP - modal blocks until Sign In or Cancel. Actions need Close (no cancel API). */}
+        {!pending.serverName && (
+          <Button
+            variant="ghost"
+            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary sm:shrink-0"
+            onClick={() => setPendingMCPOAuth(null)}
+          >
+            {localize('com_ui_close') || 'Close'}
+          </Button>
+        )}
       </div>
       <p className="flex items-center text-xs text-text-warning">
         <TriangleAlert className="mr-1.5 inline-block h-4 w-4 shrink-0" aria-hidden="true" />

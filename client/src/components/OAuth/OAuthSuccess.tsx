@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useLocalize } from '~/hooks';
 import { OAUTH_COMPLETE_TYPE } from '~/hooks/useOAuthCompleteListener';
 import { broadcastMCPOAuthComplete } from '~/hooks/useMCPOAuthBroadcastListener';
+import { getOAuthRedirectUrl } from '~/utils';
 
 export default function OAuthSuccess() {
   const localize = useLocalize();
@@ -30,6 +31,9 @@ export default function OAuthSuccess() {
             /* ignore if opener is cross-origin or closed */
           }
           window.close();
+          setTimeout(() => {
+            window.location.href = getOAuthRedirectUrl();
+          }, 150);
           return 0;
         }
         return prev - 1;
