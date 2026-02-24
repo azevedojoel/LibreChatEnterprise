@@ -5,6 +5,7 @@ export interface IOrganization extends Document {
   name: string;
   domain?: string;
   metadata?: Record<string, unknown>;
+  deletedAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;
 }

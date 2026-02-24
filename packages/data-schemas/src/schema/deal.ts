@@ -43,11 +43,15 @@ const dealSchema = new Schema<IDeal>(
       type: String,
       required: true,
     },
+    deletedAt: {
+      type: Date,
+    },
   },
   { timestamps: true },
 );
 
 dealSchema.index({ projectId: 1, pipelineId: 1, stage: 1 });
+dealSchema.index({ projectId: 1, deletedAt: 1 });
 dealSchema.index({ contactId: 1 });
 dealSchema.index({ organizationId: 1 });
 

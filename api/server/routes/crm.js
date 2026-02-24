@@ -15,19 +15,23 @@ const {
   updateContact,
   getContactById,
   listContacts,
+  softDeleteContact,
   createOrganization,
   updateOrganization,
   getOrganizationById,
   listOrganizations,
+  softDeleteOrganization,
   createDeal,
   updateDeal,
   getDealById,
   listDeals,
+  softDeleteDeal,
   listActivities,
   createPipeline,
   updatePipeline,
   getPipelineById,
   listPipelines,
+  softDeletePipeline,
 } = require('~/server/services/CRM');
 
 const router = express.Router();
@@ -187,6 +191,18 @@ router.patch('/projects/:projectId/pipelines/:pipelineId', requireProjectAccess,
   }
 });
 
+router.delete('/projects/:projectId/pipelines/:pipelineId', requireProjectAccess, async (req, res) => {
+  try {
+    const pipeline = await softDeletePipeline(req.crmProjectId, req.params.pipelineId);
+    if (!pipeline) return res.status(404).json({ error: 'Pipeline not found' });
+    res.json({ deleted: true, _id: pipeline._id });
+  } catch (err) {
+    logger.error('[CRM] softDeletePipeline', err);
+    const status = err.message?.includes('Cannot delete') ? 400 : 500;
+    res.status(status).json({ error: err.message });
+  }
+});
+
 // ========== Contacts ==========
 router.get('/projects/:projectId/contacts', requireProjectAccess, async (req, res) => {
   try {
@@ -261,6 +277,17 @@ router.patch('/projects/:projectId/contacts/:contactId', requireProjectAccess, a
   }
 });
 
+router.delete('/projects/:projectId/contacts/:contactId', requireProjectAccess, async (req, res) => {
+  try {
+    const contact = await softDeleteContact(req.crmProjectId, req.params.contactId);
+    if (!contact) return res.status(404).json({ error: 'Contact not found' });
+    res.json({ deleted: true, _id: contact._id });
+  } catch (err) {
+    logger.error('[CRM] softDeleteContact', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ========== Organizations ==========
 router.get('/projects/:projectId/organizations', requireProjectAccess, async (req, res) => {
   try {
@@ -309,6 +336,17 @@ router.patch('/projects/:projectId/organizations/:organizationId', requireProjec
     res.json(org);
   } catch (err) {
     logger.error('[CRM] updateOrganization', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/projects/:projectId/organizations/:organizationId', requireProjectAccess, async (req, res) => {
+  try {
+    const org = await softDeleteOrganization(req.crmProjectId, req.params.organizationId);
+    if (!org) return res.status(404).json({ error: 'Organization not found' });
+    res.json({ deleted: true, _id: org._id });
+  } catch (err) {
+    logger.error('[CRM] softDeleteOrganization', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -384,6 +422,17 @@ router.patch('/projects/:projectId/deals/:dealId', requireProjectAccess, async (
     res.json(deal);
   } catch (err) {
     logger.error('[CRM] updateDeal', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/projects/:projectId/deals/:dealId', requireProjectAccess, async (req, res) => {
+  try {
+    const deal = await softDeleteDeal(req.crmProjectId, req.params.dealId);
+    if (!deal) return res.status(404).json({ error: 'Deal not found' });
+    res.json({ deleted: true, _id: deal._id });
+  } catch (err) {
+    logger.error('[CRM] softDeleteDeal', err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -57,6 +57,8 @@ jest.mock('~/db/models', () => ({
 const dbModels = require('~/db/models');
 const { createDeal, updateDeal, getDealById, listDeals } = require('../dealService');
 
+const NOT_DELETED = { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] };
+
 describe('dealService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -166,7 +168,7 @@ describe('dealService', () => {
 
       await getDealById('proj-1', 'deal-1');
 
-      expect(dbModels.Deal.findOne).toHaveBeenCalledWith({ _id: 'deal-1', projectId: 'proj-1' });
+      expect(dbModels.Deal.findOne).toHaveBeenCalledWith({ _id: 'deal-1', projectId: 'proj-1', ...NOT_DELETED });
     });
   });
 
@@ -183,6 +185,7 @@ describe('dealService', () => {
 
       expect(mockDealFind).toHaveBeenCalledWith({
         projectId: 'proj-1',
+        ...NOT_DELETED,
         pipelineId: 'pipeline-1',
         stage: 'quote',
         contactId: 'contact-1',

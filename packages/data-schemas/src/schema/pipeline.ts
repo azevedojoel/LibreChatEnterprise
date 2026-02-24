@@ -21,10 +21,14 @@ const pipelineSchema = new Schema<IPipeline>(
       type: Boolean,
       default: false,
     },
+    deletedAt: {
+      type: Date,
+    },
   },
   { timestamps: true },
 );
 
 pipelineSchema.index({ projectId: 1 });
+pipelineSchema.index({ projectId: 1, deletedAt: 1 });
 
 export default pipelineSchema;

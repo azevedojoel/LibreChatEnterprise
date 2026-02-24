@@ -7,6 +7,8 @@ const { createActivity, touchContactLastActivity } = require('./activityLogger')
 
 const Contact = dbModels.Contact;
 
+const NOT_DELETED = { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] };
+
 /**
  * @param {Object} params
  * @param {string} params.projectId
@@ -71,7 +73,7 @@ async function createContact({ projectId, data, actorId, actorType = 'agent', to
  */
 async function updateContact({ projectId, contactId, updates, actorId, actorType = 'agent', toolName, conversationId, messageId }) {
   const contact = await Contact.findOneAndUpdate(
-    { _id: contactId, projectId },
+    { _id: contactId, projectId, ...NOT_DELETED },
     {
       $set: {
         ...(updates.name != null && { name: updates.name }),
@@ -112,7 +114,7 @@ async function updateContact({ projectId, contactId, updates, actorId, actorType
  * @param {string} contactId
  */
 async function getContactById(projectId, contactId) {
-  return Contact.findOne({ _id: contactId, projectId }).lean();
+  return Contact.findOne({ _id: contactId, projectId, ...NOT_DELETED }).lean();
 }
 
 /**
@@ -120,7 +122,7 @@ async function getContactById(projectId, contactId) {
  * @param {string} email
  */
 async function getContactByEmail(projectId, email) {
-  return Contact.findOne({ projectId, email: email?.toLowerCase?.() || email }).lean();
+  return Contact.findOne({ projectId, email: email?.toLowerCase?.() || email, ...NOT_DELETED }).lean();
 }
 
 function escapeRegex(str = '') {
@@ -137,7 +139,7 @@ async function findContactsByName(projectId, name, limit = 10) {
     return [];
   }
   const escaped = escapeRegex(name.trim());
-  const query = { projectId, name: { $regex: escaped, $options: 'i' } };
+  const query = { projectId, name: { $regex: escaped, $options: 'i' }, ...NOT_DELETED };
   return Contact.find(query)
     .sort({ updatedAt: -1 })
     .limit(limit)
@@ -154,7 +156,7 @@ async function findContactsByName(projectId, name, limit = 10) {
  * @param {number} [params.skip]
  */
 async function listContacts({ projectId, status, tags, noActivitySinceDays, limit = 50, skip = 0 }) {
-  const query = { projectId };
+  const query = { projectId, ...NOT_DELETED };
 
   if (status) {
     query.status = status;
@@ -183,6 +185,19 @@ async function listContacts({ projectId, status, tags, noActivitySinceDays, limi
   return contacts;
 }
 
+/**
+ * @param {string} projectId
+ * @param {string} contactId
+ */
+async function softDeleteContact(projectId, contactId) {
+  const contact = await Contact.findOneAndUpdate(
+    { _id: contactId, projectId, ...NOT_DELETED },
+    { $set: { deletedAt: new Date() } },
+    { new: true },
+  ).lean();
+  return contact;
+}
+
 module.exports = {
   createContact,
   updateContact,
@@ -190,4 +205,5 @@ module.exports = {
   getContactByEmail,
   findContactsByName,
   listContacts,
+  softDeleteContact,
 };

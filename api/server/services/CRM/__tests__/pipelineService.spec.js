@@ -52,6 +52,8 @@ const {
   getDefaultPipeline,
 } = require('../pipelineService');
 
+const NOT_DELETED = { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] };
+
 describe('pipelineService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -96,7 +98,7 @@ describe('pipelineService', () => {
       });
 
       expect(dbModels.Pipeline.updateMany).toHaveBeenCalledWith(
-        { projectId: 'proj-1' },
+        { projectId: 'proj-1', ...NOT_DELETED },
         { $set: { isDefault: false } },
       );
     });
@@ -111,7 +113,7 @@ describe('pipelineService', () => {
       await updatePipeline('proj-1', 'pipeline-1', { name: 'Sales Updated' });
 
       expect(dbModels.Pipeline.findOneAndUpdate).toHaveBeenCalledWith(
-        { _id: 'pipeline-1', projectId: 'proj-1' },
+        { _id: 'pipeline-1', projectId: 'proj-1', ...NOT_DELETED },
         expect.objectContaining({ $set: expect.objectContaining({ name: 'Sales Updated' }) }),
         { new: true },
       );
@@ -125,7 +127,7 @@ describe('pipelineService', () => {
       await updatePipeline('proj-1', 'pipeline-1', { isDefault: true });
 
       expect(dbModels.Pipeline.updateMany).toHaveBeenCalledWith(
-        { projectId: 'proj-1' },
+        { projectId: 'proj-1', ...NOT_DELETED },
         { $set: { isDefault: false } },
       );
     });
@@ -139,7 +141,7 @@ describe('pipelineService', () => {
 
       await getPipelineById('proj-1', 'pipeline-1');
 
-      expect(dbModels.Pipeline.findOne).toHaveBeenCalledWith({ _id: 'pipeline-1', projectId: 'proj-1' });
+      expect(dbModels.Pipeline.findOne).toHaveBeenCalledWith({ _id: 'pipeline-1', projectId: 'proj-1', ...NOT_DELETED });
     });
   });
 
@@ -147,7 +149,7 @@ describe('pipelineService', () => {
     it('calls Pipeline.find with projectId', async () => {
       await listPipelines('proj-1');
 
-      expect(dbModels.Pipeline.find).toHaveBeenCalledWith({ projectId: 'proj-1' });
+      expect(dbModels.Pipeline.find).toHaveBeenCalledWith({ projectId: 'proj-1', ...NOT_DELETED });
     });
   });
 
@@ -159,7 +161,7 @@ describe('pipelineService', () => {
 
       const result = await getDefaultPipeline('proj-1');
 
-      expect(dbModels.Pipeline.findOne).toHaveBeenCalledWith({ projectId: 'proj-1', isDefault: true });
+      expect(dbModels.Pipeline.findOne).toHaveBeenCalledWith({ projectId: 'proj-1', isDefault: true, ...NOT_DELETED });
       expect(result).toEqual(defaultPipeline);
     });
 
@@ -175,8 +177,12 @@ describe('pipelineService', () => {
 
       const result = await getDefaultPipeline('proj-1');
 
-      expect(dbModels.Pipeline.findOne).toHaveBeenNthCalledWith(1, { projectId: 'proj-1', isDefault: true });
-      expect(dbModels.Pipeline.findOne).toHaveBeenNthCalledWith(2, { projectId: 'proj-1' });
+      expect(dbModels.Pipeline.findOne).toHaveBeenNthCalledWith(1, {
+        projectId: 'proj-1',
+        isDefault: true,
+        ...NOT_DELETED,
+      });
+      expect(dbModels.Pipeline.findOne).toHaveBeenNthCalledWith(2, { projectId: 'proj-1', ...NOT_DELETED });
       expect(result).toEqual(firstPipeline);
     });
   });

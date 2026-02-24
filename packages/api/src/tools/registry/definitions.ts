@@ -978,6 +978,42 @@ const crmListPipelinesDefinition: ToolRegistryDefinition = {
   toolType: 'builtin',
 };
 
+const crmCreatePipelineDefinition: ToolRegistryDefinition = {
+  name: 'crm_create_pipeline',
+  description:
+    'Create a CRM pipeline. Required: name, stages (array of stage names). Optional: isDefault.',
+  schema: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'Pipeline name' },
+      stages: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Stage names in order',
+      },
+      isDefault: { type: 'boolean', description: 'Set as default pipeline for new deals' },
+    },
+    required: ['name', 'stages'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const crmUpdatePipelineDefinition: ToolRegistryDefinition = {
+  name: 'crm_update_pipeline',
+  description: 'Update a pipeline. Required: pipelineId. Optional: name, stages, isDefault.',
+  schema: {
+    type: 'object',
+    properties: {
+      pipelineId: { type: 'string', description: 'Pipeline ID' },
+      name: { type: 'string' },
+      stages: { type: 'array', items: { type: 'string' } },
+      isDefault: { type: 'boolean' },
+    },
+    required: ['pipelineId'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
 const crmCreateContactDefinition: ToolRegistryDefinition = {
   name: 'crm_create_contact',
   description:
@@ -1176,6 +1212,54 @@ const crmListActivitiesDefinition: ToolRegistryDefinition = {
   toolType: 'builtin',
 };
 
+const crmSoftDeleteContactDefinition: ToolRegistryDefinition = {
+  name: 'crm_soft_delete_contact',
+  description:
+    'Soft delete a contact. The contact is marked as deleted and excluded from lists. Required: contactId.',
+  schema: {
+    type: 'object',
+    properties: { contactId: { type: 'string', description: 'Contact ID' } },
+    required: ['contactId'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const crmSoftDeleteOrganizationDefinition: ToolRegistryDefinition = {
+  name: 'crm_soft_delete_organization',
+  description:
+    'Soft delete an organization. The organization is marked as deleted and excluded from lists. Required: organizationId.',
+  schema: {
+    type: 'object',
+    properties: { organizationId: { type: 'string', description: 'Organization ID' } },
+    required: ['organizationId'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const crmSoftDeleteDealDefinition: ToolRegistryDefinition = {
+  name: 'crm_soft_delete_deal',
+  description:
+    'Soft delete a deal. The deal is marked as deleted and excluded from lists. Required: dealId.',
+  schema: {
+    type: 'object',
+    properties: { dealId: { type: 'string', description: 'Deal ID' } },
+    required: ['dealId'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const crmSoftDeletePipelineDefinition: ToolRegistryDefinition = {
+  name: 'crm_soft_delete_pipeline',
+  description:
+    'Soft delete a pipeline. Fails if deals exist in the pipeline. Move or delete deals first. Required: pipelineId.',
+  schema: {
+    type: 'object',
+    properties: { pipelineId: { type: 'string', description: 'Pipeline ID' } },
+    required: ['pipelineId'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
 /** Tool definitions from @librechat/agents */
 const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
   workspace_read_file: readFileDefinition,
@@ -1193,6 +1277,8 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
   list_runs: listRunsDefinition,
   get_run: getRunDefinition,
   crm_list_pipelines: crmListPipelinesDefinition,
+  crm_create_pipeline: crmCreatePipelineDefinition,
+  crm_update_pipeline: crmUpdatePipelineDefinition,
   crm_create_contact: crmCreateContactDefinition,
   crm_update_contact: crmUpdateContactDefinition,
   crm_get_contact: crmGetContactDefinition,
@@ -1203,6 +1289,10 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
   crm_list_deals: crmListDealsDefinition,
   crm_log_activity: crmLogActivityDefinition,
   crm_list_activities: crmListActivitiesDefinition,
+  crm_soft_delete_contact: crmSoftDeleteContactDefinition,
+  crm_soft_delete_organization: crmSoftDeleteOrganizationDefinition,
+  crm_soft_delete_deal: crmSoftDeleteDealDefinition,
+  crm_soft_delete_pipeline: crmSoftDeletePipelineDefinition,
   [CalculatorToolDefinition.name]: {
     name: CalculatorToolDefinition.name,
     description: CalculatorToolDefinition.description,

@@ -97,6 +97,12 @@ export default function AgentSelect({
         Tools.crm_log_activity,
         Tools.crm_list_activities,
         Tools.crm_list_pipelines,
+        Tools.crm_create_pipeline,
+        Tools.crm_update_pipeline,
+        Tools.crm_soft_delete_contact,
+        Tools.crm_soft_delete_organization,
+        Tools.crm_soft_delete_deal,
+        Tools.crm_soft_delete_pipeline,
       ]);
 
       const agentTools: string[] = [];

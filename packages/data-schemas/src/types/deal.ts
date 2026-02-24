@@ -12,6 +12,7 @@ export interface IDeal extends Document {
   expectedCloseDate?: Date;
   ownerType: DealOwnerType;
   ownerId: string;
+  deletedAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;
 }

@@ -5,6 +5,7 @@ export interface IPipeline extends Document {
   name: string;
   stages: string[];
   isDefault: boolean;
+  deletedAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;
 }

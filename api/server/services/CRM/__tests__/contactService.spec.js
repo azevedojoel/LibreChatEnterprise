@@ -55,6 +55,8 @@ const {
   listContacts,
 } = require('../contactService');
 
+const NOT_DELETED = { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] };
+
 describe('contactService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -158,7 +160,7 @@ describe('contactService', () => {
       });
 
       expect(dbModels.Contact.findOneAndUpdate).toHaveBeenCalledWith(
-        { _id: 'contact-1', projectId: 'proj-1' },
+        { _id: 'contact-1', projectId: 'proj-1', ...NOT_DELETED },
         expect.objectContaining({ $set: expect.objectContaining({ name: 'John Updated' }) }),
         { new: true },
       );
@@ -195,7 +197,7 @@ describe('contactService', () => {
 
       await getContactById('proj-1', 'contact-1');
 
-      expect(dbModels.Contact.findOne).toHaveBeenCalledWith({ _id: 'contact-1', projectId: 'proj-1' });
+      expect(dbModels.Contact.findOne).toHaveBeenCalledWith({ _id: 'contact-1', projectId: 'proj-1', ...NOT_DELETED });
     });
   });
 
@@ -210,6 +212,7 @@ describe('contactService', () => {
       expect(dbModels.Contact.findOne).toHaveBeenCalledWith({
         projectId: 'proj-1',
         email: 'john@example.com',
+        ...NOT_DELETED,
       });
     });
   });
@@ -232,6 +235,7 @@ describe('contactService', () => {
       expect(mockContactFind).toHaveBeenCalledWith({
         projectId: 'proj-1',
         name: { $regex: 'John', $options: 'i' },
+        ...NOT_DELETED,
       });
     });
 
@@ -280,6 +284,7 @@ describe('contactService', () => {
       expect(mockContactFind).toHaveBeenCalledWith({
         projectId: 'proj-1',
         name: { $regex: 'John\\.\\[x\\]', $options: 'i' },
+        ...NOT_DELETED,
       });
     });
   });
@@ -296,6 +301,7 @@ describe('contactService', () => {
 
       expect(mockContactFind).toHaveBeenCalledWith({
         projectId: 'proj-1',
+        ...NOT_DELETED,
         status: 'lead',
         tags: { $in: ['hot'] },
       });

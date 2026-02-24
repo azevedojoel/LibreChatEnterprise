@@ -385,7 +385,13 @@ const loadTools = async ({
       tool === Tools.crm_list_deals ||
       tool === Tools.crm_log_activity ||
       tool === Tools.crm_list_activities ||
-      tool === Tools.crm_list_pipelines
+      tool === Tools.crm_list_pipelines ||
+      tool === Tools.crm_create_pipeline ||
+      tool === Tools.crm_update_pipeline ||
+      tool === Tools.crm_soft_delete_contact ||
+      tool === Tools.crm_soft_delete_organization ||
+      tool === Tools.crm_soft_delete_deal ||
+      tool === Tools.crm_soft_delete_pipeline
     ) {
       const currentAgent = options.req?.body?.agent ?? agent;
       const projectId =

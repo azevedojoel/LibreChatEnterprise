@@ -49,6 +49,12 @@ export enum Tools {
   crm_log_activity = 'crm_log_activity',
   crm_list_activities = 'crm_list_activities',
   crm_list_pipelines = 'crm_list_pipelines',
+  crm_create_pipeline = 'crm_create_pipeline',
+  crm_update_pipeline = 'crm_update_pipeline',
+  crm_soft_delete_contact = 'crm_soft_delete_contact',
+  crm_soft_delete_organization = 'crm_soft_delete_organization',
+  crm_soft_delete_deal = 'crm_soft_delete_deal',
+  crm_soft_delete_pipeline = 'crm_soft_delete_pipeline',
 }
 
 export enum EToolResources {

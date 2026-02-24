@@ -19,10 +19,14 @@ const organizationSchema = new Schema<IOrganization>(
     metadata: {
       type: Schema.Types.Mixed,
     },
+    deletedAt: {
+      type: Date,
+    },
   },
   { timestamps: true },
 );
 
 organizationSchema.index({ projectId: 1, name: 1 });
+organizationSchema.index({ projectId: 1, deletedAt: 1 });
 
 export default organizationSchema;

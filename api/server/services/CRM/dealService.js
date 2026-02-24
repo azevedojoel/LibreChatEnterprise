@@ -7,6 +7,8 @@ const { createActivity } = require('./activityLogger');
 const Deal = dbModels.Deal;
 const Pipeline = dbModels.Pipeline;
 
+const NOT_DELETED = { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] };
+
 /**
  * @param {Object} params
  * @param {string} params.projectId
@@ -89,7 +91,11 @@ async function updateDeal({
   if (updates.ownerType !== undefined) setFields.ownerType = updates.ownerType;
   if (updates.ownerId !== undefined) setFields.ownerId = updates.ownerId;
 
-  const deal = await Deal.findOneAndUpdate({ _id: dealId, projectId }, { $set: setFields }, { new: true }).lean();
+  const deal = await Deal.findOneAndUpdate(
+    { _id: dealId, projectId, ...NOT_DELETED },
+    { $set: setFields },
+    { new: true },
+  ).lean();
 
   if (deal && actorId) {
     const activityType = updates.stage != null && previousStage !== updates.stage ? 'stage_change' : 'deal_updated';
@@ -119,7 +125,10 @@ async function updateDeal({
  * @param {string} dealId
  */
 async function getDealById(projectId, dealId) {
-  return Deal.findOne({ _id: dealId, projectId }).populate('contactId', 'name email').populate('organizationId', 'name').lean();
+  return Deal.findOne({ _id: dealId, projectId, ...NOT_DELETED })
+    .populate('contactId', 'name email')
+    .populate('organizationId', 'name')
+    .lean();
 }
 
 /**
@@ -132,7 +141,7 @@ async function getDealById(projectId, dealId) {
  * @param {number} [params.skip]
  */
 async function listDeals({ projectId, pipelineId, stage, contactId, limit = 50, skip = 0 }) {
-  const query = { projectId };
+  const query = { projectId, ...NOT_DELETED };
   if (pipelineId) query.pipelineId = pipelineId;
   if (stage) query.stage = stage;
   if (contactId) query.contactId = contactId;
@@ -146,9 +155,22 @@ async function listDeals({ projectId, pipelineId, stage, contactId, limit = 50, 
     .lean();
 }
 
+/**
+ * @param {string} projectId
+ * @param {string} dealId
+ */
+async function softDeleteDeal(projectId, dealId) {
+  return Deal.findOneAndUpdate(
+    { _id: dealId, projectId, ...NOT_DELETED },
+    { $set: { deletedAt: new Date() } },
+    { new: true },
+  ).lean();
+}
+
 module.exports = {
   createDeal,
   updateDeal,
   getDealById,
   listDeals,
+  softDeleteDeal,
 };

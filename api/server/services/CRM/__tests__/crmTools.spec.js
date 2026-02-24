@@ -4,6 +4,13 @@
 const { Tools } = require('librechat-data-provider');
 
 const mockListPipelines = jest.fn();
+const mockCreatePipeline = jest.fn();
+const mockUpdatePipeline = jest.fn();
+const mockGetPipelineById = jest.fn();
+const mockSoftDeleteContact = jest.fn();
+const mockSoftDeleteOrganization = jest.fn();
+const mockSoftDeleteDeal = jest.fn();
+const mockSoftDeletePipeline = jest.fn();
 const mockCreateContact = jest.fn();
 const mockUpdateContact = jest.fn();
 const mockGetContactById = jest.fn();
@@ -22,6 +29,13 @@ const mockGetDefaultPipeline = jest.fn();
 
 jest.mock('../index', () => ({
   listPipelines: (...args) => mockListPipelines(...args),
+  createPipeline: (...args) => mockCreatePipeline(...args),
+  updatePipeline: (...args) => mockUpdatePipeline(...args),
+  getPipelineById: (...args) => mockGetPipelineById(...args),
+  softDeleteContact: (...args) => mockSoftDeleteContact(...args),
+  softDeleteOrganization: (...args) => mockSoftDeleteOrganization(...args),
+  softDeleteDeal: (...args) => mockSoftDeleteDeal(...args),
+  softDeletePipeline: (...args) => mockSoftDeletePipeline(...args),
   createContact: (...args) => mockCreateContact(...args),
   updateContact: (...args) => mockUpdateContact(...args),
   getContactById: (...args) => mockGetContactById(...args),
@@ -51,6 +65,8 @@ const AGENT_ID = 'agent-456';
 
 const expectedToolKeys = [
   Tools.crm_list_pipelines,
+  Tools.crm_create_pipeline,
+  Tools.crm_update_pipeline,
   Tools.crm_create_contact,
   Tools.crm_update_contact,
   Tools.crm_get_contact,
@@ -61,6 +77,10 @@ const expectedToolKeys = [
   Tools.crm_list_deals,
   Tools.crm_log_activity,
   Tools.crm_list_activities,
+  Tools.crm_soft_delete_contact,
+  Tools.crm_soft_delete_organization,
+  Tools.crm_soft_delete_deal,
+  Tools.crm_soft_delete_pipeline,
 ];
 
 describe('createCRMTools', () => {
@@ -69,9 +89,9 @@ describe('createCRMTools', () => {
   });
 
   describe('tool keys', () => {
-    it('returns an object with all 11 tool keys', () => {
+    it('returns an object with all CRM tool keys', () => {
       const tools = createCRMTools({ projectId: PROJECT_ID, agentId: AGENT_ID });
-      expect(Object.keys(tools)).toHaveLength(11);
+      expect(Object.keys(tools)).toHaveLength(expectedToolKeys.length);
       expectedToolKeys.forEach((key) => {
         expect(tools).toHaveProperty(key);
         expect(tools[key]).toBeDefined();

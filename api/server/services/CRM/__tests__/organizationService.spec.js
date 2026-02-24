@@ -46,6 +46,8 @@ const {
   listOrganizations,
 } = require('../organizationService');
 
+const NOT_DELETED = { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] };
+
 describe('organizationService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -87,7 +89,7 @@ describe('organizationService', () => {
       await updateOrganization('proj-1', 'org-1', { name: 'Acme Updated', domain: 'acme.io' });
 
       expect(dbModels.Organization.findOneAndUpdate).toHaveBeenCalledWith(
-        { _id: 'org-1', projectId: 'proj-1' },
+        { _id: 'org-1', projectId: 'proj-1', ...NOT_DELETED },
         expect.objectContaining({
           $set: expect.objectContaining({
             name: 'Acme Updated',
@@ -107,7 +109,7 @@ describe('organizationService', () => {
 
       await getOrganizationById('proj-1', 'org-1');
 
-      expect(dbModels.Organization.findOne).toHaveBeenCalledWith({ _id: 'org-1', projectId: 'proj-1' });
+      expect(dbModels.Organization.findOne).toHaveBeenCalledWith({ _id: 'org-1', projectId: 'proj-1', ...NOT_DELETED });
     });
   });
 
@@ -125,6 +127,7 @@ describe('organizationService', () => {
       expect(mockOrgFindOne).toHaveBeenCalledWith({
         projectId: 'proj-1',
         name: { $regex: '^Acme Corp$', $options: 'i' },
+        ...NOT_DELETED,
       });
       expect(result).toEqual({ _id: 'org-1', name: 'Acme Corp' });
     });
@@ -147,6 +150,7 @@ describe('organizationService', () => {
       expect(mockOrgFindOne).toHaveBeenCalledWith({
         projectId: 'proj-1',
         name: { $regex: '^Acme\\.\\[x\\]$', $options: 'i' },
+        ...NOT_DELETED,
       });
     });
   });
@@ -155,7 +159,7 @@ describe('organizationService', () => {
     it('calls Organization.find with projectId and applies sort/skip/limit', async () => {
       await listOrganizations('proj-1', { limit: 20, skip: 5 });
 
-      expect(dbModels.Organization.find).toHaveBeenCalledWith({ projectId: 'proj-1' });
+      expect(dbModels.Organization.find).toHaveBeenCalledWith({ projectId: 'proj-1', ...NOT_DELETED });
     });
   });
 });

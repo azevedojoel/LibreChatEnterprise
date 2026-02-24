@@ -50,6 +50,9 @@ const contactSchema = new Schema<IContact>(
     lastActivityAt: {
       type: Date,
     },
+    deletedAt: {
+      type: Date,
+    },
   },
   { timestamps: true },
 );
@@ -58,5 +61,6 @@ contactSchema.index({ projectId: 1, email: 1 });
 contactSchema.index({ projectId: 1, status: 1 });
 contactSchema.index({ projectId: 1, updatedAt: -1 });
 contactSchema.index({ projectId: 1, lastActivityAt: 1 });
+contactSchema.index({ projectId: 1, deletedAt: 1 });
 
 export default contactSchema;

@@ -21,6 +21,13 @@ const {
   listActivities,
   listPipelines,
   getDefaultPipeline,
+  createPipeline,
+  updatePipeline,
+  getPipelineById,
+  softDeleteContact,
+  softDeleteOrganization,
+  softDeleteDeal,
+  softDeletePipeline,
 } = require('./index');
 
 /**
@@ -60,6 +67,77 @@ function createCRMTools({ projectId, userId, agentId, conversationId, messageId 
       name: Tools.crm_list_pipelines,
       description: 'List all CRM pipelines for the current project. Returns id, name, stages, isDefault.',
       schema: { type: 'object', properties: {}, required: [] },
+    },
+  );
+
+  const createPipelineTool = tool(
+    async (rawInput) => {
+      const err = requireProject();
+      if (err) return toJson(err);
+      const { name, stages, isDefault } = rawInput;
+      if (!name) return toJson({ error: 'name is required' });
+      if (!stages?.length) return toJson({ error: 'stages (array of strings) is required' });
+      try {
+        const pipeline = await createPipeline({
+          projectId,
+          data: { name, stages, isDefault: isDefault ?? false },
+        });
+        return toJson(pipeline);
+      } catch (e) {
+        return toJson({ error: e.message || 'Failed to create pipeline' });
+      }
+    },
+    {
+      name: Tools.crm_create_pipeline,
+      description:
+        'Create a CRM pipeline. Required: name, stages (array of stage names, e.g. ["Lead","Qualified","Proposal","Won"]). Optional: isDefault (boolean).',
+      schema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Pipeline name' },
+          stages: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Stage names in order',
+          },
+          isDefault: { type: 'boolean', description: 'Set as default pipeline for new deals' },
+        },
+        required: ['name', 'stages'],
+      },
+    },
+  );
+
+  const updatePipelineTool = tool(
+    async (rawInput) => {
+      const err = requireProject();
+      if (err) return toJson(err);
+      const { pipelineId, name, stages, isDefault } = rawInput;
+      if (!pipelineId) return toJson({ error: 'pipelineId is required' });
+      try {
+        const pipeline = await updatePipeline(projectId, pipelineId, {
+          ...(name != null && { name }),
+          ...(stages !== undefined && { stages }),
+          ...(isDefault !== undefined && { isDefault }),
+        });
+        if (!pipeline) return toJson({ error: 'Pipeline not found' });
+        return toJson(pipeline);
+      } catch (e) {
+        return toJson({ error: e.message || 'Failed to update pipeline' });
+      }
+    },
+    {
+      name: Tools.crm_update_pipeline,
+      description: 'Update a pipeline. Required: pipelineId. Optional: name, stages, isDefault.',
+      schema: {
+        type: 'object',
+        properties: {
+          pipelineId: { type: 'string', description: 'Pipeline ID' },
+          name: { type: 'string' },
+          stages: { type: 'array', items: { type: 'string' } },
+          isDefault: { type: 'boolean' },
+        },
+        required: ['pipelineId'],
+      },
     },
   );
 
@@ -294,7 +372,7 @@ function createCRMTools({ projectId, userId, agentId, conversationId, messageId 
           pipelineId || (defaultPipeline?._id ? defaultPipeline._id.toString() : null);
         if (!effectivePipelineId)
           return toJson({
-            error: 'No pipeline found. Create a pipeline first via the CRM API or crm_list_pipelines.',
+            error: 'No pipeline found. Create a pipeline first using crm_create_pipeline, or check crm_list_pipelines.',
           });
         if (contactId) {
           const existingDeals = await listDeals({
@@ -517,8 +595,112 @@ function createCRMTools({ projectId, userId, agentId, conversationId, messageId 
     },
   );
 
+  const softDeleteContactTool = tool(
+    async (rawInput) => {
+      const err = requireProject();
+      if (err) return toJson(err);
+      const { contactId } = rawInput;
+      if (!contactId) return toJson({ error: 'contactId is required' });
+      try {
+        const contact = await softDeleteContact(projectId, contactId);
+        if (!contact) return toJson({ error: 'Contact not found' });
+        return toJson({ deleted: true, _id: contact._id });
+      } catch (e) {
+        return toJson({ error: e.message || 'Failed to soft delete contact' });
+      }
+    },
+    {
+      name: Tools.crm_soft_delete_contact,
+      description: 'Soft delete a contact. The contact is marked as deleted and excluded from lists. Required: contactId.',
+      schema: {
+        type: 'object',
+        properties: { contactId: { type: 'string', description: 'Contact ID' } },
+        required: ['contactId'],
+      },
+    },
+  );
+
+  const softDeleteOrganizationTool = tool(
+    async (rawInput) => {
+      const err = requireProject();
+      if (err) return toJson(err);
+      const { organizationId } = rawInput;
+      if (!organizationId) return toJson({ error: 'organizationId is required' });
+      try {
+        const org = await softDeleteOrganization(projectId, organizationId);
+        if (!org) return toJson({ error: 'Organization not found' });
+        return toJson({ deleted: true, _id: org._id });
+      } catch (e) {
+        return toJson({ error: e.message || 'Failed to soft delete organization' });
+      }
+    },
+    {
+      name: Tools.crm_soft_delete_organization,
+      description:
+        'Soft delete an organization. The organization is marked as deleted and excluded from lists. Required: organizationId.',
+      schema: {
+        type: 'object',
+        properties: { organizationId: { type: 'string', description: 'Organization ID' } },
+        required: ['organizationId'],
+      },
+    },
+  );
+
+  const softDeleteDealTool = tool(
+    async (rawInput) => {
+      const err = requireProject();
+      if (err) return toJson(err);
+      const { dealId } = rawInput;
+      if (!dealId) return toJson({ error: 'dealId is required' });
+      try {
+        const deal = await softDeleteDeal(projectId, dealId);
+        if (!deal) return toJson({ error: 'Deal not found' });
+        return toJson({ deleted: true, _id: deal._id });
+      } catch (e) {
+        return toJson({ error: e.message || 'Failed to soft delete deal' });
+      }
+    },
+    {
+      name: Tools.crm_soft_delete_deal,
+      description: 'Soft delete a deal. The deal is marked as deleted and excluded from lists. Required: dealId.',
+      schema: {
+        type: 'object',
+        properties: { dealId: { type: 'string', description: 'Deal ID' } },
+        required: ['dealId'],
+      },
+    },
+  );
+
+  const softDeletePipelineTool = tool(
+    async (rawInput) => {
+      const err = requireProject();
+      if (err) return toJson(err);
+      const { pipelineId } = rawInput;
+      if (!pipelineId) return toJson({ error: 'pipelineId is required' });
+      try {
+        const pipeline = await softDeletePipeline(projectId, pipelineId);
+        if (!pipeline) return toJson({ error: 'Pipeline not found' });
+        return toJson({ deleted: true, _id: pipeline._id });
+      } catch (e) {
+        return toJson({ error: e.message || 'Failed to soft delete pipeline' });
+      }
+    },
+    {
+      name: Tools.crm_soft_delete_pipeline,
+      description:
+        'Soft delete a pipeline. Fails if deals exist in the pipeline. Move or delete deals first. Required: pipelineId.',
+      schema: {
+        type: 'object',
+        properties: { pipelineId: { type: 'string', description: 'Pipeline ID' } },
+        required: ['pipelineId'],
+      },
+    },
+  );
+
   return {
     [Tools.crm_list_pipelines]: listPipelinesTool,
+    [Tools.crm_create_pipeline]: createPipelineTool,
+    [Tools.crm_update_pipeline]: updatePipelineTool,
     [Tools.crm_create_contact]: createContactTool,
     [Tools.crm_update_contact]: updateContactTool,
     [Tools.crm_get_contact]: getContactTool,
@@ -529,6 +711,10 @@ function createCRMTools({ projectId, userId, agentId, conversationId, messageId 
     [Tools.crm_list_deals]: listDealsTool,
     [Tools.crm_log_activity]: logActivityTool,
     [Tools.crm_list_activities]: listActivitiesTool,
+    [Tools.crm_soft_delete_contact]: softDeleteContactTool,
+    [Tools.crm_soft_delete_organization]: softDeleteOrganizationTool,
+    [Tools.crm_soft_delete_deal]: softDeleteDealTool,
+    [Tools.crm_soft_delete_pipeline]: softDeletePipelineTool,
   };
 }
 

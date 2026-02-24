@@ -5,6 +5,8 @@ const dbModels = require('~/db/models');
 
 const Organization = dbModels.Organization;
 
+const NOT_DELETED = { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] };
+
 function escapeRegex(str = '') {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -19,6 +21,7 @@ async function getOrganizationByName(projectId, name) {
   return Organization.findOne({
     projectId,
     name: { $regex: `^${escaped}$`, $options: 'i' },
+    ...NOT_DELETED,
   }).lean();
 }
 
@@ -47,7 +50,7 @@ async function createOrganization({ projectId, data }) {
  */
 async function updateOrganization(projectId, organizationId, updates) {
   return Organization.findOneAndUpdate(
-    { _id: organizationId, projectId },
+    { _id: organizationId, projectId, ...NOT_DELETED },
     {
       $set: {
         ...(updates.name != null && { name: updates.name }),
@@ -64,7 +67,7 @@ async function updateOrganization(projectId, organizationId, updates) {
  * @param {string} organizationId
  */
 async function getOrganizationById(projectId, organizationId) {
-  return Organization.findOne({ _id: organizationId, projectId }).lean();
+  return Organization.findOne({ _id: organizationId, projectId, ...NOT_DELETED }).lean();
 }
 
 /**
@@ -75,7 +78,19 @@ async function getOrganizationById(projectId, organizationId) {
  */
 async function listOrganizations(projectId, opts = {}) {
   const { limit = 50, skip = 0 } = opts;
-  return Organization.find({ projectId }).sort({ name: 1 }).skip(skip).limit(limit).lean();
+  return Organization.find({ projectId, ...NOT_DELETED }).sort({ name: 1 }).skip(skip).limit(limit).lean();
+}
+
+/**
+ * @param {string} projectId
+ * @param {string} organizationId
+ */
+async function softDeleteOrganization(projectId, organizationId) {
+  return Organization.findOneAndUpdate(
+    { _id: organizationId, projectId, ...NOT_DELETED },
+    { $set: { deletedAt: new Date() } },
+    { new: true },
+  ).lean();
 }
 
 module.exports = {
@@ -84,4 +99,5 @@ module.exports = {
   getOrganizationById,
   getOrganizationByName,
   listOrganizations,
+  softDeleteOrganization,
 };

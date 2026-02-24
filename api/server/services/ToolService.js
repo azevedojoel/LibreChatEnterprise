@@ -458,6 +458,12 @@ const nativeTools = new Set([
   Tools.crm_log_activity,
   Tools.crm_list_activities,
   Tools.crm_list_pipelines,
+  Tools.crm_create_pipeline,
+  Tools.crm_update_pipeline,
+  Tools.crm_soft_delete_contact,
+  Tools.crm_soft_delete_organization,
+  Tools.crm_soft_delete_deal,
+  Tools.crm_soft_delete_pipeline,
 ]);
 
 /** Checks if a tool name is a known built-in tool */
@@ -553,6 +559,12 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
       Tools.crm_log_activity,
       Tools.crm_list_activities,
       Tools.crm_list_pipelines,
+      Tools.crm_create_pipeline,
+      Tools.crm_update_pipeline,
+      Tools.crm_soft_delete_contact,
+      Tools.crm_soft_delete_organization,
+      Tools.crm_soft_delete_deal,
+      Tools.crm_soft_delete_pipeline,
     ];
     toolsToFilter = [...new Set([...toolsToFilter, ...crmTools])];
   }
@@ -651,7 +663,13 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
       tool === Tools.crm_list_deals ||
       tool === Tools.crm_log_activity ||
       tool === Tools.crm_list_activities ||
-      tool === Tools.crm_list_pipelines
+      tool === Tools.crm_list_pipelines ||
+      tool === Tools.crm_create_pipeline ||
+      tool === Tools.crm_update_pipeline ||
+      tool === Tools.crm_soft_delete_contact ||
+      tool === Tools.crm_soft_delete_organization ||
+      tool === Tools.crm_soft_delete_deal ||
+      tool === Tools.crm_soft_delete_pipeline
     ) {
       return checkCapability(AgentCapabilities.manage_crm);
     }
@@ -1156,6 +1174,12 @@ async function loadAgentTools({
       Tools.crm_log_activity,
       Tools.crm_list_activities,
       Tools.crm_list_pipelines,
+      Tools.crm_create_pipeline,
+      Tools.crm_update_pipeline,
+      Tools.crm_soft_delete_contact,
+      Tools.crm_soft_delete_organization,
+      Tools.crm_soft_delete_deal,
+      Tools.crm_soft_delete_pipeline,
     ];
     toolsToFilter = [...new Set([...toolsToFilter, ...crmTools])];
   }

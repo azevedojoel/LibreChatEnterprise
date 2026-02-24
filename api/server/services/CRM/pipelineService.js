@@ -4,6 +4,9 @@
 const dbModels = require('~/db/models');
 
 const Pipeline = dbModels.Pipeline;
+const Deal = dbModels.Deal;
+
+const NOT_DELETED = { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] };
 
 /**
  * @param {Object} params
@@ -17,7 +20,7 @@ async function createPipeline({ projectId, data }) {
   const isDefault = data.isDefault ?? false;
 
   if (isDefault) {
-    await Pipeline.updateMany({ projectId }, { $set: { isDefault: false } });
+    await Pipeline.updateMany({ projectId, ...NOT_DELETED }, { $set: { isDefault: false } });
   }
 
   const pipeline = await Pipeline.create({
@@ -36,7 +39,7 @@ async function createPipeline({ projectId, data }) {
  */
 async function updatePipeline(projectId, pipelineId, updates) {
   if (updates.isDefault) {
-    await Pipeline.updateMany({ projectId }, { $set: { isDefault: false } });
+    await Pipeline.updateMany({ projectId, ...NOT_DELETED }, { $set: { isDefault: false } });
   }
 
   const setFields = {};
@@ -44,7 +47,11 @@ async function updatePipeline(projectId, pipelineId, updates) {
   if (updates.stages !== undefined) setFields.stages = updates.stages;
   if (updates.isDefault !== undefined) setFields.isDefault = updates.isDefault;
 
-  return Pipeline.findOneAndUpdate({ _id: pipelineId, projectId }, { $set: setFields }, { new: true }).lean();
+  return Pipeline.findOneAndUpdate(
+    { _id: pipelineId, projectId, ...NOT_DELETED },
+    { $set: setFields },
+    { new: true },
+  ).lean();
 }
 
 /**
@@ -52,25 +59,48 @@ async function updatePipeline(projectId, pipelineId, updates) {
  * @param {string} pipelineId
  */
 async function getPipelineById(projectId, pipelineId) {
-  return Pipeline.findOne({ _id: pipelineId, projectId }).lean();
+  return Pipeline.findOne({ _id: pipelineId, projectId, ...NOT_DELETED }).lean();
 }
 
 /**
  * @param {string} projectId
  */
 async function listPipelines(projectId) {
-  return Pipeline.find({ projectId }).sort({ isDefault: -1, name: 1 }).lean();
+  return Pipeline.find({ projectId, ...NOT_DELETED }).sort({ isDefault: -1, name: 1 }).lean();
 }
 
 /**
  * @param {string} projectId
  */
 async function getDefaultPipeline(projectId) {
-  let pipeline = await Pipeline.findOne({ projectId, isDefault: true }).lean();
+  let pipeline = await Pipeline.findOne({ projectId, isDefault: true, ...NOT_DELETED }).lean();
   if (!pipeline) {
-    pipeline = await Pipeline.findOne({ projectId }).sort({ createdAt: 1 }).lean();
+    pipeline = await Pipeline.findOne({ projectId, ...NOT_DELETED }).sort({ createdAt: 1 }).lean();
   }
   return pipeline;
+}
+
+/**
+ * @param {string} projectId
+ * @param {string} pipelineId
+ * @returns {Promise<Object|null>} The soft-deleted pipeline, or null if not found or if deals exist
+ */
+async function softDeletePipeline(projectId, pipelineId) {
+  const activeDeals = await Deal.countDocuments({
+    projectId,
+    pipelineId,
+    ...NOT_DELETED,
+  });
+  if (activeDeals > 0) {
+    throw new Error(
+      `Cannot delete pipeline: ${activeDeals} deal(s) still exist in this pipeline. Move or delete deals first.`,
+    );
+  }
+  return Pipeline.findOneAndUpdate(
+    { _id: pipelineId, projectId, ...NOT_DELETED },
+    { $set: { deletedAt: new Date() } },
+    { new: true },
+  ).lean();
 }
 
 module.exports = {
@@ -79,4 +109,5 @@ module.exports = {
   getPipelineById,
   listPipelines,
   getDefaultPipeline,
+  softDeletePipeline,
 };
