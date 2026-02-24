@@ -179,6 +179,8 @@ const loadTools = async ({
   fileStrategy,
   imageOutputType,
 }) => {
+  tools = [...new Set(tools.filter((t) => t != null && typeof t === 'string'))];
+
   const toolConstructors = {
     flux: FluxAPI,
     calculator: Calculator,

@@ -1,5 +1,48 @@
+import { nanoid } from 'nanoid';
 import { ContentTypes } from 'librechat-data-provider';
 import type { TMessageContentParts } from 'librechat-data-provider';
+
+/**
+ * Ensures all tool_call IDs in content are unique. Mutates parts in place.
+ */
+function ensureUniqueToolCallIds(parts: TMessageContentParts[]): void {
+  const seenIds = new Set<string>();
+  const remapMap = new Map<string, string>();
+
+  for (const part of parts) {
+    if (part?.type !== ContentTypes.TOOL_CALL || !part.tool_call?.id) continue;
+
+    const currentId = part.tool_call.id as string;
+    if (seenIds.has(currentId)) {
+      const newId = `toolu_${nanoid()}`;
+      part.tool_call.id = newId;
+      remapMap.set(currentId, newId);
+    } else {
+      seenIds.add(currentId);
+    }
+  }
+
+  if (remapMap.size === 0) return;
+
+  const seenInToolCallIds = new Map<string, number>();
+  for (const part of parts) {
+    if (part?.type !== ContentTypes.TEXT || !Array.isArray(part.tool_call_ids))
+      continue;
+
+    const ids = part.tool_call_ids as string[];
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      if (!remapMap.has(id)) continue;
+
+      const count = seenInToolCallIds.get(id) ?? 0;
+      if (count >= 1) {
+        ids[i] = remapMap.get(id)!;
+      } else {
+        seenInToolCallIds.set(id, count + 1);
+      }
+    }
+  }
+}
 
 /**
  * Filters out malformed tool call content parts that don't have the required tool_call property.
@@ -29,6 +72,8 @@ export function filterMalformedContentParts<T>(
   if (!Array.isArray(contentParts)) {
     return contentParts;
   }
+
+  ensureUniqueToolCallIds(contentParts);
 
   return contentParts.filter((part) => {
     if (!part || typeof part !== 'object') {

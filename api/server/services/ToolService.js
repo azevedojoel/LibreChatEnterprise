@@ -517,7 +517,7 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
   const deferredToolsEnabled = checkCapability(AgentCapabilities.deferred_tools);
 
   /** Inject workspace tools when execute_code is enabled (backwards compat for agents saved before list_files/search_files existed) */
-  let toolsToFilter = (agent.tools ?? []).filter((t) => t != null && typeof t === 'string');
+  let toolsToFilter = [...new Set((agent.tools ?? []).filter((t) => t != null && typeof t === 'string'))];
   if (toolsToFilter.includes(Tools.execute_code)) {
     const workspaceTools = [
       Tools.workspace_read_file,
@@ -1134,7 +1134,7 @@ async function loadAgentTools({
   const areToolsEnabled = checkCapability(AgentCapabilities.tools);
 
   /** Inject workspace tools when execute_code is enabled (backwards compat for agents saved before list_files/search_files existed) */
-  let toolsToFilter = (agent.tools ?? []).filter((t) => t != null && typeof t === 'string');
+  let toolsToFilter = [...new Set((agent.tools ?? []).filter((t) => t != null && typeof t === 'string'))];
   if (toolsToFilter.includes(Tools.execute_code)) {
     const workspaceTools = [
       Tools.workspace_read_file,

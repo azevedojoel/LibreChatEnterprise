@@ -79,7 +79,8 @@
     "registry": "https://registry.npmjs.org/"
   },
   "dependencies": {
-    "html-to-text": "^9.0.5"
+    "html-to-text": "^9.0.5",
+    "nanoid": "^3.3.7"
   },
   "peerDependencies": {
     "@anthropic-ai/vertex-sdk": "^0.14.3",

@@ -197,4 +197,56 @@ describe('filterMalformedContentParts', () => {
       expect(result).toHaveLength(1);
     });
   });
+
+  describe('duplicate tool_call IDs', () => {
+    it('should deduplicate duplicate tool_call IDs and update tool_call_ids on text parts', () => {
+      const duplicateId = 'toolu_01QMSbm1ZHtufjaxdtiuvVRF';
+      const parts: TMessageContentParts[] = [
+        {
+          type: ContentTypes.TEXT,
+          text: 'Listing files...',
+          tool_call_ids: [duplicateId, duplicateId],
+        },
+        {
+          type: ContentTypes.TOOL_CALL,
+          tool_call: {
+            id: duplicateId,
+            name: 'workspace_list_files',
+            type: ToolCallTypes.TOOL_CALL,
+            args: '{"path":"/"}',
+            progress: 1,
+            output: '[]',
+          },
+        },
+        {
+          type: ContentTypes.TOOL_CALL,
+          tool_call: {
+            id: duplicateId,
+            name: 'workspace_list_files',
+            type: ToolCallTypes.TOOL_CALL,
+            args: '{"path":"/src"}',
+            progress: 1,
+            output: '[]',
+          },
+        },
+      ];
+
+      const result = filterMalformedContentParts(parts);
+      expect(result).toHaveLength(3);
+
+      const toolCalls = result.filter((p) => p.type === ContentTypes.TOOL_CALL);
+      expect(toolCalls).toHaveLength(2);
+
+      const ids = toolCalls
+        .filter((p): p is TMessageContentParts & { tool_call: { id: string } } => p.type === ContentTypes.TOOL_CALL && !!p.tool_call?.id)
+        .map((p) => p.tool_call.id);
+      expect(ids[0]).toBe(duplicateId);
+      expect(ids[1]).not.toBe(duplicateId);
+      expect(ids[1]).toMatch(/^toolu_/);
+      expect(new Set(ids).size).toBe(2);
+
+      const textPart = result.find((p) => p.type === ContentTypes.TEXT);
+      expect(textPart?.tool_call_ids).toEqual([duplicateId, ids[1]]);
+    });
+  });
 });
