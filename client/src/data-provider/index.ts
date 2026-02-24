@@ -6,8 +6,6 @@ export * from './Files';
 export * from './Memories';
 /* Scheduled Agents */
 export * from './ScheduledAgents';
-/* Workflows */
-export * from './Workflows';
 /* Admin Users */
 export * from './Users';
 export * from './Messages';

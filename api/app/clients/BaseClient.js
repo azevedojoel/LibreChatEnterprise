@@ -274,10 +274,6 @@ class BaseClient {
           text: message,
         });
 
-    if (opts.isWorkflowTriggered) {
-      userMessage.metadata = { ...(userMessage.metadata || {}), workflowTriggered: true };
-    }
-
     if (typeof opts?.getReqData === 'function') {
       opts.getReqData({
         userMessage,

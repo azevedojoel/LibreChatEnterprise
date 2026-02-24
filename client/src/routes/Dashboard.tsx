@@ -4,11 +4,7 @@ import {
   PromptForm,
   CreatePromptForm,
   EmptyPromptPreview,
-  WorkflowEditor,
-  EmptyWorkflowPreview,
-  CreateWorkflowForm,
 } from '~/components/Prompts';
-import { WorkflowsView } from '~/components/Workflows';
 import { UsersView } from '~/components/Users';
 import DashboardRoute from './Layouts/Dashboard';
 
@@ -82,26 +78,8 @@ const dashboardRoutes = {
       element: <UsersView />,
     },
     {
-      path: 'workflows/*',
-      element: <WorkflowsView />,
-      children: [
-        {
-          index: true,
-          element: <EmptyWorkflowPreview />,
-        },
-        {
-          path: 'new',
-          element: <CreateWorkflowForm />,
-        },
-        {
-          path: ':workflowId',
-          element: <WorkflowEditor />,
-        },
-      ],
-    },
-    {
       path: '*',
-      element: <Navigate to="/d/files" replace={true} />,
+      element: <Navigate to="/d/prompts" replace={true} />,
     },
   ],
 };

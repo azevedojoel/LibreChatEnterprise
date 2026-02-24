@@ -44,7 +44,6 @@ interface:
     users: true
     groups: true
     roles: true
-  workflows: true
   # Show expandable tool input/output (JSON). Set false for business-facing UIs.
   toolCallDetails: true
   # Spacing of tool call rows: 'normal' | 'compact'

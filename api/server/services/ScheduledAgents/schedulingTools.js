@@ -53,7 +53,7 @@ function createSchedulingTools({ userId, agentId: currentAgentId, schedulerTarge
     async (rawInput) => {
       if (rawInput.agentId === currentAgentId) {
         return JSON.stringify({
-          error: 'Agents cannot schedule themselves. Create a separate scheduling workflow.',
+          error: 'Agents cannot schedule themselves. Create a separate scheduling agent.',
         });
       }
 
@@ -136,7 +136,7 @@ function createSchedulingTools({ userId, agentId: currentAgentId, schedulerTarge
 
       if (newAgentId && newAgentId === currentAgentId) {
         return JSON.stringify({
-          error: 'Agents cannot schedule themselves. Create a separate scheduling workflow.',
+          error: 'Agents cannot schedule themselves. Create a separate scheduling agent.',
         });
       }
 

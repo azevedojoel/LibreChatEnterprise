@@ -25,7 +25,6 @@ const share = require('./share');
 const tags = require('./tags');
 const auth = require('./auth');
 const scheduledAgents = require('./scheduledAgents');
-const workflows = require('./workflows');
 const keys = require('./keys');
 const user = require('./user');
 const mcp = require('./mcp');
@@ -62,6 +61,5 @@ module.exports = {
   staticRoute,
   accessPermissions,
   scheduledAgents,
-  workflows,
   crm,
 };

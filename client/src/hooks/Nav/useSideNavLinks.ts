@@ -6,7 +6,6 @@ import {
   Settings2,
   ArrowRightToLine,
   MessageSquareQuote,
-  GitBranch,
 } from 'lucide-react';
 import {
   Permissions,
@@ -23,7 +22,6 @@ import AgentPanelSwitch from '~/components/SidePanel/Agents/AgentPanelSwitch';
 import BookmarkPanel from '~/components/SidePanel/Bookmarks/BookmarkPanel';
 import PanelSwitch from '~/components/SidePanel/Builder/PanelSwitch';
 import PromptsAccordion from '~/components/Prompts/PromptsAccordion';
-import WorkflowsPanel from '~/components/SidePanel/Workflows/WorkflowsPanel';
 import Parameters from '~/components/SidePanel/Parameters/Panel';
 import { MemoryPanel } from '~/components/SidePanel/Memories';
 import FilesPanel from '~/components/SidePanel/Files/Panel';
@@ -124,20 +122,6 @@ export default function useSideNavLinks({
       });
     }
 
-    if (
-      hasAccessToPrompts &&
-      hasAccessToAgents &&
-      (interfaceConfig.workflows ?? true) !== false
-    ) {
-      links.push({
-        title: 'com_ui_workflows',
-        label: '',
-        icon: GitBranch,
-        id: 'workflows',
-        Component: WorkflowsPanel,
-      });
-    }
-
     if (hasAccessToMemories && hasAccessToReadMemories) {
       links.push({
         title: 'com_ui_memories',
@@ -213,7 +197,6 @@ export default function useSideNavLinks({
     hasAccessToMemories,
     hasAccessToReadMemories,
     interfaceConfig.parameters,
-    interfaceConfig.workflows,
     endpointType,
     hasAccessToBookmarks,
     availableMCPServers,

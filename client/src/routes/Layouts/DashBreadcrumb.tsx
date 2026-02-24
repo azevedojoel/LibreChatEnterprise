@@ -3,7 +3,7 @@ import { useSetRecoilState } from 'recoil';
 import { Sidebar } from '@librechat/client';
 import { useLocation } from 'react-router-dom';
 import { SystemRoles } from 'librechat-data-provider';
-import { ArrowLeft, MessageSquareQuote, GitBranch, Users } from 'lucide-react';
+import { ArrowLeft, MessageSquareQuote, Users } from 'lucide-react';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -14,12 +14,10 @@ import {
 import { useLocalize, useCustomLink, useAuthContext } from '~/hooks';
 import AdvancedSwitch from '~/components/Prompts/AdvancedSwitch';
 import AdminSettings from '~/components/Prompts/AdminSettings';
-import { WorkflowsAdminSettings } from '~/components/Workflows';
 import { useDashboardContext } from '~/Providers';
 import store from '~/store';
 
 const promptsPathPattern = /prompts\/(?!new(?:\/|$)).*$/;
-const workflowsPathPattern = /^\/d\/workflows(\/|$)/;
 const usersPathPattern = /^\/d\/users(\/|$)/;
 
 const getConversationId = (prevLocationPath: string) => {
@@ -55,10 +53,6 @@ export default function DashBreadcrumb({
 
   const chatLinkHandler = useCustomLink('/c/' + lastConversationId, clickCallback);
 
-  const isWorkflowsPath = useMemo(
-    () => workflowsPathPattern.test(location.pathname),
-    [location.pathname],
-  );
   const isPromptsPath = useMemo(
     () => promptsPathPattern.test(location.pathname),
     [location.pathname],
@@ -70,13 +64,11 @@ export default function DashBreadcrumb({
 
   const sectionLabel = isUsersPath
     ? localize('com_nav_user_management')
-    : isWorkflowsPath
-      ? localize('com_ui_workflows')
-      : localize('com_ui_prompts');
-  const sectionHref = isUsersPath ? '/d/users' : isWorkflowsPath ? '/d/workflows' : '/d/prompts';
-  const SectionIcon = isUsersPath ? Users : isWorkflowsPath ? GitBranch : MessageSquareQuote;
+    : localize('com_ui_prompts');
+  const sectionHref = isUsersPath ? '/d/users' : '/d/prompts';
+  const SectionIcon = isUsersPath ? Users : MessageSquareQuote;
   const promptsLinkHandler = useCustomLink(sectionHref);
-  const panelId = isUsersPath ? 'users-panel' : isWorkflowsPath ? 'workflows-panel' : 'prompts-panel';
+  const panelId = isUsersPath ? 'users-panel' : 'prompts-panel';
 
   return (
     <div className="mr-2 mt-2 flex h-10 items-center justify-between">
@@ -145,9 +137,7 @@ export default function DashBreadcrumb({
       </Breadcrumb>
       <div className="flex items-center justify-center gap-2">
         {isPromptsPath && <AdvancedSwitch />}
-        {user?.role === SystemRoles.ADMIN &&
-          !isUsersPath &&
-          (isWorkflowsPath ? <WorkflowsAdminSettings /> : <AdminSettings />)}
+        {user?.role === SystemRoles.ADMIN && !isUsersPath && <AdminSettings />}
       </div>
     </div>
   );

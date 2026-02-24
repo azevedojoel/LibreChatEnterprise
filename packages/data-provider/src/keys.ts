@@ -72,11 +72,6 @@ export enum QueryKeys {
   /* Admin Users */
   adminUsers = 'adminUsers',
   adminUser = 'adminUser',
-  /* Workflows */
-  workflows = 'workflows',
-  workflow = 'workflow',
-  workflowRuns = 'workflowRuns',
-  workflowSchedules = 'workflowSchedules',
 }
 
 // Dynamic query keys that require parameters
@@ -85,10 +80,6 @@ export const DynamicQueryKeys = {
   scheduledAgentRuns: (limit?: number) =>
     [QueryKeys.scheduledAgentRuns, limit] as const,
   scheduledAgentRun: (id: string) => [QueryKeys.scheduledAgentRuns, id] as const,
-  workflowRuns: (workflowId: string, limit?: number) =>
-    [QueryKeys.workflowRuns, workflowId, limit] as const,
-  workflowSchedules: (workflowId: string) =>
-    [QueryKeys.workflowSchedules, workflowId] as const,
 } as const;
 
 export enum MutationKeys {

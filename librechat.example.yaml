@@ -94,8 +94,6 @@ interface:
     use: true
     share: false
     public: false
-  # Enable workflows (prompts + agents flowchart editor). Default: true
-  workflows: true
   peoplePicker:
     users: true
     groups: true

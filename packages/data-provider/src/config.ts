@@ -679,7 +679,6 @@ export const interfaceSchema = z
       })
       .optional(),
     scheduledAgents: z.boolean().optional(),
-    workflows: z.boolean().optional(),
     toolCallDetails: z.boolean().optional(),
     toolCallSpacing: z.enum(['normal', 'compact']).optional(),
   })
