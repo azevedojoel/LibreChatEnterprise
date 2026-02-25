@@ -13,6 +13,7 @@ export default {
   moduleNameMapper: {
     '^@src/(.*)$': '<rootDir>/src/$1',
     '~/(.*)': '<rootDir>/src/$1',
+    '^@toon-format/toon$': '<rootDir>/__mocks__/toon-format-toon.js',
   },
   // coverageThreshold: {
   //   global: {

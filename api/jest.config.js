@@ -10,6 +10,7 @@ module.exports = {
     '~/data/auth.json': '<rootDir>/__mocks__/auth.mock.json',
     '^openid-client/passport$': '<rootDir>/test/__mocks__/openid-client-passport.js', // Mock for the passport strategy part
     '^openid-client$': '<rootDir>/test/__mocks__/openid-client.js',
+    '^@toon-format/toon$': '<rootDir>/test/__mocks__/toon-format-toon.js',
   },
   transformIgnorePatterns: ['/node_modules/(?!(openid-client|oauth4webapi|jose)/).*/'],
 };
