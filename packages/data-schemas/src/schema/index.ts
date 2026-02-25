@@ -33,3 +33,4 @@ export { default as organizationSchema } from './organization';
 export { default as dealSchema } from './deal';
 export { default as activitySchema } from './activity';
 export { default as pipelineSchema } from './pipeline';
+export { default as toolApprovalLinkSchema } from './toolApprovalLink';

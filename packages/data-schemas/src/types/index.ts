@@ -38,3 +38,4 @@ export * from './organization';
 export * from './deal';
 export * from './activity';
 export * from './pipeline';
+export * from './toolApprovalLink';
