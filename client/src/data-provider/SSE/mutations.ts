@@ -22,12 +22,10 @@ export interface AbortStreamResponse {
  * Can pass either streamId or conversationId - backend will find the job.
  */
 export const abortStream = async (params: AbortStreamParams): Promise<AbortStreamResponse> => {
-  console.log('[abortStream] Calling abort endpoint with params:', params);
   const result = (await request.post(
     `${apiBaseUrl()}/api/agents/chat/abort`,
     params,
   )) as AbortStreamResponse;
-  console.log('[abortStream] Abort response:', result);
   return result;
 };
 
@@ -38,5 +36,55 @@ export const abortStream = async (params: AbortStreamParams): Promise<AbortStrea
 export function useAbortStreamMutation() {
   return useMutation({
     mutationFn: abortStream,
+  });
+}
+
+export interface SubmitToolConfirmationParams {
+  /** Token flow (approval page): id from URL */
+  id?: string;
+  /** Inline flow (web UI): conversationId, messageId, toolCallId */
+  conversationId?: string;
+  messageId?: string;
+  toolCallId?: string;
+  approved: boolean;
+}
+
+export interface PendingToolConfirmationResponse {
+  toolName: string;
+  argsSummary: string;
+  conversationId: string;
+}
+
+/**
+ * Submit user approval/denial for a destructive tool.
+ */
+export const submitToolConfirmation = async (
+  params: SubmitToolConfirmationParams,
+): Promise<{ success: boolean; error?: string }> => {
+  const result = (await request.post(
+    `${apiBaseUrl()}/api/agents/chat/tool-confirmation`,
+    params,
+  )) as { success: boolean; error?: string };
+  return result;
+};
+
+/**
+ * Fetch pending tool confirmation details (for approval page).
+ */
+export const getPendingToolConfirmation = async (params: {
+  id: string;
+}): Promise<PendingToolConfirmationResponse> => {
+  const query = new URLSearchParams(params).toString();
+  return request.get(
+    `${apiBaseUrl()}/api/agents/chat/tool-confirmation/pending?${query}`,
+  ) as Promise<PendingToolConfirmationResponse>;
+};
+
+/**
+ * React Query mutation hook for submitting tool confirmation.
+ */
+export function useSubmitToolConfirmationMutation() {
+  return useMutation({
+    mutationFn: submitToolConfirmation,
   });
 }

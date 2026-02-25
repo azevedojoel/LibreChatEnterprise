@@ -122,6 +122,7 @@ export default function useResumableSSE(
     executeCodeOutputHandler,
     resetContentHandler,
     handleAgentHandoff,
+    onToolConfirmationRequired,
   } = useEventHandlers({
     setMessages,
     getMessages,
@@ -245,6 +246,17 @@ export default function useResumableSSE(
             executeCodeOutputHandler({
               data: data.data as { tool_call_id: string; chunk: string; source: string },
               submission: currentSubmission as EventSubmission,
+            });
+            return;
+          }
+
+          if (data.event === 'tool_confirmation_required' && data.data) {
+            onToolConfirmationRequired(data.data as {
+              toolCallId: string;
+              toolName: string;
+              args?: string;
+              conversationId: string;
+              runId: string;
             });
             return;
           }

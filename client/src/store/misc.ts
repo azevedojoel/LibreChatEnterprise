@@ -74,6 +74,26 @@ export const pendingMCPOAuthAtom = atom<PendingMCPOAuth | null>({
   default: null,
 });
 
+/** Pending tool confirmation - modal shows Approve/Deny for destructive tools */
+export interface PendingToolConfirmation {
+  conversationId: string;
+  runId: string;
+  toolCallId: string;
+  toolName: string;
+  argsSummary?: string;
+}
+
+export const pendingToolConfirmationAtom = atom<PendingToolConfirmation | null>({
+  key: 'pendingToolConfirmation',
+  default: null,
+});
+
+/** Persisted expanded state for tool call JSON - survives navigation. Key: conversationId:messageId:toolCallId */
+export const expandedToolCallsAtom = atom<Set<string>>({
+  key: 'expandedToolCalls',
+  default: new Set(),
+});
+
 export default {
   hideBannerHint,
   messageAttachmentsMap,
@@ -81,4 +101,6 @@ export default {
   queriesEnabled,
   chatBadges,
   pendingMCPOAuthAtom,
+  pendingToolConfirmationAtom,
+  expandedToolCallsAtom,
 };

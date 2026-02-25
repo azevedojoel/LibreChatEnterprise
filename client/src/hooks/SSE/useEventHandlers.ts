@@ -184,6 +184,7 @@ export default function useEventHandlers({
   const applyAgentTemplate = useApplyAgentTemplate();
   const setAbortScroll = useSetRecoilState(store.abortScroll);
   const setPendingMCPOAuth = useSetRecoilState(store.pendingMCPOAuthAtom);
+  const setPendingToolConfirmation = useSetRecoilState(store.pendingToolConfirmationAtom);
   const navigate = useNavigate();
   const location = useLocation();
   const agentsMap = useAgentsMapContext();
@@ -258,6 +259,19 @@ export default function useEventHandlers({
       }
     },
     [setPendingMCPOAuth],
+  );
+
+  const onToolConfirmationRequired = useCallback(
+    (data: { toolCallId: string; toolName: string; args?: string; conversationId: string; runId: string }) => {
+      setPendingToolConfirmation({
+        conversationId: data.conversationId,
+        runId: data.runId,
+        toolCallId: data.toolCallId,
+        toolName: data.toolName,
+        argsSummary: data.args,
+      });
+    },
+    [setPendingToolConfirmation],
   );
 
   const onAuthCleared = useCallback(
@@ -1051,5 +1065,6 @@ export default function useEventHandlers({
     abortConversation,
     resetContentHandler,
     handleAgentHandoff,
+    onToolConfirmationRequired,
   };
 }
