@@ -253,6 +253,14 @@ async function processInboundEmail(payload) {
     syntheticReq._headlessOAuthUrls = capturedOAuthUrls;
     /** Tracks MCP servers we've already captured a URL for (deduplicates per-server) */
     syntheticReq._headlessOAuthServers = new Set();
+    /** When set, sends approval email for destructive tools (headless flow) */
+    syntheticReq._headlessSendApprovalEmail = async ({ toolName, argsSummary, approvalUrl }) => {
+      const appName = process.env.APP_TITLE || 'Daily Thread';
+      const subject = `${appName}: Tool approval required`;
+      const body = `Your agent requested approval for a destructive action.\n\nTool: ${toolName}\n${argsSummary ? `Arguments: ${argsSummary}\n\n` : ''}To approve or deny, sign in and visit:\n${approvalUrl}\n\nThis link expires in 1 hour.`;
+      const html = `<p>Your agent requested approval for a destructive action.</p><p><strong>Tool:</strong> ${toolName}</p>${argsSummary ? `<p><strong>Arguments:</strong> <code>${argsSummary}</code></p>` : ''}<p>To approve or deny, <a href="${approvalUrl}">sign in and visit this link</a>.</p><p><em>This link expires in 1 hour.</em></p>`;
+      await sendInboundReply({ to: fromEmail, subject, body, html });
+    };
 
     const result = await initializeClient({
       req: syntheticReq,

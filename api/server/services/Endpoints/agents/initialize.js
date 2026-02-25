@@ -8,6 +8,7 @@ const {
   GenerationJobManager,
   getCustomEndpointConfig,
   createSequentialChainEdges,
+  sendEvent,
 } = require('@librechat/api');
 const {
   EModelEndpoint,
@@ -19,7 +20,13 @@ const {
   createToolEndCallback,
   getDefaultHandlers,
 } = require('~/server/controllers/agents/callbacks');
-const { loadAgentTools, loadToolsForExecution } = require('~/server/services/ToolService');
+const {
+  loadAgentTools,
+  loadToolsForExecution,
+  isDestructiveTool,
+} = require('~/server/services/ToolService');
+const { nanoid } = require('nanoid');
+const ToolConfirmationStore = require('~/server/services/ToolConfirmationStore');
 const { getModelsConfig } = require('~/server/controllers/ModelController');
 const AgentClient = require('~/server/controllers/agents/client');
 const { getConvoFiles } = require('~/models/Conversation');
@@ -27,6 +34,7 @@ const { processAddedConvo } = require('./addedConvo');
 const { getAgent } = require('~/models/Agent');
 const { logViolation } = require('~/cache');
 const db = require('~/models');
+const { ToolApprovalLink } = require('~/db/models');
 
 /**
  * Creates a tool loader function for the agent.
@@ -125,6 +133,13 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
    */
   const agentToolContexts = new Map();
 
+  const emitToolConfirmationEvent = (eventData) => {
+    if (streamId) {
+      return GenerationJobManager.emitChunk(streamId, eventData);
+    }
+    sendEvent(res, eventData);
+  };
+
   const toolExecuteOptions = {
     loadTools: async (toolNames, agentId) => {
       const ctx = agentToolContexts.get(agentId) ?? {};
@@ -147,6 +162,70 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
       return result;
     },
     toolEndCallback,
+    isDestructiveTool,
+    requestToolConfirmation: async (toolCall, metadata) => {
+      const conversationId = metadata?.thread_id;
+      const runId = metadata?.run_id;
+      const userId = metadata?.user_id;
+      if (!conversationId || !runId || !userId) {
+        logger.warn('[ToolConfirmation] Missing metadata for confirmation', {
+          hasThreadId: !!conversationId,
+          hasRunId: !!runId,
+          hasUserId: !!userId,
+        });
+        return { approved: false };
+      }
+      const argsStr =
+        typeof toolCall.args === 'string'
+          ? toolCall.args
+          : JSON.stringify(toolCall.args ?? {});
+      const argsSummary = argsStr.length > 200 ? argsStr.slice(0, 200) + '...' : argsStr;
+
+      const { promise } = await ToolConfirmationStore.register({
+        conversationId,
+        runId,
+        toolCallId: toolCall.id,
+        userId,
+        toolName: toolCall.name,
+        argsSummary,
+      });
+
+      emitToolConfirmationEvent({
+        event: 'tool_confirmation_required',
+        data: {
+          toolCallId: toolCall.id,
+          toolName: toolCall.name,
+          args: argsSummary,
+          conversationId,
+          runId,
+        },
+      });
+
+      if (req._headlessSendApprovalEmail) {
+        const baseUrl = process.env.DOMAIN_CLIENT || process.env.DOMAIN_SERVER || 'http://localhost:3080';
+        const token = nanoid(32);
+        const expiresAt = new Date(Date.now() + 3600 * 1000); // 1 hour TTL
+        await ToolApprovalLink.create({
+          token,
+          conversationId,
+          runId,
+          toolCallId: toolCall.id,
+          userId,
+          toolName: toolCall.name,
+          argsSummary,
+          status: 'pending',
+          expiresAt,
+        });
+        const approvalUrl = `${baseUrl}/approve/tool?id=${token}`;
+        await req._headlessSendApprovalEmail({
+          toolName: toolCall.name,
+          argsSummary,
+          approvalUrl,
+        });
+      }
+
+      return promise;
+    },
     captureOAuthUrl: (url, options = {}) => {
       const arr = req._headlessOAuthUrls;
       const serverName = options?.serverName;
