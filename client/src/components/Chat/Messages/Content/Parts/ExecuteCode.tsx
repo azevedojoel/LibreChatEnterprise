@@ -3,8 +3,9 @@ import { useRecoilValue } from 'recoil';
 import type { TAttachment } from 'librechat-data-provider';
 import ProgressText from '~/components/Chat/Messages/Content/ProgressText';
 import MarkdownLite from '~/components/Chat/Messages/Content/MarkdownLite';
-import { useProgress, useLocalize } from '~/hooks';
+import { useProgress, useLocalize, useToolApproval } from '~/hooks';
 import { AttachmentGroup } from './Attachment';
+import ToolApprovalBar from '~/components/Chat/Messages/Content/ToolApprovalBar';
 import Stdout from './Stdout';
 import { cn } from '~/utils';
 import store from '~/store';
@@ -50,14 +51,18 @@ export default function ExecuteCode({
   args,
   output = '',
   attachments,
+  toolCallId,
 }: {
   initialProgress: number;
   isSubmitting: boolean;
   args?: string;
   output?: string;
   attachments?: TAttachment[];
+  toolCallId?: string;
 }) {
   const localize = useLocalize();
+  const { pendingMatches, handleApprove, handleDeny, approvalSubmitting } = useToolApproval(toolCallId);
+
   const hasOutput = output.length > 0;
   const outputRef = useRef<string>(output);
   const outputContainerRef = useRef<HTMLDivElement>(null);
@@ -65,6 +70,15 @@ export default function ExecuteCode({
   const [isAnimating, setIsAnimating] = useState(false);
   const showAnalysisCode = useRecoilValue(store.showCode);
   const [showCode, setShowCode] = useState(showAnalysisCode);
+
+  const hasAutoExpandedRef = useRef(false);
+  useEffect(() => {
+    if (pendingMatches && !hasAutoExpandedRef.current) {
+      hasAutoExpandedRef.current = true;
+      setShowCode(true);
+    }
+    if (!pendingMatches) hasAutoExpandedRef.current = false;
+  }, [pendingMatches]);
   const [contentHeight, setContentHeight] = useState<number | undefined>(0);
 
   const prevShowCodeRef = useRef<boolean>(showCode);
@@ -147,21 +161,36 @@ export default function ExecuteCode({
 
   return (
     <>
-      <div className="relative my-2.5 flex size-5 shrink-0 items-center gap-2.5">
-        <ProgressText
-          progress={progress}
-          onClick={() => setShowCode((prev) => !prev)}
-          inProgressText={localize('com_ui_analyzing')}
-          finishedText={
-            cancelled ? localize('com_ui_cancelled') : localize('com_ui_analyzing_finished')
-          }
-          hasInput={!!code?.length}
-          isExpanded={showCode}
-          error={cancelled}
-        />
+      <div
+        className={cn(
+          'relative flex shrink-0 items-center gap-2.5',
+          pendingMatches ? 'my-3 min-h-8' : 'my-2.5 size-5',
+        )}
+      >
+        {pendingMatches ? (
+          <ToolApprovalBar
+            onApprove={handleApprove}
+            onDeny={handleDeny}
+            onToggleExpand={() => setShowCode((prev) => !prev)}
+            isExpanded={showCode}
+            isSubmitting={approvalSubmitting}
+          />
+        ) : (
+          <ProgressText
+            progress={progress}
+            onClick={() => setShowCode((prev) => !prev)}
+            inProgressText={localize('com_ui_analyzing')}
+            finishedText={
+              cancelled ? localize('com_ui_cancelled') : localize('com_ui_analyzing_finished')
+            }
+            hasInput={!!code?.length}
+            isExpanded={showCode}
+            error={cancelled}
+          />
+        )}
       </div>
       <div
-        className="relative mb-2"
+        className={cn('relative mb-2', showCode && 'mt-2')}
         style={{
           height: showCode ? contentHeight : 0,
           overflow: 'hidden',

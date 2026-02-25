@@ -4,29 +4,47 @@ import { RecoilRoot } from 'recoil';
 import { Tools } from 'librechat-data-provider';
 import ToolCall from '../ToolCall';
 
-// Mock dependencies
-jest.mock('~/hooks', () => ({
-  useLocalize: () => (key: string, values?: any) => {
-    const translations: Record<string, string> = {
-      com_assistants_function_use: `Used ${values?.[0]}`,
-      com_assistants_completed_function: `Completed ${values?.[0]}`,
-      com_assistants_completed_action: `Completed action on ${values?.[0]}`,
-      com_assistants_running_var: `Running ${values?.[0]}`,
-      com_assistants_running_action: 'Running action',
-      com_ui_sign_in_to_domain: `Sign in with ${values?.[0]}`,
-      com_ui_continue_oauth: 'Continue with OAuth',
-      com_ui_cancel: 'Cancel',
-      com_ui_cancelled: 'Cancelled',
-      com_ui_requires_auth: 'Requires authentication',
-      com_ui_connect_account: 'Connect account',
-      com_assistants_allow_sites_you_trust:
-        "We'll open a secure sign-in page. Only connect accounts from services you trust.",
-    };
-    return translations[key] || key;
-  },
-  useProgress: (initialProgress: number) => (initialProgress >= 1 ? 1 : initialProgress),
-  useMCPConnectionStatus: () => ({ connectionStatus: {} }),
-}));
+// Mock dependencies - useToolApproval return value mutated per test; get mock via require('~/hooks').useToolApproval
+// Use var so it's hoisted and assignable when the mock factory runs
+var mockUseToolApprovalReturn: {
+  pendingMatches: boolean;
+  handleApprove: jest.Mock;
+  handleDeny: jest.Mock;
+  approvalSubmitting: boolean;
+};
+
+jest.mock('~/hooks', () => {
+  mockUseToolApprovalReturn = {
+    pendingMatches: false,
+    handleApprove: jest.fn(),
+    handleDeny: jest.fn(),
+    approvalSubmitting: false,
+  };
+  const mockUseToolApproval = jest.fn((toolCallId?: string) => mockUseToolApprovalReturn);
+  return {
+    useLocalize: () => (key: string, values?: any) => {
+      const translations: Record<string, string> = {
+        com_assistants_function_use: `Used ${values?.[0]}`,
+        com_assistants_completed_function: `Completed ${values?.[0]}`,
+        com_assistants_completed_action: `Completed action on ${values?.[0]}`,
+        com_assistants_running_var: `Running ${values?.[0]}`,
+        com_assistants_running_action: 'Running action',
+        com_ui_sign_in_to_domain: `Sign in with ${values?.[0]}`,
+        com_ui_continue_oauth: 'Continue with OAuth',
+        com_ui_cancel: 'Cancel',
+        com_ui_cancelled: 'Cancelled',
+        com_ui_requires_auth: 'Requires authentication',
+        com_ui_connect_account: 'Connect account',
+        com_assistants_allow_sites_you_trust:
+          "We'll open a secure sign-in page. Only connect accounts from services you trust.",
+      };
+      return translations[key] || key;
+    },
+    useProgress: (initialProgress: number) => (initialProgress >= 1 ? 1 : initialProgress),
+    useMCPConnectionStatus: () => ({ connectionStatus: {} }),
+    useToolApproval: mockUseToolApproval,
+  };
+});
 
 jest.mock('~/components/Chat/Messages/Content/MessageContent', () => ({
   __esModule: true,
@@ -40,6 +58,11 @@ jest.mock('../ToolCallInfo', () => ({
       {JSON.stringify(props)}
     </div>
   ),
+}));
+
+jest.mock('../ToolApprovalBar', () => ({
+  __esModule: true,
+  default: () => <div data-testid="tool-approval-bar">ToolApprovalBar</div>,
 }));
 
 jest.mock('../ProgressText', () => ({
@@ -67,6 +90,7 @@ jest.mock('lucide-react', () => ({
   ChevronDown: () => <span>{'ChevronDown'}</span>,
   ChevronUp: () => <span>{'ChevronUp'}</span>,
   TriangleAlert: () => <span>{'TriangleAlert'}</span>,
+  ShieldAlert: () => <span>{'ShieldAlert'}</span>,
 }));
 
 jest.mock('~/utils', () => ({
@@ -79,6 +103,12 @@ jest.mock('~/utils', () => ({
 jest.mock('~/data-provider', () => ({
   ...jest.requireActual('~/data-provider'),
   useGetStartupConfig: () => ({ data: { interface: {} } }),
+}));
+
+jest.mock('~/data-provider/SSE/mutations', () => ({
+  useSubmitToolConfirmationMutation: () => ({
+    mutateAsync: jest.fn().mockResolvedValue({ success: true }),
+  }),
 }));
 
 jest.mock('@tanstack/react-query', () => ({
@@ -403,6 +433,38 @@ describe('ToolCall', () => {
 
       const attachmentGroup = screen.getByTestId('attachment-group');
       expect(JSON.parse(attachmentGroup.textContent!)).toEqual(complexAttachments);
+    });
+  });
+
+  describe('pending tool approval', () => {
+    beforeEach(() => {
+      mockUseToolApprovalReturn.pendingMatches = false;
+      mockUseToolApprovalReturn.approvalSubmitting = false;
+    });
+
+    it('should render ToolApprovalBar when pendingMatches is true', () => {
+      mockUseToolApprovalReturn.pendingMatches = true;
+      mockUseToolApprovalReturn.approvalSubmitting = false;
+
+      renderWithRecoil(<ToolCall {...mockProps} toolCallId="tool-call-123" />);
+
+      expect(screen.getByTestId('tool-approval-bar')).toBeInTheDocument();
+      expect(screen.queryByText('testFunction')).not.toBeInTheDocument();
+    });
+
+    it('should render ProgressText when pendingMatches is false', () => {
+      mockUseToolApprovalReturn.pendingMatches = false;
+
+      renderWithRecoil(<ToolCall {...mockProps} toolCallId="tool-call-123" />);
+
+      expect(screen.queryByTestId('tool-approval-bar')).not.toBeInTheDocument();
+      expect(screen.getByText('testFunction')).toBeInTheDocument();
+    });
+
+    it('should pass toolCallId to useToolApproval', () => {
+      const { useToolApproval } = require('~/hooks');
+      renderWithRecoil(<ToolCall {...mockProps} toolCallId="my-tool-id" />);
+      expect(useToolApproval).toHaveBeenCalledWith('my-tool-id');
     });
   });
 });

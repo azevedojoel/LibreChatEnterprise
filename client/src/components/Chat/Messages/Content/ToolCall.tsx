@@ -1,5 +1,5 @@
-import { useMemo, useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { useSetRecoilState } from 'recoil';
+import { useMemo, useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
+import { useRecoilValue, useSetRecoilState } from 'recoil';
 import {
   Constants,
   ContentTypes,
@@ -41,11 +41,13 @@ const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
   'tasks.moveTask': 'Moving Google Task',
 };
 import type { TAttachment } from 'librechat-data-provider';
-import { useLocalize, useProgress, useMCPConnectionStatus } from '~/hooks';
+import { useLocalize, useProgress, useMCPConnectionStatus, useToolApproval } from '~/hooks';
+import { useMessageContext } from '~/Providers';
 import { useGetStartupConfig } from '~/data-provider';
 import { AttachmentGroup } from './Parts';
 import ToolCallInfo from './ToolCallInfo';
 import ProgressText from './ProgressText';
+import ToolApprovalBar from './ToolApprovalBar';
 import { logger, cn } from '~/utils';
 
 export default function ToolCall({
@@ -58,6 +60,7 @@ export default function ToolCall({
   attachments,
   auth,
   showAuthButton = true,
+  toolCallId,
 }: {
   initialProgress: number;
   isLast?: boolean;
@@ -70,16 +73,56 @@ export default function ToolCall({
   expires_at?: number;
   /** When false, do not set the OAuth overlay (first tool per server in message shows it) */
   showAuthButton?: boolean;
+  toolCallId?: string;
 }) {
   const localize = useLocalize();
+  const { conversationId, messageId } = useMessageContext();
   const setPendingMCPOAuth = useSetRecoilState(store.pendingMCPOAuthAtom);
+  const expandedToolCalls = useRecoilValue(store.expandedToolCallsAtom);
+  const setExpandedToolCalls = useSetRecoilState(store.expandedToolCallsAtom);
+  const { pendingMatches, handleApprove, handleDeny, approvalSubmitting } = useToolApproval(toolCallId);
   const { data: startupConfig } = useGetStartupConfig();
+
+  const expandedKey =
+    conversationId && messageId && toolCallId
+      ? `${conversationId}:${messageId}:${toolCallId}`
+      : null;
+  const [localShowInfo, setLocalShowInfo] = useState(false);
+  const showInfo = expandedKey
+    ? expandedToolCalls.has(expandedKey)
+    : localShowInfo;
+
+  const toggleShowInfo = useCallback(() => {
+    if (expandedKey) {
+      setExpandedToolCalls((prev) => {
+        const next = new Set(prev);
+        if (next.has(expandedKey)) next.delete(expandedKey);
+        else next.add(expandedKey);
+        return next;
+      });
+    } else {
+      setLocalShowInfo((prev) => !prev);
+    }
+  }, [expandedKey, setExpandedToolCalls]);
+
+  const hasAutoExpandedRef = useRef(false);
+  useEffect(() => {
+    if (pendingMatches && expandedKey && !hasAutoExpandedRef.current) {
+      hasAutoExpandedRef.current = true;
+      setExpandedToolCalls((prev) => {
+        if (prev.has(expandedKey)) return prev;
+        const next = new Set(prev);
+        next.add(expandedKey);
+        return next;
+      });
+    }
+    if (!pendingMatches) hasAutoExpandedRef.current = false;
+  }, [pendingMatches, expandedKey, setExpandedToolCalls]);
 
   const interfaceConfig = startupConfig?.interface as
     | { toolCallSpacing?: 'normal' | 'compact' }
     | undefined;
   const isCompactSpacing = interfaceConfig?.toolCallSpacing === 'compact';
-  const [showInfo, setShowInfo] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const [contentHeight, setContentHeight] = useState<number | undefined>(0);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -358,29 +401,41 @@ export default function ToolCall({
     <>
       <div
         className={cn(
-          'relative flex flex-col gap-1',
+          'relative flex flex-col',
           isCompactSpacing ? 'my-0.5' : 'my-1',
+          pendingMatches ? 'gap-3' : 'gap-1',
         )}
       >
         <div
           className={cn(
-            'flex h-5 shrink-0 items-center',
+            'flex shrink-0 items-center',
             isCompactSpacing ? 'gap-1' : 'gap-1.5',
+            pendingMatches ? 'min-h-8 flex-wrap' : 'h-5',
           )}
         >
-          <ProgressText
-            muted
-            progress={displayProgress}
-            onClick={() => setShowInfo((prev) => !prev)}
-            inProgressText={labelWithPattern || localize('com_assistants_running_action')}
-            authText={
-              !cancelled && authDomain.length > 0 ? localize('com_ui_requires_auth') : undefined
-            }
-            finishedText={getFinishedText()}
-            hasInput={hasInfo}
-            isExpanded={showInfo}
-            error={cancelled}
-          />
+          {pendingMatches ? (
+            <ToolApprovalBar
+              onApprove={handleApprove}
+              onDeny={handleDeny}
+              onToggleExpand={toggleShowInfo}
+              isExpanded={showInfo}
+              isSubmitting={approvalSubmitting}
+            />
+          ) : (
+            <ProgressText
+              muted
+              progress={displayProgress}
+              onClick={toggleShowInfo}
+              inProgressText={labelWithPattern || localize('com_assistants_running_action')}
+              authText={
+                !cancelled && authDomain.length > 0 ? localize('com_ui_requires_auth') : undefined
+              }
+              finishedText={getFinishedText()}
+              hasInput={hasInfo}
+              isExpanded={showInfo}
+              error={cancelled}
+            />
+          )}
         </div>
       </div>
       <div

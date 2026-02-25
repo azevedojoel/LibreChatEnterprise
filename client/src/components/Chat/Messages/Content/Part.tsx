@@ -116,6 +116,7 @@ const Part = memo(
             output={toolCall.output ?? ''}
             initialProgress={toolCall.progress ?? 0.1}
             args={typeof toolCall.args === 'string' ? toolCall.args : ''}
+            toolCallId={toolCall.id}
           />
         );
       } else if (
@@ -165,6 +166,7 @@ const Part = memo(
             expires_at={toolCall.expires_at}
             isLast={isLast}
             showAuthButton={showAuthButton}
+            toolCallId={toolCall.id}
           />
         );
       } else if (toolCall.type === ToolCallTypes.CODE_INTERPRETER) {
