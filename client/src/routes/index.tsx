@@ -19,6 +19,7 @@ import dashboardRoutes from './Dashboard';
 import ShareRoute from './ShareRoute';
 import ChatRoute from './ChatRoute';
 import Search from './Search';
+import ToolApprovalPage from './ToolApprovalPage';
 import Root from './Root';
 
 const AuthLayout = () => (
@@ -99,6 +100,11 @@ export const router = createBrowserRouter(
           ],
         },
         dashboardRoutes,
+        {
+          path: 'approve/tool',
+          element: <ToolApprovalPage />,
+          errorElement: <RouteErrorBoundary />,
+        },
         {
           path: '/',
           element: <Root />,

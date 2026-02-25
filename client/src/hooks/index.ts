@@ -38,3 +38,4 @@ export { default as useResourcePermissions } from './useResourcePermissions';
 export { default as useChatBadges, useResetChatBadges } from './useChatBadges';
 export { default as useOAuthCompleteListener } from './useOAuthCompleteListener';
 export { default as useMCPOAuthBroadcastListener } from './useMCPOAuthBroadcastListener';
+export { useToolApproval } from './useToolApproval';
