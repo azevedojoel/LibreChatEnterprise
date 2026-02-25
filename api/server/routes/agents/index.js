@@ -269,6 +269,134 @@ router.post('/chat/abort', async (req, res) => {
   return res.status(404).json({ error: 'Job not found', streamId: jobStreamId });
 });
 
+/**
+ * @route GET /chat/tool-confirmation/pending
+ * @desc Fetch pending tool confirmation details (for approval page display)
+ * @access Private (JWT required)
+ * @query id - Token from approval URL (?id=TOKEN)
+ */
+router.get('/chat/tool-confirmation/pending', async (req, res) => {
+  const { id: token } = req.query;
+  const userId = req.user?.id;
+
+  if (!token || !userId) {
+    return res.status(400).json({
+      error: 'Missing required query params',
+      required: ['id'],
+    });
+  }
+
+  const { ToolApprovalLink } = require('~/db/models');
+  const link = await ToolApprovalLink.findOne({ token, status: 'pending' });
+  if (!link) {
+    return res.status(404).json({ error: 'expired' });
+  }
+  if (link.expiresAt < new Date()) {
+    return res.status(404).json({ error: 'expired' });
+  }
+  if (String(link.userId) !== String(userId)) {
+    return res.status(403).json({ error: 'Unauthorized' });
+  }
+
+  // Optional: track when user first visited
+  if (!link.clickedAt) {
+    await ToolApprovalLink.updateOne({ _id: link._id }, { clickedAt: new Date() });
+  }
+
+  return res.json({
+    toolName: link.toolName,
+    argsSummary: link.argsSummary || '',
+    conversationId: link.conversationId,
+  });
+});
+
+/**
+ * @route POST /chat/tool-confirmation
+ * @desc Submit user approval/denial for a destructive tool
+ * @access Private (JWT required)
+ * @body Token flow: { id: string (token), approved: boolean }
+ * @body Inline flow: { conversationId, messageId, toolCallId, approved: boolean }
+ */
+router.post('/chat/tool-confirmation', async (req, res) => {
+  const { id: token, conversationId, messageId, toolCallId, approved } = req.body;
+  const userId = req.user?.id;
+
+  if (!userId || typeof approved !== 'boolean') {
+    return res.status(400).json({
+      error: 'Missing required fields',
+      required: ['approved'],
+    });
+  }
+
+  const ToolConfirmationStore = require('~/server/services/ToolConfirmationStore');
+  let runId;
+  let resolvedConversationId;
+  let resolvedToolCallId;
+
+  if (token) {
+    // Token flow (approval page / email link)
+    const { ToolApprovalLink } = require('~/db/models');
+    const link = await ToolApprovalLink.findOne({ token });
+    if (!link) {
+      return res.status(404).json({ error: 'expired' });
+    }
+    if (link.expiresAt < new Date()) {
+      return res.status(404).json({ error: 'expired' });
+    }
+    if (link.status !== 'pending') {
+      return res.status(409).json({ error: 'already processed' });
+    }
+    if (String(link.userId) !== String(userId)) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+    resolvedConversationId = link.conversationId;
+    runId = link.runId;
+    resolvedToolCallId = link.toolCallId;
+  } else if (conversationId && messageId && toolCallId) {
+    // Inline flow (web UI - no token)
+    const { searchConversation } = require('~/models/Conversation');
+    const conversation = await searchConversation(conversationId);
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+    if (String(conversation.user) !== String(userId)) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+    resolvedConversationId = conversationId;
+    runId = messageId;
+    resolvedToolCallId = toolCallId;
+  } else {
+    return res.status(400).json({
+      error: 'Missing required fields',
+      required: ['approved'],
+      requiredForInline: ['conversationId', 'messageId', 'toolCallId'],
+    });
+  }
+
+  const result = await ToolConfirmationStore.submit({
+    conversationId: resolvedConversationId,
+    runId,
+    toolCallId: resolvedToolCallId,
+    approved,
+    userId,
+  });
+
+  if (!result.success) {
+    const status = result.error === 'expired' ? 404 : 403;
+    return res.status(status).json({ error: result.error || 'Failed to submit' });
+  }
+
+  if (token) {
+    const { ToolApprovalLink } = require('~/db/models');
+    await ToolApprovalLink.updateOne(
+      { token },
+      { status: approved ? 'approved' : 'denied', resolvedAt: new Date() },
+    );
+  }
+
+  return res.json({ success: true });
+});
+
 const chatRouter = express.Router();
 chatRouter.use(configMiddleware);
 
