@@ -466,6 +466,8 @@ const nativeTools = new Set([
   Tools.crm_soft_delete_pipeline,
 ]);
 
+const { isDestructiveTool } = require('./destructiveTools');
+
 /** Checks if a tool name is a known built-in tool */
 const isBuiltInTool = (toolName) =>
   Boolean(
@@ -1896,6 +1898,7 @@ async function loadActionToolsForExecution({
 module.exports = {
   loadTools,
   isBuiltInTool,
+  isDestructiveTool,
   getToolkitKey,
   loadAgentTools,
   loadToolsForExecution,

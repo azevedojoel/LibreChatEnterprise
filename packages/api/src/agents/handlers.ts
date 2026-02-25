@@ -48,6 +48,13 @@ export interface ToolExecuteOptions {
   toolEndCallback?: ToolEndCallback;
   /** Callback to capture OAuth URL when headless OAuth error occurs (e.g., inbound email) */
   captureOAuthUrl?: (url: string, options?: { serverName?: string }) => void;
+  /** Check if a tool requires user confirmation before execution */
+  isDestructiveTool?: (toolName: string) => boolean;
+  /** Request user confirmation for destructive tools. Returns { approved } - if false, tool is not executed */
+  requestToolConfirmation?: (
+    toolCall: ToolCallRequest,
+    metadata: Record<string, unknown>,
+  ) => Promise<{ approved: boolean }>;
 }
 
 /**
@@ -56,7 +63,8 @@ export interface ToolExecuteOptions {
  * executes them in parallel, and resolves with the results.
  */
 export function createToolExecuteHandler(options: ToolExecuteOptions): EventHandler {
-  const { loadTools, toolEndCallback, captureOAuthUrl } = options;
+  const { loadTools, toolEndCallback, captureOAuthUrl, isDestructiveTool, requestToolConfirmation } =
+    options;
 
   return {
     handle: async (_event: string, data: ToolExecuteBatchRequest) => {
@@ -133,6 +141,22 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
                   );
                   toolCallConfig.toolDefs = toolDefs;
                   toolCallConfig.toolMap = ptcToolMap ?? toolMap;
+                }
+              }
+
+              if (
+                isDestructiveTool?.(tc.name) &&
+                requestToolConfirmation
+              ) {
+                const metadataRecord = (metadata ?? {}) as Record<string, unknown>;
+                const { approved } = await requestToolConfirmation(tc, metadataRecord);
+                if (!approved) {
+                  return {
+                    toolCallId: tc.id,
+                    status: 'error' as const,
+                    content: '',
+                    errorMessage: 'User denied execution.',
+                  };
                 }
               }
 

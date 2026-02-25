@@ -2,8 +2,10 @@ const {
   AgentCapabilities,
   defaultAgentCapabilities,
   Tools,
+  Constants,
   isEphemeralAgentId,
 } = require('librechat-data-provider');
+const { isDestructiveTool } = require('../destructiveTools');
 
 /**
  * Simulates the file_search tool inclusion logic from loadAgentTools / loadToolDefinitionsWrapper.
@@ -283,5 +285,52 @@ describe('ToolService - Capability Checking', () => {
 
       expect(shouldIncludeFileSearch(agentId, ephemeralAgent, checkCapabilityEnabled)).toBe(false);
     });
+  });
+});
+
+describe('ToolService - isDestructiveTool', () => {
+  it('returns true for execute_code and code_interpreter', () => {
+    expect(isDestructiveTool(Tools.execute_code)).toBe(true);
+    expect(isDestructiveTool('code_interpreter')).toBe(true);
+  });
+
+  it('returns true for CRM tools', () => {
+    expect(isDestructiveTool(Tools.crm_create_contact)).toBe(true);
+    expect(isDestructiveTool(Tools.crm_update_contact)).toBe(true);
+    expect(isDestructiveTool(Tools.crm_soft_delete_contact)).toBe(true);
+    expect(isDestructiveTool(Tools.crm_create_deal)).toBe(true);
+  });
+
+  it('returns true for schedule tools', () => {
+    expect(isDestructiveTool(Tools.create_schedule)).toBe(true);
+    expect(isDestructiveTool(Tools.delete_schedule)).toBe(true);
+    expect(isDestructiveTool(Tools.update_schedule)).toBe(true);
+    expect(isDestructiveTool(Tools.run_schedule)).toBe(true);
+  });
+
+  it('returns true for Gmail and Calendar tools', () => {
+    expect(isDestructiveTool('gmail.send')).toBe(true);
+    expect(isDestructiveTool('gmail_send')).toBe(true);
+    expect(isDestructiveTool('calendar.createEvent')).toBe(true);
+    expect(isDestructiveTool('calendar_create_event')).toBe(true);
+  });
+
+  it('returns false for non-destructive tools', () => {
+    expect(isDestructiveTool(Tools.web_search)).toBe(false);
+    expect(isDestructiveTool(Tools.file_search)).toBe(false);
+    expect(isDestructiveTool('unknown_tool')).toBe(false);
+  });
+
+  it('handles MCP tool names - extracts base name before _mcp_', () => {
+    const mcpDelimiter = Constants.mcp_delimiter || '_mcp_';
+    expect(isDestructiveTool(`gmail_send${mcpDelimiter}GoogleWorkspace`)).toBe(true);
+    expect(isDestructiveTool(`calendar_create_event${mcpDelimiter}ServerName`)).toBe(true);
+    expect(isDestructiveTool(`web_search${mcpDelimiter}Server`)).toBe(false);
+  });
+
+  it('handles null, undefined, empty string', () => {
+    expect(isDestructiveTool(null)).toBe(false);
+    expect(isDestructiveTool(undefined)).toBe(false);
+    expect(isDestructiveTool('')).toBe(false);
   });
 });
