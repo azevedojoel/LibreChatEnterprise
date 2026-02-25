@@ -10,7 +10,7 @@ import {
 } from 'react';
 import { debounce } from 'lodash';
 import { useRecoilState } from 'recoil';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { setTokenHeader, SystemRoles } from 'librechat-data-provider';
 import type * as t from 'librechat-data-provider';
 import {
@@ -47,6 +47,7 @@ const AuthContextProvider = ({
   });
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   const setUserContext = useMemo(
     () =>
@@ -86,7 +87,12 @@ const AuthContextProvider = ({
         return;
       }
       setError(undefined);
-      setUserContext({ token, isAuthenticated: true, user, redirect: '/c/new' });
+      const redirectParam = new URLSearchParams(location.search).get('redirect');
+      const redirect =
+        redirectParam && redirectParam.startsWith('/') && !redirectParam.startsWith('//')
+          ? redirectParam
+          : '/c/new';
+      setUserContext({ token, isAuthenticated: true, user, redirect });
     },
     onError: (error: TResError | unknown) => {
       const resError = error as TResError;

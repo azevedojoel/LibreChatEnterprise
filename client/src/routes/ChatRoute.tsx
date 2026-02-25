@@ -58,7 +58,10 @@ export default function ChatRoute() {
     }
   }, [conversationId, isTemporaryChat, setIsTemporary, defaultTemporaryChat]);
 
-  // Clear MCP OAuth overlay when switching conversations
+  // Clear MCP OAuth overlay when switching conversations.
+  // Do NOT clear pendingToolConfirmation - matching is by conversationId, so approval UI
+  // only shows for the correct conversation. Preserving it lets users navigate away and
+  // return to approve.
   useEffect(() => {
     setPendingMCPOAuth(null);
   }, [conversationId, setPendingMCPOAuth]);
