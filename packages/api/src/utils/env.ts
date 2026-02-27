@@ -342,7 +342,10 @@ export function processMCPEnv(params: {
 
   // Process OAuth configuration if it exists (for all transport types)
   if ('oauth' in newObj && newObj.oauth) {
-    const processedOAuth: Record<string, boolean | string | string[] | undefined> = {};
+    const processedOAuth: Record<
+      string,
+      boolean | string | string[] | Record<string, string> | undefined
+    > = {};
     for (const [key, originalValue] of Object.entries(newObj.oauth)) {
       // Only process string values for environment variables
       // token_exchange_method is an enum and shouldn't be processed

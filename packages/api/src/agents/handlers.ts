@@ -63,8 +63,13 @@ export interface ToolExecuteOptions {
  * executes them in parallel, and resolves with the results.
  */
 export function createToolExecuteHandler(options: ToolExecuteOptions): EventHandler {
-  const { loadTools, toolEndCallback, captureOAuthUrl, isDestructiveTool, requestToolConfirmation } =
-    options;
+  const {
+    loadTools,
+    toolEndCallback,
+    captureOAuthUrl,
+    isDestructiveTool,
+    requestToolConfirmation,
+  } = options;
 
   return {
     handle: async (_event: string, data: ToolExecuteBatchRequest) => {
@@ -136,18 +141,14 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
                 if (toolRegistry) {
                   const toolDefs: LCTool[] = Array.from(toolRegistry.values()).filter(
                     (t) =>
-                      t.name !== Constants.PROGRAMMATIC_TOOL_CALLING &&
-                      !isToolSearchTool(t.name),
+                      t.name !== Constants.PROGRAMMATIC_TOOL_CALLING && !isToolSearchTool(t.name),
                   );
                   toolCallConfig.toolDefs = toolDefs;
                   toolCallConfig.toolMap = ptcToolMap ?? toolMap;
                 }
               }
 
-              if (
-                isDestructiveTool?.(tc.name) &&
-                requestToolConfirmation
-              ) {
+              if (isDestructiveTool?.(tc.name) && requestToolConfirmation) {
                 const metadataRecord = (metadata ?? {}) as Record<string, unknown>;
                 const { approved } = await requestToolConfirmation(tc, metadataRecord);
                 if (!approved) {
@@ -204,7 +205,8 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
                 messageForModel =
                   'User cancelled authentication and does not want to proceed. Do not retry this integration.';
               }
-              const hasOAuthMarker = !isUserCancelled && errorMessage.includes(HEADLESS_OAUTH_URL_MARKER);
+              const hasOAuthMarker =
+                !isUserCancelled && errorMessage.includes(HEADLESS_OAUTH_URL_MARKER);
               logger.info(`[ON_TOOL_EXECUTE] OAuth check for ${tc.name}`, {
                 hasCaptureOAuthUrl: !!captureOAuthUrl,
                 hasOAuthMarker,
@@ -212,11 +214,14 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
               });
               if (captureOAuthUrl && hasOAuthMarker) {
                 const url = errorMessage
-                  .slice(errorMessage.indexOf(HEADLESS_OAUTH_URL_MARKER) + HEADLESS_OAUTH_URL_MARKER.length)
+                  .slice(
+                    errorMessage.indexOf(HEADLESS_OAUTH_URL_MARKER) +
+                      HEADLESS_OAUTH_URL_MARKER.length,
+                  )
                   .trim();
                 const serverName =
-                  typeof tc.name === 'string' && tc.name.includes(Constants.mcp_delimiter)
-                    ? tc.name.split(Constants.mcp_delimiter).pop() ?? undefined
+                  typeof tc.name === 'string' && tc.name.includes(Constants.MCP_DELIMITER)
+                    ? (tc.name.split(Constants.MCP_DELIMITER).pop() ?? undefined)
                     : undefined;
                 logger.info(`[ON_TOOL_EXECUTE] Extracting OAuth URL for email`, {
                   urlLength: url?.length ?? 0,
@@ -247,11 +252,15 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
 
         if (captureOAuthUrl && hasOAuthMarker) {
           const url = errorMessage
-            .slice(errorMessage.indexOf(HEADLESS_OAUTH_URL_MARKER) + HEADLESS_OAUTH_URL_MARKER.length)
+            .slice(
+              errorMessage.indexOf(HEADLESS_OAUTH_URL_MARKER) + HEADLESS_OAUTH_URL_MARKER.length,
+            )
             .trim();
           const serverName =
-            toolCalls.length > 0 && typeof toolCalls[0].name === 'string' && toolCalls[0].name.includes(Constants.mcp_delimiter)
-              ? toolCalls[0].name.split(Constants.mcp_delimiter).pop() ?? undefined
+            toolCalls.length > 0 &&
+            typeof toolCalls[0].name === 'string' &&
+            toolCalls[0].name.includes(Constants.MCP_DELIMITER)
+              ? (toolCalls[0].name.split(Constants.MCP_DELIMITER).pop() ?? undefined)
               : undefined;
           if (url) {
             captureOAuthUrl(url, { serverName });

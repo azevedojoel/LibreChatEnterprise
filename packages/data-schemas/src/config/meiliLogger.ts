@@ -1,5 +1,8 @@
 import winston from 'winston';
-import 'winston-daily-rotate-file';
+import DailyRotateFile from 'winston-daily-rotate-file';
+
+// Explicitly register transport - avoids "not a constructor" when multiple winston versions exist in monorepo
+winston.transports.DailyRotateFile = DailyRotateFile;
 import { getLogDirectory } from './utils';
 
 const logDir = getLogDirectory();
