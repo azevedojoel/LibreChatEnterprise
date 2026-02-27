@@ -12,6 +12,42 @@ const ToolCacheKeys = {
 };
 
 /**
+ * Invalidates all MCP tool caches for a given server name (all users).
+ * Requires Redis with scanIterator. No-op if Redis is not available.
+ * @param {string} serverName - MCP server name (e.g. 'Google', 'Google-Workspace')
+ * @returns {Promise<number>} Number of cache keys deleted
+ */
+async function invalidateMCPServerByName(serverName) {
+  if (!serverName || typeof serverName !== 'string') return 0;
+  try {
+    const { keyvRedisClient, scanKeys, batchDeleteKeys, cacheConfig } = require('@librechat/api');
+    if (!keyvRedisClient || !('scanIterator' in keyvRedisClient)) return 0;
+
+    const namespace = CacheKeys.TOOL_CACHE;
+    const prefix = cacheConfig.REDIS_KEY_PREFIX || '';
+    const sep = cacheConfig.GLOBAL_PREFIX_SEPARATOR || '::';
+    const basePattern = prefix
+      ? `${prefix}${sep}${namespace}:*`
+      : `${namespace}:*`;
+
+    const allKeys = await scanKeys(keyvRedisClient, basePattern);
+    const suffix = `:tools:mcp:`;
+    const keysToDelete = allKeys.filter((key) => {
+      const idx = key.indexOf(suffix);
+      if (idx === -1) return false;
+      const afterSuffix = key.slice(idx + suffix.length);
+      return afterSuffix.endsWith(`:${serverName}`);
+    });
+
+    if (keysToDelete.length === 0) return 0;
+    await batchDeleteKeys(keyvRedisClient, keysToDelete);
+    return keysToDelete.length;
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * Retrieves available tools from cache
  * @function getCachedTools
  * @param {Object} options - Options for retrieving tools
@@ -105,4 +141,5 @@ module.exports = {
   setCachedTools,
   getMCPServerTools,
   invalidateCachedTools,
+  invalidateMCPServerByName,
 };
