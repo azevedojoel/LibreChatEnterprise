@@ -28,7 +28,7 @@ import {
 import MCPServerStatusIcon from '~/components/MCP/MCPServerStatusIcon';
 import MCPConfigDialog from '~/components/MCP/MCPConfigDialog';
 import MCPToolItem from './MCPToolItem';
-import { cn } from '~/utils';
+import { cn, getToolDisplayName } from '~/utils';
 
 export default function MCPTool({ serverInfo }: { serverInfo?: MCPServerInfo }) {
   const localize = useLocalize();
@@ -72,7 +72,10 @@ export default function MCPTool({ serverInfo }: { serverInfo?: MCPServerInfo }) 
       (tool) =>
         tool.metadata?.name?.toLowerCase().includes(q) ||
         tool.metadata?.description?.toLowerCase().includes(q) ||
-        tool.tool_id?.toLowerCase().includes(q),
+        tool.tool_id?.toLowerCase().includes(q) ||
+        getToolDisplayName(tool.metadata?.name ?? tool.tool_id ?? '')
+          .toLowerCase()
+          .includes(q),
     );
   }, [tools, toolFilter]);
 
