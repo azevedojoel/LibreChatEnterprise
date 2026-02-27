@@ -1,4 +1,4 @@
-import { registerTransform, registerToolOnlyFallback } from './registry';
+import { registerToolOnlyFallback } from './registry';
 import { stripHtml } from './utils';
 
 /** Google Calendar: raw array of events */
@@ -240,43 +240,16 @@ function transformListTodoTasks(parsed: unknown): string {
   return body;
 }
 
-const GOOGLE_SERVER_ALIASES = [
-  'Google',
-  'google',
-  'google-workspace',
-  'Google Workspace',
-  'Google_Workspace',
-];
-
-const MICROSOFT_SERVER_ALIASES = ['Microsoft', 'Microsoft 365', 'ms365', 'ms-365'];
-
 export function registerCommonTransforms(): void {
-  // Google
-  for (const server of GOOGLE_SERVER_ALIASES) {
-    registerTransform(server, 'calendar.listEvents', transformCalendarListEvents);
-    registerTransform(server, 'drive.search', transformDriveSearch);
-  }
-  registerToolOnlyFallback('calendar.listEvents', transformCalendarListEvents);
-  registerToolOnlyFallback('drive.search', transformDriveSearch);
+  registerToolOnlyFallback('calendar_listEvents', transformCalendarListEvents);
+  registerToolOnlyFallback('drive_search', transformDriveSearch);
 
-  // Microsoft calendar
   const MS_CALENDAR_LIST_TOOLS = [
     'list-calendar-events',
     'get-calendar-view',
     'get-specific-calendar-view',
   ];
   const MS_CALENDAR_GET_TOOLS = ['get-calendar-event', 'get-specific-calendar-event'];
-  for (const server of MICROSOFT_SERVER_ALIASES) {
-    for (const tool of MS_CALENDAR_LIST_TOOLS) {
-      registerTransform(server, tool, transformMicrosoftCalendarList);
-    }
-    for (const tool of MS_CALENDAR_GET_TOOLS) {
-      registerTransform(server, tool, transformGetCalendarEvent);
-    }
-    registerTransform(server, 'list-folder-files', transformListFolderFiles);
-    registerTransform(server, 'list-todo-task-lists', transformListTodoTaskLists);
-    registerTransform(server, 'list-todo-tasks', transformListTodoTasks);
-  }
   for (const tool of MS_CALENDAR_LIST_TOOLS) {
     registerToolOnlyFallback(tool, transformMicrosoftCalendarList);
   }

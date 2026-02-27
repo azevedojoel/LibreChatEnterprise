@@ -1,4 +1,4 @@
-import { registerTransform, registerToolOnlyFallback } from './registry';
+import { registerToolOnlyFallback } from './registry';
 import { stripHtml } from './utils';
 
 type ODataValueResponse<T> = {
@@ -95,8 +95,6 @@ function transformGetMailMessage(parsed: unknown): string {
   return parts.join('\n');
 }
 
-const MICROSOFT_SERVER_ALIASES = ['Microsoft', 'Microsoft 365', 'ms365', 'ms-365'];
-
 const LIST_MAIL_TOOLS = [
   'list-mail-messages',
   'list-mail-folder-messages',
@@ -105,14 +103,6 @@ const LIST_MAIL_TOOLS = [
 const GET_MAIL_TOOLS = ['get-mail-message', 'get-shared-mailbox-message'];
 
 export function registerOutlookTransforms(): void {
-  for (const server of MICROSOFT_SERVER_ALIASES) {
-    for (const tool of LIST_MAIL_TOOLS) {
-      registerTransform(server, tool, transformListMailMessages);
-    }
-    for (const tool of GET_MAIL_TOOLS) {
-      registerTransform(server, tool, transformGetMailMessage);
-    }
-  }
   for (const tool of LIST_MAIL_TOOLS) {
     registerToolOnlyFallback(tool, transformListMailMessages);
   }

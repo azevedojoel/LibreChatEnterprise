@@ -1,6 +1,6 @@
 /**
  * Registry of tool-specific transforms for token-optimized MCP responses.
- * Key format: "serverName:toolName" (e.g. "Google:tasks.listTasks")
+ * Key format: "serverName:toolName" (e.g. "Google:tasks_listTasks")
  * Also supports tool-name-only fallback for tools unique across servers.
  */
 

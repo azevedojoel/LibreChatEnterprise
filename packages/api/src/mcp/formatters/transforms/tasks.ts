@@ -1,4 +1,4 @@
-import { registerTransform, registerToolOnlyFallback } from './registry';
+import { registerToolOnlyFallback } from './registry';
 
 type TaskItem = {
   id?: string;
@@ -77,19 +77,7 @@ function transformListTaskLists(parsed: unknown): string {
   return data?.nextPageToken ? `${body}\nnextPageToken: ${data.nextPageToken}` : body;
 }
 
-const GOOGLE_SERVER_ALIASES = [
-  'Google',
-  'google',
-  'google-workspace',
-  'Google Workspace',
-  'Google_Workspace',
-];
-
 export function registerTaskTransforms(): void {
-  for (const server of GOOGLE_SERVER_ALIASES) {
-    registerTransform(server, 'tasks.listTasks', transformListTasks);
-    registerTransform(server, 'tasks.listTaskLists', transformListTaskLists);
-  }
-  registerToolOnlyFallback('tasks.listTasks', transformListTasks);
-  registerToolOnlyFallback('tasks.listTaskLists', transformListTaskLists);
+  registerToolOnlyFallback('tasks_listTasks', transformListTasks);
+  registerToolOnlyFallback('tasks_listTaskLists', transformListTaskLists);
 }

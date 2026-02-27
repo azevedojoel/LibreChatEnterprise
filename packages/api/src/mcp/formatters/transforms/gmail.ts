@@ -1,4 +1,4 @@
-import { registerTransform, registerToolOnlyFallback } from './registry';
+import { registerToolOnlyFallback } from './registry';
 import { stripHtml } from './utils';
 
 type GmailSearchMessage = {
@@ -97,19 +97,7 @@ function transformGmailGet(parsed: unknown): string {
   return parts.join('\n');
 }
 
-const GOOGLE_SERVER_ALIASES = [
-  'Google',
-  'google',
-  'google-workspace',
-  'Google Workspace',
-  'Google_Workspace',
-];
-
 export function registerGmailTransforms(): void {
-  for (const server of GOOGLE_SERVER_ALIASES) {
-    registerTransform(server, 'gmail.search', transformGmailSearch);
-    registerTransform(server, 'gmail.get', transformGmailGet);
-  }
-  registerToolOnlyFallback('gmail.search', transformGmailSearch);
-  registerToolOnlyFallback('gmail.get', transformGmailGet);
+  registerToolOnlyFallback('gmail_search', transformGmailSearch);
+  registerToolOnlyFallback('gmail_get', transformGmailGet);
 }
