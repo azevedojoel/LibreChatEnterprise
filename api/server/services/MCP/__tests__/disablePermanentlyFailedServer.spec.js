@@ -89,7 +89,7 @@ describe('removeMCPFromUserAgents', () => {
       id: 'agent-1',
       author: userId,
       mcpServerNames: [serverName],
-      tools: [`tasks_list${serverToolSuffix}`, `web_search`, `other_tool_mcp_Google`],
+      tools: [`tasks_listTasks${serverToolSuffix}`, `web_search`, `other_tool_mcp_Google`],
       versions: null,
     };
     mockAgentFind.mockResolvedValue([agentWithTools]);
@@ -112,8 +112,8 @@ describe('removeMCPFromUserAgents', () => {
       author: userId,
       mcpServerNames: [serverName, 'Google'],
       tools: [
-        `tasks_list${serverToolSuffix}`,
-        `calendar_events_mcp_Google`,
+        `tasks_listTasks${serverToolSuffix}`,
+        `calendar_listEvents_mcp_Google`,
       ],
       versions: null,
     };
@@ -123,7 +123,7 @@ describe('removeMCPFromUserAgents', () => {
 
     expect(mockUpdateAgent).toHaveBeenCalledWith(
       { id: 'agent-1', author: userId },
-      { tools: ['calendar_events_mcp_Google'] },
+      { tools: ['calendar_listEvents_mcp_Google'] },
       expect.any(Object),
     );
   });
@@ -136,7 +136,7 @@ describe('removeMCPFromUserAgents', () => {
       tools: ['legacy_tool'],
       versions: [
         { tools: ['v1_tool'] },
-        { tools: [`tasks_list${serverToolSuffix}`, 'keep_tool'] },
+        { tools: [`tasks_listTasks${serverToolSuffix}`, 'keep_tool'] },
       ],
     };
     mockAgentFind.mockResolvedValue([agentWithVersions]);

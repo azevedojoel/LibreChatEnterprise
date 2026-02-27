@@ -5,7 +5,7 @@ jest.mock('../formatters/json-to-toon', () => ({
 import { tokenOptimizedFormatter } from '../formatters/token-optimized';
 
 describe('tokenOptimizedFormatter', () => {
-  describe('tasks.listTasks (Google)', () => {
+  describe('tasks_listTasks (Google)', () => {
     it('strips URLs and returns compact id|name|status|date format', () => {
       const input = JSON.stringify({
         items: [
@@ -34,7 +34,7 @@ describe('tokenOptimizedFormatter', () => {
 
       const result = tokenOptimizedFormatter(input, {
         serverName: 'Google',
-        toolName: 'tasks.listTasks',
+        toolName: 'tasks_listTasks',
       });
 
       expect(result).not.toContain('https://');
@@ -60,7 +60,7 @@ describe('tokenOptimizedFormatter', () => {
 
       const result = tokenOptimizedFormatter(input, {
         serverName: 'Google',
-        toolName: 'tasks.listTasks',
+        toolName: 'tasks_listTasks',
       });
 
       expect(result).toContain('nextPageToken: token-xyz');
@@ -70,13 +70,13 @@ describe('tokenOptimizedFormatter', () => {
       const input = JSON.stringify({ items: [] });
       const result = tokenOptimizedFormatter(input, {
         serverName: 'Google',
-        toolName: 'tasks.listTasks',
+        toolName: 'tasks_listTasks',
       });
       expect(result).toBe('(empty)');
     });
   });
 
-  describe('tasks.listTaskLists (Google)', () => {
+  describe('tasks_listTaskLists (Google)', () => {
     it('returns compact id|name|date format', () => {
       const input = JSON.stringify({
         items: [
@@ -87,7 +87,7 @@ describe('tokenOptimizedFormatter', () => {
 
       const result = tokenOptimizedFormatter(input, {
         serverName: 'Google',
-        toolName: 'tasks.listTaskLists',
+        toolName: 'tasks_listTaskLists',
       });
 
       expect(result).toContain('id | name | date');
@@ -101,7 +101,7 @@ describe('tokenOptimizedFormatter', () => {
   });
 
   describe('tool-only fallback', () => {
-    it('transforms tasks.listTasks even with non-standard server name', () => {
+    it('transforms tasks_listTasks even with non-standard server name', () => {
       const input = JSON.stringify({
         items: [
           {
@@ -114,7 +114,7 @@ describe('tokenOptimizedFormatter', () => {
       });
       const result = tokenOptimizedFormatter(input, {
         serverName: 'MyCustomGoogle',
-        toolName: 'tasks.listTasks',
+        toolName: 'tasks_listTasks',
       });
 
       expect(result).toContain('id | name | status | date');
@@ -147,13 +147,13 @@ describe('tokenOptimizedFormatter', () => {
       const input = JSON.stringify({ error: 'Invalid task list ID' });
       const result = tokenOptimizedFormatter(input, {
         serverName: 'Google',
-        toolName: 'tasks.listTasks',
+        toolName: 'tasks_listTasks',
       });
       expect(result).toBe('Invalid task list ID');
     });
   });
 
-  describe('gmail.search (Google)', () => {
+  describe('gmail_search (Google)', () => {
     it('returns compact id|threadId table with nextPageToken and resultSizeEstimate', () => {
       const input = JSON.stringify({
         messages: [
@@ -165,7 +165,7 @@ describe('tokenOptimizedFormatter', () => {
       });
       const result = tokenOptimizedFormatter(input, {
         serverName: 'Google',
-        toolName: 'gmail.search',
+        toolName: 'gmail_search',
       });
       expect(result).toContain('id | threadId');
       expect(result).toContain('msg1');
@@ -175,7 +175,7 @@ describe('tokenOptimizedFormatter', () => {
     });
   });
 
-  describe('gmail.get (Google)', () => {
+  describe('gmail_get (Google)', () => {
     it('strips HTML from body and returns compact metadata', () => {
       const input = JSON.stringify({
         id: 'msg123',
@@ -188,7 +188,7 @@ describe('tokenOptimizedFormatter', () => {
       });
       const result = tokenOptimizedFormatter(input, {
         serverName: 'Google',
-        toolName: 'gmail.get',
+        toolName: 'gmail_get',
       });
       expect(result).toContain('id: msg123');
       expect(result).toContain('subject: Hello');
@@ -199,9 +199,30 @@ describe('tokenOptimizedFormatter', () => {
       expect(result).toContain('doc.pdf');
       expect(result).toContain('1024');
     });
+
+    it('strips hrefs from links, keeping only link text', () => {
+      const longUrl =
+        'https://example.com/very/long/path/with/many/segments?utm_source=newsletter&utm_medium=email&utm_campaign=promo123';
+      const input = JSON.stringify({
+        id: 'msg456',
+        subject: 'Check this',
+        from: 'sender@example.com',
+        to: 'recipient@example.com',
+        date: '2025-02-17T10:00:00Z',
+        body: `<p>Click <a href="${longUrl}">here</a> for more info.</p>`,
+      });
+      const result = tokenOptimizedFormatter(input, {
+        serverName: 'Google',
+        toolName: 'gmail_get',
+      });
+      expect(result).toContain('here');
+      expect(result).toContain('Click');
+      expect(result).not.toContain(longUrl);
+      expect(result).not.toContain('utm_source');
+    });
   });
 
-  describe('calendar.listEvents (Google)', () => {
+  describe('calendar_listEvents (Google)', () => {
     it('returns compact id|summary|start|end|status table for raw array', () => {
       const input = JSON.stringify([
         {
@@ -214,7 +235,7 @@ describe('tokenOptimizedFormatter', () => {
       ]);
       const result = tokenOptimizedFormatter(input, {
         serverName: 'Google',
-        toolName: 'calendar.listEvents',
+        toolName: 'calendar_listEvents',
       });
       expect(result).toContain('id | summary | start | end | status');
       expect(result).toContain('ev1');
@@ -223,7 +244,7 @@ describe('tokenOptimizedFormatter', () => {
     });
   });
 
-  describe('drive.search (Google)', () => {
+  describe('drive_search (Google)', () => {
     it('returns compact id|name|modifiedTime|mimeType table', () => {
       const input = JSON.stringify({
         files: [
@@ -233,7 +254,7 @@ describe('tokenOptimizedFormatter', () => {
       });
       const result = tokenOptimizedFormatter(input, {
         serverName: 'Google',
-        toolName: 'drive.search',
+        toolName: 'drive_search',
       });
       expect(result).toContain('id | name | modifiedTime | mimeType');
       expect(result).toContain('f1');

@@ -221,7 +221,7 @@ describe('ToolService - Capability Checking', () => {
 
     it('should filter MCP tool IDs correctly by ephemeralAgent.tools', () => {
       const mcpToolId = `search_mcp_github`;
-      const toolsToFilter = [Tools.file_search, mcpToolId, 'list_files_mcp_Google-Workspace'];
+      const toolsToFilter = [Tools.file_search, mcpToolId, 'drive.search_mcp_Google-Workspace'];
       const ephemeralAgent = { tools: [mcpToolId] };
 
       const result = filterToolsByEphemeralAgent(toolsToFilter, ephemeralAgent);
@@ -309,10 +309,8 @@ describe('ToolService - isDestructiveTool', () => {
   });
 
   it('returns true for Gmail and Calendar tools', () => {
-    expect(isDestructiveTool('gmail.send')).toBe(true);
     expect(isDestructiveTool('gmail_send')).toBe(true);
-    expect(isDestructiveTool('calendar.createEvent')).toBe(true);
-    expect(isDestructiveTool('calendar_create_event')).toBe(true);
+    expect(isDestructiveTool('calendar_createEvent')).toBe(true);
   });
 
   it('returns false for non-destructive tools', () => {
@@ -324,7 +322,7 @@ describe('ToolService - isDestructiveTool', () => {
   it('handles MCP tool names - extracts base name before _mcp_', () => {
     const mcpDelimiter = Constants.mcp_delimiter || '_mcp_';
     expect(isDestructiveTool(`gmail_send${mcpDelimiter}GoogleWorkspace`)).toBe(true);
-    expect(isDestructiveTool(`calendar_create_event${mcpDelimiter}ServerName`)).toBe(true);
+    expect(isDestructiveTool(`calendar_createEvent${mcpDelimiter}ServerName`)).toBe(true);
     expect(isDestructiveTool(`web_search${mcpDelimiter}Server`)).toBe(false);
   });
 

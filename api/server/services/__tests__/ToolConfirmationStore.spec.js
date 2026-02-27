@@ -164,7 +164,7 @@ describe('ToolConfirmationStore', () => {
         runId: 'run-pending',
         toolCallId: 'tool-pending',
         userId: 'user-pending',
-        toolName: 'calendar_create_event',
+        toolName: 'calendar_createEvent',
         argsSummary: 'meeting at 3pm',
       };
 

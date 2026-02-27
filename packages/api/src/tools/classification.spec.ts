@@ -30,7 +30,7 @@ describe('classification.ts', () => {
 
   describe('getServerNameFromTool', () => {
     it('should extract server name from MCP tool name', () => {
-      const result = getServerNameFromTool('list_files_mcp_Google-Workspace');
+      const result = getServerNameFromTool('drive.search_mcp_Google-Workspace');
       expect(result).toBe('Google-Workspace');
     });
 
