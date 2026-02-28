@@ -109,13 +109,19 @@ const Part = memo(
         (toolCall.name === Tools.execute_code ||
           toolCall.name === Constants.PROGRAMMATIC_TOOL_CALLING)
       ) {
+        const argsStr =
+          typeof toolCall.args === 'string'
+            ? toolCall.args
+            : toolCall.args != null
+              ? JSON.stringify(toolCall.args)
+              : '';
         return (
           <ExecuteCode
             attachments={attachments}
             isSubmitting={isSubmitting}
             output={toolCall.output ?? ''}
             initialProgress={toolCall.progress ?? 0.1}
-            args={typeof toolCall.args === 'string' ? toolCall.args : ''}
+            args={argsStr}
             toolCallId={toolCall.id}
           />
         );

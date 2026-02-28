@@ -83,9 +83,10 @@ export interface PendingToolConfirmation {
   argsSummary?: string;
 }
 
-export const pendingToolConfirmationAtom = atom<PendingToolConfirmation | null>({
+/** Map of toolCallId -> PendingToolConfirmation (supports parallel tool confirmations) */
+export const pendingToolConfirmationAtom = atom<Record<string, PendingToolConfirmation>>({
   key: 'pendingToolConfirmation',
-  default: null,
+  default: {},
 });
 
 /** Persisted expanded state for tool call JSON - survives navigation. Key: conversationId:messageId:toolCallId */

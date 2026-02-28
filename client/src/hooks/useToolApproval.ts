@@ -12,20 +12,20 @@ import store from '~/store';
  */
 export function useToolApproval(toolCallId?: string) {
   const { conversationId, messageId } = useMessageContext();
-  const pendingToolConfirmation = useRecoilValue(store.pendingToolConfirmationAtom);
+  const pendingToolConfirmations = useRecoilValue(store.pendingToolConfirmationAtom);
   const setPendingToolConfirmation = useSetRecoilState(store.pendingToolConfirmationAtom);
   const submitMutation = useSubmitToolConfirmationMutation();
   const { showToast } = useToastContext();
   const localize = useLocalize();
 
+  const pending = toolCallId ? pendingToolConfirmations[toolCallId] : undefined;
   const pendingMatches =
-    !!pendingToolConfirmation &&
+    !!pending &&
     !!toolCallId &&
     !!conversationId &&
     !!messageId &&
-    pendingToolConfirmation.toolCallId === toolCallId &&
-    pendingToolConfirmation.conversationId === conversationId &&
-    pendingToolConfirmation.runId === messageId;
+    pending.conversationId === conversationId &&
+    pending.runId === messageId;
 
   const [approvalSubmitting, setApprovalSubmitting] = useState(false);
 
@@ -39,7 +39,13 @@ export function useToolApproval(toolCallId?: string) {
         toolCallId,
         approved: true,
       });
-      if (result.success) setPendingToolConfirmation(null);
+      if (result.success) {
+        setPendingToolConfirmation((prev) => {
+          const next = { ...prev };
+          delete next[toolCallId];
+          return next;
+        });
+      }
     } catch {
       showToast({
         message: localize('com_ui_tool_approval_submit_error') || 'Failed to submit approval. Please try again.',
@@ -60,7 +66,13 @@ export function useToolApproval(toolCallId?: string) {
         toolCallId,
         approved: false,
       });
-      if (result.success) setPendingToolConfirmation(null);
+      if (result.success) {
+        setPendingToolConfirmation((prev) => {
+          const next = { ...prev };
+          delete next[toolCallId];
+          return next;
+        });
+      }
     } catch {
       showToast({
         message: localize('com_ui_tool_approval_submit_error') || 'Failed to submit approval. Please try again.',

@@ -67,7 +67,8 @@ export default function useStepHandler({
   onAuthMerged,
   onAuthCleared,
 }: TUseStepHandler) {
-  const toolCallIdMap = useRef(new Map<string, string | undefined>());
+  /** runStepId -> toolCallId[] for parallel delta routing (index -> id) */
+  const toolCallIdMap = useRef(new Map<string, string[]>());
   const messageMap = useRef(new Map<string, TMessage>());
   const stepMap = useRef(new Map<string, Agents.RunStep>());
   /** Buffer for deltas that arrive before their corresponding run step */
@@ -200,12 +201,10 @@ export default function useStepHandler({
       const name = getNonEmptyValue([contentPart.tool_call.name, existingToolCall?.name]) ?? '';
 
       // Preserve auth/expires_at from either source - auth deltas may arrive separately
-      const auth = getNonEmptyValue([
-        contentPart.tool_call.auth,
-        existingToolCall?.auth,
-      ]) as string | undefined;
-      const expires_at =
-        contentPart.tool_call.expires_at ?? existingToolCall?.expires_at;
+      const auth = getNonEmptyValue([contentPart.tool_call.auth, existingToolCall?.auth]) as
+        | string
+        | undefined;
+      const expires_at = contentPart.tool_call.expires_at ?? existingToolCall?.expires_at;
 
       const newToolCall: Agents.ToolCall & PartMetadata = {
         id,
@@ -289,9 +288,6 @@ export default function useStepHandler({
 
         stepMap.current.set(runStep.id, runStep);
 
-        // Calculate content index - use server index, offset by initialContent for edit scenarios
-        const contentIndex = runStep.index + initialContent.length;
-
         let response = messageMap.current.get(responseMessageId);
 
         if (!response) {
@@ -336,12 +332,13 @@ export default function useStepHandler({
 
         // Store tool call IDs if present
         if (runStep.stepDetails.type === StepTypes.TOOL_CALLS) {
+          const stepCalls = runStep.stepDetails.tool_calls as Agents.ToolCall[];
+          const toolCallIds = stepCalls.map((tc) => tc.id ?? '');
+          toolCallIdMap.current.set(runStep.id, toolCallIds);
+
           let updatedResponse = { ...response };
-          (runStep.stepDetails.tool_calls as Agents.ToolCall[]).forEach((toolCall) => {
+          stepCalls.forEach((toolCall) => {
             const toolCallId = toolCall.id ?? '';
-            if ('id' in toolCall && toolCallId) {
-              toolCallIdMap.current.set(runStep.id, toolCallId);
-            }
 
             const contentPart: Agents.MessageContentComplex = {
               type: ContentTypes.TOOL_CALL,
@@ -352,10 +349,19 @@ export default function useStepHandler({
               },
             };
 
-            // Use the pre-calculated contentIndex which handles parallel agent indexing
+            // Find by tool_call id or append - parallel tool calls each need their own slot
+            const content = updatedResponse.content ?? [];
+            let targetIndex = content.findIndex(
+              (p) =>
+                p?.type === ContentTypes.TOOL_CALL &&
+                (p as Agents.ToolCallContent).tool_call?.id === toolCallId,
+            );
+            if (targetIndex < 0) {
+              targetIndex = content.length;
+            }
             updatedResponse = updateContent(
               updatedResponse,
-              contentIndex,
+              targetIndex,
               contentPart,
               false,
               getStepMetadata(runStep),
@@ -529,9 +535,26 @@ export default function useStepHandler({
           const content = updatedResponse.content ?? [];
 
           runStepDelta.delta.tool_calls.forEach((toolCallDelta) => {
-            // Prefer delta's id (map overwrites for multi-tool steps)
+            // Resolve toolCallId: delta id > toolCallIdMap[index] > runStep.tool_calls[index]
+            const mappedIds = toolCallIdMap.current.get(runStepDelta.id);
+            const stepCalls =
+              runStep.stepDetails.type === StepTypes.TOOL_CALLS
+                ? (runStep.stepDetails.tool_calls as Agents.ToolCall[])
+                : undefined;
+            // Normalize index: backend sends global index (e.g. 1) for parallel tools; step may have only 1 tool call
+            const stepLen = stepCalls?.length ?? 0;
+            const effectiveIndex =
+              typeof toolCallDelta.index === 'number' && stepLen > 0
+                ? Math.min(toolCallDelta.index, stepLen - 1)
+                : toolCallDelta.index;
             const toolCallId =
-              toolCallDelta.id ?? toolCallIdMap.current.get(runStepDelta.id) ?? '';
+              toolCallDelta.id ??
+              (typeof effectiveIndex === 'number' && mappedIds
+                ? mappedIds[effectiveIndex]
+                : undefined) ??
+              (typeof effectiveIndex === 'number' ? stepCalls?.[effectiveIndex]?.id : undefined) ??
+              (stepCalls?.length === 1 ? stepCalls[0].id : undefined) ??
+              '';
 
             const contentPart: Agents.MessageContentComplex = {
               type: ContentTypes.TOOL_CALL,
@@ -551,9 +574,9 @@ export default function useStepHandler({
               const toolNameForAuth =
                 toolCallDelta.name ??
                 (runStep.stepDetails.type === StepTypes.TOOL_CALLS
-                  ? (runStep.stepDetails.tool_calls as Agents.ToolCall[])?.find(
+                  ? ((runStep.stepDetails.tool_calls as Agents.ToolCall[])?.find(
                       (tc) => tc.id === toolCallId,
-                    )?.name ?? ''
+                    )?.name ?? '')
                   : '');
               onAuthMerged?.(auth, toolNameForAuth);
             }
@@ -564,10 +587,13 @@ export default function useStepHandler({
             const deltaName = toolCallDelta.name ?? '';
             if (auth != null || toolCallId) {
               const foundIdx = content.findIndex((part) => {
-                const tc = part?.tool_call ?? (part as { tool_call?: Agents.ToolCall })?.tool_call;
+                if (part?.type !== ContentTypes.TOOL_CALL) return false;
+                const tc = (part as Agents.ToolCallContent).tool_call;
                 if (!tc) return false;
+                // When we have toolCallId, match ONLY by id - name matches wrong part for parallel same-name tools
+                if (toolCallId && tc.id === toolCallId) return true;
+                if (toolCallId) return false;
                 return (
-                  (toolCallId && tc.id === toolCallId) ||
                   (deltaName && tc.name === deltaName) ||
                   (deltaName && tc.name?.includes(deltaName)) ||
                   (deltaName && deltaName.includes(tc.name ?? ''))
@@ -588,8 +614,8 @@ export default function useStepHandler({
 
                 // Before appending, verify we don't already have this tool (avoids duplicate IDs)
                 const matchPart = (part: TMessageContentParts | undefined) => {
-                  const tc =
-                    part?.tool_call ?? (part as { tool_call?: Agents.ToolCall })?.tool_call;
+                  if (part?.type !== ContentTypes.TOOL_CALL) return false;
+                  const tc = (part as Agents.ToolCallContent).tool_call;
                   if (!tc) return false;
                   return (
                     (toolCallId && tc.id === toolCallId) ||
@@ -622,7 +648,7 @@ export default function useStepHandler({
                       expires_at: expiresAt ?? undefined,
                     },
                   };
-                  const newContent = [...content, newPart];
+                  const newContent = [...content, newPart] as TMessageContentParts[];
                   updatedResponse = { ...updatedResponse, content: newContent };
                   messageMap.current.set(responseMessageId, updatedResponse);
                   const currentMessages = getMessages() ?? [];

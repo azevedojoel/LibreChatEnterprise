@@ -38,6 +38,7 @@ export default function useChatHelpers(index = 0, paramId?: string) {
   const resetLatestMessage = useResetRecoilState(store.latestMessageFamily(index));
   const [isSubmitting, setIsSubmitting] = useRecoilState(store.isSubmittingFamily(index));
   const [latestMessage, setLatestMessage] = useRecoilState(store.latestMessageFamily(index));
+  const setPendingToolConfirmation = useSetRecoilState(store.pendingToolConfirmationAtom);
   const setSiblingIdx = useSetRecoilState(
     store.messagesSiblingIdxFamily(latestMessage?.parentMessageId ?? null),
   );
@@ -119,6 +120,7 @@ export default function useChatHelpers(index = 0, paramId?: string) {
    * Assistants endpoint has its own abort mechanism via useEventHandlers.abortConversation.
    */
   const stopGenerating = useCallback(async () => {
+    setPendingToolConfirmation({});
     const actualEndpoint = endpointType ?? endpoint;
     const isAssistants = isAssistantsEndpoint(actualEndpoint);
     console.log('[useChatHelpers] stopGenerating called', {
@@ -152,7 +154,15 @@ export default function useChatHelpers(index = 0, paramId?: string) {
       console.log('[useChatHelpers] Assistants endpoint, just clearing submissions');
       clearAllSubmissions();
     }
-  }, [conversationId, endpoint, endpointType, abortMutation, clearAllSubmissions, queryClient]);
+  }, [
+    conversationId,
+    endpoint,
+    endpointType,
+    abortMutation,
+    clearAllSubmissions,
+    queryClient,
+    setPendingToolConfirmation,
+  ]);
 
   const handleStopGenerating = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();

@@ -27,13 +27,10 @@ jest.mock('~/data-provider/SSE/mutations', () => ({
 
 function createWrapper(
   initialState?: {
-    pendingToolConfirmation: {
-      conversationId: string;
-      runId: string;
-      toolCallId: string;
-      toolName: string;
-      argsSummary?: string;
-    } | null;
+    pendingToolConfirmation: Record<
+      string,
+      { conversationId: string; runId: string; toolCallId: string; toolName: string; argsSummary?: string }
+    >;
   },
 ) {
   const initState = initialState?.pendingToolConfirmation
@@ -69,11 +66,13 @@ describe('useToolApproval', () => {
     const { result } = renderHook(() => useToolApproval('tool-1'), {
       wrapper: createWrapper({
         pendingToolConfirmation: {
-          conversationId: 'conv-other',
-          runId: 'msg-other',
-          toolCallId: 'tool-other',
-          toolName: 'execute_code',
-          argsSummary: '',
+          'tool-other': {
+            conversationId: 'conv-other',
+            runId: 'msg-other',
+            toolCallId: 'tool-other',
+            toolName: 'execute_code',
+            argsSummary: '',
+          },
         },
       }),
     });
@@ -85,11 +84,13 @@ describe('useToolApproval', () => {
     const { result } = renderHook(() => useToolApproval('tool-1'), {
       wrapper: createWrapper({
         pendingToolConfirmation: {
-          conversationId: 'conv-1',
-          runId: 'msg-1',
-          toolCallId: 'tool-1',
-          toolName: 'execute_code',
-          argsSummary: '',
+          'tool-1': {
+            conversationId: 'conv-1',
+            runId: 'msg-1',
+            toolCallId: 'tool-1',
+            toolName: 'execute_code',
+            argsSummary: '',
+          },
         },
       }),
     });
@@ -101,11 +102,13 @@ describe('useToolApproval', () => {
     const { result } = renderHook(() => useToolApproval(undefined), {
       wrapper: createWrapper({
         pendingToolConfirmation: {
-          conversationId: 'conv-1',
-          runId: 'msg-1',
-          toolCallId: 'tool-1',
-          toolName: 'execute_code',
-          argsSummary: '',
+          'tool-1': {
+            conversationId: 'conv-1',
+            runId: 'msg-1',
+            toolCallId: 'tool-1',
+            toolName: 'execute_code',
+            argsSummary: '',
+          },
         },
       }),
     });
@@ -119,11 +122,13 @@ describe('useToolApproval', () => {
     const { result } = renderHook(() => useToolApproval('tool-1'), {
       wrapper: createWrapper({
         pendingToolConfirmation: {
-          conversationId: 'conv-1',
-          runId: 'msg-1',
-          toolCallId: 'tool-1',
-          toolName: 'execute_code',
-          argsSummary: '',
+          'tool-1': {
+            conversationId: 'conv-1',
+            runId: 'msg-1',
+            toolCallId: 'tool-1',
+            toolName: 'execute_code',
+            argsSummary: '',
+          },
         },
       }),
     });
@@ -146,11 +151,13 @@ describe('useToolApproval', () => {
     const { result } = renderHook(() => useToolApproval('tool-1'), {
       wrapper: createWrapper({
         pendingToolConfirmation: {
-          conversationId: 'conv-1',
-          runId: 'msg-1',
-          toolCallId: 'tool-1',
-          toolName: 'execute_code',
-          argsSummary: '',
+          'tool-1': {
+            conversationId: 'conv-1',
+            runId: 'msg-1',
+            toolCallId: 'tool-1',
+            toolName: 'execute_code',
+            argsSummary: '',
+          },
         },
       }),
     });
@@ -203,11 +210,13 @@ describe('useToolApproval', () => {
     const { result } = renderHook(() => useToolApproval('tool-1'), {
       wrapper: createWrapper({
         pendingToolConfirmation: {
-          conversationId: 'conv-1',
-          runId: 'msg-1',
-          toolCallId: 'tool-1',
-          toolName: 'execute_code',
-          argsSummary: '',
+          'tool-1': {
+            conversationId: 'conv-1',
+            runId: 'msg-1',
+            toolCallId: 'tool-1',
+            toolName: 'execute_code',
+            argsSummary: '',
+          },
         },
       }),
     });
@@ -220,5 +229,46 @@ describe('useToolApproval', () => {
       message: 'com_ui_tool_approval_submit_error',
       status: 'error',
     });
+  });
+
+  it('parallel: both tools show pendingMatches, approving one removes only that one', async () => {
+    mockMutateAsync.mockResolvedValue({ success: true });
+
+    const { result } = renderHook(
+      () => ({
+        tool1: useToolApproval('tool-1'),
+        tool2: useToolApproval('tool-2'),
+      }),
+      {
+        wrapper: createWrapper({
+          pendingToolConfirmation: {
+            'tool-1': {
+              conversationId: 'conv-1',
+              runId: 'msg-1',
+              toolCallId: 'tool-1',
+              toolName: 'execute_code',
+              argsSummary: '',
+            },
+            'tool-2': {
+              conversationId: 'conv-1',
+              runId: 'msg-1',
+              toolCallId: 'tool-2',
+              toolName: 'execute_code',
+              argsSummary: '',
+            },
+          },
+        }),
+      },
+    );
+
+    expect(result.current.tool1.pendingMatches).toBe(true);
+    expect(result.current.tool2.pendingMatches).toBe(true);
+
+    await act(async () => {
+      await result.current.tool1.handleApprove();
+    });
+
+    expect(result.current.tool1.pendingMatches).toBe(false);
+    expect(result.current.tool2.pendingMatches).toBe(true);
   });
 });
