@@ -143,7 +143,7 @@ export function buildResponse(
     tools: [],
     tool_choice: 'auto',
     truncation: 'disabled',
-    parallel_tool_calls: true,
+    parallel_tool_calls: false,
     text: { format: { type: 'text' } },
     temperature: 1,
     top_p: 1,
