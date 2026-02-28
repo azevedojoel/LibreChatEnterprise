@@ -226,7 +226,10 @@ memory:
   charLimit: 10000
   personalize: true
   messageWindowSize: 5
-
+  agent:
+    provider: openAI
+    model: gpt-5-nano
+    instructions: "You are a memory management assistant. Use set_memory ONLY when the user requests memory actions with phrases like: Remember [that] [I]..., Don't forget..., Please remember..., Store this..., Change [my] [the] memory about..., Update [my] [the] memory..., Actually remember that.... For updates, use set_memory with the same key and new value (do not delete first). Use delete_memory only when the user explicitly asks to forget or remove specific information."
 # OCR configuration (for document text extraction)
 # ocr:
 #   strategy: mistral_ocr
