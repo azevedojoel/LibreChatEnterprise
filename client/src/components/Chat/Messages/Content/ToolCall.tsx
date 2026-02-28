@@ -93,20 +93,6 @@ export default function ToolCall({
     }
   }, [expandedKey, setExpandedToolCalls]);
 
-  const hasAutoExpandedRef = useRef(false);
-  useEffect(() => {
-    if (pendingMatches && expandedKey && !hasAutoExpandedRef.current) {
-      hasAutoExpandedRef.current = true;
-      setExpandedToolCalls((prev) => {
-        if (prev.has(expandedKey)) return prev;
-        const next = new Set(prev);
-        next.add(expandedKey);
-        return next;
-      });
-    }
-    if (!pendingMatches) hasAutoExpandedRef.current = false;
-  }, [pendingMatches, expandedKey, setExpandedToolCalls]);
-
   const interfaceConfig = startupConfig?.interface as
     | { toolCallSpacing?: 'normal' | 'compact' }
     | undefined;
@@ -408,6 +394,7 @@ export default function ToolCall({
               onToggleExpand={toggleShowInfo}
               isExpanded={showInfo}
               isSubmitting={approvalSubmitting}
+              toolName={name}
             />
           ) : (
             <ProgressText

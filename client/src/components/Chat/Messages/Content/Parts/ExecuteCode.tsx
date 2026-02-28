@@ -70,15 +70,6 @@ export default function ExecuteCode({
   const [isAnimating, setIsAnimating] = useState(false);
   const showAnalysisCode = useRecoilValue(store.showCode);
   const [showCode, setShowCode] = useState(showAnalysisCode);
-
-  const hasAutoExpandedRef = useRef(false);
-  useEffect(() => {
-    if (pendingMatches && !hasAutoExpandedRef.current) {
-      hasAutoExpandedRef.current = true;
-      setShowCode(true);
-    }
-    if (!pendingMatches) hasAutoExpandedRef.current = false;
-  }, [pendingMatches]);
   const [contentHeight, setContentHeight] = useState<number | undefined>(0);
 
   const prevShowCodeRef = useRef<boolean>(showCode);
@@ -174,6 +165,7 @@ export default function ExecuteCode({
             onToggleExpand={() => setShowCode((prev) => !prev)}
             isExpanded={showCode}
             isSubmitting={approvalSubmitting}
+            toolName="execute_code"
           />
         ) : (
           <ProgressText

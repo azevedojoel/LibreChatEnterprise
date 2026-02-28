@@ -39,10 +39,16 @@ describe('ToolApprovalBar', () => {
     expect(screen.getByText('Deny')).toBeInTheDocument();
   });
 
-  it('renders approval required message', () => {
+  it('renders approval required message when toolName is not provided', () => {
     render(<ToolApprovalBar {...defaultProps} />);
 
     expect(screen.getByText('Tool approval required')).toBeInTheDocument();
+  });
+
+  it('renders human-readable tool name when toolName is provided', () => {
+    render(<ToolApprovalBar {...defaultProps} toolName="execute_code" />);
+
+    expect(screen.getByText('Code Interpreter')).toBeInTheDocument();
   });
 
   it('calls onApprove when Approve button is clicked', () => {

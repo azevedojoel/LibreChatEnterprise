@@ -4,6 +4,8 @@ import { Constants, Tools } from 'librechat-data-provider';
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
   [Tools.search_user_files]: 'Grepped',
   [Tools.workspace_glob_files]: 'Globbed',
+  [Tools.execute_code]: 'Code Interpreter',
+  [Tools.workspace_create_file]: 'Create File',
   [Constants.TOOL_SEARCH]: 'Discovery',
   // Google Workspace MCP tools (underscore notation)
   tasks_listTaskLists: 'Listing Google Task Lists',

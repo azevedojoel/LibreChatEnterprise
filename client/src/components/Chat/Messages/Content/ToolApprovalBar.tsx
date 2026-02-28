@@ -1,6 +1,7 @@
 import { Button } from '@librechat/client';
 import { ShieldAlert } from 'lucide-react';
 import { useLocalize } from '~/hooks';
+import { getToolDisplayName } from '~/utils';
 
 type ToolApprovalBarProps = {
   onApprove: () => void;
@@ -8,6 +9,8 @@ type ToolApprovalBarProps = {
   onToggleExpand: () => void;
   isExpanded: boolean;
   isSubmitting: boolean;
+  /** Tool name for human-readable label (e.g. execute_code, tasks_createTask) */
+  toolName?: string;
 };
 
 export default function ToolApprovalBar({
@@ -16,14 +19,16 @@ export default function ToolApprovalBar({
   onToggleExpand,
   isExpanded,
   isSubmitting,
+  toolName,
 }: ToolApprovalBarProps) {
   const localize = useLocalize();
+  const label = toolName ? getToolDisplayName(toolName) : (localize('com_ui_tool_approval_required') || 'Tool approval required');
 
   return (
     <div className="flex min-h-7 flex-wrap items-center gap-x-3 gap-y-2 py-0.5">
       <span className="flex items-center gap-1.5 text-sm text-text-secondary">
         <ShieldAlert className="h-4 w-4 shrink-0 text-text-warning" aria-hidden="true" />
-        {localize('com_ui_tool_approval_required') || 'Tool approval required'}
+        {label}
       </span>
       <div className="flex gap-2">
         <Button
