@@ -801,6 +801,34 @@ class GenerationJobManagerClass {
       return;
     }
 
+    const eventObj = event as Record<string, unknown>;
+    const eventType = eventObj.event as string | undefined;
+    const eventData = eventObj.data as Record<string, unknown> | undefined;
+    if (
+      eventType === 'on_run_step' ||
+      eventType === 'on_run_step_delta' ||
+      eventType === 'tool_confirmation_required'
+    ) {
+      const stepDetails = eventData?.stepDetails as { type?: string; tool_calls?: unknown[] } | undefined;
+      const delta = eventData?.delta as { type?: string; tool_calls?: unknown[] } | undefined;
+      const toolCalls = stepDetails?.tool_calls ?? delta?.tool_calls ?? [];
+      logger.debug(`[ToolConfirmation] ${eventType}`, {
+        streamId: streamId.slice(0, 12),
+        stepId: eventData?.id,
+        runId: eventData?.runId,
+        toolCallCount: toolCalls.length,
+        toolCalls: toolCalls.map((tc: { id?: string; index?: number; name?: string }) => ({
+          id: tc?.id,
+          index: tc?.index,
+          name: tc?.name,
+        })),
+        ...(eventType === 'tool_confirmation_required' && {
+          toolCallId: eventData?.toolCallId,
+          toolName: eventData?.toolName,
+        }),
+      });
+    }
+
     // Track user message from created event
     this.trackUserMessage(streamId, event);
 
