@@ -9,7 +9,7 @@ import {
   Spinner,
   useToastContext,
 } from '@librechat/client';
-import { Mail, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Copy, CopyCheck, Mail, Pencil, Plus, Trash2 } from 'lucide-react';
 import MultiConvoAdminSettings from './MultiConvoAdminSettings';
 import PresetsAdminSettings from './PresetsAdminSettings';
 import EndpointsMenuAdminSettings from './EndpointsMenuAdminSettings';
@@ -19,10 +19,21 @@ import {
   useUpdateAdminUserMutation,
   useDeleteAdminUserMutation,
   useSendAdminPasswordResetMutation,
+  useListProjectsQuery,
+  useCreateProjectMutation,
 } from '~/data-provider';
 import type { TAdminUser } from 'librechat-data-provider';
 import { useLocalize, useAuthContext } from '~/hooks';
+import { useGetAgentsConfig } from '~/hooks/Agents';
 import { cn } from '~/utils';
+import { useMemo } from 'react';
+
+function generateInboundEmailToken(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  const arr = new Uint8Array(8);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, (b) => chars[b % chars.length]).join('');
+}
 
 const PAGE_SIZE = 20;
 
@@ -54,16 +65,7 @@ function UserManagement() {
     },
   });
 
-  const updateMutation = useUpdateAdminUserMutation({
-    onSuccess: () => {
-      showToast({ message: localize('com_ui_user_updated'), status: 'success' });
-      setEditUser(null);
-    },
-    onError: (error: Error) => {
-      const msg = (error as any)?.response?.data?.error ?? error.message;
-      showToast({ message: msg, status: 'error' });
-    },
-  });
+  const updateMutation = useUpdateAdminUserMutation();
 
   const deleteMutation = useDeleteAdminUserMutation({
     onSuccess: () => {
@@ -89,19 +91,53 @@ function UserManagement() {
   const users = data?.users ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
+  const { data: projects = [] } = useListProjectsQuery();
+  const projectNameMap = useMemo(
+    () => new Map(projects.map((p) => [p._id, p.name])),
+    [projects],
+  );
 
   const handleCreate = useCallback(
-    (payload: { email: string; name?: string; username?: string; password?: string; role?: string; emailVerified?: boolean }) => {
+    (payload: {
+      email: string;
+      name?: string;
+      username?: string;
+      password?: string;
+      role?: string;
+      emailVerified?: boolean;
+      inboundEmailToken?: string;
+      projectId?: string;
+    }) => {
       createMutation.mutate(payload);
     },
     [createMutation],
   );
 
   const handleUpdate = useCallback(
-    (userId: string, payload: { email?: string; name?: string; username?: string; role?: string; emailVerified?: boolean }) => {
-      updateMutation.mutate({ userId, data: payload });
+    (userId: string, payload: {
+      email?: string;
+      name?: string;
+      username?: string;
+      role?: string;
+      emailVerified?: boolean;
+      inboundEmailToken?: string | null;
+      projectId?: string | null;
+    }) => {
+      updateMutation.mutate(
+        { userId, data: payload },
+        {
+          onSuccess: () => {
+            showToast({ message: localize('com_ui_user_updated'), status: 'success' });
+            setEditUser(null);
+          },
+          onError: (error: Error) => {
+            const msg = (error as any)?.response?.data?.error ?? error.message;
+            showToast({ message: msg, status: 'error' });
+          },
+        },
+      );
     },
-    [updateMutation],
+    [updateMutation, showToast, localize],
   );
 
   const handleDeleteConfirm = useCallback(() => {
@@ -155,8 +191,10 @@ function UserManagement() {
               <tr className="border-b border-border-medium bg-surface-secondary">
                 <th className="px-5 py-3 font-medium">{localize('com_ui_user_email')}</th>
                 <th className="px-5 py-3 font-medium">{localize('com_ui_user_name')}</th>
+                <th className="px-5 py-3 font-medium">{localize('com_ui_agent_email')}</th>
                 <th className="px-5 py-3 font-medium">{localize('com_ui_user_role')}</th>
                 <th className="px-5 py-3 font-medium">{localize('com_ui_user_provider')}</th>
+                <th className="px-5 py-3 font-medium">{localize('com_agents_crm_project')}</th>
                 <th className="px-5 py-3 font-medium text-right">{localize('com_ui_actions')}</th>
               </tr>
             </thead>
@@ -168,8 +206,16 @@ function UserManagement() {
                 >
                   <td className="px-5 py-3">{user.email}</td>
                   <td className="px-5 py-3">{user.name || '-'}</td>
+                  <td className="px-5 py-3">
+                    {user.inboundEmailToken ? `${user.inboundEmailToken}@…` : '-'}
+                  </td>
                   <td className="px-5 py-3">{user.role}</td>
                   <td className="px-5 py-3">{user.provider || 'local'}</td>
+                  <td className="px-5 py-3">
+                    {user.projectId
+                      ? projectNameMap.get(String(user.projectId)) ?? String(user.projectId)
+                      : '-'}
+                  </td>
                   <td className="px-5 py-3 text-right">
                     <div className="flex justify-end gap-1">
                       {user.provider === 'local' && (
@@ -300,20 +346,63 @@ function CreateUserDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: { email: string; name?: string; username?: string; password?: string; role?: string }) => void;
+  onSubmit: (data: {
+    email: string;
+    name?: string;
+    username?: string;
+    password?: string;
+    role?: string;
+    inboundEmailToken?: string;
+    projectId?: string;
+  }) => void;
   isLoading: boolean;
 }) {
   const localize = useLocalize();
+  const { showToast } = useToastContext();
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [inboundEmailToken, setInboundEmailToken] = useState('');
   const [role, setRole] = useState(SystemRoles.USER);
+  const [projectId, setProjectId] = useState('');
+  const [newProjectName, setNewProjectName] = useState('');
   const [generatePassword, setGeneratePassword] = useState(false);
+  const { data: projects = [] } = useListProjectsQuery();
+  const createProject = useCreateProjectMutation({
+    onSuccess: (data) => {
+      setProjectId(data._id);
+      setNewProjectName('');
+      showToast({ message: localize('com_agents_crm_project_create_success') });
+    },
+    onError: (err) => {
+      const message =
+        err?.message?.includes('reserved') ? localize('com_agents_crm_project_name_reserved') : err?.message;
+      showToast({ message: message ?? localize('com_ui_error'), status: 'error' });
+    },
+  });
+  const projectOptions = useMemo(
+    () => projects.map((p) => ({ label: p.name, value: p._id })),
+    [projects],
+  );
 
   const handleGeneratePassword = () => {
     setPassword(Math.random().toString(36).slice(-12) + 'A1!');
     setGeneratePassword(true);
+  };
+
+  const handleGenerateToken = () => {
+    setInboundEmailToken(generateInboundEmailToken());
+  };
+
+  const handleCreateProject = () => {
+    const trimmed = newProjectName.trim();
+    if (!trimmed) return;
+    if (trimmed.toLowerCase() === 'instance') {
+      showToast({ message: localize('com_agents_crm_project_name_reserved'), status: 'error' });
+      return;
+    }
+    createProject.mutate({ name: trimmed });
   };
 
   const handleSubmit = () => {
@@ -322,12 +411,15 @@ function CreateUserDialog({
     }
     const finalPassword =
       password && password.length >= 8 ? password : undefined;
+    const tokenValue = inboundEmailToken.trim() || undefined;
     onSubmit({
       email: email.trim().toLowerCase(),
       name: name.trim() || undefined,
       username: username.trim() || undefined,
       password: finalPassword,
       role,
+      inboundEmailToken: tokenValue,
+      projectId: projectId.trim() || undefined,
     });
   };
 
@@ -384,6 +476,24 @@ function CreateUserDialog({
               <p className="mt-1 text-xs text-text-secondary">{localize('com_ui_password_hint')}</p>
             </div>
             <div>
+              <Label className="text-text-primary">{localize('com_ui_inbound_email_token')}</Label>
+              <div className="mt-1 flex gap-2">
+                <Input
+                  value={inboundEmailToken}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (!v.includes('__')) setInboundEmailToken(v);
+                  }}
+                  placeholder={localize('com_ui_inbound_email_token_placeholder')}
+                  className="flex-1"
+                  maxLength={64}
+                />
+                <Button type="button" variant="outline" size="sm" onClick={handleGenerateToken}>
+                  {localize('com_ui_generate')}
+                </Button>
+              </div>
+            </div>
+            <div>
               <Label className="text-text-primary">{localize('com_ui_user_role')}</Label>
               <select
                 value={role}
@@ -396,6 +506,43 @@ function CreateUserDialog({
                 <option value={SystemRoles.USER}>{SystemRoles.USER}</option>
                 <option value={SystemRoles.ADMIN}>{SystemRoles.ADMIN}</option>
               </select>
+            </div>
+            <div>
+              <Label className="text-text-primary">{localize('com_agents_crm_project')}</Label>
+              <select
+                value={projectId}
+                onChange={(e) => setProjectId(e.target.value)}
+                className={cn(
+                  'mt-1 w-full rounded-lg border border-border-light bg-transparent px-3 py-2',
+                  'text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border-heavy',
+                )}
+                aria-label={localize('com_agents_crm_project_placeholder')}
+              >
+                <option value="">{localize('com_agents_crm_project_placeholder')}</option>
+                {projectOptions.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+              <div className="mt-2 flex gap-2">
+                <Input
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  placeholder={localize('com_agents_crm_project_name_placeholder')}
+                  className="flex-1"
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleCreateProject())}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCreateProject}
+                  disabled={!newProjectName.trim() || createProject.isPending}
+                >
+                  {localize('com_agents_crm_project_create')}
+                </Button>
+              </div>
             </div>
           </div>
         }
@@ -424,25 +571,102 @@ function EditUserDialog({
   user: TAdminUser;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: { email?: string; name?: string; username?: string; role?: string; emailVerified?: boolean }) => void;
+  onSubmit: (data: {
+    email?: string;
+    name?: string;
+    username?: string;
+    role?: string;
+    emailVerified?: boolean;
+    inboundEmailToken?: string | null;
+    projectId?: string | null;
+  }) => void;
   isLoading: boolean;
   isEditingSelf?: boolean;
 }) {
   const localize = useLocalize();
+  const { showToast } = useToastContext();
+  const { agentsConfig } = useGetAgentsConfig();
+  const inboundEmailAddress = agentsConfig?.inboundEmailAddress;
+
   const [email, setEmail] = useState(user.email);
   const [name, setName] = useState(user.name || '');
   const [username, setUsername] = useState(user.username || '');
+  const [inboundEmailToken, setInboundEmailToken] = useState(user.inboundEmailToken || '');
   const [role, setRole] = useState(user.role ?? SystemRoles.USER);
   const [emailVerified, setEmailVerified] = useState(user.emailVerified ?? true);
+  const [projectId, setProjectId] = useState(
+    user.projectId ? String(user.projectId) : '',
+  );
+  const [newProjectName, setNewProjectName] = useState('');
+  const [isCopying, setIsCopying] = useState(false);
+  const { data: projects = [] } = useListProjectsQuery();
+  const createProject = useCreateProjectMutation({
+    onSuccess: (data) => {
+      setProjectId(data._id);
+      setNewProjectName('');
+      showToast({ message: localize('com_agents_crm_project_create_success') });
+    },
+    onError: (err) => {
+      const message =
+        err?.message?.includes('reserved') ? localize('com_agents_crm_project_name_reserved') : err?.message;
+      showToast({ message: message ?? localize('com_ui_error'), status: 'error' });
+    },
+  });
+  const projectOptions = useMemo(
+    () => projects.map((p) => ({ label: p.name, value: p._id })),
+    [projects],
+  );
+
+  const fullEmail =
+    inboundEmailAddress && inboundEmailToken.trim()
+      ? `${inboundEmailToken.trim()}@${inboundEmailAddress}`
+      : '';
+
+  const handleGenerateToken = () => {
+    setInboundEmailToken(generateInboundEmailToken());
+  };
+
+  const handleCopy = useCallback(async () => {
+    if (!fullEmail || isCopying) return;
+    setIsCopying(true);
+    try {
+      await navigator.clipboard.writeText(fullEmail);
+      showToast({ message: localize('com_ui_copied_to_clipboard') });
+    } catch {
+      showToast({ message: localize('com_agents_link_copy_failed'), status: 'error' });
+    } finally {
+      setTimeout(() => setIsCopying(false), 3000);
+    }
+  }, [fullEmail, isCopying, showToast, localize]);
+
+  const handleCreateProject = () => {
+    const trimmed = newProjectName.trim();
+    if (!trimmed) return;
+    if (trimmed.toLowerCase() === 'instance') {
+      showToast({ message: localize('com_agents_crm_project_name_reserved'), status: 'error' });
+      return;
+    }
+    createProject.mutate({ name: trimmed });
+  };
 
   const handleSubmit = () => {
     if (!email?.trim() || !email.includes('@')) {
       return;
     }
-    const payload: { email?: string; name?: string; username?: string; role?: string; emailVerified?: boolean } = {
+    const payload: {
+      email?: string;
+      name?: string;
+      username?: string;
+      role?: string;
+      emailVerified?: boolean;
+      inboundEmailToken?: string | null;
+      projectId?: string | null;
+    } = {
       name: name.trim() || undefined,
       username: username.trim() || undefined,
       emailVerified,
+      inboundEmailToken: inboundEmailToken.trim() || null,
+      projectId: projectId.trim() || null,
     };
     if (!isEditingSelf) {
       payload.email = email.trim().toLowerCase();
@@ -504,6 +728,41 @@ function EditUserDialog({
                 <option value={SystemRoles.ADMIN}>{SystemRoles.ADMIN}</option>
               </select>
             </div>
+            <div>
+              <Label className="text-text-primary">{localize('com_ui_inbound_email_token')}</Label>
+              <div className="mt-1 flex gap-2">
+                <Input
+                  value={inboundEmailToken}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (!v.includes('__')) setInboundEmailToken(v);
+                  }}
+                  placeholder={localize('com_ui_inbound_email_token_placeholder')}
+                  className="flex-1"
+                  maxLength={64}
+                />
+                <Button type="button" variant="outline" size="sm" onClick={handleGenerateToken}>
+                  {localize('com_ui_generate')}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopy}
+                  disabled={!fullEmail}
+                  aria-label={localize('com_ui_copied_to_clipboard')}
+                >
+                  {isCopying ? (
+                    <CopyCheck className="size-4" />
+                  ) : (
+                    <Copy className="size-4" />
+                  )}
+                </Button>
+              </div>
+              <p className="mt-1 text-xs text-text-secondary">
+                {localize('com_ui_inbound_email_token_info')}
+              </p>
+            </div>
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -513,6 +772,46 @@ function EditUserDialog({
                 className="rounded border-border-medium"
               />
               <Label htmlFor="editEmailVerified">{localize('com_ui_email_verified')}</Label>
+            </div>
+            <div>
+              <Label className="text-text-primary">{localize('com_agents_crm_project')}</Label>
+              <select
+                value={projectId}
+                onChange={(e) => setProjectId(e.target.value)}
+                className={cn(
+                  'mt-1 w-full rounded-lg border border-border-light bg-transparent px-3 py-2',
+                  'text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border-heavy',
+                )}
+                aria-label={localize('com_agents_crm_project_placeholder')}
+              >
+                <option value="">{localize('com_agents_crm_project_placeholder')}</option>
+                {projectOptions.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+              <div className="mt-2 flex gap-2">
+                <Input
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  placeholder={localize('com_agents_crm_project_name_placeholder')}
+                  className="flex-1"
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleCreateProject())}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCreateProject}
+                  disabled={!newProjectName.trim() || createProject.isPending}
+                >
+                  {localize('com_agents_crm_project_create')}
+                </Button>
+              </div>
+              <p className="mt-1 text-xs text-text-secondary">
+                {localize('com_ui_user_crm_project_info')}
+              </p>
             </div>
           </div>
         }

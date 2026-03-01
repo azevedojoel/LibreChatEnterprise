@@ -1,9 +1,17 @@
 import React, { useMemo } from 'react';
 import DOMPurify from 'dompurify';
 import { useForm, Controller } from 'react-hook-form';
-import { Input, Label, Button } from '@librechat/client';
+import { Input, Label, Button, useToastContext } from '@librechat/client';
+import { Folder } from 'lucide-react';
 import { useMCPAuthValuesQuery } from '~/data-provider/Tools/queries';
+import {
+  useGetStartupConfig,
+  useCreateProjectMutation,
+  useListProjectsQuery,
+} from '~/data-provider';
 import { useLocalize } from '~/hooks';
+import { ControlCombobox } from '@librechat/client';
+import type { OptionWithIcon } from '~/common';
 
 export interface CustomUserVarConfig {
   title: string;
@@ -24,6 +32,124 @@ interface AuthFieldProps {
   control: any;
   errors: any;
   autoFocus?: boolean;
+}
+
+interface MCPProjectSelectorFieldProps {
+  name: string;
+  config: CustomUserVarConfig;
+  hasValue: boolean;
+  control: any;
+  errors: any;
+  setValue: (name: string, value: string) => void;
+  onSave: (authData: Record<string, string>) => void;
+  localize: (key: string, vars?: Record<string, string>) => string;
+}
+
+function MCPProjectSelectorField({
+  name,
+  config,
+  hasValue,
+  control,
+  errors,
+  setValue,
+  onSave,
+  localize,
+}: MCPProjectSelectorFieldProps) {
+  const { showToast } = useToastContext();
+  const [newProjectName, setNewProjectName] = React.useState('');
+  const { data: startupConfig } = useGetStartupConfig();
+  const { data: projects = [] } = useListProjectsQuery();
+  const instanceProjectId = startupConfig?.instanceProjectId;
+
+  const createProject = useCreateProjectMutation({
+    onSuccess: (data) => {
+      setValue(name, data._id);
+      onSave({ [name]: data._id });
+      setNewProjectName('');
+      showToast({ message: localize('com_agents_crm_project_create_success') });
+    },
+    onError: (err) => {
+      const message =
+        err?.message?.includes('reserved') ? localize('com_agents_crm_project_name_reserved') : err?.message;
+      showToast({ message: message ?? localize('com_ui_error'), status: 'error' });
+    },
+  });
+
+  const projectOptions = useMemo(() => {
+    return projects.map((p) => ({
+      label: p._id === instanceProjectId ? localize('com_agents_crm_project_instance') : p.name,
+      value: p._id,
+      icon: <Folder size={16} className="text-text-secondary" />,
+    })) as OptionWithIcon[];
+  }, [projects, instanceProjectId, localize]);
+
+  const handleCreateProject = () => {
+    const trimmed = newProjectName.trim();
+    if (!trimmed) return;
+    if (trimmed.toLowerCase() === 'instance') {
+      showToast({ message: localize('com_agents_crm_project_name_reserved'), status: 'error' });
+      return;
+    }
+    createProject.mutate({ name: trimmed });
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label htmlFor={name} className="text-sm font-medium">
+          {config.title} <span className="sr-only">({hasValue ? localize('com_ui_set') : localize('com_ui_unset')})</span>
+        </Label>
+        {hasValue && (
+          <div className="flex min-w-fit items-center gap-2 whitespace-nowrap rounded-full border border-border-light px-2 py-0.5 text-xs font-medium text-text-secondary">
+            <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
+            <span>{localize('com_ui_set')}</span>
+          </div>
+        )}
+      </div>
+      <Controller
+        name={name}
+        control={control}
+        defaultValue=""
+        render={({ field }) => (
+          <div className="space-y-2">
+            <ControlCombobox
+              isCollapsed={false}
+              ariaLabel={localize('com_agents_crm_project_placeholder')}
+              selectedValue={field.value}
+              setValue={field.onChange}
+              selectPlaceholder={localize('com_agents_crm_project_placeholder')}
+              searchPlaceholder={localize('com_ui_agent_var', { 0: localize('com_ui_search') })}
+              items={projectOptions}
+              className="h-10 w-full rounded border border-border-medium bg-transparent px-2 py-1 text-text-primary"
+              containerClassName="px-0"
+              SelectIcon={<Folder size={16} className="text-text-secondary" />}
+            />
+            <div className="flex gap-2">
+              <Input
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                placeholder={localize('com_agents_crm_project_name_placeholder')}
+                className="flex-1 rounded border border-border-medium bg-transparent px-2 py-1 text-sm text-text-primary"
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleCreateProject())}
+              />
+              <Button
+                type="button"
+                onClick={handleCreateProject}
+                disabled={!newProjectName.trim() || createProject.isPending}
+                className="shrink-0"
+              >
+                {localize('com_agents_crm_project_create')}
+              </Button>
+            </div>
+          </div>
+        )}
+      />
+      {config.description && (
+        <p className="text-xs text-text-secondary">{config.description}</p>
+      )}
+      {errors[name] && <p className="text-xs text-red-500">{errors[name]?.message}</p>}
+    </div>
+  );
 }
 
 function AuthField({ name, config, hasValue, control, errors, autoFocus }: AuthFieldProps) {
@@ -129,6 +255,7 @@ export default function CustomUserVarsSection({
     reset,
     control,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<Record<string, string>>({
     defaultValues: useMemo(() => {
@@ -158,6 +285,18 @@ export default function CustomUserVarsSection({
       <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
         {Object.entries(fields).map(([key, config], index) => {
           const hasValue = authValuesData?.authValueFlags?.[key] || false;
+          const isCRMProjectId = serverName === 'CRM' && key === 'PROJECT_ID';
+
+          if (isCRMProjectId) {
+            return (
+              <div key={key} className="space-y-2">
+                <Label className="text-sm font-medium">{config.title}</Label>
+                <p className="text-xs text-text-secondary">
+                  {localize('com_ui_user_crm_project_info')}
+                </p>
+              </div>
+            );
+          }
 
           return (
             <AuthField

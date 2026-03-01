@@ -1,10 +1,10 @@
 const bcrypt = require('bcryptjs');
+const mongoose = require('mongoose');
 const { logger } = require('@librechat/data-schemas');
 const { SystemRoles } = require('librechat-data-provider');
 const {
   findUser,
   createUser: createUserModel,
-  updateUser: updateUserModel,
   getUserById,
   deleteUserById,
   createToken,
@@ -42,6 +42,7 @@ const listUsers = async (req, res) => {
         { email: regex },
         { name: regex },
         { username: regex },
+        { inboundEmailToken: regex },
       ];
     }
 
@@ -98,7 +99,7 @@ const getUser = async (req, res) => {
  */
 const createUser = async (req, res) => {
   try {
-    const { email, password, name, username, role } = req.body;
+    const { email, password, name, username, role, inboundEmailToken, projectId } = req.body;
     const appConfig = await getAppConfig();
 
     if (!email || !email.trim()) {
@@ -117,6 +118,28 @@ const createUser = async (req, res) => {
       ? bcrypt.hashSync(password.trim(), salt)
       : undefined;
 
+    const tokenValue =
+      typeof inboundEmailToken === 'string' && inboundEmailToken.trim()
+        ? inboundEmailToken.trim()
+        : undefined;
+
+    if (tokenValue) {
+      const existingTokenUser = await findUser({ inboundEmailToken: tokenValue }, '_id');
+      if (existingTokenUser) {
+        return res.status(409).json({
+          message: 'Another user already has this inbound email token',
+        });
+      }
+    }
+
+    let projectIdObj = null;
+    if (projectId != null && projectId !== '') {
+      if (!mongoose.Types.ObjectId.isValid(projectId)) {
+        return res.status(400).json({ message: 'Invalid project ID' });
+      }
+      projectIdObj = new mongoose.Types.ObjectId(projectId);
+    }
+
     const newUserData = {
       provider: 'local',
       email: normalizedEmail,
@@ -125,6 +148,8 @@ const createUser = async (req, res) => {
       role: role === SystemRoles.ADMIN ? SystemRoles.ADMIN : SystemRoles.USER,
       emailVerified: true,
       ...(hashedPassword && { password: hashedPassword }),
+      ...(tokenValue && { inboundEmailToken: tokenValue }),
+      ...(projectIdObj && { projectId: projectIdObj }),
     };
 
     const result = await createUserModel(newUserData, appConfig?.balance, true, true);
@@ -148,7 +173,8 @@ const createUser = async (req, res) => {
 const updateUser = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { name, username, email, role, emailVerified, password } = req.body;
+    const { name, username, email, role, emailVerified, password, inboundEmailToken, projectId } =
+      req.body;
 
     const existingUser = await getUserById(userId);
     if (!existingUser) {
@@ -156,6 +182,7 @@ const updateUser = async (req, res) => {
     }
 
     const updateData = {};
+    const unsetData = {};
 
     if (name !== undefined) {
       updateData.name = name?.trim() || '';
@@ -180,13 +207,56 @@ const updateUser = async (req, res) => {
     if (password !== undefined && password?.trim()) {
       updateData.password = bcrypt.hashSync(password.trim(), bcrypt.genSaltSync(10));
     }
+    if (inboundEmailToken !== undefined) {
+      const tokenValue =
+        typeof inboundEmailToken === 'string' && inboundEmailToken.trim()
+          ? inboundEmailToken.trim()
+          : null;
+      if (tokenValue) {
+        const existingTokenUser = await findUser(
+          { inboundEmailToken: tokenValue, _id: { $ne: userId } },
+          '_id',
+        );
+        if (existingTokenUser) {
+          return res.status(409).json({
+            message: 'Another user already has this inbound email token',
+          });
+        }
+        updateData.inboundEmailToken = tokenValue;
+      } else {
+        unsetData.inboundEmailToken = '';
+      }
+    }
+    if (projectId !== undefined) {
+      if (projectId === null || projectId === '') {
+        unsetData.projectId = '';
+      } else {
+        if (!mongoose.Types.ObjectId.isValid(projectId)) {
+          return res.status(400).json({ message: 'Invalid project ID' });
+        }
+        updateData.projectId = new mongoose.Types.ObjectId(projectId);
+      }
+    }
 
-    if (Object.keys(updateData).length === 0) {
+    if (Object.keys(updateData).length === 0 && Object.keys(unsetData).length === 0) {
       const { _id, password: _p, totpSecret: _t, ...rest } = existingUser;
       return res.status(200).json({ _id, id: _id?.toString(), ...rest });
     }
 
-    const updated = await updateUserModel(userId, updateData);
+    const User = require('~/db/models').User;
+    const updateOp = {};
+    if (Object.keys(updateData).length > 0) {
+      updateOp.$set = updateData;
+    }
+    if (Object.keys(unsetData).length > 0) {
+      updateOp.$unset = unsetData;
+    }
+    const updated = await User.findByIdAndUpdate(userId, updateOp, {
+      new: true,
+      runValidators: true,
+    })
+      .select(EXCLUDED_FIELDS)
+      .lean();
     if (!updated) {
       return res.status(500).json({ message: 'Failed to update user' });
     }
