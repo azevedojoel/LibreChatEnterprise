@@ -18,12 +18,12 @@ imageOutputType: png
 interface:
   customWelcome: 'Daily Thread'
   fileSearch: true
-  endpointsMenu: true
-  modelSelect: true
-  parameters: true
+  endpointsMenu: false
+  modelSelect: false
+  parameters: false
   sidePanel: true
   presets: true
-  multiConvo: true
+  multiConvo: false
   bookmarks: true
   memories: true
   temporaryChat: true
@@ -196,6 +196,24 @@ mcpServers:
       scope: "User.Read Mail.Read Mail.ReadWrite Mail.Send Mail.Read.Shared Mail.Send.Shared Calendars.Read Calendars.ReadWrite Calendars.Read.Shared Files.Read Files.ReadWrite Tasks.Read Tasks.ReadWrite Contacts.Read Contacts.ReadWrite People.Read User.Read.All offline_access"
     env:
       MS365_MCP_OAUTH_TOKEN: "{{LIBRECHAT_MCP_OAUTH_ACCESS_TOKEN}}"
+  CRM:
+    initTimeout: 150000
+    type: stdio
+    command: node
+    iconPath: /assets/crm.png
+    args:
+      - ./mcp-servers/crm-mcp-server/dist/index.js
+      - --project-id
+      - "{{PROJECT_ID}}"
+    startup: false
+    outputFormatter: token-optimized
+    serverInstructions: |
+      Use crm_list_pipelines first to see available pipelines and stages.
+      For "leads with no follow-up in N days", use crm_list_contacts with noActivitySinceDays (e.g. 3).
+    env:
+      CRM_PROJECT_ID: "{{PROJECT_ID}}"
+      LIBRECHAT_MCP_ACCESS_TOKEN: "{{LIBRECHAT_MCP_ACCESS_TOKEN}}"
+      LIBRECHAT_API_BASE_URL: "{{LIBRECHAT_API_BASE_URL}}"
 #   filesystem:
 #     type: stdio
 #     command: npx
@@ -312,6 +330,7 @@ endpoints:
 
   # Agents endpoint
   agents:
+    defaultAgentForChat: system-general
     recursionLimit: 50
     maxRecursionLimit: 100
     disableBuilder: false
@@ -330,9 +349,26 @@ endpoints:
       - chain
       - ocr
       - manage_scheduling
-      - manage_crm
-      - inbound_email
-    inboundEmailAddress: inbound.postmarkapp.com  # Domain for agent email addresses (inbound+token@domain). Change to your Postmark inbound domain or custom domain.
+    inboundEmailAddress: inbound.postmarkapp.com  # Domain for user agent email addresses (token@domain). Change to your domain (e.g. dailythread.ai for ImprovMX).
+    systemAgents:
+      - id: system-general
+        name: Ellis
+        provider: openAI
+        model: gpt-5-mini-2025-08-07
+        instructions: |
+          You are Ellis, the default AI assistant for Daily Thread. You exist as a shared system agent—one personality that serves all users in this deployment. You are not a separate instance per user; you are a single assistant with access to the tools and context each user provides in their conversation.
+
+          Your role:
+          - Be a true AI assistant: helpful, attentive, and proactive. Understand what users need and deliver it clearly.
+          - You have access to the user's data through this system: their files (via file_search), the web (via web_search), and any context they share in the chat. Use these to give accurate, grounded answers.
+          - When users add and connect Google Workspace or Microsoft 365 tools, you can help with email, documents, scheduling, and files. Until then, use file_search and web_search for their needs.
+          - When users email this system, their messages reach you. Reply in a natural, conversational way—as if you're their dedicated assistant.
+          - Respect privacy and boundaries. You see only what the user shares in the current conversation and any files they attach or reference. Don't assume access to other users' data.
+          - Be concise when appropriate, but thorough when the task demands it. Adapt your tone to the user's needs.
+
+          You are part of Daily Thread—a platform that connects people with AI assistance. Your job is to make that connection feel seamless and valuable.
+        tools: [file_search, web_search, CRM]
+    defaultAgentForInboundEmail: system-general  # System agent that handles inbound email
 
   # Anthropic with Vertex AI (uncomment if using)
   # anthropic:
