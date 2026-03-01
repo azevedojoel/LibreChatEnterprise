@@ -4,7 +4,6 @@ const { logger } = require('@librechat/data-schemas');
 const { getCustomEndpointConfig } = require('@librechat/api');
 const {
   Tools,
-  SystemRoles,
   ResourceType,
   actionDelimiter,
   isAgentsEndpoint,
@@ -12,11 +11,7 @@ const {
   encodeEphemeralAgentId,
 } = require('librechat-data-provider');
 const { mcp_all, mcp_delimiter } = require('librechat-data-provider').Constants;
-const {
-  removeAgentFromAllProjects,
-  removeAgentIdsFromProject,
-  addAgentIdsToProject,
-} = require('./Project');
+const { removeAgentFromAllProjects } = require('./Project');
 const { removeAllPermissions } = require('~/server/services/PermissionService');
 const { getMCPServerTools } = require('~/server/services/Config');
 const { Agent, AclEntry, User } = require('~/db/models');
@@ -87,21 +82,6 @@ const getAgent = async (searchParameter) => await Agent.findOne(searchParameter)
  * @returns {Promise<Agent[]>} Array of agent documents as plain objects.
  */
 const getAgents = async (searchParameter) => await Agent.find(searchParameter).lean();
-
-/**
- * Get an agent by its inbound email token.
- * Used for routing inbound emails to the correct agent.
- * @param {string} inboundToken - The agent's inboundEmailToken
- * @returns {Promise<Object|null>} The agent document as a plain object, or null if not found
- */
-const getAgentByInboundToken = async (inboundToken) => {
-  if (!inboundToken || typeof inboundToken !== 'string') {
-    return null;
-  }
-  return Agent.findOne({ inboundEmailToken: inboundToken.trim() })
-    .populate('author', 'id name email')
-    .lean();
-};
 
 /**
  * Load an agent based on the provided ID
@@ -211,17 +191,23 @@ const loadAgent = async ({ req, spec, agent_id, endpoint, model_parameters }) =>
   if (!agent_id) {
     return null;
   }
+  // For agents endpoint: try DB first - system agents (system-general) and
+  // custom IDs don't start with "agent_" but are real DB agents
+  if (isAgentsEndpoint(endpoint)) {
+    const dbAgent = await getAgent({ id: agent_id });
+    if (dbAgent) {
+      dbAgent.version = dbAgent.versions ? dbAgent.versions.length : 0;
+      return dbAgent;
+    }
+  }
+  // Ephemeral agent path (encoded IDs, or no DB match)
   if (isEphemeralAgentId(agent_id)) {
     return await loadEphemeralAgent({ req, spec, endpoint, model_parameters });
   }
-  const agent = await getAgent({
-    id: agent_id,
-  });
-
+  const agent = await getAgent({ id: agent_id });
   if (!agent) {
     return null;
   }
-
   agent.version = agent.versions ? agent.versions.length : 0;
   return agent;
 };
@@ -306,16 +292,6 @@ const isDuplicateVersion = (updateData, currentData, versions, actionsHash = nul
         break;
       }
 
-      // Special handling for projectIds (MongoDB ObjectIds)
-      if (field === 'projectIds') {
-        const wouldBeIds = wouldBeArr.map((id) => id.toString()).sort();
-        const versionIds = lastVersionArr.map((id) => id.toString()).sort();
-
-        if (!wouldBeIds.every((id, i) => id === versionIds[i])) {
-          isMatch = false;
-          break;
-        }
-      }
       // Handle arrays of objects
       else if (
         wouldBeArr.length > 0 &&
@@ -455,10 +431,7 @@ const updateAgent = async (searchParameter, updateData, options = {}) => {
       }
     }
 
-    const inboundEmailTokenChanged =
-      directUpdates.inboundEmailToken !== undefined &&
-      String(directUpdates.inboundEmailToken || '') !== String(versionData.inboundEmailToken || '');
-    const effectiveForceVersion = forceVersion || inboundEmailTokenChanged;
+    const effectiveForceVersion = forceVersion;
 
     const shouldCreateVersion =
       !skipVersioning &&
@@ -731,7 +704,6 @@ const getListAgentsByAccess = async ({
     name: 1,
     avatar: 1,
     author: 1,
-    projectIds: 1,
     description: 1,
     updatedAt: 1,
     category: 1,
@@ -774,64 +746,6 @@ const getListAgentsByAccess = async ({
     has_more: hasMore,
     after: nextCursor,
   };
-};
-
-/**
- * Updates the projects associated with an agent, adding and removing project IDs as specified.
- * This function also updates the corresponding projects to include or exclude the agent ID.
- *
- * @param {Object} params - Parameters for updating the agent's projects.
- * @param {IUser} params.user - Parameters for updating the agent's projects.
- * @param {string} params.agentId - The ID of the agent to update.
- * @param {string[]} [params.projectIds] - Array of project IDs to add to the agent.
- * @param {string[]} [params.removeProjectIds] - Array of project IDs to remove from the agent.
- * @returns {Promise<MongoAgent>} The updated agent document.
- * @throws {Error} If there's an error updating the agent or projects.
- */
-const updateAgentProjects = async ({ user, agentId, projectIds, removeProjectIds }) => {
-  const updateOps = {};
-
-  if (removeProjectIds && removeProjectIds.length > 0) {
-    for (const projectId of removeProjectIds) {
-      await removeAgentIdsFromProject(projectId, [agentId]);
-    }
-    updateOps.$pull = { projectIds: { $in: removeProjectIds } };
-  }
-
-  if (projectIds && projectIds.length > 0) {
-    for (const projectId of projectIds) {
-      await addAgentIdsToProject(projectId, [agentId]);
-    }
-    updateOps.$addToSet = { projectIds: { $each: projectIds } };
-  }
-
-  if (Object.keys(updateOps).length === 0) {
-    return await getAgent({ id: agentId });
-  }
-
-  const updateQuery = { id: agentId, author: user.id };
-  if (user.role === SystemRoles.ADMIN) {
-    delete updateQuery.author;
-  }
-
-  const updatedAgent = await updateAgent(updateQuery, updateOps, {
-    updatingUserId: user.id,
-    skipVersioning: true,
-  });
-  if (updatedAgent) {
-    return updatedAgent;
-  }
-  if (updateOps.$addToSet) {
-    for (const projectId of projectIds) {
-      await removeAgentIdsFromProject(projectId, [agentId]);
-    }
-  } else if (updateOps.$pull) {
-    for (const projectId of removeProjectIds) {
-      await addAgentIdsToProject(projectId, [agentId]);
-    }
-  }
-
-  return await getAgent({ id: agentId });
 };
 
 /**
@@ -936,14 +850,12 @@ const countPromotedAgents = async () => {
 module.exports = {
   getAgent,
   getAgents,
-  getAgentByInboundToken,
   loadAgent,
   createAgent,
   updateAgent,
   deleteAgent,
   deleteUserAgents,
   revertAgentVersion,
-  updateAgentProjects,
   countPromotedAgents,
   addAgentResourceFile,
   getListAgentsByAccess,
