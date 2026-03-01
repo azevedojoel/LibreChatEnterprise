@@ -200,7 +200,6 @@ mcpServers:
     initTimeout: 150000
     type: stdio
     command: node
-    iconPath: /assets/crm.png
     args:
       - ./mcp-servers/crm-mcp-server/dist/index.js
       - --project-id

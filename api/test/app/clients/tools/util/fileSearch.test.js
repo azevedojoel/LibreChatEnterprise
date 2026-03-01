@@ -41,7 +41,9 @@ describe('fileSearch.js - tuple return validation', () => {
 
       expect(Array.isArray(result)).toBe(true);
       expect(result).toHaveLength(2);
-      expect(result[0]).toBe('No files to search. Instruct the user to add files for the search.');
+      expect(result[0]).toBe(
+        'No files to search. The user has no embedded files in My Files. Instruct them to upload documents to My Files to enable search.',
+      );
       expect(result[1]).toBeUndefined();
     });
 

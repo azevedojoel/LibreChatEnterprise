@@ -2,7 +2,7 @@ const axios = require('axios');
 const { tool } = require('@langchain/core/tools');
 const { logger } = require('@librechat/data-schemas');
 const { generateShortLivedToken } = require('@librechat/api');
-const { Tools, EToolResources } = require('librechat-data-provider');
+const { Tools } = require('librechat-data-provider');
 const { filterFilesByAgentAccess } = require('~/server/services/Files/permissions');
 const { getFiles } = require('~/models');
 
@@ -18,11 +18,15 @@ const fileSearchJsonSchema = {
   required: ['query'],
 };
 
+/** Max number of user files to include in file_search (most recent first) */
+const FILE_SEARCH_LIMIT = 50;
+
 /**
+ * Primes files for the file_search tool. Always searches the user's My Files (embedded documents).
+ * Attached files are for analysis/context—file_search searches the user's full file library.
  *
  * @param {Object} options
  * @param {ServerRequest} options.req
- * @param {Agent['tool_resources']} options.tool_resources
  * @param {string} [options.agentId] - The agent ID for file access control
  * @returns {Promise<{
  *   files: Array<{ file_id: string; filename: string }>,
@@ -30,43 +34,50 @@ const fileSearchJsonSchema = {
  * }>}
  */
 const primeFiles = async (options) => {
-  const { tool_resources, req, agentId } = options;
-  const file_ids = tool_resources?.[EToolResources.file_search]?.file_ids ?? [];
-  const agentResourceIds = new Set(file_ids);
-  const resourceFiles = tool_resources?.[EToolResources.file_search]?.files ?? [];
+  const { req, agentId } = options;
 
-  // Get all files first
-  const allFiles = (await getFiles({ file_id: { $in: file_ids } }, null, { text: 0 })) ?? [];
+  if (!req?.user?.id) {
+    return {
+      files: [],
+      toolContext: `- Note: Semantic search is available through the ${Tools.file_search} tool but no files are currently loaded. Request the user to upload documents to search through.`,
+    };
+  }
 
-  // Filter by access if user and agent are provided
+  const userId = req.user.id?.toString?.() ?? req.user.id;
+
+  // Always search the user's My Files (embedded documents)
+  const allFiles =
+    (await getFiles(
+      { user: userId, embedded: true },
+      null,
+      { text: 0 },
+    )) ?? [];
+
+  // Limit to most recent files for performance
+  const limitedFiles = allFiles.slice(0, FILE_SEARCH_LIMIT);
+
+  // Filter by access if agent is provided
   let dbFiles;
-  if (req?.user?.id && agentId) {
+  if (agentId) {
     dbFiles = await filterFilesByAgentAccess({
-      files: allFiles,
+      files: limitedFiles,
       userId: req.user.id,
       role: req.user.role,
       agentId,
     });
   } else {
-    dbFiles = allFiles;
+    dbFiles = limitedFiles;
   }
 
-  dbFiles = dbFiles.concat(resourceFiles);
-
-  let toolContext = `- Note: Semantic search is available through the ${Tools.file_search} tool but no files are currently loaded. Request the user to upload documents to search through.`;
+  let toolContext =
+    dbFiles.length === 0
+      ? `- Note: Semantic search is available through the ${Tools.file_search} tool but no files are currently loaded. Request the user to upload documents to My Files to search through.`
+      : `- Note: Use the ${Tools.file_search} tool to search across the user's My Files:`;
 
   const files = [];
-  for (let i = 0; i < dbFiles.length; i++) {
-    const file = dbFiles[i];
-    if (!file) {
-      continue;
-    }
-    if (i === 0) {
-      toolContext = `- Note: Use the ${Tools.file_search} tool to find relevant information within:`;
-    }
-    toolContext += `\n\t- ${file.filename}${
-      agentResourceIds.has(file.file_id) ? '' : ' (just attached by user)'
-    }`;
+  for (const file of dbFiles) {
+    if (!file) continue;
+    toolContext += `\n\t- ${file.filename}`;
     files.push({
       file_id: file.file_id,
       filename: file.filename,
@@ -89,7 +100,10 @@ const createFileSearchTool = async ({ userId, files, entity_id, fileCitations = 
   return tool(
     async ({ query }) => {
       if (files.length === 0) {
-        return ['No files to search. Instruct the user to add files for the search.', undefined];
+        return [
+          'No files to search. The user has no embedded files in My Files. Instruct them to upload documents to My Files to enable search.',
+          undefined,
+        ];
       }
       const jwtToken = generateShortLivedToken(userId);
       if (!jwtToken) {
@@ -179,7 +193,7 @@ const createFileSearchTool = async ({ userId, files, entity_id, fileCitations = 
     {
       name: Tools.file_search,
       responseFormat: 'content_and_artifact',
-      description: `Performs semantic search across attached "${Tools.file_search}" documents using natural language queries. This tool analyzes the content of uploaded files to find relevant information, quotes, and passages that best match your query. Use this to extract specific information or find relevant sections within the available documents.${
+      description: `Performs semantic search across the user's My Files using natural language queries. Searches all embedded documents the user has uploaded. Use this when the user asks to search their files, find information in their documents, or locate content across their file library.${
         fileCitations
           ? `
 

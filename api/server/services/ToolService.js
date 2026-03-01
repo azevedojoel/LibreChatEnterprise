@@ -934,11 +934,11 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
         '- Workspace tools: operate on the conversation-scoped workspace (shared with execute_code). Files from email attachments or file_search are NOT in the workspace—use file_search for those.';
   }
 
-  if (hasFileSearch && tool_resources) {
+  if (hasFileSearch) {
     try {
       const { toolContext } = await primeSearchFiles({
         req,
-        tool_resources,
+        tool_resources: tool_resources ?? {},
         agentId: agent.id,
       });
       if (toolContext) {
