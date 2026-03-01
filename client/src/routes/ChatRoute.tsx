@@ -66,6 +66,20 @@ export default function ChatRoute() {
     setPendingMCPOAuth(null);
   }, [conversationId, setPendingMCPOAuth]);
 
+  // Prune resolved tool approvals when switching conversations to avoid unbounded growth.
+  // Keep only entries for the current conversation.
+  const setResolvedToolApprovals = useSetRecoilState(store.resolvedToolApprovalsAtom);
+  useEffect(() => {
+    setResolvedToolApprovals((prev) => {
+      if (!conversationId || conversationId === Constants.NEW_CONVO) return {};
+      const prefix = `${conversationId}:`;
+      const next = Object.fromEntries(
+        Object.entries(prev).filter(([key]) => key.startsWith(prefix)),
+      );
+      return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+    });
+  }, [conversationId, setResolvedToolApprovals]);
+
   /** This effect is mainly for the first conversation state change on first load of the page.
    *  Adjusting this may have unintended consequences on the conversation state.
    */

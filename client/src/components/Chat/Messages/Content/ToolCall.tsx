@@ -68,7 +68,8 @@ export default function ToolCall({
   const setPendingMCPOAuth = useSetRecoilState(store.pendingMCPOAuthAtom);
   const expandedToolCalls = useRecoilValue(store.expandedToolCallsAtom);
   const setExpandedToolCalls = useSetRecoilState(store.expandedToolCallsAtom);
-  const { pendingMatches, handleApprove, handleDeny, approvalSubmitting } = useToolApproval(toolCallId);
+  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting } =
+    useToolApproval(toolCallId, output ?? '');
   const { data: startupConfig } = useGetStartupConfig();
 
   const expandedKey =
@@ -371,23 +372,25 @@ export default function ToolCall({
     return null;
   }
 
+  const showApprovalBar = approvalStatus !== null;
+
   return (
     <>
       <div
         className={cn(
           'relative flex flex-col',
           isCompactSpacing ? 'my-0.5' : 'my-1',
-          pendingMatches ? 'gap-3' : 'gap-1',
+          showApprovalBar ? 'gap-3' : 'gap-1',
         )}
       >
         <div
           className={cn(
             'flex shrink-0 items-center',
             isCompactSpacing ? 'gap-1' : 'gap-1.5',
-            pendingMatches ? 'min-h-8 flex-wrap' : 'h-5',
+            showApprovalBar ? 'min-h-8 flex-wrap' : 'h-5',
           )}
         >
-          {pendingMatches ? (
+          {showApprovalBar ? (
             <ToolApprovalBar
               onApprove={handleApprove}
               onDeny={handleDeny}
@@ -395,6 +398,9 @@ export default function ToolCall({
               isExpanded={showInfo}
               isSubmitting={approvalSubmitting}
               toolName={name}
+              resolved={
+                approvalStatus === 'approved' ? 'approved' : approvalStatus === 'denied' ? 'denied' : undefined
+              }
             />
           ) : (
             <ProgressText

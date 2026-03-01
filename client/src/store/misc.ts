@@ -95,6 +95,16 @@ export const expandedToolCallsAtom = atom<Set<string>>({
   default: new Set(),
 });
 
+/**
+ * Resolved tool approvals - tools that required approval and user approved/denied.
+ * Key: conversationId:messageId:toolCallId. Value: 'approved' | 'denied'.
+ * Used to show "Approved"/"Denied" only for tools that actually went through the approval flow.
+ */
+export const resolvedToolApprovalsAtom = atom<Record<string, 'approved' | 'denied'>>({
+  key: 'resolvedToolApprovals',
+  default: {},
+});
+
 export default {
   hideBannerHint,
   messageAttachmentsMap,
@@ -104,4 +114,5 @@ export default {
   pendingMCPOAuthAtom,
   pendingToolConfirmationAtom,
   expandedToolCallsAtom,
+  resolvedToolApprovalsAtom,
 };

@@ -181,6 +181,13 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
           : JSON.stringify(toolCall.args ?? {});
       const argsSummary = argsStr.length > 200 ? argsStr.slice(0, 200) + '...' : argsStr;
 
+      logger.debug('[ToolConfirmation] Registering', {
+        conversationId,
+        runId,
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
+      });
+
       const { promise } = await ToolConfirmationStore.register({
         conversationId,
         runId,

@@ -1,10 +1,38 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '@librechat/client';
-import { ShieldAlert, CheckCircle } from 'lucide-react';
+import { ShieldAlert, CheckCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { useLocalize } from '~/hooks';
+import { getToolDisplayName, humanizeToolName } from '~/utils';
 import useAuthRedirect from './useAuthRedirect';
 import { getPendingToolConfirmation, submitToolConfirmation } from '~/data-provider/SSE/mutations';
+
+const MAX_ARG_VALUE_LENGTH = 60;
+
+/** Parse argsSummary JSON into key-value pairs for token bubbles. Falls back to raw display when truncated or invalid. */
+function parseArgsToBubbles(argsSummary: string): Array<{ key: string; value: string }> {
+  if (!argsSummary?.trim()) return [];
+  try {
+    const parsed = JSON.parse(argsSummary);
+    if (typeof parsed !== 'object' || parsed === null) return [];
+    const pairs: Array<{ key: string; value: string }> = [];
+    for (const [key, val] of Object.entries(parsed)) {
+      if (key.startsWith('_') || key === '') continue;
+      let value = '';
+      if (val === null || val === undefined) value = '—';
+      else if (typeof val === 'object') value = JSON.stringify(val);
+      else value = String(val);
+      if (value.length > MAX_ARG_VALUE_LENGTH) value = value.slice(0, MAX_ARG_VALUE_LENGTH) + '…';
+      const humanKey = humanizeToolName(key);
+      pairs.push({ key: humanKey, value });
+    }
+    return pairs;
+  } catch {
+    // Fallback: show raw when truncated or invalid JSON
+    const display = argsSummary.slice(0, MAX_ARG_VALUE_LENGTH) + (argsSummary.length > MAX_ARG_VALUE_LENGTH ? '…' : '');
+    return [{ key: 'Arguments', value: display }];
+  }
+}
 
 export default function ToolApprovalPage() {
   const { isAuthenticated } = useAuthRedirect();
@@ -18,11 +46,15 @@ export default function ToolApprovalPage() {
     toolName: string;
     argsSummary: string;
     conversationId: string;
+    contextLabel?: string;
+    conversationTitle?: string;
+    recentMessages?: Array<{ role: 'user' | 'assistant'; text: string }>;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [resolved, setResolved] = useState<'approved' | 'denied' | null>(null);
+  const [messagesExpanded, setMessagesExpanded] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated || !id) {
@@ -168,15 +200,67 @@ export default function ToolApprovalPage() {
           {localize('com_ui_tool_approval_prompt') ||
             'Your agent is requesting to run a potentially destructive tool. Approve or deny to continue.'}
         </p>
+        {pending && (pending.contextLabel || pending.conversationTitle) && (
+          <p className="text-sm text-text-secondary">
+            {pending.contextLabel || pending.conversationTitle}
+          </p>
+        )}
         {pending && (
           <div className="rounded-lg border border-border-medium bg-surface-secondary p-3">
             <p className="text-sm font-medium text-text-primary">
-              {localize('com_ui_tool_name') || 'Tool'}: {pending.toolName}
+              {localize('com_ui_tool_name') || 'Tool'}: {getToolDisplayName(pending.toolName)}
             </p>
-            {pending.argsSummary && (
-              <pre className="mt-2 max-h-32 overflow-auto break-words rounded bg-surface-primary p-2 text-xs text-text-secondary">
-                {pending.argsSummary}
-              </pre>
+            {(() => {
+              const bubbles = parseArgsToBubbles(pending.argsSummary ?? '');
+              if (bubbles.length === 0) return null;
+              return (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {bubbles.map(({ key, value }) => (
+                    <span
+                      key={key}
+                      className="inline-flex max-w-full items-center gap-1 rounded-md border border-border-medium bg-surface-primary px-2 py-1 text-xs text-text-secondary"
+                      title={value.length >= MAX_ARG_VALUE_LENGTH ? value : undefined}
+                    >
+                      <span className="font-medium text-text-primary">{key}:</span>
+                      <span className="truncate">{value}</span>
+                    </span>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+        {pending?.recentMessages && pending.recentMessages.length > 0 && (
+          <div className="rounded-lg border border-border-medium bg-surface-secondary">
+            <button
+              type="button"
+              onClick={() => setMessagesExpanded((e) => !e)}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary hover:bg-surface-primary/50"
+              aria-expanded={messagesExpanded}
+            >
+              {messagesExpanded ? (
+                <ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true" />
+              ) : (
+                <ChevronRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+              )}
+              {localize('com_ui_tool_approval_context') || 'Conversation context'}
+            </button>
+            {messagesExpanded && (
+              <div className="max-h-48 space-y-2 overflow-auto border-t border-border-medium px-3 py-2">
+                {pending.recentMessages.map((msg, i) => (
+                  <div
+                    key={i}
+                    className={`rounded px-2 py-1.5 text-xs ${
+                      msg.role === 'user'
+                        ? 'bg-surface-primary text-text-primary'
+                        : 'bg-surface-primary/50 text-text-secondary'
+                    }`}
+                  >
+                    <span className="font-medium">{msg.role === 'user' ? 'You' : 'Agent'}: </span>
+                    <span className="break-words">{msg.text}</span>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )}

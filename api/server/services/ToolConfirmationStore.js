@@ -110,7 +110,7 @@ async function register({ conversationId, runId, toolCallId, userId, toolName, a
  * @param {string} params.toolCallId
  * @param {boolean} params.approved
  * @param {string} params.userId
- * @returns {Promise<{ success: boolean, error?: 'expired' | 'unauthorized' }>}
+ * @returns {Promise<{ success: boolean, payload?: { toolName: string, argsSummary: string }, error?: 'expired' | 'unauthorized' }>}
  */
 async function submit({ conversationId, runId, toolCallId, approved, userId }) {
   const compositeKey = key(conversationId, runId, toolCallId);
@@ -123,11 +123,14 @@ async function submit({ conversationId, runId, toolCallId, approved, userId }) {
     if (entry.payload && String(entry.payload.userId) !== String(userId)) {
       return { success: false, error: 'unauthorized' };
     }
+    const payload = entry.payload
+      ? { toolName: entry.payload.toolName || '', argsSummary: entry.payload.argsSummary || '' }
+      : { toolName: '', argsSummary: '' };
     memoryMap.delete(compositeKey);
     if (entry.resolve) {
       entry.resolve({ approved });
     }
-    return { success: true };
+    return { success: true, payload };
   }
 
   try {
@@ -144,12 +147,17 @@ async function submit({ conversationId, runId, toolCallId, approved, userId }) {
       return { success: false, error: 'unauthorized' };
     }
 
+    const auditPayload = {
+      toolName: payload.toolName || '',
+      argsSummary: payload.argsSummary || '',
+    };
+
     payload.status = approved ? 'approved' : 'denied';
     await ioredisClient.set(compositeKey, JSON.stringify(payload), 'EX', 60); // Short TTL after resolve
 
     await ioredisClient.publish(compositeKey, JSON.stringify({ approved }));
 
-    return { success: true };
+    return { success: true, payload: auditPayload };
   } catch (err) {
     logger.error('[ToolConfirmationStore] Submit failed:', err);
     return { success: false, error: 'expired' };

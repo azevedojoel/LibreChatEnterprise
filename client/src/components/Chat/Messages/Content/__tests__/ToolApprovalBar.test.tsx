@@ -10,6 +10,8 @@ jest.mock('~/hooks', () => ({
       com_ui_deny: 'Deny',
       com_ui_expand: 'Expand',
       com_ui_collapse: 'Collapse',
+      com_ui_tool_approved: 'Approved',
+      com_ui_tool_denied: 'Denied',
     };
     return translations[key] || key;
   },
@@ -86,5 +88,27 @@ describe('ToolApprovalBar', () => {
 
     expect(screen.getByText('Approve')).toBeDisabled();
     expect(screen.getByText('Deny')).toBeDisabled();
+  });
+
+  it('shows Approved status and hides Approve/Deny buttons when resolved', () => {
+    render(<ToolApprovalBar {...defaultProps} resolved="approved" />);
+
+    expect(screen.getByText('Approved')).toBeInTheDocument();
+    expect(screen.queryByText('Approve')).not.toBeInTheDocument();
+    expect(screen.queryByText('Deny')).not.toBeInTheDocument();
+  });
+
+  it('shows Denied status and hides Approve/Deny buttons when resolved', () => {
+    render(<ToolApprovalBar {...defaultProps} resolved="denied" />);
+
+    expect(screen.getByText('Denied')).toBeInTheDocument();
+    expect(screen.queryByText('Approve')).not.toBeInTheDocument();
+    expect(screen.queryByText('Deny')).not.toBeInTheDocument();
+  });
+
+  it('shows Expand when resolved and not expanded', () => {
+    render(<ToolApprovalBar {...defaultProps} resolved="approved" isExpanded={false} />);
+
+    expect(screen.getByText('Expand')).toBeInTheDocument();
   });
 });

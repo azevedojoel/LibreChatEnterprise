@@ -349,10 +349,15 @@ export default function useEventHandlers({
           m.messageId === msg.messageId ? updatedMessage : m,
         );
         setMessages(updatedMessages);
+        setPendingToolConfirmation((prev) => {
+          const next = { ...prev };
+          delete next[tool_call_id];
+          return next;
+        });
         return;
       }
     },
-    [getMessages, setMessages],
+    [getMessages, setMessages, setPendingToolConfirmation],
   );
 
   const messageHandler = useCallback(

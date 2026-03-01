@@ -92,7 +92,10 @@ describe('ToolConfirmationStore', () => {
 
       const [result, resolved] = await Promise.all([submitPromise, promise]);
 
-      expect(result).toEqual({ success: true });
+      expect(result).toEqual({
+        success: true,
+        payload: { toolName: 'gmail_send', argsSummary: '' },
+      });
       expect(resolved).toEqual({ approved: true });
     });
 
@@ -153,7 +156,10 @@ describe('ToolConfirmationStore', () => {
       });
 
       const resolved = await promise;
-      expect(result).toEqual({ success: true });
+      expect(result).toEqual({
+        success: true,
+        payload: { toolName: 'execute_code', argsSummary: '' },
+      });
       expect(resolved).toEqual({ approved: false });
     });
 
@@ -251,7 +257,10 @@ describe('ToolConfirmationStore', () => {
 
       const [result, resolved] = await Promise.all([submitPromise, promise]);
 
-      expect(result).toEqual({ success: true });
+      expect(result).toEqual({
+        success: true,
+        payload: { toolName: 'execute_code', argsSummary: '' },
+      });
       expect(resolved).toEqual({ approved: true });
     });
 

@@ -42,9 +42,12 @@ export function useAbortStreamMutation() {
 export interface SubmitToolConfirmationParams {
   /** Token flow (approval page): id from URL */
   id?: string;
-  /** Inline flow (web UI): conversationId, messageId, toolCallId */
+  /** Inline flow (web UI): conversationId, messageId or runId, toolCallId */
   conversationId?: string;
+  /** Fallback when runId not available (e.g. from tool_confirmation_required) */
   messageId?: string;
+  /** Prefer runId from tool_confirmation_required to avoid backend mismatch */
+  runId?: string;
   toolCallId?: string;
   approved: boolean;
 }
@@ -53,6 +56,9 @@ export interface PendingToolConfirmationResponse {
   toolName: string;
   argsSummary: string;
   conversationId: string;
+  contextLabel?: string;
+  conversationTitle?: string;
+  recentMessages?: Array<{ role: 'user' | 'assistant'; text: string }>;
 }
 
 /**

@@ -35,6 +35,7 @@ jest.mock('~/hooks', () => ({
       com_ui_tool_approved_message: 'The tool has been approved and will continue executing.',
       com_ui_tool_denied_message: 'The tool has been denied.',
       com_ui_view_conversation: 'View conversation',
+      com_ui_tool_approval_context: 'Conversation context',
     };
     return translations[key] || key;
   },
@@ -98,10 +99,10 @@ describe('ToolApprovalPage', () => {
     });
   });
 
-  it('renders tool name and args when pending', async () => {
+  it('renders tool friendly name and token bubbles when pending', async () => {
     mockGetPendingToolConfirmation.mockResolvedValue({
       toolName: 'execute_code',
-      argsSummary: 'print("hello")',
+      argsSummary: '{"path": "/tmp/script.py", "language": "python"}',
       conversationId: 'conv-1',
     });
 
@@ -109,8 +110,9 @@ describe('ToolApprovalPage', () => {
     render(<RouterProvider router={router} />);
 
     await waitFor(() => {
-      expect(screen.getByText(/execute_code/)).toBeInTheDocument();
-      expect(screen.getByText(/print\("hello"\)/)).toBeInTheDocument();
+      expect(screen.getByText(/Code Interpreter/)).toBeInTheDocument();
+      expect(screen.getByText(/\/tmp\/script\.py/)).toBeInTheDocument();
+      expect(screen.getByText(/python/)).toBeInTheDocument();
     });
 
     expect(screen.getByText('Approve')).toBeInTheDocument();
@@ -160,6 +162,34 @@ describe('ToolApprovalPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Denied')).toBeInTheDocument();
       expect(screen.getByText('The tool has been denied.')).toBeInTheDocument();
+    });
+  });
+
+  it('shows context label and collapsible messages when provided', async () => {
+    mockGetPendingToolConfirmation.mockResolvedValue({
+      toolName: 'execute_code',
+      argsSummary: '{}',
+      conversationId: 'conv-1',
+      contextLabel: 'Deals agent, daily run',
+      recentMessages: [
+        { role: 'user', text: 'Summarize the deals' },
+        { role: 'assistant', text: 'Here is the summary...' },
+      ],
+    });
+
+    const router = createTestRouter('id=token-1');
+    render(<RouterProvider router={router} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Deals agent, daily run')).toBeInTheDocument();
+      expect(screen.getByText('Conversation context')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Conversation context'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Summarize the deals/)).toBeInTheDocument();
+      expect(screen.getByText(/Here is the summary/)).toBeInTheDocument();
     });
   });
 

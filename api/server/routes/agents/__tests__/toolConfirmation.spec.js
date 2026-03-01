@@ -19,6 +19,10 @@ const mockToolApprovalLink = {
   updateOne: jest.fn(),
 };
 
+const mockToolApprovalRecord = {
+  findOneAndUpdate: jest.fn(),
+};
+
 const mockToolConfirmationStore = {
   submit: jest.fn(),
 };
@@ -51,14 +55,30 @@ jest.mock('~/server/middleware', () => ({
   messageUserLimiter: (req, res, next) => next(),
 }));
 
+const mockConversationFindOne = jest.fn();
+const mockGetMessages = jest.fn();
+const mockGetAgent = jest.fn();
+
 jest.mock('~/db/models', () => ({
   ToolApprovalLink: mockToolApprovalLink,
+  ToolApprovalRecord: mockToolApprovalRecord,
+  Conversation: { findOne: (...args) => mockConversationFindOne(...args) },
+  ScheduledRun: { findById: jest.fn() },
+  ScheduledPrompt: {},
 }));
 
 jest.mock('~/server/services/ToolConfirmationStore', () => mockToolConfirmationStore);
 
 jest.mock('~/models/Conversation', () => ({
   searchConversation: (...args) => mockSearchConversation(...args),
+}));
+
+jest.mock('~/models/Message', () => ({
+  getMessages: (...args) => mockGetMessages(...args),
+}));
+
+jest.mock('~/models/Agent', () => ({
+  getAgent: (...args) => mockGetAgent(...args),
 }));
 
 jest.mock('~/server/routes/agents/chat', () => require('express').Router());
@@ -81,6 +101,8 @@ describe('Tool Confirmation API Routes', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockConversationFindOne.mockResolvedValue(null);
+    mockGetMessages.mockResolvedValue([]);
   });
 
   describe('GET /chat/tool-confirmation/pending', () => {
@@ -165,7 +187,7 @@ describe('Tool Confirmation API Routes', () => {
         .query({ id: 'token-1' });
 
       expect(response.status).toBe(200);
-      expect(response.body).toEqual({
+      expect(response.body).toMatchObject({
         toolName: 'execute_code',
         argsSummary: 'print(1)',
         conversationId: 'conv-1',
@@ -174,6 +196,46 @@ describe('Tool Confirmation API Routes', () => {
         { _id: 'link-1' },
         expect.objectContaining({ clickedAt: expect.any(Date) }),
       );
+    });
+
+    it('should return contextLabel and recentMessages when conversation exists', async () => {
+      const link = {
+        _id: 'link-2',
+        token: 'token-2',
+        userId: 'test-user-123',
+        toolName: 'execute_code',
+        argsSummary: '{}',
+        conversationId: 'conv-2',
+        expiresAt: new Date(Date.now() + 3600000),
+        clickedAt: null,
+      };
+      mockToolApprovalLink.findOne.mockResolvedValue(link);
+      mockToolApprovalLink.updateOne.mockResolvedValue({});
+      mockConversationFindOne.mockResolvedValue({
+        title: 'Deals agent — 2/28/2026',
+        scheduledRunId: null,
+      });
+      mockGetMessages.mockResolvedValue([
+        { text: 'Summarize deals', isCreatedByUser: true },
+        { content: [{ type: 'text', text: 'Here is the summary' }], isCreatedByUser: false },
+      ]);
+
+      const response = await request(app)
+        .get('/api/agents/chat/tool-confirmation/pending')
+        .query({ id: 'token-2' });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        toolName: 'execute_code',
+        argsSummary: '{}',
+        conversationId: 'conv-2',
+        contextLabel: 'Deals agent — 2/28/2026',
+        conversationTitle: 'Deals agent — 2/28/2026',
+        recentMessages: [
+          { role: 'user', text: 'Summarize deals' },
+          { role: 'assistant', text: 'Here is the summary' },
+        ],
+      });
     });
   });
 
@@ -266,7 +328,7 @@ describe('Tool Confirmation API Routes', () => {
         expect(response.body).toEqual({ error: 'Unauthorized' });
       });
 
-      it('should return 200 and update link when successful', async () => {
+      it('should return 200 and update link when successful (persists audit record)', async () => {
         const link = {
           token: 'token-1',
           userId: 'test-user-123',
@@ -275,10 +337,13 @@ describe('Tool Confirmation API Routes', () => {
           conversationId: 'conv-1',
           runId: 'run-1',
           toolCallId: 'tool-1',
+          toolName: 'gmail_send',
+          argsSummary: '{"to":"user@example.com"}',
         };
         mockToolApprovalLink.findOne.mockResolvedValue(link);
         mockToolApprovalLink.updateOne.mockResolvedValue({});
         mockToolConfirmationStore.submit.mockResolvedValue({ success: true });
+        mockToolApprovalRecord.findOneAndUpdate.mockResolvedValue({});
 
         const response = await request(app)
           .post('/api/agents/chat/tool-confirmation')
@@ -299,6 +364,17 @@ describe('Tool Confirmation API Routes', () => {
             status: 'approved',
             resolvedAt: expect.any(Date),
           }),
+        );
+        expect(mockToolApprovalRecord.findOneAndUpdate).toHaveBeenCalledWith(
+          { conversationId: 'conv-1', runId: 'run-1', toolCallId: 'tool-1' },
+          expect.objectContaining({
+            userId: 'test-user-123',
+            toolName: 'gmail_send',
+            argsSummary: '{"to":"user@example.com"}',
+            status: 'approved',
+            resolvedAt: expect.any(Date),
+          }),
+          { upsert: true, new: true },
         );
       });
     });
@@ -339,11 +415,15 @@ describe('Tool Confirmation API Routes', () => {
         expect(response.body).toEqual({ error: 'Unauthorized' });
       });
 
-      it('should return 200 when successful', async () => {
+      it('should return 200 when successful with messageId and persist audit record', async () => {
         mockSearchConversation.mockResolvedValue({
           user: 'test-user-123',
         });
-        mockToolConfirmationStore.submit.mockResolvedValue({ success: true });
+        mockToolConfirmationStore.submit.mockResolvedValue({
+          success: true,
+          payload: { toolName: 'execute_code', argsSummary: 'print(1)' },
+        });
+        mockToolApprovalRecord.findOneAndUpdate.mockResolvedValue({});
 
         const response = await request(app)
           .post('/api/agents/chat/tool-confirmation')
@@ -364,6 +444,104 @@ describe('Tool Confirmation API Routes', () => {
           userId: 'test-user-123',
         });
         expect(mockToolApprovalLink.updateOne).not.toHaveBeenCalled();
+        expect(mockToolApprovalRecord.findOneAndUpdate).toHaveBeenCalledWith(
+          { conversationId: 'conv-1', runId: 'msg-1', toolCallId: 'tool-1' },
+          expect.objectContaining({
+            userId: 'test-user-123',
+            toolName: 'execute_code',
+            argsSummary: 'print(1)',
+            status: 'approved',
+            resolvedAt: expect.any(Date),
+          }),
+          { upsert: true, new: true },
+        );
+      });
+
+      it('should return 200 when successful with runId from tool_confirmation_required (prefer runId over messageId)', async () => {
+        mockSearchConversation.mockResolvedValue({
+          user: 'test-user-123',
+        });
+        mockToolConfirmationStore.submit.mockResolvedValue({
+          success: true,
+          payload: { toolName: 'execute_code', argsSummary: 'print(1)' },
+        });
+        mockToolApprovalRecord.findOneAndUpdate.mockResolvedValue({});
+
+        const response = await request(app)
+          .post('/api/agents/chat/tool-confirmation')
+          .send({
+            conversationId: 'conv-1',
+            runId: 'run-from-server-123',
+            messageId: 'msg-1',
+            toolCallId: 'tool-1',
+            approved: true,
+          });
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ success: true });
+        expect(mockToolConfirmationStore.submit).toHaveBeenCalledWith({
+          conversationId: 'conv-1',
+          runId: 'run-from-server-123',
+          toolCallId: 'tool-1',
+          approved: true,
+          userId: 'test-user-123',
+        });
+      });
+
+      it('should return 200 when runId only (no messageId) - client sends runId from event', async () => {
+        mockSearchConversation.mockResolvedValue({
+          user: 'test-user-123',
+        });
+        mockToolConfirmationStore.submit.mockResolvedValue({
+          success: true,
+          payload: { toolName: 'execute_code', argsSummary: '' },
+        });
+        mockToolApprovalRecord.findOneAndUpdate.mockResolvedValue({});
+
+        const response = await request(app)
+          .post('/api/agents/chat/tool-confirmation')
+          .send({
+            conversationId: 'conv-1',
+            runId: 'run-from-event',
+            toolCallId: 'tool-1',
+            approved: true,
+          });
+
+        expect(response.status).toBe(200);
+        expect(mockToolConfirmationStore.submit).toHaveBeenCalledWith({
+          conversationId: 'conv-1',
+          runId: 'run-from-event',
+          toolCallId: 'tool-1',
+          approved: true,
+          userId: 'test-user-123',
+        });
+      });
+
+      it('should return 200 when audit persistence fails (audit failure does not affect response)', async () => {
+        mockSearchConversation.mockResolvedValue({
+          user: 'test-user-123',
+        });
+        mockToolConfirmationStore.submit.mockResolvedValue({
+          success: true,
+          payload: { toolName: 'gmail_send', argsSummary: '' },
+        });
+        mockToolApprovalRecord.findOneAndUpdate.mockRejectedValue(new Error('DB error'));
+
+        const response = await request(app)
+          .post('/api/agents/chat/tool-confirmation')
+          .send({
+            conversationId: 'conv-2',
+            messageId: 'msg-2',
+            toolCallId: 'tool-2',
+            approved: false,
+          });
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ success: true });
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          '[ToolConfirmation] Failed to persist inline approval audit:',
+          expect.any(Error),
+        );
       });
 
       it('should return 404 when ToolConfirmationStore returns expired', async () => {

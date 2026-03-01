@@ -61,7 +61,8 @@ export default function ExecuteCode({
   toolCallId?: string;
 }) {
   const localize = useLocalize();
-  const { pendingMatches, handleApprove, handleDeny, approvalSubmitting } = useToolApproval(toolCallId);
+  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting } =
+    useToolApproval(toolCallId, output);
 
   const hasOutput = output.length > 0;
   const outputRef = useRef<string>(output);
@@ -149,16 +150,17 @@ export default function ExecuteCode({
   }, [showCode, isAnimating]);
 
   const cancelled = !isSubmitting && progress < 1;
+  const showApprovalBar = approvalStatus !== null;
 
   return (
     <>
       <div
         className={cn(
           'relative flex shrink-0 items-center gap-2.5',
-          pendingMatches ? 'my-3 min-h-8' : 'my-2.5 size-5',
+          showApprovalBar ? 'my-3 min-h-8' : 'my-2.5 size-5',
         )}
       >
-        {pendingMatches ? (
+        {showApprovalBar ? (
           <ToolApprovalBar
             onApprove={handleApprove}
             onDeny={handleDeny}
@@ -166,6 +168,7 @@ export default function ExecuteCode({
             isExpanded={showCode}
             isSubmitting={approvalSubmitting}
             toolName="execute_code"
+            resolved={approvalStatus === 'approved' ? 'approved' : approvalStatus === 'denied' ? 'denied' : undefined}
           />
         ) : (
           <ProgressText

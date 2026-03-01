@@ -8,6 +8,7 @@ import ToolCall from '../ToolCall';
 // Use var so it's hoisted and assignable when the mock factory runs
 var mockUseToolApprovalReturn: {
   pendingMatches: boolean;
+  approvalStatus: 'pending' | 'approved' | 'denied' | null;
   handleApprove: jest.Mock;
   handleDeny: jest.Mock;
   approvalSubmitting: boolean;
@@ -16,11 +17,12 @@ var mockUseToolApprovalReturn: {
 jest.mock('~/hooks', () => {
   mockUseToolApprovalReturn = {
     pendingMatches: false,
+    approvalStatus: null,
     handleApprove: jest.fn(),
     handleDeny: jest.fn(),
     approvalSubmitting: false,
   };
-  const mockUseToolApproval = jest.fn((toolCallId?: string) => mockUseToolApprovalReturn);
+  const mockUseToolApproval = jest.fn((toolCallId?: string, _output?: string) => mockUseToolApprovalReturn);
   return {
     useLocalize: () => (key: string, values?: any) => {
       const translations: Record<string, string> = {
@@ -439,11 +441,13 @@ describe('ToolCall', () => {
   describe('pending tool approval', () => {
     beforeEach(() => {
       mockUseToolApprovalReturn.pendingMatches = false;
+      mockUseToolApprovalReturn.approvalStatus = null;
       mockUseToolApprovalReturn.approvalSubmitting = false;
     });
 
     it('should render ToolApprovalBar when pendingMatches is true', () => {
       mockUseToolApprovalReturn.pendingMatches = true;
+      mockUseToolApprovalReturn.approvalStatus = 'pending';
       mockUseToolApprovalReturn.approvalSubmitting = false;
 
       renderWithRecoil(<ToolCall {...mockProps} toolCallId="tool-call-123" />);
@@ -461,10 +465,10 @@ describe('ToolCall', () => {
       expect(screen.getByText('testFunction')).toBeInTheDocument();
     });
 
-    it('should pass toolCallId to useToolApproval', () => {
+    it('should pass toolCallId and output to useToolApproval', () => {
       const { useToolApproval } = require('~/hooks');
-      renderWithRecoil(<ToolCall {...mockProps} toolCallId="my-tool-id" />);
-      expect(useToolApproval).toHaveBeenCalledWith('my-tool-id');
+      renderWithRecoil(<ToolCall {...mockProps} toolCallId="my-tool-id" output="result" />);
+      expect(useToolApproval).toHaveBeenCalledWith('my-tool-id', 'result');
     });
   });
 });

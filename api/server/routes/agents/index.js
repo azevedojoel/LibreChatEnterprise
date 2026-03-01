@@ -303,11 +303,74 @@ router.get('/chat/tool-confirmation/pending', async (req, res) => {
     await ToolApprovalLink.updateOne({ _id: link._id }, { clickedAt: new Date() });
   }
 
-  return res.json({
+  const payload = {
     toolName: link.toolName,
     argsSummary: link.argsSummary || '',
     conversationId: link.conversationId,
-  });
+  };
+
+  try {
+    const { Conversation, ScheduledRun, ScheduledPrompt } = require('~/db/models');
+    const { getMessages } = require('~/models/Message');
+    const { getAgent } = require('~/models/Agent');
+
+    const convo = await Conversation.findOne({
+      conversationId: link.conversationId,
+      user: userId,
+    })
+      .select('title scheduledRunId')
+      .lean();
+
+    if (convo) {
+      payload.conversationTitle = convo.title || null;
+
+      if (convo.scheduledRunId) {
+        const run = await ScheduledRun.findById(convo.scheduledRunId)
+          .populate('scheduleId', 'name agentId')
+          .lean();
+        if (run?.scheduleId) {
+          const schedule = run.scheduleId;
+          const agent = await getAgent({ id: schedule.agentId });
+          const agentName = agent?.name;
+          const scheduleName = schedule.name || 'Scheduled run';
+          payload.contextLabel = agentName
+            ? `${scheduleName}, ${agentName}`
+            : scheduleName;
+        } else {
+          payload.contextLabel = convo.title || 'Scheduled run';
+        }
+      } else {
+        payload.contextLabel = convo.title || 'Inbound email';
+      }
+
+      const messages = await getMessages(
+        { conversationId: link.conversationId, user: userId },
+        'text content isCreatedByUser',
+      );
+      const recent = (messages || []).slice(-8);
+      const MAX_MSG_LEN = 200;
+      payload.recentMessages = recent.map((msg) => {
+        let text = '';
+        if (msg.text && typeof msg.text === 'string') {
+          text = msg.text;
+        } else if (Array.isArray(msg.content)) {
+          const parts = msg.content
+            .filter((p) => p && (p.type === 'text' || p.type === 'reasoning') && (p.text || p.think))
+            .map((p) => (typeof (p.text ?? p.think) === 'string' ? (p.text ?? p.think) : ''));
+          text = parts.join(' ').trim();
+        }
+        if (text.length > MAX_MSG_LEN) text = text.slice(0, MAX_MSG_LEN) + '…';
+        return {
+          role: msg.isCreatedByUser ? 'user' : 'assistant',
+          text: text || '(no text)',
+        };
+      });
+    }
+  } catch (err) {
+    logger.warn('[ToolConfirmation] Failed to enrich pending response:', err);
+  }
+
+  return res.json(payload);
 });
 
 /**
@@ -318,7 +381,8 @@ router.get('/chat/tool-confirmation/pending', async (req, res) => {
  * @body Inline flow: { conversationId, messageId, toolCallId, approved: boolean }
  */
 router.post('/chat/tool-confirmation', async (req, res) => {
-  const { id: token, conversationId, messageId, toolCallId, approved } = req.body;
+  const { id: token, conversationId, messageId, toolCallId, approved, runId: runIdFromBody } =
+    req.body;
   const userId = req.user?.id;
 
   if (!userId || typeof approved !== 'boolean') {
@@ -332,28 +396,31 @@ router.post('/chat/tool-confirmation', async (req, res) => {
   let runId;
   let resolvedConversationId;
   let resolvedToolCallId;
+  let tokenLink = null;
 
   if (token) {
     // Token flow (approval page / email link)
     const { ToolApprovalLink } = require('~/db/models');
-    const link = await ToolApprovalLink.findOne({ token });
-    if (!link) {
+    tokenLink = await ToolApprovalLink.findOne({ token });
+    if (!tokenLink) {
       return res.status(404).json({ error: 'expired' });
     }
-    if (link.expiresAt < new Date()) {
+    if (tokenLink.expiresAt < new Date()) {
       return res.status(404).json({ error: 'expired' });
     }
-    if (link.status !== 'pending') {
+    if (tokenLink.status !== 'pending') {
       return res.status(409).json({ error: 'already processed' });
     }
-    if (String(link.userId) !== String(userId)) {
+    if (String(tokenLink.userId) !== String(userId)) {
       return res.status(403).json({ error: 'Unauthorized' });
     }
-    resolvedConversationId = link.conversationId;
-    runId = link.runId;
-    resolvedToolCallId = link.toolCallId;
-  } else if (conversationId && messageId && toolCallId) {
+    resolvedConversationId = tokenLink.conversationId;
+    runId = tokenLink.runId;
+    resolvedToolCallId = tokenLink.toolCallId;
+  } else if (conversationId && (messageId || runIdFromBody) && toolCallId) {
     // Inline flow (web UI - no token)
+    // Prefer runId from client (from tool_confirmation_required event) to avoid messageId/runId mismatch
+    runId = runIdFromBody ?? messageId;
     const { searchConversation } = require('~/models/Conversation');
     const conversation = await searchConversation(conversationId);
     if (!conversation) {
@@ -363,13 +430,12 @@ router.post('/chat/tool-confirmation', async (req, res) => {
       return res.status(403).json({ error: 'Unauthorized' });
     }
     resolvedConversationId = conversationId;
-    runId = messageId;
     resolvedToolCallId = toolCallId;
   } else {
     return res.status(400).json({
       error: 'Missing required fields',
       required: ['approved'],
-      requiredForInline: ['conversationId', 'messageId', 'toolCallId'],
+      requiredForInline: ['conversationId', 'messageId or runId', 'toolCallId'],
     });
   }
 
@@ -381,17 +447,74 @@ router.post('/chat/tool-confirmation', async (req, res) => {
     userId,
   });
 
+  logger.debug('[ToolConfirmation] Submit result', {
+    conversationId: resolvedConversationId,
+    runId,
+    toolCallId: resolvedToolCallId,
+    approved,
+    success: result.success,
+    error: result.error,
+  });
+
   if (!result.success) {
+    logger.warn('[ToolConfirmation] Submit failed', {
+      conversationId: resolvedConversationId,
+      runId,
+      toolCallId: resolvedToolCallId,
+      error: result.error,
+    });
     const status = result.error === 'expired' ? 404 : 403;
     return res.status(status).json({ error: result.error || 'Failed to submit' });
   }
 
-  if (token) {
+  if (token && tokenLink) {
     const { ToolApprovalLink } = require('~/db/models');
     await ToolApprovalLink.updateOne(
       { token },
       { status: approved ? 'approved' : 'denied', resolvedAt: new Date() },
     );
+    // Token flow: persist audit record for compliance (same as inline flow)
+    try {
+      const { ToolApprovalRecord } = require('~/db/models');
+      const resolvedAt = new Date();
+      await ToolApprovalRecord.findOneAndUpdate(
+        {
+          conversationId: tokenLink.conversationId,
+          runId: tokenLink.runId,
+          toolCallId: tokenLink.toolCallId,
+        },
+        {
+          userId,
+          toolName: tokenLink.toolName || '',
+          argsSummary: tokenLink.argsSummary || '',
+          status: approved ? 'approved' : 'denied',
+          resolvedAt,
+        },
+        { upsert: true, new: true },
+      );
+    } catch (auditErr) {
+      logger.warn('[ToolConfirmation] Failed to persist token approval audit:', auditErr);
+    }
+  } else if (!token) {
+    // Inline flow: persist audit record for compliance
+    try {
+      const { ToolApprovalRecord } = require('~/db/models');
+      const payload = result.payload || { toolName: '', argsSummary: '' };
+      const resolvedAt = new Date();
+      await ToolApprovalRecord.findOneAndUpdate(
+        { conversationId: resolvedConversationId, runId, toolCallId: resolvedToolCallId },
+        {
+          userId,
+          toolName: payload.toolName,
+          argsSummary: payload.argsSummary || '',
+          status: approved ? 'approved' : 'denied',
+          resolvedAt,
+        },
+        { upsert: true, new: true },
+      );
+    } catch (auditErr) {
+      logger.warn('[ToolConfirmation] Failed to persist inline approval audit:', auditErr);
+    }
   }
 
   return res.json({ success: true });
