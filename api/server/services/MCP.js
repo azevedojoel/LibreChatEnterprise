@@ -1,5 +1,5 @@
 const { tool } = require('@langchain/core/tools');
-const { logger } = require('@librechat/data-schemas');
+const { logger, signPayload } = require('@librechat/data-schemas');
 const {
   Providers,
   StepTypes,
@@ -580,14 +580,34 @@ function createToolInstance({
 
       let customUserVars =
         config?.configurable?.userMCPAuthMap?.[`${Constants.mcp_prefix}${serverName}`] ?? {};
-      /** CRM always needs PROJECT_ID - fetch from user when calling */
+      /** CRM always needs PROJECT_ID and LIBRECHAT_MCP_ACCESS_TOKEN - inject when calling */
       if (serverName === 'CRM') {
         const uid = config?.configurable?.user?.id ?? config?.configurable?.user_id;
+        const user = config?.configurable?.user;
         if (uid) {
           const userDoc = await findUser({ _id: uid }, 'projectId');
           const projectId = userDoc?.projectId?.toString?.() ?? userDoc?.projectId;
           if (projectId) {
             customUserVars = { ...customUserVars, PROJECT_ID: projectId };
+          }
+        }
+        /** CRM MCP calls LibreChat API - needs short-lived JWT for requireJwtAuth */
+        const effectiveUid = uid ?? user?.id ?? user?._id?.toString?.();
+        if (effectiveUid && process.env.JWT_SECRET) {
+          try {
+            const token = await signPayload({
+              payload: {
+                id: effectiveUid,
+                username: user?.username,
+                provider: user?.provider,
+                email: user?.email,
+              },
+              secret: process.env.JWT_SECRET,
+              expirationTime: 300,
+            });
+            customUserVars = { ...customUserVars, LIBRECHAT_MCP_ACCESS_TOKEN: token };
+          } catch (err) {
+            logger.warn('[MCP][CRM] Failed to generate LIBRECHAT_MCP_ACCESS_TOKEN:', err);
           }
         }
       }
