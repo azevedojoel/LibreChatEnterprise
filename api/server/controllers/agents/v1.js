@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const { z } = require('zod');
 const fs = require('fs').promises;
 const { nanoid } = require('nanoid');
@@ -204,7 +205,6 @@ const getAgentHandler = async (req, res, expandProperties = false) => {
         author: agent.author,
         provider: agent.provider,
         model: agent.model,
-        projectIds: agent.projectIds,
         // @deprecated - isCollaborative replaced by ACL permissions
         isCollaborative: agent.isCollaborative,
         isPublic: agent.isPublic,
@@ -537,6 +537,14 @@ const getListAgentsHandler = async (req, res) => {
       requiredPermissions: PermissionBits.VIEW,
     });
 
+    // Merge user-accessible and publicly accessible (e.g. system agents like Ellis)
+    const allAccessibleIds = [
+      ...new Set([
+        ...accessibleIds.map((id) => id.toString()),
+        ...publiclyAccessibleIds.map((id) => id.toString()),
+      ]),
+    ].map((idStr) => new mongoose.Types.ObjectId(idStr));
+
     /**
      * Refresh all S3 avatars for this user's accessible agent set (not only the current page)
      * This addresses page-size limits preventing refresh of agents beyond the first page
@@ -549,7 +557,7 @@ const getListAgentsHandler = async (req, res) => {
     } else {
       try {
         const fullList = await getListAgentsByAccess({
-          accessibleIds,
+          accessibleIds: allAccessibleIds,
           otherParams: {},
           limit: MAX_AVATAR_REFRESH_AGENTS,
           after: null,
@@ -568,7 +576,7 @@ const getListAgentsHandler = async (req, res) => {
 
     // Use the new ACL-aware function
     const data = await getListAgentsByAccess({
-      accessibleIds,
+      accessibleIds: allAccessibleIds,
       otherParams: filter,
       limit,
       after: cursor,

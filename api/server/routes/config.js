@@ -1,7 +1,12 @@
 const express = require('express');
 const { logger } = require('@librechat/data-schemas');
 const { isEnabled, getBalanceConfig } = require('@librechat/api');
-const { Constants, CacheKeys, defaultSocialLogins } = require('librechat-data-provider');
+const {
+  Constants,
+  CacheKeys,
+  defaultSocialLogins,
+  EModelEndpoint,
+} = require('librechat-data-provider');
 const { getLdapConfig } = require('~/server/services/Config/ldap');
 const { getAppConfig } = require('~/server/services/Config/app');
 const { getProjectByName } = require('~/models/Project');
@@ -99,6 +104,8 @@ router.get('/', async function (req, res) {
       interface: appConfig?.interfaceConfig,
       turnstile: appConfig?.turnstileConfig,
       modelSpecs: appConfig?.modelSpecs,
+      defaultAgentForChat:
+        appConfig?.endpoints?.[EModelEndpoint.agents]?.defaultAgentForChat,
       balance: balanceConfig,
       sharedLinksEnabled,
       publicSharedLinksEnabled,

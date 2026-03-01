@@ -36,6 +36,7 @@ const { getAppConfig } = require('./services/Config');
 const staticCache = require('./utils/staticCache');
 const noIndex = require('./middleware/noIndex');
 const { seedDatabase } = require('~/models');
+const { seedSystemAgents } = require('./services/seedSystemAgents');
 const routes = require('./routes');
 
 const { PORT, HOST, ALLOW_SOCIAL_LOGIN, DISABLE_COMPRESSION, TRUST_PROXY } = process.env ?? {};
@@ -69,6 +70,7 @@ const startServer = async () => {
 
   await seedDatabase();
   const appConfig = await getAppConfig();
+  await seedSystemAgents(appConfig);
   requireRedisAtStartup(appConfig?.interfaceConfig?.scheduledAgents);
   initializeFileStorage(appConfig);
   await performStartupChecks(appConfig);

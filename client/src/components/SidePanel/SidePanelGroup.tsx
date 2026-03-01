@@ -4,7 +4,9 @@ import { useRecoilValue } from 'recoil';
 import { getConfigDefaults } from 'librechat-data-provider';
 import { ResizablePanel, ResizablePanelGroup, useMediaQuery } from '@librechat/client';
 import type { ImperativePanelHandle } from 'react-resizable-panels';
+import { SystemRoles } from 'librechat-data-provider';
 import { useGetStartupConfig } from '~/data-provider';
+import { useAuthContext } from '~/hooks';
 import ArtifactsPanel from './ArtifactsPanel';
 import { normalizeLayout, cn } from '~/utils';
 import SidePanel from './SidePanel';
@@ -46,6 +48,8 @@ const SidePanelGroup = memo(
 
     const isSmallScreen = useMediaQuery('(max-width: 767px)');
     const hideSidePanel = useRecoilValue(store.hideSidePanel);
+    const { user } = useAuthContext();
+    const isAdmin = user?.role === SystemRoles.ADMIN;
 
     const calculateLayout = useCallback(() => {
       if (artifacts == null) {
@@ -127,7 +131,7 @@ const SidePanelGroup = memo(
             />
           )}
 
-          {!hideSidePanel && interfaceConfig.sidePanel === true && (
+          {!hideSidePanel && interfaceConfig.sidePanel === true && isAdmin && (
             <SidePanel
               panelRef={panelRef}
               minSize={minSize}
@@ -147,7 +151,7 @@ const SidePanelGroup = memo(
         {artifacts != null && isSmallScreen && (
           <div className="fixed inset-0 z-[100]">{artifacts}</div>
         )}
-        {!hideSidePanel && interfaceConfig.sidePanel === true && (
+        {!hideSidePanel && interfaceConfig.sidePanel === true && isAdmin && (
           <button
             onClick={handleClosePanel}
             aria-label="Close right side panel"

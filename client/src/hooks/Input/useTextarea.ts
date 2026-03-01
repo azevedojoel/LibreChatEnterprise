@@ -18,6 +18,7 @@ import { useInteractionHealthCheck } from '~/data-provider';
 import { useChatContext } from '~/Providers/ChatContext';
 import { globalAudioId } from '~/common';
 import { useLocalize } from '~/hooks';
+import { useGetStartupConfig } from '~/data-provider';
 import store from '~/store';
 
 type KeyEvent = KeyboardEvent<HTMLTextAreaElement>;
@@ -35,6 +36,7 @@ export default function useTextarea({
 }) {
   const localize = useLocalize();
   const getSender = useGetSender();
+  const { data: startupConfig } = useGetStartupConfig();
   const isComposing = useRef(false);
   const agentsMap = useAgentsMapContext();
   const { handleFiles } = useFileHandling();
@@ -81,7 +83,13 @@ export default function useTextarea({
       const currentEndpoint = conversation?.endpoint ?? '';
       const currentAgentId = conversation?.agent_id ?? '';
       const currentAssistantId = conversation?.assistant_id ?? '';
-      if (isAgent && (!currentAgentId || !agentsMap?.[currentAgentId])) {
+      const isDefaultAgent =
+        startupConfig?.defaultAgentForChat &&
+        currentAgentId === startupConfig.defaultAgentForChat;
+      if (
+        isAgent &&
+        (!currentAgentId || (!agentsMap?.[currentAgentId] && !isDefaultAgent))
+      ) {
         return localize('com_endpoint_agent_placeholder');
       } else if (
         isAssistant &&
@@ -136,6 +144,7 @@ export default function useTextarea({
     conversation,
     latestMessage,
     isNotAppendable,
+    startupConfig?.defaultAgentForChat,
   ]);
 
   const handleKeyDown = useCallback(

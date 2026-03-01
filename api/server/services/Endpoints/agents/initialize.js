@@ -14,7 +14,6 @@ const {
   EModelEndpoint,
   isAgentsEndpoint,
   getResponseSender,
-  isEphemeralAgentId,
 } = require('librechat-data-provider');
 const {
   createToolEndCallback,
@@ -536,7 +535,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
     endpointType: endpointOption.endpointType,
     resendFiles: primaryConfig.resendFiles ?? true,
     maxContextTokens: primaryConfig.maxContextTokens,
-    endpoint: isEphemeralAgentId(primaryConfig.id) ? primaryConfig.endpoint : EModelEndpoint.agents,
+    endpoint: EModelEndpoint.agents,
     handoffState,
   });
 

@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useMediaQuery } from '@librechat/client';
 import { useOutletContext } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { getConfigDefaults, PermissionTypes, Permissions } from 'librechat-data-provider';
+import { getConfigDefaults, PermissionTypes, Permissions, SystemRoles } from 'librechat-data-provider';
 import type { ContextType } from '~/common';
 import { PresetsMenu, HeaderNewChat, OpenSidebar } from './Menus';
 import ModelSelector from './Menus/Endpoints/ModelSelector';
@@ -11,7 +11,7 @@ import ExportAndShareMenu from './ExportAndShareMenu';
 import BookmarkMenu from './Menus/BookmarkMenu';
 import { TemporaryChat } from './TemporaryChat';
 import AddMultiConvo from './AddMultiConvo';
-import { useHasAccess } from '~/hooks';
+import { useHasAccess, useAuthContext } from '~/hooks';
 import { cn } from '~/utils';
 
 const defaultInterface = getConfigDefaults().interface;
@@ -35,10 +35,12 @@ export default function Header() {
     permission: Permissions.USE,
   });
 
+  const { user } = useAuthContext();
   const hasAccessToPresets = useHasAccess({
     permissionType: PermissionTypes.PRESETS,
     permission: Permissions.USE,
   });
+  const showPresets = hasAccessToPresets === true && user?.role === SystemRoles.ADMIN;
 
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
 
@@ -71,7 +73,7 @@ export default function Header() {
             >
               <ModelSelector startupConfig={startupConfig} />
               {interfaceConfig.presets === true &&
-                hasAccessToPresets === true &&
+                showPresets &&
                 interfaceConfig.modelSelect && <PresetsMenu />}
               {hasAccessToBookmarks === true && <BookmarkMenu />}
               {hasAccessToMultiConvo === true && <AddMultiConvo />}

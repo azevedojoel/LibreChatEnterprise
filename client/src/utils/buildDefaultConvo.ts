@@ -14,11 +14,14 @@ const buildDefaultConvo = ({
   conversation,
   endpoint = null,
   lastConversationSetup,
+  defaultAgentForChat,
 }: {
   models: string[];
   conversation: TConversation;
   endpoint?: EModelEndpoint | null;
   lastConversationSetup: TConversation | null;
+  /** System agent ID to use when no agent is selected. From endpoints.agents.defaultAgentForChat. */
+  defaultAgentForChat?: string;
 }): TConversation => {
   const { lastSelectedModel, lastSelectedTools } = getLocalStorageItems();
   const endpointType = lastConversationSetup?.endpointType ?? conversation.endpointType;
@@ -74,6 +77,14 @@ const buildDefaultConvo = ({
     (!defaultAgentId || isEphemeralAgentId(defaultAgentId))
   ) {
     defaultConvo.agent_id = agentId;
+  }
+  // Use config default when no agent selected (e.g. first-time user)
+  if (
+    isAgentsEndpoint(endpoint) &&
+    !defaultConvo.agent_id &&
+    defaultAgentForChat
+  ) {
+    defaultConvo.agent_id = defaultAgentForChat;
   }
 
   // Clear model for non-ephemeral agents - agents use their configured model internally

@@ -85,7 +85,12 @@ const useNewConvo = (index = 0) => {
       ) => {
         const modelsConfig = modelsData ?? modelsQuery.data;
         const { endpoint = null } = conversation;
-        const buildDefaultConversation = (endpoint === null || buildDefault) ?? false;
+        const needsDefaultAgent =
+          isAgentsEndpoint(endpoint) &&
+          !conversation.agent_id &&
+          !!startupConfig?.defaultAgentForChat;
+        const buildDefaultConversation =
+          (endpoint === null || buildDefault || needsDefaultAgent) ?? false;
         const activePreset =
           // use default preset only when it's defined,
           // preset is not provided,
@@ -129,6 +134,15 @@ const useNewConvo = (index = 0) => {
             defaultEndpoint = Object.keys(endpointsConfig ?? {}).find(
               (ep) => !isAgentsEndpoint(ep as EModelEndpoint) && endpointsConfig?.[ep],
             ) as EModelEndpoint | undefined;
+          }
+
+          // Prefer agents when defaultAgentForChat is configured (e.g. Ellis-only app)
+          if (
+            startupConfig?.defaultAgentForChat &&
+            hasAgentAccess &&
+            endpointsConfig?.[EModelEndpoint.agents]
+          ) {
+            defaultEndpoint = EModelEndpoint.agents;
           }
 
           if (!defaultEndpoint) {
@@ -193,6 +207,7 @@ const useNewConvo = (index = 0) => {
             lastConversationSetup: activePreset as TConversation,
             endpoint: defaultEndpoint,
             models,
+            defaultAgentForChat: startupConfig?.defaultAgentForChat,
           });
         }
 
@@ -246,7 +261,14 @@ const useNewConvo = (index = 0) => {
           state: disableFocus ? {} : { focusChat: true },
         });
       },
-    [endpointsConfig, defaultPreset, assistantsListMap, modelsQuery.data, hasAgentAccess],
+    [
+      endpointsConfig,
+      defaultPreset,
+      assistantsListMap,
+      modelsQuery.data,
+      hasAgentAccess,
+      startupConfig?.defaultAgentForChat,
+    ],
   );
 
   const newConversation = useCallback(

@@ -1,13 +1,24 @@
-import React, { useContext, useCallback } from 'react';
+import React, { useContext, useCallback, useMemo } from 'react';
 import Cookies from 'js-cookie';
 import { useRecoilState } from 'recoil';
+import type { RecoilState } from 'recoil';
 import { Dropdown, ThemeContext } from '@librechat/client';
+import { SystemRoles } from 'librechat-data-provider';
 import ArchivedChats from './ArchivedChats';
 import ToggleSwitch from '../ToggleSwitch';
-import { useLocalize } from '~/hooks';
+import { useLocalize, useAuthContext, type TranslationKeys } from '~/hooks';
 import store from '~/store';
 
-const toggleSwitchConfigs = [
+type ToggleConfig = {
+  stateAtom: RecoilState<boolean>;
+  localizationKey: TranslationKeys;
+  switchId: string;
+  hoverCardText?: TranslationKeys;
+  key: string;
+  adminOnly?: boolean;
+};
+
+const toggleSwitchConfigs: ToggleConfig[] = [
   {
     stateAtom: store.enableUserMsgMarkdown,
     localizationKey: 'com_nav_user_msg_markdown',
@@ -28,6 +39,7 @@ const toggleSwitchConfigs = [
     switchId: 'hideSidePanel',
     hoverCardText: undefined,
     key: 'hideSidePanel',
+    adminOnly: true,
   },
   {
     stateAtom: store.keepScreenAwake,
@@ -152,8 +164,17 @@ export const LangSelector = ({
 
 function General() {
   const { theme, setTheme } = useContext(ThemeContext);
-
+  const { user } = useAuthContext();
   const [langcode, setLangcode] = useRecoilState(store.lang);
+
+  const visibleToggleConfigs = useMemo(
+    () =>
+      toggleSwitchConfigs.filter(
+        (config) =>
+          !('adminOnly' in config && config.adminOnly) || user?.role === SystemRoles.ADMIN,
+      ),
+    [user?.role],
+  );
 
   const changeTheme = useCallback(
     (value: string) => {
@@ -186,7 +207,7 @@ function General() {
       <div className="pb-3">
         <LangSelector langcode={langcode} onChange={changeLang} />
       </div>
-      {toggleSwitchConfigs.map((config) => (
+      {visibleToggleConfigs.map((config) => (
         <div key={config.key} className="pb-3">
           <ToggleSwitch
             stateAtom={config.stateAtom}

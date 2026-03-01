@@ -1,12 +1,14 @@
 const { logger } = require('@librechat/data-schemas');
 const {
   Constants,
+  EModelEndpoint,
   ResourceType,
   isAgentsEndpoint,
   isEphemeralAgentId,
 } = require('librechat-data-provider');
 const { canAccessResource } = require('./canAccessResource');
 const { getAgent } = require('~/models/Agent');
+const { getAppConfig } = require('~/server/services/Config/app');
 
 /**
  * Agent ID resolver function for agent_id from request body
@@ -58,6 +60,16 @@ const canAccessAgentFromBody = (options) => {
 
       if (!isAgentsEndpoint(endpoint)) {
         agentId = Constants.EPHEMERAL_AGENT_ID;
+      }
+
+      if (!agentId && isAgentsEndpoint(endpoint)) {
+        const appConfig = await getAppConfig({ role: req.user?.role });
+        const defaultAgentForChat =
+          appConfig?.endpoints?.[EModelEndpoint.agents]?.defaultAgentForChat;
+        if (defaultAgentForChat) {
+          agentId = defaultAgentForChat;
+          req.body.agent_id = agentId;
+        }
       }
 
       if (!agentId) {

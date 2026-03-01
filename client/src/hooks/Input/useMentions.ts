@@ -6,6 +6,7 @@ import {
   PermissionBits,
   EModelEndpoint,
   PermissionTypes,
+  SystemRoles,
   isAgentsEndpoint,
   getConfigDefaults,
   isAssistantsEndpoint,
@@ -20,6 +21,7 @@ import {
 } from '~/data-provider';
 import useAssistantListMap from '~/hooks/Assistants/useAssistantListMap';
 import { useAgentsMapContext } from '~/Providers/AgentsMapContext';
+import { useAuthContext } from '~/hooks';
 import { mapEndpoints, getPresetTitle } from '~/utils';
 import { EndpointIcon } from '~/components/Endpoints';
 import useHasAccess from '~/hooks/Roles/useHasAccess';
@@ -63,10 +65,12 @@ export default function useMentions({
     permission: Permissions.USE,
   });
 
+  const { user } = useAuthContext();
   const hasAccessToPresets = useHasAccess({
     permissionType: PermissionTypes.PRESETS,
     permission: Permissions.USE,
   });
+  const showPresets = hasAccessToPresets === true && user?.role === SystemRoles.ADMIN;
 
   const agentsMap = useAgentsMapContext();
   const { data: presets } = useGetPresetsQuery();
@@ -224,7 +228,7 @@ export default function useMentions({
         : []),
       ...((interfaceConfig.modelSelect === true &&
       interfaceConfig.presets === true &&
-      hasAccessToPresets === true
+      showPresets
         ? presets
         : []
       )?.map((preset, index) => ({
@@ -257,7 +261,7 @@ export default function useMentions({
     includeAssistants,
     interfaceConfig.presets,
     interfaceConfig.modelSelect,
-    hasAccessToPresets,
+    showPresets,
   ]);
 
   return {

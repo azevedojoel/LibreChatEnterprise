@@ -4,11 +4,9 @@
  */
 const crypto = require('crypto');
 const { logger } = require('@librechat/data-schemas');
-const { EModelEndpoint, ResourceType, PermissionBits, Constants } = require('librechat-data-provider');
+const { EModelEndpoint, Constants } = require('librechat-data-provider');
 const { GenerationJobManager } = require('@librechat/api');
-const { getAgentByInboundToken } = require('~/models/Agent');
-const { findUser } = require('~/models');
-const { checkPermission } = require('~/server/services/PermissionService');
+const { getUserByInboundToken, findUser } = require('~/models');
 const { formatEmailContent } = require('~/server/utils/formatEmailHighlights');
 const { sendInboundReply } = require('~/server/services/sendInboundReply');
 const { initializeClient } = require('~/server/services/Endpoints/agents');
@@ -28,23 +26,36 @@ function extractEmailAddress(value) {
   return angleMatch ? angleMatch[1].trim() : trimmed;
 }
 
-function parseMailboxHash(mailboxHash) {
-  if (!mailboxHash || typeof mailboxHash !== 'string') {
-    return { agentToken: null, conversationId: null };
+/** Extract user token and optional conversationId from MailboxHash or To local part */
+function parseRoutingToken(mailboxHash, toAddress) {
+  let token = null;
+  let conversationId = null;
+  if (mailboxHash && typeof mailboxHash === 'string') {
+    const trimmed = mailboxHash.trim();
+    if (trimmed) {
+      const parts = trimmed.split(MAILBOX_HASH_DELIMITER);
+      if (parts.length >= 2) {
+        token = parts[0];
+        conversationId = parts[1];
+      } else {
+        token = trimmed;
+      }
+    }
   }
-  const trimmed = mailboxHash.trim();
-  if (!trimmed) {
-    return { agentToken: null, conversationId: null };
+  if (!token && toAddress) {
+    const fullLocal = (toAddress.split('@')[0] || '').trim();
+    const afterPlus = fullLocal.includes('+') ? fullLocal.split('+').slice(1).join('+') : fullLocal;
+    if (afterPlus) {
+      const parts = afterPlus.split(MAILBOX_HASH_DELIMITER);
+      token = parts[0] || null;
+      conversationId = parts[1] || null;
+    }
   }
-  const parts = trimmed.split(MAILBOX_HASH_DELIMITER);
-  if (parts.length >= 2) {
-    return { agentToken: parts[0], conversationId: parts[1] };
-  }
-  return { agentToken: trimmed, conversationId: null };
+  return { token, conversationId };
 }
 
-function buildReplyToAddress(originalRecipient, agentToken, conversationId) {
-  if (!originalRecipient || !agentToken || !conversationId) {
+function buildReplyToAddress(originalRecipient, userToken, conversationId) {
+  if (!originalRecipient || !userToken || !conversationId) {
     return null;
   }
   try {
@@ -52,10 +63,10 @@ function buildReplyToAddress(originalRecipient, agentToken, conversationId) {
     if (atIdx === -1) {
       return null;
     }
-    const localPart = originalRecipient.slice(0, atIdx);
     const domain = originalRecipient.slice(atIdx);
+    const localPart = originalRecipient.slice(0, atIdx);
     const hash = localPart.split('+')[0] || localPart;
-    return `${hash}+${agentToken}${MAILBOX_HASH_DELIMITER}${conversationId}${domain}`;
+    return `${hash}+${userToken}${MAILBOX_HASH_DELIMITER}${conversationId}${domain}`;
   } catch {
     return null;
   }
@@ -73,23 +84,39 @@ function stripHtml(html) {
 
 /**
  * Process a single inbound email payload.
+ * Routes by user inboundEmailToken; uses system agent from config.
  * @param {Object} payload - Parsed Postmark webhook JSON
  */
 async function processInboundEmail(payload) {
-  const mailboxHash = payload.MailboxHash ?? payload.Mailboxhash ?? '';
-  const { agentToken, conversationId: parsedConversationId } = parseMailboxHash(mailboxHash);
+  const { getAppConfig } = require('~/server/services/Config');
+  const appConfig = await getAppConfig();
+  const agentsConfig = appConfig?.endpoints?.[EModelEndpoint.agents];
+  const defaultAgentId = agentsConfig?.defaultAgentForInboundEmail;
 
-  const defaultAgentToken = process.env.INBOUND_EMAIL_DEFAULT_AGENT_TOKEN;
-  const resolvedAgentToken = agentToken || defaultAgentToken;
-
-  if (!resolvedAgentToken) {
-    logger.warn('[InboundEmail] No agent token in MailboxHash and no default configured');
+  if (!defaultAgentId) {
+    logger.warn('[InboundEmail] No defaultAgentForInboundEmail configured in endpoints.agents');
     return;
   }
 
-  const agent = await getAgentByInboundToken(resolvedAgentToken);
-  if (!agent) {
-    logger.warn('[InboundEmail] Agent not found for token');
+  const mailboxHash = payload.MailboxHash ?? payload.Mailboxhash ?? '';
+  const originalRecipient =
+    payload.OriginalRecipient ??
+    (Array.isArray(payload.ToFull) && payload.ToFull[0]?.Email
+      ? payload.ToFull[0].Email
+      : extractEmailAddress(payload.To ?? '') || '');
+  const { token: userToken, conversationId: parsedConversationId } = parseRoutingToken(
+    mailboxHash,
+    originalRecipient,
+  );
+
+  if (!userToken) {
+    logger.warn('[InboundEmail] No user token in MailboxHash or To address');
+    return;
+  }
+
+  const targetUser = await getUserByInboundToken(userToken, '_id role email');
+  if (!targetUser) {
+    logger.warn('[InboundEmail] User not found for token', { token: userToken });
     return;
   }
 
@@ -99,29 +126,29 @@ async function processInboundEmail(payload) {
     return;
   }
 
-  const senderUser = await findUser({ email: fromEmail.trim() }, '_id role');
-  if (!senderUser) {
-    logger.warn('[InboundEmail] Sender email not found as LibreChat user', { email: fromEmail });
+  const senderEmail = fromEmail.trim().toLowerCase();
+  const targetEmail = (targetUser.email || '').trim().toLowerCase();
+  if (senderEmail !== targetEmail) {
+    logger.warn('[InboundEmail] Sender email does not match target user', {
+      from: senderEmail,
+      expected: targetEmail,
+    });
     return;
   }
 
-  const senderUserId = senderUser._id?.toString?.() ?? senderUser._id;
-  const authorId = agent.author?._id?.toString?.() ?? agent.author?.toString?.() ?? agent.author;
-  const hasAccess =
-    authorId === senderUserId ||
-    (await checkPermission({
-      userId: senderUserId,
-      role: senderUser.role,
-      resourceType: ResourceType.AGENT,
-      resourceId: agent._id,
-      requiredPermission: PermissionBits.VIEW,
-    }));
+  const senderUserId = targetUser._id?.toString?.() ?? targetUser._id;
+  const senderUser = await findUser({ _id: senderUserId }, '_id role');
+  if (!senderUser) {
+    logger.warn('[InboundEmail] Sender user not found');
+    return;
+  }
 
-  if (!hasAccess) {
-    logger.warn('[InboundEmail] Sender does not have access to agent', {
-      email: fromEmail,
-      agentId: agent.id,
-    });
+  const Agent = require('~/db/models').Agent;
+  const agent = await Agent.findOne({ id: defaultAgentId })
+    .populate('author', 'id name email')
+    .lean();
+  if (!agent) {
+    logger.warn('[InboundEmail] System agent not found', { agentId: defaultAgentId });
     return;
   }
 
@@ -132,11 +159,6 @@ async function processInboundEmail(payload) {
   );
 
   const subject = payload.Subject ?? '';
-  const originalRecipient =
-    payload.OriginalRecipient ??
-    (Array.isArray(payload.ToFull) && payload.ToFull[0]?.Email
-      ? payload.ToFull[0].Email
-      : extractEmailAddress(payload.To ?? '') || '');
 
   let messageText =
     payload.StrippedTextReply ||
@@ -153,9 +175,6 @@ async function processInboundEmail(payload) {
     logger.warn('[InboundEmail] Empty message body');
     return;
   }
-
-  const { getAppConfig } = require('~/server/services/Config');
-  const appConfig = await getAppConfig();
 
   if (parsedConversationId) {
     const { searchConversation } = require('~/models/Conversation');
@@ -191,13 +210,12 @@ async function processInboundEmail(payload) {
   }
 
   const replySubject = subject.startsWith('Re:') ? subject : `Re: ${subject}`;
-  const replyAgentToken = agent.inboundEmailToken ?? resolvedAgentToken;
-  const replyTo = buildReplyToAddress(originalRecipient, replyAgentToken, conversationId);
+  const replyTo = buildReplyToAddress(originalRecipient, userToken, conversationId);
 
   if (!replyTo) {
     logger.warn('[InboundEmail] Could not build Reply-To address', {
       hasOriginalRecipient: !!originalRecipient,
-      hasAgentToken: !!replyAgentToken,
+      hasUserToken: !!userToken,
       conversationId,
     });
   }
