@@ -1,6 +1,6 @@
 const { logger } = require('@librechat/data-schemas');
 const { CacheKeys, Constants } = require('librechat-data-provider');
-const { findToken, createToken, updateToken, deleteTokens } = require('~/models');
+const { findToken, createToken, updateToken, deleteTokens, findUser } = require('~/models');
 const { updateMCPServerTools } = require('~/server/services/Config');
 const { getMCPManager, getFlowStateManager } = require('~/config');
 const { getLogStores } = require('~/cache');
@@ -42,7 +42,15 @@ async function reinitMCPServer({
   let oauthUrl = null;
 
   try {
-    const customUserVars = userMCPAuthMap?.[`${Constants.mcp_prefix}${serverName}`];
+    let customUserVars = { ...(userMCPAuthMap?.[`${Constants.mcp_prefix}${serverName}`] ?? {}) };
+    /** CRM always needs PROJECT_ID - fetch from user when connecting */
+    if (serverName === 'CRM' && user?.id) {
+      const userDoc = await findUser({ _id: user.id }, 'projectId');
+      const projectId = userDoc?.projectId?.toString?.() ?? userDoc?.projectId;
+      if (projectId) {
+        customUserVars = { ...customUserVars, PROJECT_ID: projectId };
+      }
+    }
     const flowManager = _flowManager ?? getFlowStateManager(getLogStores(CacheKeys.FLOWS));
     const mcpManager = getMCPManager();
     const tokenMethods = { findToken, updateToken, createToken, deleteTokens };

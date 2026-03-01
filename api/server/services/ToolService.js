@@ -64,7 +64,7 @@ const { createReauthToken, buildReauthLink } = require('~/server/utils/mcpReauth
 const { recordUsage } = require('~/server/services/Threads');
 const { loadTools } = require('~/app/clients/tools/util');
 const { redactMessage } = require('~/config/parsers');
-const { findPluginAuthsByKeys } = require('~/models');
+const { findPluginAuthsByKeys, findUser } = require('~/models');
 const { getAgents } = require('~/models/Agent');
 const {
   buildSchedulerTargetContext,
@@ -447,23 +447,6 @@ const nativeTools = new Set([
   Tools.run_schedule,
   Tools.list_runs,
   Tools.get_run,
-  Tools.crm_create_contact,
-  Tools.crm_update_contact,
-  Tools.crm_get_contact,
-  Tools.crm_list_contacts,
-  Tools.crm_create_organization,
-  Tools.crm_create_deal,
-  Tools.crm_update_deal,
-  Tools.crm_list_deals,
-  Tools.crm_log_activity,
-  Tools.crm_list_activities,
-  Tools.crm_list_pipelines,
-  Tools.crm_create_pipeline,
-  Tools.crm_update_pipeline,
-  Tools.crm_soft_delete_contact,
-  Tools.crm_soft_delete_organization,
-  Tools.crm_soft_delete_deal,
-  Tools.crm_soft_delete_pipeline,
 ]);
 
 const { isDestructiveTool } = require('./destructiveTools');
@@ -519,7 +502,9 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
   const deferredToolsEnabled = checkCapability(AgentCapabilities.deferred_tools);
 
   /** Inject workspace tools when execute_code is enabled (backwards compat for agents saved before list_files/search_files existed) */
-  let toolsToFilter = [...new Set((agent.tools ?? []).filter((t) => t != null && typeof t === 'string'))];
+  let toolsToFilter = [
+    ...new Set((agent.tools ?? []).filter((t) => t != null && typeof t === 'string')),
+  ];
   if (toolsToFilter.includes(Tools.execute_code)) {
     const workspaceTools = [
       Tools.workspace_read_file,
@@ -547,28 +532,34 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
     toolsToFilter = [...new Set([...toolsToFilter, ...schedulingTools])];
   }
 
-  /** Inject CRM tools when manage_crm is enabled */
-  if (toolsToFilter.includes(AgentCapabilities.manage_crm)) {
-    const crmTools = [
-      Tools.crm_create_contact,
-      Tools.crm_update_contact,
-      Tools.crm_get_contact,
-      Tools.crm_list_contacts,
-      Tools.crm_create_organization,
-      Tools.crm_create_deal,
-      Tools.crm_update_deal,
-      Tools.crm_list_deals,
-      Tools.crm_log_activity,
-      Tools.crm_list_activities,
-      Tools.crm_list_pipelines,
-      Tools.crm_create_pipeline,
-      Tools.crm_update_pipeline,
-      Tools.crm_soft_delete_contact,
-      Tools.crm_soft_delete_organization,
-      Tools.crm_soft_delete_deal,
-      Tools.crm_soft_delete_pipeline,
-    ];
-    toolsToFilter = [...new Set([...toolsToFilter, ...crmTools])];
+  /** Filter CRM tools when user has no projectId - CRM requires user.projectId */
+  const hasCRMTools = toolsToFilter.some(
+    (t) =>
+      t === 'CRM' ||
+      (typeof t === 'string' &&
+        t.includes(Constants.mcp_delimiter) &&
+        t.endsWith(Constants.mcp_delimiter + 'CRM')),
+  );
+  /** tool_search can discover and call CRM tools at runtime, so we need PROJECT_ID when agent has it */
+  const hasToolSearch = toolsToFilter.some(
+    (t) =>
+      t === Constants.TOOL_SEARCH || (typeof t === 'string' && t.startsWith('tool_search_mcp_')),
+  );
+  let userProjectId = null;
+  if (hasCRMTools || hasToolSearch) {
+    const userDoc = await findUser({ _id: req.user.id }, 'projectId');
+    userProjectId = userDoc?.projectId;
+    if (hasCRMTools && !userProjectId) {
+      toolsToFilter = toolsToFilter.filter(
+        (t) =>
+          t !== 'CRM' &&
+          !(
+            typeof t === 'string' &&
+            t.includes(Constants.mcp_delimiter) &&
+            t.endsWith(Constants.mcp_delimiter + 'CRM')
+          ),
+      );
+    }
   }
 
   /** Filter by ephemeralAgent (chat badge overrides) */
@@ -654,27 +645,6 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
       if (appConfig?.interfaceConfig?.scheduledAgents === false) return false;
       return checkCapability(AgentCapabilities.manage_scheduling);
     }
-    if (
-      tool === Tools.crm_create_contact ||
-      tool === Tools.crm_update_contact ||
-      tool === Tools.crm_get_contact ||
-      tool === Tools.crm_list_contacts ||
-      tool === Tools.crm_create_organization ||
-      tool === Tools.crm_create_deal ||
-      tool === Tools.crm_update_deal ||
-      tool === Tools.crm_list_deals ||
-      tool === Tools.crm_log_activity ||
-      tool === Tools.crm_list_activities ||
-      tool === Tools.crm_list_pipelines ||
-      tool === Tools.crm_create_pipeline ||
-      tool === Tools.crm_update_pipeline ||
-      tool === Tools.crm_soft_delete_contact ||
-      tool === Tools.crm_soft_delete_organization ||
-      tool === Tools.crm_soft_delete_deal ||
-      tool === Tools.crm_soft_delete_pipeline
-    ) {
-      return checkCapability(AgentCapabilities.manage_crm);
-    }
     if (!areToolsEnabled && !tool.includes(actionDelimiter)) {
       return false;
     }
@@ -686,13 +656,23 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
   }
 
   /** @type {Record<string, Record<string, string>>} */
-  let userMCPAuthMap;
+  let userMCPAuthMap = {};
   if (hasCustomUserVars(req.config)) {
     userMCPAuthMap = await getUserMCPAuthMap({
       tools: agent.tools,
       userId: req.user.id,
       findPluginAuthsByKeys,
     });
+  }
+  /** Inject PROJECT_ID from user.projectId for CRM MCP when user has project (CRM or tool_search can discover CRM) */
+  if (userProjectId && (hasCRMTools || hasToolSearch)) {
+    const crmKey = Constants.mcp_prefix + 'CRM';
+    const projectIdStr = userProjectId.toString?.() ?? String(userProjectId);
+    userMCPAuthMap[crmKey] = {
+      ...userMCPAuthMap[crmKey],
+      PROJECT_ID: projectIdStr,
+    };
+    logger.debug('[ToolService] CRM PROJECT_ID injected', { userProjectId: projectIdStr, crmKey });
   }
 
   const flowsCache = getLogStores(CacheKeys.FLOWS);
@@ -845,7 +825,9 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
           ? async () => {
               const servers = req._headlessOAuthServers;
               if (servers?.has(serverName)) {
-                logger.info(`[Tool Definitions] Headless: skipping duplicate reauth link for ${serverName}`);
+                logger.info(
+                  `[Tool Definitions] Headless: skipping duplicate reauth link for ${serverName}`,
+                );
                 return;
               }
               const reauthToken = await createReauthToken({
@@ -1004,31 +986,6 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
     filteredTools.includes(Tools.list_runs) ||
     filteredTools.includes(Tools.get_run);
 
-  const hasCRMTools =
-    filteredTools.includes(Tools.crm_list_pipelines) ||
-    filteredTools.includes(Tools.crm_list_contacts) ||
-    filteredTools.includes(Tools.crm_create_contact);
-  if (hasCRMTools && !toolContextMap[Tools.crm_list_pipelines]) {
-    let crmContext =
-      "Use crm_list_pipelines to see available pipelines and stages. For 'leads with no follow-up in N days' or 'contacts who haven't been contacted', use crm_list_contacts with noActivitySinceDays (e.g. noActivitySinceDays: 3). CRM data is scoped to the agent's project.";
-    const projectId = agent?.projectIds?.[0];
-    if (projectId) {
-      try {
-        const { listPipelines } = require('~/server/services/CRM');
-        const pipelines = await listPipelines(projectId.toString?.() ?? projectId);
-        if (pipelines?.length > 0) {
-          const pipelineList = pipelines
-            .map((p) => `  - ${p.name}: stages [${(p.stages || []).join(', ')}]`)
-            .join('\n');
-          crmContext += `\n\n# Pipelines in this project\n${pipelineList}`;
-        }
-      } catch (err) {
-        logger.debug('[loadToolDefinitionsWrapper] Could not load CRM pipelines for context:', err?.message);
-      }
-    }
-    toolContextMap[Tools.crm_list_pipelines] = crmContext;
-  }
-
   if (hasSchedulingTools) {
     const parts = [SCHEDULER_DEFAULT_INSTRUCTIONS];
     if (agent.schedulerTargetAgentIds?.length > 0) {
@@ -1136,7 +1093,9 @@ async function loadAgentTools({
   const areToolsEnabled = checkCapability(AgentCapabilities.tools);
 
   /** Inject workspace tools when execute_code is enabled (backwards compat for agents saved before list_files/search_files existed) */
-  let toolsToFilter = [...new Set((agent.tools ?? []).filter((t) => t != null && typeof t === 'string'))];
+  let toolsToFilter = [
+    ...new Set((agent.tools ?? []).filter((t) => t != null && typeof t === 'string')),
+  ];
   if (toolsToFilter.includes(Tools.execute_code)) {
     const workspaceTools = [
       Tools.workspace_read_file,
@@ -1163,27 +1122,34 @@ async function loadAgentTools({
     toolsToFilter = [...new Set([...toolsToFilter, ...schedulingTools])];
   }
 
-  if (toolsToFilter.includes(AgentCapabilities.manage_crm)) {
-    const crmTools = [
-      Tools.crm_create_contact,
-      Tools.crm_update_contact,
-      Tools.crm_get_contact,
-      Tools.crm_list_contacts,
-      Tools.crm_create_organization,
-      Tools.crm_create_deal,
-      Tools.crm_update_deal,
-      Tools.crm_list_deals,
-      Tools.crm_log_activity,
-      Tools.crm_list_activities,
-      Tools.crm_list_pipelines,
-      Tools.crm_create_pipeline,
-      Tools.crm_update_pipeline,
-      Tools.crm_soft_delete_contact,
-      Tools.crm_soft_delete_organization,
-      Tools.crm_soft_delete_deal,
-      Tools.crm_soft_delete_pipeline,
-    ];
-    toolsToFilter = [...new Set([...toolsToFilter, ...crmTools])];
+  /** Filter CRM tools when user has no projectId - CRM requires user.projectId */
+  const hasCRMToolsLoadAgent = toolsToFilter.some(
+    (t) =>
+      t === 'CRM' ||
+      (typeof t === 'string' &&
+        t.includes(Constants.mcp_delimiter) &&
+        t.endsWith(Constants.mcp_delimiter + 'CRM')),
+  );
+  /** tool_search can discover and call CRM tools at runtime */
+  const hasToolSearchLoadAgent = toolsToFilter.some(
+    (t) =>
+      t === Constants.TOOL_SEARCH || (typeof t === 'string' && t.startsWith('tool_search_mcp_')),
+  );
+  let userProjectIdLoadAgent = null;
+  if (hasCRMToolsLoadAgent || hasToolSearchLoadAgent) {
+    const userDoc = await findUser({ _id: req.user.id }, 'projectId');
+    userProjectIdLoadAgent = userDoc?.projectId;
+    if (hasCRMToolsLoadAgent && !userProjectIdLoadAgent) {
+      toolsToFilter = toolsToFilter.filter(
+        (t) =>
+          t !== 'CRM' &&
+          !(
+            typeof t === 'string' &&
+            t.includes(Constants.mcp_delimiter) &&
+            t.endsWith(Constants.mcp_delimiter + 'CRM')
+          ),
+      );
+    }
   }
 
   /** Filter by ephemeralAgent (chat badge overrides) */
@@ -1286,13 +1252,26 @@ async function loadAgentTools({
   }
 
   /** @type {Record<string, Record<string, string>>} */
-  let userMCPAuthMap;
+  let userMCPAuthMap = {};
   //TODO pass config from registry
   if (hasCustomUserVars(req.config)) {
     userMCPAuthMap = await getUserMCPAuthMap({
       tools: agent.tools,
       userId: req.user.id,
       findPluginAuthsByKeys,
+    });
+  }
+  /** Inject PROJECT_ID from user.projectId for CRM MCP when user has project (CRM or tool_search) */
+  if (userProjectIdLoadAgent && (hasCRMToolsLoadAgent || hasToolSearchLoadAgent)) {
+    const crmKey = Constants.mcp_prefix + 'CRM';
+    const projectIdStr = userProjectIdLoadAgent.toString?.() ?? String(userProjectIdLoadAgent);
+    userMCPAuthMap[crmKey] = {
+      ...userMCPAuthMap[crmKey],
+      PROJECT_ID: projectIdStr,
+    };
+    logger.debug('[ToolService] loadAgentTools CRM PROJECT_ID injected', {
+      userProjectId: projectIdStr,
+      crmKey,
     });
   }
 

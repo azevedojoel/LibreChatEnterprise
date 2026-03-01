@@ -1,6 +1,6 @@
 /**
- * LangChain tools for the native CRM.
- * Used when an agent has the manage_crm capability.
+ * LangChain tools for the CRM API.
+ * Used by the CRM MCP server (mcp-servers/crm-mcp-server) which calls the CRM API.
  */
 const { tool } = require('@langchain/core/tools');
 const { Tools } = require('librechat-data-provider');

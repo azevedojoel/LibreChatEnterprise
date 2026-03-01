@@ -27,7 +27,7 @@ const {
   getFlowStateManager,
   getMCPManager,
 } = require('~/config');
-const { findToken, createToken, updateToken } = require('~/models');
+const { findToken, createToken, updateToken, findUser } = require('~/models');
 const { getGraphApiToken } = require('./GraphTokenService');
 const { reinitMCPServer } = require('./Tools/mcp');
 const { getAppConfig } = require('./Config');
@@ -578,8 +578,19 @@ function createToolInstance({
         derivedSignal.addEventListener('abort', abortHandler, { once: true });
       }
 
-      const customUserVars =
-        config?.configurable?.userMCPAuthMap?.[`${Constants.mcp_prefix}${serverName}`];
+      let customUserVars =
+        config?.configurable?.userMCPAuthMap?.[`${Constants.mcp_prefix}${serverName}`] ?? {};
+      /** CRM always needs PROJECT_ID - fetch from user when calling */
+      if (serverName === 'CRM') {
+        const uid = config?.configurable?.user?.id ?? config?.configurable?.user_id;
+        if (uid) {
+          const userDoc = await findUser({ _id: uid }, 'projectId');
+          const projectId = userDoc?.projectId?.toString?.() ?? userDoc?.projectId;
+          if (projectId) {
+            customUserVars = { ...customUserVars, PROJECT_ID: projectId };
+          }
+        }
+      }
 
       const result = await mcpManager.callTool({
         serverName,
@@ -781,6 +792,14 @@ async function getServerConnectionStatus(
   userConnections,
   oauthServers,
 ) {
+  /** CRM doesn't need OAuth - when user has projectId, treat as ready (connection created lazily on first use) */
+  if (serverName === 'CRM' && userId) {
+    const userDoc = await findUser({ _id: userId }, 'projectId');
+    if (userDoc?.projectId) {
+      return { requiresOAuth: false, connectionState: 'connected' };
+    }
+  }
+
   const connection = appConnections.get(serverName) || userConnections.get(serverName);
   const isStaleOrDoNotExist = connection ? connection?.isStale(config.updatedAt) : true;
 

@@ -1,19 +1,20 @@
 /**
  * CRM REST API - Native CRM for DailyThread.
- * All routes are scoped by projectId. User must have access to at least one agent in the project.
+ * All routes are scoped by projectId. User must have projectId assigned (or be ADMIN).
  */
 const express = require('express');
 const mongoose = require('mongoose');
 const { logger } = require('@librechat/data-schemas');
-const { checkPermission } = require('~/server/services/PermissionService');
-const { ResourceType, PermissionBits } = require('librechat-data-provider');
+const { SystemRoles } = require('librechat-data-provider');
 const { requireJwtAuth } = require('~/server/middleware');
 const { getProjectById, listProjects, createProject } = require('~/models/Project');
-const { getAgents } = require('~/models/Agent');
+const { findUser } = require('~/models');
 const {
   createContact,
   updateContact,
   getContactById,
+  getContactByEmail,
+  findContactsByName,
   listContacts,
   softDeleteContact,
   createOrganization,
@@ -32,14 +33,15 @@ const {
   getPipelineById,
   listPipelines,
   softDeletePipeline,
+  createActivity,
+  touchContactLastActivity,
 } = require('~/server/services/CRM');
 
 const router = express.Router();
 
 /**
  * Verifies user has access to the project for CRM operations.
- * User must have VIEW access to at least one agent in the project.
- * Checks both ResourceType.AGENT (in-app share) and ResourceType.REMOTE_AGENT (API access).
+ * User has access if user.projectId matches the requested projectId, or user is ADMIN.
  */
 async function canAccessProjectForCRM(userId, role, projectId) {
   if (!projectId || !mongoose.Types.ObjectId.isValid(projectId)) {
@@ -48,34 +50,14 @@ async function canAccessProjectForCRM(userId, role, projectId) {
   const project = await getProjectById(projectId);
   if (!project) return false;
 
-  const projectObjId = mongoose.Types.ObjectId.isValid(projectId)
-    ? new mongoose.Types.ObjectId(projectId)
-    : null;
-  if (!projectObjId) return false;
-  const agents = await getAgents({ projectIds: projectObjId });
-  const agentIds = (agents || []).map((a) => a._id?.toString?.() ?? a.id ?? a._id).filter(Boolean);
-  if (agentIds.length === 0) return false;
-
-  for (const agentId of agentIds) {
-    const hasAgentAccess = await checkPermission({
-      userId,
-      role,
-      resourceType: ResourceType.AGENT,
-      resourceId: agentId,
-      requiredPermission: PermissionBits.VIEW,
-    });
-    if (hasAgentAccess) return true;
-
-    const hasRemoteAgentAccess = await checkPermission({
-      userId,
-      role,
-      resourceType: ResourceType.REMOTE_AGENT,
-      resourceId: agentId,
-      requiredPermission: PermissionBits.VIEW,
-    });
-    if (hasRemoteAgentAccess) return true;
+  if (role === SystemRoles.ADMIN) {
+    return true;
   }
-  return false;
+
+  const user = await findUser({ _id: userId }, 'projectId');
+  if (!user) return false;
+  const userProjectId = user.projectId?.toString?.() ?? user.projectId;
+  return userProjectId === projectId;
 }
 
 /** Middleware: require projectId and verify access */
@@ -90,7 +72,7 @@ const requireProjectAccess = async (req, res, next) => {
     projectId,
   );
   if (!hasAccess) {
-    return res.status(403).json({ error: 'Access denied to this project' });
+    return res.status(403).json({ error: 'Unable to access CRM data' });
   }
   req.crmProjectId = projectId;
   next();
@@ -245,6 +227,27 @@ router.post('/projects/:projectId/contacts', requireProjectAccess, async (req, r
     res.status(201).json(contact);
   } catch (err) {
     logger.error('[CRM] createContact', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/projects/:projectId/contacts/lookup', requireProjectAccess, async (req, res) => {
+  try {
+    const { email, name } = req.query;
+    if (email) {
+      const contact = await getContactByEmail(req.crmProjectId, email);
+      if (!contact) return res.status(404).json({ error: 'Contact not found' });
+      return res.json(contact);
+    }
+    if (name) {
+      const matches = await findContactsByName(req.crmProjectId, name, 1);
+      const contact = matches[0] ?? null;
+      if (!contact) return res.status(404).json({ error: 'Contact not found' });
+      return res.json(contact);
+    }
+    return res.status(400).json({ error: 'email or name query parameter is required' });
+  } catch (err) {
+    logger.error('[CRM] contactLookup', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -451,6 +454,29 @@ router.get('/projects/:projectId/activities', requireProjectAccess, async (req, 
     res.json(activities);
   } catch (err) {
     logger.error('[CRM] listActivities', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/projects/:projectId/activities', requireProjectAccess, async (req, res) => {
+  try {
+    const { contactId, dealId, type, summary, metadata } = req.body;
+    if (!type) return res.status(400).json({ error: 'type is required' });
+    if (!contactId && !dealId) return res.status(400).json({ error: 'contactId or dealId is required' });
+    const activity = await createActivity({
+      projectId: req.crmProjectId,
+      contactId,
+      dealId,
+      type: type || 'agent_action',
+      actorType: 'user',
+      actorId: req.user.id,
+      summary,
+      metadata,
+    });
+    if (contactId) await touchContactLastActivity(contactId);
+    res.status(201).json(activity);
+  } catch (err) {
+    logger.error('[CRM] createActivity', err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -1,14 +1,13 @@
 /**
  * CRM REST API route tests.
- * Mocks: requireJwtAuth, getProjectById, getAgents, checkPermission, CRM services.
+ * Mocks: requireJwtAuth, getProjectById, findUser, CRM services.
  */
 const express = require('express');
 const request = require('supertest');
 const mongoose = require('mongoose');
 
 const mockGetProjectById = jest.fn();
-const mockGetAgents = jest.fn();
-const mockCheckPermission = jest.fn();
+const mockFindUser = jest.fn();
 const mockListPipelines = jest.fn();
 const mockCreatePipeline = jest.fn();
 const mockGetPipelineById = jest.fn();
@@ -35,13 +34,13 @@ jest.mock('~/models/Project', () => ({
   getProjectById: (...args) => mockGetProjectById(...args),
 }));
 
-jest.mock('~/models/Agent', () => ({
-  getAgents: (...args) => mockGetAgents(...args),
-}));
-
-jest.mock('~/server/services/PermissionService', () => ({
-  checkPermission: (...args) => mockCheckPermission(...args),
-}));
+jest.mock('~/models', () => {
+  const actual = jest.requireActual('~/models');
+  return {
+    ...actual,
+    findUser: (...args) => mockFindUser(...args),
+  };
+});
 
 jest.mock('~/server/services/CRM', () => ({
   listPipelines: (...args) => mockListPipelines(...args),
@@ -70,18 +69,16 @@ describe('CRM Routes', () => {
   const validContactId = new mongoose.Types.ObjectId().toString();
   const validOrgId = new mongoose.Types.ObjectId().toString();
   const validDealId = new mongoose.Types.ObjectId().toString();
-  const agentId = new mongoose.Types.ObjectId().toString();
 
   const setupAccessGranted = () => {
     mockGetProjectById.mockResolvedValue({ _id: validProjectId });
-    mockGetAgents.mockResolvedValue([{ _id: agentId }]);
-    mockCheckPermission.mockResolvedValue(true);
+    mockFindUser.mockResolvedValue({ _id: 'user-123', projectId: validProjectId });
   };
 
   const setupAccessDenied = (projectFound = true) => {
     mockGetProjectById.mockResolvedValue(projectFound ? { _id: validProjectId } : null);
-    mockGetAgents.mockResolvedValue(projectFound ? [{ _id: agentId }] : []);
-    mockCheckPermission.mockResolvedValue(false);
+    // User without projectId or with different projectId gets 403
+    mockFindUser.mockResolvedValue(projectFound ? { _id: 'user-123', projectId: null } : null);
   };
 
   beforeAll(() => {
@@ -107,7 +104,7 @@ describe('CRM Routes', () => {
         .get('/api/crm/projects/invalid-id/pipelines')
         .expect(403);
 
-      expect(response.body.error).toBe('Access denied to this project');
+      expect(response.body.error).toBe('Unable to access CRM data');
       expect(mockListPipelines).not.toHaveBeenCalled();
     });
 
@@ -118,17 +115,17 @@ describe('CRM Routes', () => {
         .get(`/api/crm/projects/${validProjectId}/pipelines`)
         .expect(403);
 
-      expect(response.body.error).toBe('Access denied to this project');
+      expect(response.body.error).toBe('Unable to access CRM data');
     });
 
-    it('returns 403 when user lacks agent access', async () => {
+    it('returns 403 when user has no projectId assigned', async () => {
       setupAccessDenied(true);
 
       const response = await request(app)
         .get(`/api/crm/projects/${validProjectId}/pipelines`)
         .expect(403);
 
-      expect(response.body.error).toBe('Access denied to this project');
+      expect(response.body.error).toBe('Unable to access CRM data');
     });
 
     it('returns 200 when access granted', async () => {

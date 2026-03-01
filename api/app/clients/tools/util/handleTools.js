@@ -43,7 +43,6 @@ const { primeFiles: primeCodeFiles } = require('~/server/services/Files/Code/pro
 const { createLocalCodeExecutionTool } = require('~/server/services/LocalCodeExecution');
 const { createWorkspaceCodeEditTools } = require('~/server/services/WorkspaceCodeEdit');
 const { createSchedulingTools } = require('~/server/services/ScheduledAgents/schedulingTools');
-const { createCRMTools } = require('~/server/services/CRM/crmTools');
 const { buildSchedulerTargetContext, buildSchedulerPromptContext } = require('~/server/services/ScheduledAgents/schedulerContext');
 const { SCHEDULER_DEFAULT_INSTRUCTIONS } = require('~/server/services/ScheduledAgents/schedulerInstructions');
 const { getAgents } = require('~/models/Agent');
@@ -375,44 +374,6 @@ const loadTools = async ({
         await ensureWorkspaceInjected();
         return toolMap[tool];
       };
-      continue;
-    } else if (
-      tool === Tools.crm_create_contact ||
-      tool === Tools.crm_update_contact ||
-      tool === Tools.crm_get_contact ||
-      tool === Tools.crm_list_contacts ||
-      tool === Tools.crm_create_organization ||
-      tool === Tools.crm_create_deal ||
-      tool === Tools.crm_update_deal ||
-      tool === Tools.crm_list_deals ||
-      tool === Tools.crm_log_activity ||
-      tool === Tools.crm_list_activities ||
-      tool === Tools.crm_list_pipelines ||
-      tool === Tools.crm_create_pipeline ||
-      tool === Tools.crm_update_pipeline ||
-      tool === Tools.crm_soft_delete_contact ||
-      tool === Tools.crm_soft_delete_organization ||
-      tool === Tools.crm_soft_delete_deal ||
-      tool === Tools.crm_soft_delete_pipeline
-    ) {
-      const currentAgent = options.req?.body?.agent ?? agent;
-      const projectId =
-        options.req?.body?.projectId ??
-        (currentAgent?.projectIds?.[0] ? currentAgent.projectIds[0].toString?.() ?? currentAgent.projectIds[0] : null);
-      const conversationId = options.req?.body?.conversationId ?? options.conversationId;
-      const messageId = options.req?.body?.messageId ?? options.messageId;
-      const crmTools = createCRMTools({
-        projectId,
-        userId: user,
-        agentId: currentAgent?.id ?? agent?.id,
-        conversationId,
-        messageId,
-      });
-      requestedTools[tool] = async () => crmTools[tool];
-      if (!toolContextMap[Tools.crm_list_pipelines]) {
-        toolContextMap[Tools.crm_list_pipelines] =
-          'Use crm_list_pipelines first to see available pipelines and stages. CRM data is scoped to the agent\'s project.';
-      }
       continue;
     } else if (
       tool === Tools.list_schedules ||

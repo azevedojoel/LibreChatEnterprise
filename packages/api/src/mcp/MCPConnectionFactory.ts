@@ -1,4 +1,4 @@
-import { logger } from '@librechat/data-schemas';
+import { logger, signPayload } from '@librechat/data-schemas';
 import type { OAuthClientInformation } from '@modelcontextprotocol/sdk/shared/auth.js';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import type { TokenMethods } from '@librechat/data-schemas';
@@ -13,9 +13,68 @@ import { MCPConnection } from './connection';
 import { processMCPEnv } from '~/utils';
 
 const MCP_OAUTH_TOKEN_PLACEHOLDER = '{{LIBRECHAT_MCP_OAUTH_ACCESS_TOKEN}}';
+const MCP_ACCESS_TOKEN_PLACEHOLDER = '{{LIBRECHAT_MCP_ACCESS_TOKEN}}';
+const MCP_API_BASE_URL_PLACEHOLDER = '{{LIBRECHAT_API_BASE_URL}}';
+const PROJECT_ID_PLACEHOLDER = '{{PROJECT_ID}}';
 
 /** Marker in headless oauthStart throw - when present, propagate so captureOAuthUrl can extract the URL */
 const HEADLESS_OAUTH_URL_MARKER = 'To authenticate, open this URL in your browser';
+
+function configUsesPlaceholder(config: t.MCPOptions, placeholder: string): boolean {
+  const str = JSON.stringify(config);
+  return str.includes(placeholder);
+}
+
+async function augmentMCPCustomUserVars(params: {
+  options: t.MCPOptions;
+  user?: t.IUser;
+  customUserVars?: Record<string, string>;
+  body?: t.RequestBody;
+}): Promise<Record<string, string>> {
+  const { options, user, customUserVars = {}, body } = params;
+  const augmented = { ...customUserVars };
+
+  if (configUsesPlaceholder(options, MCP_ACCESS_TOKEN_PLACEHOLDER) && user) {
+    const u = user as { id?: string; _id?: { toString?: () => string } };
+    const userId = u.id ?? u._id?.toString?.();
+    if (userId) {
+      try {
+        const token = await signPayload({
+          payload: {
+            id: userId,
+            username: (user as { username?: string }).username,
+            provider: (user as { provider?: string }).provider,
+            email: (user as { email?: string }).email,
+          },
+          secret: process.env.JWT_SECRET,
+          expirationTime: 300, // 5 minutes
+        });
+        augmented['LIBRECHAT_MCP_ACCESS_TOKEN'] = token;
+      } catch (err) {
+        logger.warn('[MCP] Failed to generate LIBRECHAT_MCP_ACCESS_TOKEN:', err);
+      }
+    }
+  }
+
+  if (configUsesPlaceholder(options, MCP_API_BASE_URL_PLACEHOLDER)) {
+    augmented['LIBRECHAT_API_BASE_URL'] =
+      process.env.DOMAIN_SERVER || process.env.DOMAIN_CLIENT || 'http://localhost:3080';
+  }
+
+  /** CRM requires PROJECT_ID - always inject from customUserVars or user.projectId when config uses it */
+  if (configUsesPlaceholder(options, PROJECT_ID_PLACEHOLDER)) {
+    const projectId =
+      (augmented['PROJECT_ID'] && augmented['PROJECT_ID'] !== PROJECT_ID_PLACEHOLDER
+        ? augmented['PROJECT_ID']
+        : null) ??
+      (user as { projectId?: string } | undefined)?.projectId?.toString?.();
+    if (projectId) {
+      augmented['PROJECT_ID'] = projectId;
+    }
+  }
+
+  return augmented;
+}
 
 function injectMCPOAuthTokenIntoConfig(
   config: t.MCPOptions,
@@ -69,7 +128,17 @@ export class MCPConnectionFactory {
     basic: t.BasicConnectionOptions,
     oauth?: t.OAuthConnectionOptions,
   ): Promise<MCPConnection> {
-    const factory = new this(basic, oauth);
+    let augmentedOauth = oauth;
+    if (oauth && (oauth.user || oauth.customUserVars)) {
+      const augmentedCustomUserVars = await augmentMCPCustomUserVars({
+        options: basic.serverConfig,
+        user: oauth.user,
+        customUserVars: oauth.customUserVars,
+        body: oauth.requestBody,
+      });
+      augmentedOauth = { ...oauth, customUserVars: augmentedCustomUserVars };
+    }
+    const factory = new this(basic, augmentedOauth);
     return factory.createConnection();
   }
 
@@ -82,7 +151,17 @@ export class MCPConnectionFactory {
     basic: t.BasicConnectionOptions,
     oauth?: Omit<t.OAuthConnectionOptions, 'returnOnOAuth'>,
   ): Promise<ToolDiscoveryResult> {
-    const factory = new this(basic, oauth ? { ...oauth, returnOnOAuth: true } : undefined);
+    let augmentedOauth = oauth ? { ...oauth, returnOnOAuth: true } : undefined;
+    if (augmentedOauth && (augmentedOauth.user || augmentedOauth.customUserVars)) {
+      const augmentedCustomUserVars = await augmentMCPCustomUserVars({
+        options: basic.serverConfig,
+        user: augmentedOauth.user,
+        customUserVars: augmentedOauth.customUserVars,
+        body: augmentedOauth.requestBody,
+      });
+      augmentedOauth = { ...augmentedOauth, customUserVars: augmentedCustomUserVars };
+    }
+    const factory = new this(basic, augmentedOauth);
     return factory.discoverToolsInternal();
   }
 

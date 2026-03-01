@@ -15,6 +15,7 @@ const ALLOWED_USER_FIELDS = [
   'email',
   'provider',
   'role',
+  'projectId',
   'googleId',
   'facebookId',
   'openidId',

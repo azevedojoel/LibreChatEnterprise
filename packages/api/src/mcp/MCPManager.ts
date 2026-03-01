@@ -303,6 +303,13 @@ Please follow these instructions when using tools from the respective MCP server
     try {
       if (userId && user) this.updateUserLastActivity(userId);
 
+      if (serverName === 'CRM') {
+        logger.debug(`${logPrefix} callTool ${toolName}`, {
+          toolArguments,
+          customUserVars: customUserVars ? { PROJECT_ID: customUserVars.PROJECT_ID ?? 'MISSING' } : 'MISSING',
+        });
+      }
+
       // For stdio OAuth servers, always use a fresh connection so the token is injected
       // into the spawned process. Cached connections can have stale/missing env.
       const rawConfig = (await MCPServersRegistry.getInstance().getServerConfig(
