@@ -34,3 +34,4 @@ export { default as dealSchema } from './deal';
 export { default as activitySchema } from './activity';
 export { default as pipelineSchema } from './pipeline';
 export { default as toolApprovalLinkSchema } from './toolApprovalLink';
+export { default as toolApprovalRecordSchema } from './toolApprovalRecord';

@@ -35,6 +35,7 @@ import { createDealModel } from './deal';
 import { createActivityModel } from './activity';
 import { createPipelineModel } from './pipeline';
 import { createToolApprovalLinkModel } from './toolApprovalLink';
+import { createToolApprovalRecordModel } from './toolApprovalRecord';
 
 /**
  * Creates all database models for all collections
@@ -78,5 +79,6 @@ export function createModels(mongoose: typeof import('mongoose')) {
     Activity: createActivityModel(mongoose),
     Pipeline: createPipelineModel(mongoose),
     ToolApprovalLink: createToolApprovalLinkModel(mongoose),
+    ToolApprovalRecord: createToolApprovalRecordModel(mongoose),
   };
 }
