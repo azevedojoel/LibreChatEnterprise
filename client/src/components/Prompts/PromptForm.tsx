@@ -36,7 +36,6 @@ import Description from './Description';
 import SharePrompt from './SharePrompt';
 import PromptName from './PromptName';
 import Command from './Command';
-import PromptScheduleSection from './PromptScheduleSection';
 import store from '~/store';
 
 interface RightPanelProps {
@@ -462,10 +461,6 @@ const PromptForm = () => {
                       initialValue={group.command ?? ''}
                       onValueChange={canEdit ? handleUpdateCommand : undefined}
                       disabled={!canEdit}
-                    />
-                    <PromptScheduleSection
-                      promptGroupId={group._id}
-                      promptGroupName={group.name ?? ''}
                     />
                   </div>
                 )}
