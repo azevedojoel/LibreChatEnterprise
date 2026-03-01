@@ -157,6 +157,22 @@ const userSchema = new Schema<IUser>(
       type: String,
       sparse: true,
     },
+    /** CRM project assigned by admin; scopes CRM MCP tools for this user */
+    projectId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Project',
+      default: null,
+    },
+    /** Token for inbound email routing; when set, user can receive email at token@domain */
+    inboundEmailToken: {
+      type: String,
+      sparse: true,
+      unique: true,
+      trim: true,
+      match: [/^[a-zA-Z0-9_-]+$/, 'Token must be alphanumeric, underscore, or hyphen only'],
+      minlength: 1,
+      maxlength: 64,
+    },
   },
   { timestamps: true },
 );

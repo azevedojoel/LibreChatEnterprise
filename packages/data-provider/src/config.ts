@@ -188,7 +188,6 @@ export enum AgentCapabilities {
   chain = 'chain',
   ocr = 'ocr',
   manage_scheduling = 'manage_scheduling',
-  manage_crm = 'manage_crm',
   inbound_email = 'inbound_email',
 }
 
@@ -278,7 +277,6 @@ export const defaultAgentCapabilities = [
   AgentCapabilities.chain,
   AgentCapabilities.ocr,
   AgentCapabilities.manage_scheduling,
-  AgentCapabilities.inbound_email,
 ];
 
 export const agentsEndpointSchema = baseEndpointSchema
@@ -298,6 +296,22 @@ export const agentsEndpointSchema = baseEndpointSchema
         .default(defaultAgentCapabilities),
       /** Domain for inbound email addresses (inbound+token@domain). Required for copy-to-clipboard. */
       inboundEmailAddress: z.string().optional(),
+      /** System agents seeded on startup; shared by all users. */
+      systemAgents: z
+        .array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            model: z.string(),
+            instructions: z.string().optional().default('You are a helpful assistant.'),
+            tools: z.array(z.string()).optional().default(['file_search', 'web_search']),
+          }),
+        )
+        .optional(),
+      /** ID of system agent that handles inbound email. Must match a systemAgents[].id. */
+      defaultAgentForInboundEmail: z.string().optional(),
+      /** ID of system agent used as default for new chat conversations. Must match a systemAgents[].id. */
+      defaultAgentForChat: z.string().optional(),
     }),
   )
   .default({
@@ -790,6 +804,8 @@ export type TStartupConfig = {
   helpAndFaqURL: string;
   customFooter?: string;
   modelSpecs?: TSpecsConfig;
+  /** ID of system agent used as default for new chat conversations. */
+  defaultAgentForChat?: string;
   modelDescriptions?: Record<string, Record<string, string>>;
   sharedLinksEnabled: boolean;
   publicSharedLinksEnabled: boolean;

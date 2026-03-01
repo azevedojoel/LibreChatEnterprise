@@ -207,6 +207,7 @@ export type TUser = {
   personalization?: {
     memories?: boolean;
   };
+  inboundEmailToken?: string;
   createdAt: string;
   updatedAt: string;
 };

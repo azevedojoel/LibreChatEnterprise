@@ -88,11 +88,6 @@ const agentSchema = new Schema<IAgent>(
       type: Schema.Types.Mixed,
       default: {},
     },
-    projectIds: {
-      type: [Schema.Types.ObjectId],
-      ref: 'Project',
-      index: true,
-    },
     versions: {
       type: [Schema.Types.Mixed],
       default: [],
@@ -127,13 +122,6 @@ const agentSchema = new Schema<IAgent>(
     schedulerTargetAgentIds: {
       type: [String],
       default: undefined,
-    },
-    /** Token for inbound email routing; when set, agent can receive email at hash+token@inbound */
-    inboundEmailToken: {
-      type: String,
-      default: undefined,
-      index: true,
-      sparse: true,
     },
   },
   {

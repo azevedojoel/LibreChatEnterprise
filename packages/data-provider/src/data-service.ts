@@ -1215,6 +1215,8 @@ export const createAdminUser = (data: {
   name?: string;
   username?: string;
   role?: string;
+  inboundEmailToken?: string;
+  projectId?: string;
 }): Promise<q.TAdminUser> => request.post(endpoints.adminUsers(), data);
 
 export const updateAdminUser = (
@@ -1226,6 +1228,8 @@ export const updateAdminUser = (
     role: string;
     emailVerified: boolean;
     password: string;
+    inboundEmailToken: string | null;
+    projectId: string | null;
   }>,
 ): Promise<q.TAdminUser> => request.patch(endpoints.adminUser(userId), data);
 

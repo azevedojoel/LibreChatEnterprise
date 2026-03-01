@@ -146,6 +146,24 @@ export function createUserMethods(mongoose: typeof import('mongoose')) {
   }
 
   /**
+   * Get a user by their inbound email token. Used for routing inbound emails.
+   */
+  async function getUserByInboundToken(
+    inboundToken: string,
+    fieldsToSelect?: string | string[] | null,
+  ): Promise<IUser | null> {
+    if (!inboundToken || typeof inboundToken !== 'string') {
+      return null;
+    }
+    const User = mongoose.models.User;
+    const query = User.findOne({ inboundEmailToken: inboundToken.trim() });
+    if (fieldsToSelect) {
+      query.select(fieldsToSelect);
+    }
+    return (await query.lean()) as IUser | null;
+  }
+
+  /**
    * Delete a user by their unique ID.
    */
   async function deleteUserById(userId: string): Promise<UserDeleteResult> {
@@ -328,6 +346,7 @@ export function createUserMethods(mongoose: typeof import('mongoose')) {
     updateUser,
     searchUsers,
     getUserById,
+    getUserByInboundToken,
     generateToken,
     deleteUserById,
     updateUserPlugins,

@@ -969,11 +969,10 @@ const getRunDefinition: ToolRegistryDefinition = {
   toolType: 'builtin',
 };
 
-/** CRM tools - used when agent has manage_crm capability */
+/** CRM tools - exposed via CRM MCP server */
 const crmListPipelinesDefinition: ToolRegistryDefinition = {
   name: 'crm_list_pipelines',
-  description:
-    'List all CRM pipelines for the current project. Returns id, name, stages, isDefault.',
+  description: 'List all CRM pipelines. Returns id, name, stages, isDefault.',
   schema: { type: 'object', properties: {}, required: [] } as ExtendedJsonSchema,
   toolType: 'builtin',
 };

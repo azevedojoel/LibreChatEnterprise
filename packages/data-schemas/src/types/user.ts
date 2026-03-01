@@ -43,6 +43,10 @@ export interface IUser extends Document {
   updatedAt?: Date;
   /** Field for external source identification (for consistency with TPrincipal schema) */
   idOnTheSource?: string;
+  /** CRM project assigned by admin; scopes CRM MCP tools for this user */
+  projectId?: Types.ObjectId | null;
+  /** Token for inbound email routing; when set, user can receive email at token@domain */
+  inboundEmailToken?: string;
 }
 
 export interface BalanceConfig {
@@ -71,6 +75,8 @@ export interface UpdateUserRequest {
   personalization?: {
     memories?: boolean;
   };
+  inboundEmailToken?: string | null;
+  projectId?: string | Types.ObjectId | null;
 }
 
 export interface UserDeleteResult {

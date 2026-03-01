@@ -239,7 +239,6 @@ export const defaultAgentFormValues = {
   tools: [],
   tool_options: {},
   provider: {},
-  projectIds: [],
   edges: [],
   artifacts: '',
   /** @deprecated Use ACL permissions instead */
@@ -249,9 +248,7 @@ export const defaultAgentFormValues = {
   [Tools.file_search]: false,
   [Tools.web_search]: false,
   manage_scheduling: false,
-  manage_crm: false,
   schedulerTargetAgentIds: [],
-  inboundEmailToken: '',
   category: 'general',
   support_contact: {
     name: '',

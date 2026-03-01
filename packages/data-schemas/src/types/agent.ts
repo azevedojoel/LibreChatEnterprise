@@ -35,7 +35,6 @@ export interface IAgent extends Omit<Document, 'model'> {
   isCollaborative?: boolean;
   conversation_starters?: string[];
   tool_resources?: unknown;
-  projectIds?: Types.ObjectId[];
   versions?: Omit<IAgent, 'versions'>[];
   category: string;
   support_contact?: ISupportContact;
@@ -47,5 +46,4 @@ export interface IAgent extends Omit<Document, 'model'> {
   /** Agent IDs this Schedule Manager can schedule (when manage_scheduling is enabled) */
   schedulerTargetAgentIds?: string[];
   /** Token for inbound email routing; when set, agent can receive email at hash+token@inbound */
-  inboundEmailToken?: string;
 }

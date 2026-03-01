@@ -88,10 +88,6 @@ export const agentBaseSchema = z.object({
   support_contact: agentSupportContactSchema,
   category: z.string().optional(),
   schedulerTargetAgentIds: z.array(z.string()).optional(),
-  /** Project IDs for CRM context; CRM tools use first project when no conversation projectId */
-  projectIds: z.array(z.string()).optional(),
-  /** Token for inbound email routing; when set, agent can receive email at hash+token@inbound */
-  inboundEmailToken: z.string().nullable().optional(),
 });
 
 /** Create schema extends base with required fields for creation */
@@ -106,8 +102,6 @@ export const agentUpdateSchema = agentBaseSchema.extend({
   avatar: z.union([agentAvatarSchema, z.null()]).optional(),
   provider: z.string().optional(),
   model: z.string().nullable().optional(),
-  projectIds: z.array(z.string()).optional(),
-  removeProjectIds: z.array(z.string()).optional(),
   isCollaborative: z.boolean().optional(),
 });
 
