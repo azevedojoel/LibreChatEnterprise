@@ -180,6 +180,11 @@ module.exports = {
 
     filters.push({ $or: [{ expiredAt: null }, { expiredAt: { $exists: false } }] });
 
+    // Exclude scheduled agent runs from main chat list
+    filters.push({
+      $or: [{ scheduledRunId: null }, { scheduledRunId: { $exists: false } }],
+    });
+
     if (search) {
       try {
         const meiliResults = await Conversation.meiliSearch(search, { filter: `user = "${user}"` });
