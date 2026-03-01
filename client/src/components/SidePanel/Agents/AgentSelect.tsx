@@ -70,7 +70,6 @@ export default function AgentSelect({
         [AgentCapabilities.file_search]: false,
         [AgentCapabilities.execute_code]: false,
         [AgentCapabilities.manage_scheduling]: false,
-        [AgentCapabilities.manage_crm]: false,
         [AgentCapabilities.end_after_tools]: false,
         [AgentCapabilities.hide_sequential_outputs]: false,
       };
@@ -83,26 +82,6 @@ export default function AgentSelect({
         Tools.run_schedule,
         Tools.list_runs,
         Tools.get_run,
-      ]);
-
-      const crmToolSet = new Set([
-        Tools.crm_create_contact,
-        Tools.crm_update_contact,
-        Tools.crm_get_contact,
-        Tools.crm_list_contacts,
-        Tools.crm_create_organization,
-        Tools.crm_create_deal,
-        Tools.crm_update_deal,
-        Tools.crm_list_deals,
-        Tools.crm_log_activity,
-        Tools.crm_list_activities,
-        Tools.crm_list_pipelines,
-        Tools.crm_create_pipeline,
-        Tools.crm_update_pipeline,
-        Tools.crm_soft_delete_contact,
-        Tools.crm_soft_delete_organization,
-        Tools.crm_soft_delete_deal,
-        Tools.crm_soft_delete_pipeline,
       ]);
 
       const agentTools: string[] = [];
@@ -127,13 +106,6 @@ export default function AgentSelect({
           capabilities[AgentCapabilities.manage_scheduling] = true;
           if (!agentTools.includes(AgentCapabilities.manage_scheduling)) {
             agentTools.push(AgentCapabilities.manage_scheduling);
-          }
-          return;
-        }
-        if (crmToolSet.has(tool)) {
-          capabilities[AgentCapabilities.manage_crm] = true;
-          if (!agentTools.includes(AgentCapabilities.manage_crm)) {
-            agentTools.push(AgentCapabilities.manage_crm);
           }
           return;
         }
@@ -186,20 +158,6 @@ export default function AgentSelect({
           value.every((item) => typeof item === 'string')
         ) {
           formValues[name] = value;
-          return;
-        }
-
-        if (
-          name === 'projectIds' &&
-          Array.isArray(value) &&
-          value.every((item) => typeof item === 'string')
-        ) {
-          formValues[name] = value;
-          return;
-        }
-
-        if (name === 'inboundEmailToken' && (value === null || typeof value === 'string')) {
-          formValues[name] = value ?? '';
           return;
         }
 

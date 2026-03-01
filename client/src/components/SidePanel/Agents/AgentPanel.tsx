@@ -71,8 +71,6 @@ export function composeAgentUpdatePayload(data: AgentForm, agent_id?: string | n
     agent_ids,
     edges,
     schedulerTargetAgentIds,
-    projectIds,
-    inboundEmailToken,
     end_after_tools,
     hide_sequential_outputs,
     recursion_limit,
@@ -123,8 +121,6 @@ export function composeAgentUpdatePayload(data: AgentForm, agent_id?: string | n
       agent_ids,
       edges,
       schedulerTargetAgentIds,
-      projectIds,
-      inboundEmailToken,
       end_after_tools,
       hide_sequential_outputs,
       recursion_limit,
@@ -471,16 +467,6 @@ export default function AgentPanel() {
           });
         }
       }
-      if (data.manage_crm === true) {
-        tools.push(AgentCapabilities.manage_crm);
-        if (!data.projectIds?.length) {
-          return showToast({
-            message: localize('com_agents_crm_project_required'),
-            status: 'error',
-          });
-        }
-      }
-
       const { payload: basePayload, provider, model } = composeAgentUpdatePayload(data, agent_id);
 
       if (agent_id) {

@@ -26,10 +26,7 @@ import FileContext from './FileContext';
 import SearchForm from './Search/Form';
 import FileSearch from './FileSearch';
 import SchedulingCheckbox from './SchedulingCheckbox';
-import CRMCheckbox from './CRMCheckbox';
 import SchedulerTargetAgents from './SchedulerTargetAgents';
-import CRMProjectSelector from './CRMProjectSelector';
-import InboundEmailToken from './InboundEmailToken';
 import Artifacts from './Artifacts';
 import AgentTool from './AgentTool';
 import CodeForm from './Code/Form';
@@ -91,8 +88,6 @@ export default function AgentConfig() {
     webSearchEnabled,
     fileSearchEnabled,
     manageSchedulingEnabled,
-    manageCRMEnabled,
-    inboundEmailEnabled,
   } = useAgentCapabilities(agentsConfig?.capabilities);
 
   const context_files = useMemo(() => {
@@ -297,9 +292,7 @@ export default function AgentConfig() {
           artifactsEnabled ||
           contextEnabled ||
           webSearchEnabled ||
-          manageSchedulingEnabled ||
-          manageCRMEnabled ||
-          inboundEmailEnabled) && (
+          manageSchedulingEnabled) && (
           <div className="mb-4 flex w-full flex-col items-start gap-3">
             <label className="text-token-text-primary block font-medium">
               {localize('com_assistants_capabilities')}
@@ -330,17 +323,6 @@ export default function AgentConfig() {
                 />
               </>
             )}
-            {manageCRMEnabled && (
-              <>
-                <CRMCheckbox />
-                <Controller
-                  name="projectIds"
-                  control={control}
-                  render={({ field }) => <CRMProjectSelector field={field} />}
-                />
-              </>
-            )}
-            {inboundEmailEnabled && <InboundEmailToken />}
           </div>
         )}
         {/* MCP Section */}

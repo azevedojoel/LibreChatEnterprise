@@ -13,7 +13,6 @@ interface AgentCapabilitiesResult {
   deferredToolsEnabled: boolean;
   programmaticToolsEnabled: boolean;
   manageSchedulingEnabled: boolean;
-  manageCRMEnabled: boolean;
   inboundEmailEnabled: boolean;
 }
 
@@ -75,11 +74,6 @@ export default function useAgentCapabilities(
     [capabilities],
   );
 
-  const manageCRMEnabled = useMemo(
-    () => capabilities?.includes(AgentCapabilities.manage_crm) ?? false,
-    [capabilities],
-  );
-
   const inboundEmailEnabled = useMemo(
     () => capabilities?.includes(AgentCapabilities.inbound_email) ?? false,
     [capabilities],
@@ -97,7 +91,6 @@ export default function useAgentCapabilities(
     deferredToolsEnabled,
     programmaticToolsEnabled,
     manageSchedulingEnabled,
-    manageCRMEnabled,
     inboundEmailEnabled,
   };
 }

@@ -24,7 +24,6 @@ export type TAgentCapabilities = {
   [AgentCapabilities.file_search]: boolean;
   [AgentCapabilities.execute_code]: boolean;
   [AgentCapabilities.manage_scheduling]?: boolean;
-  [AgentCapabilities.manage_crm]?: boolean;
   [AgentCapabilities.end_after_tools]?: boolean;
   [AgentCapabilities.hide_sequential_outputs]?: boolean;
 };
@@ -45,8 +44,6 @@ export type AgentForm = {
   agent_ids?: string[];
   edges?: GraphEdge[];
   schedulerTargetAgentIds?: string[];
-  projectIds?: string[];
-  inboundEmailToken?: string | null;
   [AgentCapabilities.artifacts]?: ArtifactModes | string;
   recursion_limit?: number;
   support_contact?: SupportContact;
