@@ -78,7 +78,7 @@ async function listSchedules(req, res) {
  */
 async function createSchedule(req, res) {
   try {
-    const { name, agentId, promptGroupId, scheduleType, cronExpression, runAt, timezone, selectedTools } =
+    const { name, agentId, promptGroupId, scheduleType, cronExpression, runAt, timezone, selectedTools, emailOnComplete } =
       req.body;
 
     if (!name || !agentId || !promptGroupId || !scheduleType) {
@@ -112,6 +112,7 @@ async function createSchedule(req, res) {
       runAt,
       timezone,
       selectedTools,
+      emailOnComplete,
     });
 
     res.status(201).json(schedule);
@@ -211,7 +212,9 @@ async function runSchedule(req, res) {
 async function listRuns(req, res) {
   try {
     const opts = { limit: req.query.limit };
-    if (req.query.promptGroupId) {
+    if (req.query.scheduleId) {
+      opts.scheduleId = req.query.scheduleId;
+    } else if (req.query.promptGroupId) {
       opts.promptGroupId = req.query.promptGroupId;
     }
     const runs = await listRunsForUser(req.user.id, opts);

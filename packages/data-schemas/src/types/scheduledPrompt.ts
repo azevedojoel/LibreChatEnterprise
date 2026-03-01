@@ -17,6 +17,7 @@ export interface IScheduledPrompt extends Document {
   lastRunStatus?: ScheduledRunStatus;
   conversationId?: string;
   selectedTools?: string[] | null;
+  emailOnComplete?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }

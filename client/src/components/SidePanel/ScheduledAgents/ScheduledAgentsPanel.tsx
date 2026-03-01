@@ -2,8 +2,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useRecoilValue } from 'recoil';
 import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { Trans } from 'react-i18next';
-import { Plus, Play, Trash2, ExternalLink, Loader2, Square } from 'lucide-react';
-import cronstrue from 'cronstrue';
+import { Plus, Play, Trash2, ExternalLink, Loader2, Square, ChevronLeft } from 'lucide-react';
 import {
   Button,
   Spinner,
@@ -14,11 +13,7 @@ import {
   useToastContext,
 } from '@librechat/client';
 import { PermissionBits, QueryKeys, dataService } from 'librechat-data-provider';
-import type {
-  ScheduledAgentSchedule,
-  ScheduledRun,
-  TConversation,
-} from 'librechat-data-provider';
+import type { ScheduledAgentSchedule, ScheduledRun, TConversation } from 'librechat-data-provider';
 import {
   useGetScheduledAgentsQuery,
   useGetScheduledAgentRunsQuery,
@@ -29,13 +24,13 @@ import {
   useCancelScheduledRunMutation,
 } from '~/data-provider';
 import { useListAgentsQuery } from '~/data-provider/Agents';
-import { useLocalize, useNavigateToConvo } from '~/hooks';
+import { useLocalize, useNavigateToConvo, type TranslationKeys } from '~/hooks';
 import ScheduleForm from '~/components/SidePanel/ScheduledAgents/ScheduleForm';
 import { ScheduledRunProgress } from '~/components/SidePanel/ScheduledAgents/ScheduledRunProgress';
 import { cn } from '~/utils';
 import store from '~/store';
 
-const RUNS_LIMIT = 25;
+const RUNS_LIMIT = 10;
 
 function formatRunTime(iso: string) {
   try {
@@ -44,24 +39,6 @@ function formatRunTime(iso: string) {
   } catch {
     return iso;
   }
-}
-
-function getScheduleDescription(schedule: ScheduledAgentSchedule): string {
-  if (schedule.scheduleType === 'recurring' && schedule.cronExpression) {
-    try {
-      return cronstrue.toString(schedule.cronExpression);
-    } catch {
-      return schedule.cronExpression;
-    }
-  }
-  if (schedule.scheduleType === 'one-off' && schedule.runAt) {
-    try {
-      return formatRunTime(schedule.runAt);
-    } catch {
-      return schedule.runAt;
-    }
-  }
-  return '—';
 }
 
 function getNextRunText(schedule: ScheduledAgentSchedule, completedLabel: string): string {
@@ -113,6 +90,7 @@ export default function ScheduledAgentsPanel() {
   const { showToast } = useToastContext();
   const [formOpen, setFormOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<ScheduledAgentSchedule | null>(null);
+  const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [scheduleToDelete, setScheduleToDelete] = useState<ScheduledAgentSchedule | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -120,6 +98,10 @@ export default function ScheduledAgentsPanel() {
 
   const { data: schedules = [], isLoading: schedulesLoading } = useGetScheduledAgentsQuery();
   const { data: runs = [], isLoading: runsLoading } = useGetScheduledAgentRunsQuery(RUNS_LIMIT);
+  const { data: scheduleRuns = [], isLoading: scheduleRunsLoading } = useGetScheduledAgentRunsQuery(
+    selectedScheduleId ? { scheduleId: selectedScheduleId, limit: 15 } : RUNS_LIMIT,
+    { enabled: !!selectedScheduleId },
+  );
   const { data: agentsData } = useListAgentsQuery({
     limit: 100,
     requiredPermission: PermissionBits.VIEW,
@@ -247,7 +229,8 @@ export default function ScheduledAgentsPanel() {
     updateMutation.mutate({ id: schedule._id, data: { enabled: !schedule.enabled } });
   };
 
-  const handleEdit = (schedule: ScheduledAgentSchedule) => {
+  const handleEdit = (schedule: ScheduledAgentSchedule, e: React.MouseEvent) => {
+    e.stopPropagation();
     setEditingSchedule(schedule);
     setFormOpen(true);
   };
@@ -255,13 +238,10 @@ export default function ScheduledAgentsPanel() {
   const handleViewRun = (run: ScheduledRun) => {
     if (run.conversationId) {
       queryClient.invalidateQueries([QueryKeys.messages, run.conversationId]);
-      navigateToConvo(
-        { conversationId: run.conversationId } as TConversation,
-        {
-          currentConvoId: conversation?.conversationId ?? undefined,
-          resetLatestMessage: true,
-        },
-      );
+      navigateToConvo({ conversationId: run.conversationId } as TConversation, {
+        currentConvoId: conversation?.conversationId ?? undefined,
+        resetLatestMessage: true,
+      });
     }
   };
 
@@ -282,7 +262,8 @@ export default function ScheduledAgentsPanel() {
     setEditingSchedule(null);
   };
 
-  const handleDeleteClick = (schedule: ScheduledAgentSchedule) => {
+  const handleDeleteClick = (schedule: ScheduledAgentSchedule, e: React.MouseEvent) => {
+    e.stopPropagation();
     setScheduleToDelete(schedule);
     setDeleteDialogOpen(true);
   };
@@ -290,6 +271,36 @@ export default function ScheduledAgentsPanel() {
   const displayedSchedules = useMemo(
     () => schedules.filter((s) => s._id !== pendingDeleteId),
     [schedules, pendingDeleteId],
+  );
+
+  const upcomingSchedules = useMemo(() => {
+    return displayedSchedules
+      .filter((s) => s.enabled && s.nextRunAt)
+      .sort((a, b) => {
+        const aTime = new Date(a.nextRunAt!).getTime();
+        const bTime = new Date(b.nextRunAt!).getTime();
+        return aTime - bTime;
+      });
+  }, [displayedSchedules]);
+
+  const pausedSchedules = useMemo(
+    () => displayedSchedules.filter((s) => !s.enabled),
+    [displayedSchedules],
+  );
+
+  const queuedOrRunningRuns = useMemo(
+    () => runs.filter((r) => r.status === 'queued' || r.status === 'running'),
+    [runs],
+  );
+
+  const recentRuns = useMemo(
+    () => runs.filter((r) => r.status === 'success' || r.status === 'failed'),
+    [runs],
+  );
+
+  const selectedSchedule = useMemo(
+    () => (selectedScheduleId ? schedules.find((s) => s._id === selectedScheduleId) : null),
+    [selectedScheduleId, schedules],
   );
 
   if (schedulesLoading) {
@@ -300,185 +311,43 @@ export default function ScheduledAgentsPanel() {
     );
   }
 
-  return (
-    <div className="flex h-full w-full flex-col gap-4 overflow-y-auto p-2">
-      <div role="region" aria-label={localize('com_sidepanel_scheduled_agents')}>
-        {/* Schedules header */}
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="text-sm font-medium text-text-primary">
-            {localize('com_sidepanel_scheduled_agents')}
-          </h3>
+  if (selectedScheduleId && selectedSchedule) {
+    return (
+      <div className="flex h-full w-full flex-col gap-4 overflow-y-auto p-2">
+        <div className="flex items-center gap-2">
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
-            className="shrink-0"
-            onClick={() => {
-              setEditingSchedule(null);
-              setFormOpen(true);
-            }}
-            aria-label={localize('com_ui_create')}
+            className="h-8 shrink-0"
+            onClick={() => setSelectedScheduleId(null)}
+            aria-label={localize('com_ui_back')}
           >
-            <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
-            {localize('com_ui_create')}
+            <ChevronLeft className="mr-1 h-4 w-4" aria-hidden="true" />
+            {localize('com_ui_back')}
           </Button>
         </div>
-
-        {/* Undo bar */}
-        {pendingDeleteId && (
-          <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-[#02855E] bg-[#02855E]/20 px-3 py-2 text-sm">
-            <span className="text-text-primary">
-              {localize('com_sidepanel_scheduled_agents_deleted')}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 shrink-0 font-semibold underline"
-              onClick={handleUndoDelete}
-            >
-              {localize('com_ui_undo')}
-            </Button>
-          </div>
-        )}
-
-        {/* Schedule list */}
-        <div className="mt-2 space-y-2">
-          {displayedSchedules.length === 0 ? (
-            <p className="text-sm text-text-secondary">
-              {localize('com_sidepanel_scheduled_agents_no_schedules')}
-            </p>
-          ) : (
-            displayedSchedules.map((schedule) => (
-              <div
-                key={schedule._id}
-                className="flex flex-col gap-1 rounded-lg border border-border-medium bg-surface-primary p-2"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-text-primary">
-                      {schedule.name}
-                    </p>
-                    <p className="truncate text-xs text-text-secondary">
-                      {resolvedAgentsMap[schedule.agentId] ?? schedule.agentId}
-                      {typeof schedule.promptGroupId === 'object' && schedule.promptGroupId
-                        ? ` • ${schedule.promptGroupId.command ? `/${schedule.promptGroupId.command}` : schedule.promptGroupId.name}`
-                        : ''}{' '}
-                      • {schedule.scheduleType}
-                    </p>
-                    <p className="truncate text-xs text-text-secondary">
-                      {getScheduleDescription(schedule)}
-                    </p>
-                    <p className="truncate text-xs text-text-secondary">
-                      {localize('com_sidepanel_scheduled_agents_next_run')}:{' '}
-                      {getNextRunText(
-                        schedule,
-                        localize('com_sidepanel_scheduled_agents_completed'),
-                      )}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={schedule.enabled}
-                    onCheckedChange={() => handleToggle(schedule)}
-                    aria-label={`${schedule.name} enabled`}
-                  />
-                </div>
-                <div className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 flex-1"
-                    onClick={() =>
-                      runMutation.mutate(schedule._id, {
-                        onSuccess: handleRunSuccess,
-                        onError: handleRunError,
-                      })
-                    }
-                    disabled={runMutation.isLoading}
-                  >
-                    <Play className="mr-1 h-3 w-3" aria-hidden="true" />
-                    {localize('com_ui_run')}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7"
-                    onClick={() => handleEdit(schedule)}
-                  >
-                    {localize('com_ui_edit')}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-red-600 hover:text-red-700 dark:text-red-400"
-                    onClick={() => handleDeleteClick(schedule)}
-                    disabled={deleteMutation.isLoading}
-                  >
-                    <Trash2 className="h-3 w-3" aria-hidden="true" />
-                  </Button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        {formOpen && (
-          <div className="mt-4">
-            <ScheduleForm
-              agents={agents}
-              schedule={editingSchedule}
-              onClose={handleFormClose}
-              onSubmit={(data) => {
-                const payload = {
-                  name: data.name,
-                  agentId: data.agentId,
-                  promptGroupId: data.promptGroupId,
-                  scheduleType: data.scheduleType,
-                  ...(data.scheduleType === 'recurring'
-                    ? { cronExpression: data.cronExpression }
-                    : { runAt: data.runAt }),
-                  timezone: data.timezone || 'UTC',
-                  ...(data.selectedTools !== undefined && { selectedTools: data.selectedTools }),
-                };
-                const opts = { onSuccess: handleFormSuccess, onError: handleFormError };
-                if (editingSchedule) {
-                  updateMutation.mutate({ id: editingSchedule._id, data: payload }, opts);
-                } else {
-                  createMutation.mutate(payload, opts);
-                }
-              }}
-              isSubmitting={createMutation.isLoading || updateMutation.isLoading}
-            />
-          </div>
-        )}
-
-        {/* Recent runs */}
-        <div className="mt-4">
+        <div role="region" aria-label={localize('com_sidepanel_scheduled_agents_view_runs')}>
           <h3 className="mb-2 text-sm font-medium text-text-primary">
-            {localize('com_ui_recent')}
+            {selectedSchedule.name} — {localize('com_sidepanel_scheduled_agents_view_runs')}
           </h3>
-          {runsLoading && <Spinner className="mx-auto my-4" />}
-          {!runsLoading && runs.length === 0 && (
+          {scheduleRunsLoading && <Spinner className="mx-auto my-4" />}
+          {!scheduleRunsLoading && scheduleRuns.length === 0 && (
             <p className="text-sm text-text-secondary">
               {localize('com_sidepanel_scheduled_agents_no_recent_runs')}
             </p>
           )}
-          {!runsLoading && runs.length > 0 && (
+          {!scheduleRunsLoading && scheduleRuns.length > 0 && (
             <div className="space-y-1">
-              {runs.map((run) => {
-                const scheduleInfo =
-                  run.scheduleId && typeof run.scheduleId === 'object'
-                    ? run.scheduleId
-                    : { name: 'Schedule', agentId: '' };
-                return (
-                  <div
-                    key={run._id}
-                    className="flex flex-col gap-1 rounded border border-border-medium bg-surface-primary px-2 py-1.5"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm text-text-primary">{scheduleInfo.name}</p>
-                        <p className="text-xs text-text-secondary">{formatRunTime(run.runAt)}</p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-2">
+              {scheduleRuns.map((run) => (
+                <div
+                  key={run._id}
+                  className="flex flex-col gap-1 rounded border border-border-medium bg-surface-primary px-2 py-1.5"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-text-secondary">{formatRunTime(run.runAt)}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
                       <StatusBadge status={run.status} />
                       {(run.status === 'queued' || run.status === 'running') && (
                         <Button
@@ -487,8 +356,7 @@ export default function ScheduledAgentsPanel() {
                           className="h-7"
                           onClick={() => handleCancelRun(run._id)}
                           disabled={
-                            cancelRunMutation.isLoading &&
-                            cancelRunMutation.variables === run._id
+                            cancelRunMutation.isLoading && cancelRunMutation.variables === run._id
                           }
                           aria-label={localize('com_nav_stop_generating')}
                           title={localize('com_nav_stop_generating')}
@@ -511,6 +379,176 @@ export default function ScheduledAgentsPanel() {
                         <ExternalLink className="h-3 w-3" aria-hidden="true" />
                       </Button>
                     </div>
+                  </div>
+                  {run.status === 'running' && run.conversationId && (
+                    <ScheduledRunProgress
+                      runId={run._id}
+                      streamId={run.conversationId}
+                      status={run.status}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full w-full flex-col gap-4 overflow-y-auto p-2">
+      <div role="region" aria-label={localize('com_sidepanel_scheduled_agents')}>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-sm font-medium text-text-primary">
+            {localize('com_sidepanel_scheduled_agents')}
+          </h3>
+          <Button
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            onClick={() => {
+              setEditingSchedule(null);
+              setFormOpen(true);
+            }}
+            aria-label={localize('com_ui_create')}
+          >
+            <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
+            {localize('com_ui_create')}
+          </Button>
+        </div>
+
+        {pendingDeleteId && (
+          <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-[#02855E] bg-[#02855E]/20 px-3 py-2 text-sm">
+            <span className="text-text-primary">
+              {localize('com_sidepanel_scheduled_agents_deleted')}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 shrink-0 font-semibold underline"
+              onClick={handleUndoDelete}
+            >
+              {localize('com_ui_undo')}
+            </Button>
+          </div>
+        )}
+
+        {formOpen && (
+          <div className="mt-4">
+            <ScheduleForm
+              agents={agents}
+              schedule={editingSchedule}
+              onClose={handleFormClose}
+              onSubmit={(data) => {
+                const payload = {
+                  name: data.name,
+                  agentId: data.agentId,
+                  promptGroupId: data.promptGroupId,
+                  scheduleType: data.scheduleType,
+                  ...(data.scheduleType === 'recurring'
+                    ? { cronExpression: data.cronExpression }
+                    : { runAt: data.runAt }),
+                  timezone: data.timezone || 'UTC',
+                  ...(data.selectedTools !== undefined && { selectedTools: data.selectedTools }),
+                  emailOnComplete: data.emailOnComplete,
+                };
+                const opts = { onSuccess: handleFormSuccess, onError: handleFormError };
+                if (editingSchedule) {
+                  updateMutation.mutate({ id: editingSchedule._id, data: payload }, opts);
+                } else {
+                  createMutation.mutate(payload, opts);
+                }
+              }}
+              isSubmitting={createMutation.isLoading || updateMutation.isLoading}
+            />
+          </div>
+        )}
+
+        {/* Upcoming section */}
+        <div className="mt-4">
+          <h3 className="mb-2 text-sm font-medium text-text-primary">
+            {localize('com_sidepanel_scheduled_agents_upcoming')}
+          </h3>
+          {upcomingSchedules.length === 0 && queuedOrRunningRuns.length === 0 ? (
+            <p className="text-sm text-text-secondary">
+              {localize('com_sidepanel_scheduled_agents_no_schedules')}
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {upcomingSchedules.map((schedule) => (
+                <ScheduleCard
+                  key={schedule._id}
+                  schedule={schedule}
+                  resolvedAgentsMap={resolvedAgentsMap}
+                  completedLabel={localize('com_sidepanel_scheduled_agents_completed')}
+                  onToggle={() => handleToggle(schedule)}
+                  onEdit={(e) => handleEdit(schedule, e)}
+                  onDelete={(e) => handleDeleteClick(schedule, e)}
+                  onRun={() =>
+                    runMutation.mutate(schedule._id, {
+                      onSuccess: handleRunSuccess,
+                      onError: handleRunError,
+                    })
+                  }
+                  onViewRuns={() => setSelectedScheduleId(schedule._id)}
+                  runMutationLoading={runMutation.isLoading}
+                  deleteMutationLoading={deleteMutation.isLoading}
+                  localize={localize}
+                />
+              ))}
+              {queuedOrRunningRuns.map((run) => {
+                const scheduleInfo =
+                  run.scheduleId && typeof run.scheduleId === 'object'
+                    ? run.scheduleId
+                    : { name: 'Schedule', agentId: '' };
+                return (
+                  <div
+                    key={run._id}
+                    className="flex flex-col gap-1 rounded-lg border border-border-medium bg-surface-primary p-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-text-primary">
+                          {scheduleInfo.name}
+                        </p>
+                        <p className="truncate text-xs text-text-secondary">
+                          {resolvedAgentsMap[scheduleInfo.agentId] ?? scheduleInfo.agentId}
+                        </p>
+                        <p className="text-xs text-text-secondary">{formatRunTime(run.runAt)}</p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <StatusBadge status={run.status} />
+                        {(run.status === 'queued' || run.status === 'running') && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7"
+                            onClick={() => handleCancelRun(run._id)}
+                            disabled={
+                              cancelRunMutation.isLoading && cancelRunMutation.variables === run._id
+                            }
+                            aria-label={localize('com_nav_stop_generating')}
+                            title={localize('com_nav_stop_generating')}
+                          >
+                            {cancelRunMutation.isLoading &&
+                            cancelRunMutation.variables === run._id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+                            ) : (
+                              <Square className="h-3 w-3" aria-hidden="true" fill="currentColor" />
+                            )}
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7"
+                          onClick={() => handleViewRun(run)}
+                          aria-label={localize('com_ui_view')}
+                        >
+                          <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                        </Button>
+                      </div>
                     </div>
                     {run.status === 'running' && run.conversationId && (
                       <ScheduledRunProgress
@@ -525,9 +563,90 @@ export default function ScheduledAgentsPanel() {
             </div>
           )}
         </div>
+
+        {/* Paused section */}
+        {pausedSchedules.length > 0 && (
+          <div className="mt-4">
+            <h3 className="mb-2 text-sm font-medium text-text-primary">
+              {localize('com_sidepanel_scheduled_agents_paused')}
+            </h3>
+            <div className="space-y-2">
+              {pausedSchedules.map((schedule) => (
+                <ScheduleCard
+                  key={schedule._id}
+                  schedule={schedule}
+                  resolvedAgentsMap={resolvedAgentsMap}
+                  completedLabel={localize('com_sidepanel_scheduled_agents_completed')}
+                  onToggle={() => handleToggle(schedule)}
+                  onEdit={(e) => handleEdit(schedule, e)}
+                  onDelete={(e) => handleDeleteClick(schedule, e)}
+                  onRun={() =>
+                    runMutation.mutate(schedule._id, {
+                      onSuccess: handleRunSuccess,
+                      onError: handleRunError,
+                    })
+                  }
+                  onViewRuns={() => setSelectedScheduleId(schedule._id)}
+                  runMutationLoading={runMutation.isLoading}
+                  deleteMutationLoading={deleteMutation.isLoading}
+                  localize={localize}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Recent runs section */}
+        <div className="mt-4">
+          <h3 className="mb-2 text-sm font-medium text-text-primary">
+            {localize('com_sidepanel_scheduled_agents_recent_runs')}
+          </h3>
+          {runsLoading && <Spinner className="mx-auto my-4" />}
+          {!runsLoading && recentRuns.length === 0 && (
+            <p className="text-sm text-text-secondary">
+              {localize('com_sidepanel_scheduled_agents_no_recent_runs')}
+            </p>
+          )}
+          {!runsLoading && recentRuns.length > 0 && (
+            <div className="space-y-1">
+              {recentRuns.map((run) => {
+                const scheduleInfo =
+                  run.scheduleId && typeof run.scheduleId === 'object'
+                    ? run.scheduleId
+                    : { name: 'Schedule', agentId: '' };
+                return (
+                  <div
+                    key={run._id}
+                    className="flex cursor-pointer flex-col gap-1 rounded border border-border-medium bg-surface-primary px-2 py-1.5 transition-colors hover:bg-surface-secondary"
+                    onClick={() => handleViewRun(run)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleViewRun(run);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm text-text-primary">{scheduleInfo.name}</p>
+                        <p className="text-xs text-text-secondary">{formatRunTime(run.runAt)}</p>
+                      </div>
+                      <StatusBadge status={run.status} />
+                      <ExternalLink
+                        className="h-3 w-3 shrink-0 text-text-secondary"
+                        aria-hidden="true"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Delete confirmation dialog */}
       <OGDialog
         open={deleteDialogOpen}
         onOpenChange={(open) => {
@@ -558,6 +677,99 @@ export default function ScheduledAgentsPanel() {
           }}
         />
       </OGDialog>
+    </div>
+  );
+}
+
+type ScheduleCardProps = {
+  schedule: ScheduledAgentSchedule;
+  resolvedAgentsMap: Record<string, string>;
+  completedLabel: string;
+  onToggle: () => void;
+  onEdit: (e: React.MouseEvent) => void;
+  onDelete: (e: React.MouseEvent) => void;
+  onRun: () => void;
+  onViewRuns: () => void;
+  runMutationLoading: boolean;
+  deleteMutationLoading: boolean;
+  localize: (key: TranslationKeys) => string;
+};
+
+function ScheduleCard({
+  schedule,
+  resolvedAgentsMap,
+  completedLabel,
+  onToggle,
+  onEdit,
+  onDelete,
+  onRun,
+  onViewRuns,
+  runMutationLoading,
+  deleteMutationLoading,
+  localize,
+}: ScheduleCardProps) {
+  const agentName = resolvedAgentsMap[schedule.agentId] ?? schedule.agentId;
+  const nextRunText = getNextRunText(schedule, completedLabel);
+  const lastRunText = schedule.lastRunAt
+    ? `${formatRunTime(schedule.lastRunAt)} — ${schedule.lastRunStatus ?? '—'}`
+    : '—';
+
+  return (
+    <div
+      className="flex cursor-pointer flex-col gap-1 rounded-lg border border-border-medium bg-surface-primary p-2 transition-colors hover:bg-surface-secondary"
+      onClick={onViewRuns}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onViewRuns();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-text-primary">{schedule.name}</p>
+          <p className="truncate text-xs text-text-secondary">{agentName}</p>
+          <p className="truncate text-xs text-text-secondary">
+            {localize('com_sidepanel_scheduled_agents_next_run')}: {nextRunText}
+          </p>
+          <p className="truncate text-xs text-text-secondary">
+            {localize('com_sidepanel_scheduled_agents_last_run')}: {lastRunText}
+          </p>
+        </div>
+        <div onClick={(e) => e.stopPropagation()}>
+          <Switch
+            checked={schedule.enabled}
+            onCheckedChange={onToggle}
+            aria-label={`${schedule.name} enabled`}
+          />
+        </div>
+      </div>
+      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 flex-1"
+          onClick={onRun}
+          disabled={runMutationLoading}
+        >
+          <Play className="mr-1 h-3 w-3" aria-hidden="true" />
+          {localize('com_ui_run')}
+        </Button>
+        <Button variant="ghost" size="sm" className="h-7" onClick={onEdit}>
+          {localize('com_ui_edit')}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-red-600 hover:text-red-700 dark:text-red-400"
+          onClick={onDelete}
+          disabled={deleteMutationLoading}
+        >
+          <Trash2 className="h-3 w-3" aria-hidden="true" />
+        </Button>
+      </div>
     </div>
   );
 }

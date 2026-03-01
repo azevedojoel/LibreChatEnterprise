@@ -252,6 +252,7 @@ export type ScheduledAgentSchedule = {
   lastRunAt?: string | null;
   lastRunStatus?: ScheduledRunStatus | null;
   conversationId?: string | null;
+  emailOnComplete?: boolean;
   createdAt?: string;
   updatedAt?: string;
 };

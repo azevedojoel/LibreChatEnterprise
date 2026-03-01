@@ -11,6 +11,8 @@ const { Conversation, PromptGroup, ScheduledPrompt, ScheduledRun, User } = requi
 const { disposeClient } = require('~/server/cleanup');
 const abortRegistry = require('./abortRegistry');
 const { resolveScheduledPrompt } = require('./resolvePrompt');
+const { formatEmailContent } = require('~/server/utils/formatEmailHighlights');
+const { sendInboundReply } = require('~/server/services/sendInboundReply');
 
 /**
  * Execute a scheduled agent run.
@@ -74,7 +76,7 @@ async function executeScheduledAgent({
       throw new Error(`User ${userId} does not have permission to use agent ${agentId}`);
     }
 
-    const schedule = await ScheduledPrompt.findById(scheduleId).select('name promptGroupId').lean();
+    const schedule = await ScheduledPrompt.findById(scheduleId).select('name promptGroupId emailOnComplete').lean();
     if (!schedule) {
       throw new Error(`Schedule not found: ${scheduleId}`);
     }
@@ -238,6 +240,33 @@ async function executeScheduledAgent({
         ...(existingConversationId ? {} : { conversationId }),
       },
     });
+
+    if (schedule.emailOnComplete !== false && user.email) {
+      try {
+        const contentParts = client?.getContentParts?.() ?? client?.contentParts ?? [];
+        const appName = process.env.APP_TITLE || 'LibreChat';
+        const agentName = agent?.name;
+        const { html: emailHtml, text: emailText } = formatEmailContent(contentParts, [], {
+          appName,
+          agentName,
+          userMessage: resolvedPrompt,
+        });
+        const subject = `${schedule?.name ?? 'Scheduled run'} — ${runAt.toLocaleDateString()}`;
+        const sendResult = await sendInboundReply({
+          to: user.email,
+          subject,
+          body: emailText || '(No response content)',
+          html: emailHtml || null,
+        });
+        if (!sendResult.success) {
+          logger.warn('[ScheduledAgents] Failed to send email on complete:', sendResult.error);
+        } else {
+          logger.info('[ScheduledAgents] Email sent on complete: to=%s schedule=%s', user.email, scheduleId);
+        }
+      } catch (emailErr) {
+        logger.error('[ScheduledAgents] Error sending email on complete:', emailErr);
+      }
+    }
 
     if (client) {
       disposeClient(client);

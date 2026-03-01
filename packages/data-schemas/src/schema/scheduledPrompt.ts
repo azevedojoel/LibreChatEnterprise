@@ -62,6 +62,10 @@ const scheduledPromptSchema = new Schema<IScheduledPrompt>(
       type: [String],
       default: null,
     },
+    emailOnComplete: {
+      type: Boolean,
+      default: true,
+    },
   },
   { timestamps: true, collection: 'scheduledprompts' },
 );

@@ -26,6 +26,7 @@ export type ScheduleFormValues = {
   runAt: string;
   timezone: string;
   selectedTools: string[] | null;
+  emailOnComplete: boolean;
 };
 
 type Props = {
@@ -69,6 +70,7 @@ export default function ScheduleForm({
       runAt: '',
       timezone: 'UTC',
       selectedTools: null as string[] | null,
+      emailOnComplete: true,
     },
   });
 
@@ -100,6 +102,7 @@ export default function ScheduleForm({
       setValue('runAt', schedule.runAt ? new Date(schedule.runAt).toISOString().slice(0, 16) : '');
       setValue('timezone', schedule.timezone ? validTimezone : 'UTC');
       setValue('selectedTools', schedule.selectedTools ?? null);
+      setValue('emailOnComplete', schedule.emailOnComplete !== false);
     }
   }, [schedule, setValue]);
 
@@ -170,7 +173,7 @@ export default function ScheduleForm({
               <option value="">{localize('com_ui_select')}</option>
               {promptGroups.map((g) => (
                 <option key={g._id} value={g._id}>
-                  {g.command ? `/${g.command} - ${g.name}` : g.name}
+                  {g.name}
                 </option>
               ))}
             </select>
@@ -256,6 +259,26 @@ export default function ScheduleForm({
               </option>
             ))}
           </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <Controller
+            name="emailOnComplete"
+            control={control}
+            render={({ field }) => (
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={field.value}
+                  onChange={(e) => field.onChange(e.target.checked)}
+                  className="rounded"
+                  aria-label={localize('com_sidepanel_scheduled_agents_email_on_complete')}
+                />
+                <span className="text-sm text-text-primary">
+                  {localize('com_sidepanel_scheduled_agents_email_on_complete')}
+                </span>
+              </label>
+            )}
+          />
         </div>
         {watch('agentId') && (
           <Controller

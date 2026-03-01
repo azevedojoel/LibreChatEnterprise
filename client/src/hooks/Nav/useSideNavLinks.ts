@@ -6,6 +6,7 @@ import {
   Settings2,
   ArrowRightToLine,
   MessageSquareQuote,
+  CalendarClock,
 } from 'lucide-react';
 import {
   Permissions,
@@ -24,6 +25,7 @@ import PanelSwitch from '~/components/SidePanel/Builder/PanelSwitch';
 import PromptsAccordion from '~/components/Prompts/PromptsAccordion';
 import Parameters from '~/components/SidePanel/Parameters/Panel';
 import { MemoryPanel } from '~/components/SidePanel/Memories';
+import ScheduledAgentsPanel from '~/components/SidePanel/ScheduledAgents/ScheduledAgentsPanel';
 import FilesPanel from '~/components/SidePanel/Files/Panel';
 import { useHasAccess, useMCPServerManager } from '~/hooks';
 
@@ -122,6 +124,20 @@ export default function useSideNavLinks({
       });
     }
 
+    if (
+      interfaceConfig.scheduledAgents !== false &&
+      hasAccessToAgents &&
+      endpointsConfig?.[EModelEndpoint.agents]
+    ) {
+      links.push({
+        title: 'com_sidepanel_scheduled_agents',
+        label: '',
+        icon: CalendarClock,
+        id: 'scheduled-agents',
+        Component: ScheduledAgentsPanel,
+      });
+    }
+
     if (hasAccessToMemories && hasAccessToReadMemories) {
       links.push({
         title: 'com_ui_memories',
@@ -197,6 +213,7 @@ export default function useSideNavLinks({
     hasAccessToMemories,
     hasAccessToReadMemories,
     interfaceConfig.parameters,
+    interfaceConfig.scheduledAgents,
     endpointType,
     hasAccessToBookmarks,
     availableMCPServers,

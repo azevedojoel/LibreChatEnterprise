@@ -1076,6 +1076,7 @@ export const createScheduledAgent = (data: {
   runAt?: string;
   timezone?: string;
   selectedTools?: string[] | null;
+  emailOnComplete?: boolean;
 }): Promise<q.ScheduledAgentSchedule> => request.post(endpoints.scheduledAgents(), data);
 
 export const updateScheduledAgent = (
@@ -1090,6 +1091,7 @@ export const updateScheduledAgent = (
     enabled: boolean;
     timezone: string;
     selectedTools: string[] | null;
+    emailOnComplete: boolean;
   }>,
 ): Promise<q.ScheduledAgentSchedule> =>
   request.patch(`${endpoints.scheduledAgents()}/${id}`, data);
@@ -1110,12 +1112,15 @@ export const runScheduledAgent = (
 export const listScheduledAgentRuns = (opts?: {
   limit?: number;
   promptGroupId?: string;
+  scheduleId?: string;
 }): Promise<q.ScheduledRun[]> => {
   const params = new URLSearchParams();
   if (opts?.limit) {
     params.set('limit', String(opts.limit));
   }
-  if (opts?.promptGroupId) {
+  if (opts?.scheduleId) {
+    params.set('scheduleId', opts.scheduleId);
+  } else if (opts?.promptGroupId) {
     params.set('promptGroupId', opts.promptGroupId);
   }
   const query = params.toString() ? `?${params.toString()}` : '';

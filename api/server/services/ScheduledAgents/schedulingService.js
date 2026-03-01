@@ -80,7 +80,8 @@ async function listSchedulesForUser(userId, opts = {}) {
  * @returns {Promise<Object>} Created schedule
  */
 async function createScheduleForUser(userId, data) {
-  const { name, agentId, promptGroupId, scheduleType, cronExpression, runAt, timezone, selectedTools } = data;
+  const { name, agentId, promptGroupId, scheduleType, cronExpression, runAt, timezone, selectedTools, emailOnComplete } =
+    data;
 
   const schedule = await ScheduledPrompt.create({
     userId,
@@ -93,6 +94,7 @@ async function createScheduleForUser(userId, data) {
     enabled: true,
     timezone: timezone || 'UTC',
     ...(selectedTools !== undefined && { selectedTools }),
+    ...(emailOnComplete !== undefined && { emailOnComplete }),
   });
 
   return typeof schedule.toObject === 'function' ? schedule.toObject() : schedule;
@@ -114,7 +116,7 @@ async function updateScheduleForUser(userId, scheduleId, updates) {
     return null;
   }
 
-  const { name, agentId, promptGroupId, scheduleType, cronExpression, runAt, enabled, timezone, selectedTools } =
+  const { name, agentId, promptGroupId, scheduleType, cronExpression, runAt, enabled, timezone, selectedTools, emailOnComplete } =
     updates;
 
   const effectiveScheduleType = scheduleType ?? schedule.scheduleType;
@@ -128,6 +130,7 @@ async function updateScheduleForUser(userId, scheduleId, updates) {
   if (enabled != null) schedule.enabled = enabled;
   if (timezone != null) schedule.timezone = timezone;
   if (selectedTools !== undefined) schedule.selectedTools = selectedTools;
+  if (emailOnComplete !== undefined) schedule.emailOnComplete = emailOnComplete;
 
   await schedule.save();
   return typeof schedule.toObject === 'function' ? schedule.toObject() : schedule;
@@ -207,12 +210,15 @@ async function runScheduleForUser(userId, scheduleId) {
  * @param {Object} [opts]
  * @param {number} [opts.limit]
  * @param {string} [opts.promptGroupId] - Filter runs by prompt group ID
+ * @param {string} [opts.scheduleId] - Filter runs by schedule ID
  * @returns {Promise<Object[]>} List of runs
  */
 async function listRunsForUser(userId, opts = {}) {
   const limit = Math.min(parseInt(opts.limit, 10) || 25, 100);
   const query = { userId };
-  if (opts.promptGroupId) {
+  if (opts.scheduleId) {
+    query.scheduleId = opts.scheduleId;
+  } else if (opts.promptGroupId) {
     const scheduleIds = await ScheduledPrompt.find({
       userId,
       promptGroupId: opts.promptGroupId,

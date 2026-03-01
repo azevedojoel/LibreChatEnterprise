@@ -581,18 +581,26 @@ export const useGetScheduledAgentsQuery = (
 const ACTIVE_RUN_STATUSES = ['queued', 'running'] as const;
 
 export const useGetScheduledAgentRunsQuery = (
-  limitOrOpts: number | { limit?: number; promptGroupId?: string } = 25,
+  limitOrOpts: number | { limit?: number; promptGroupId?: string; scheduleId?: string } = 25,
   config?: UseQueryOptions<q.ScheduledRun[]>,
 ): QueryObserverResult<q.ScheduledRun[]> => {
   const opts =
     typeof limitOrOpts === 'number'
       ? { limit: limitOrOpts }
-      : { limit: limitOrOpts.limit ?? 25, promptGroupId: limitOrOpts.promptGroupId };
+      : {
+          limit: limitOrOpts.limit ?? 25,
+          promptGroupId: limitOrOpts.promptGroupId,
+          scheduleId: limitOrOpts.scheduleId,
+        };
   return useQuery<q.ScheduledRun[]>(
-    [QueryKeys.scheduledAgentRuns, opts.limit, opts.promptGroupId ?? 'all'],
+    [QueryKeys.scheduledAgentRuns, opts.limit, opts.promptGroupId ?? 'all', opts.scheduleId ?? 'all'],
     () =>
       dataService.listScheduledAgentRuns(
-        opts.promptGroupId ? { limit: opts.limit, promptGroupId: opts.promptGroupId } : { limit: opts.limit },
+        opts.scheduleId
+          ? { limit: opts.limit, scheduleId: opts.scheduleId }
+          : opts.promptGroupId
+            ? { limit: opts.limit, promptGroupId: opts.promptGroupId }
+            : { limit: opts.limit },
       ),
     {
       refetchOnWindowFocus: false,
