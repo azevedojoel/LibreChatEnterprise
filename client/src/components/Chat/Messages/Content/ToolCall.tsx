@@ -62,14 +62,15 @@ const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
   'delete-todo-task': 'Deleting To Do task',
 };
 import type { TAttachment } from 'librechat-data-provider';
+import { Plug } from 'lucide-react';
 import { useLocalize, useProgress, useMCPConnectionStatus, useToolApproval } from '~/hooks';
 import { useMessageContext } from '~/Providers';
 import { useGetStartupConfig } from '~/data-provider';
 import { AttachmentGroup } from './Parts';
 import ToolCallInfo from './ToolCallInfo';
-import ProgressText from './ProgressText';
+import ToolResultContainer from './ToolResultContainer';
 import ToolApprovalBar from './ToolApprovalBar';
-import { logger, cn } from '~/utils';
+import { logger, cn, getToolDisplayName } from '~/utils';
 
 export default function ToolCall({
   initialProgress = 0.1,
@@ -166,6 +167,8 @@ export default function ToolCall({
     () => (function_name && TOOL_DISPLAY_NAMES[function_name]) ?? function_name ?? '',
     [function_name],
   );
+
+  const humanizedDisplayName = useMemo(() => getToolDisplayName(name), [name]);
 
   const inlinePattern = useMemo(() => {
     if (function_name !== Tools.search_user_files && function_name !== Tools.workspace_glob_files) {
@@ -343,6 +346,33 @@ export default function ToolCall({
     [displayName, inlinePattern],
   );
 
+  const { resultsCount, summaryText } = useMemo(() => {
+    const base = labelWithPattern || humanizedDisplayName || localize('com_assistants_running_action');
+    if (!output || typeof output !== 'string') {
+      return { resultsCount: undefined, summaryText: base };
+    }
+    const trimmed = output.trim();
+    let count: number | undefined;
+    if (trimmed.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(trimmed) as { total?: number; results?: unknown[] };
+        if (typeof parsed.total === 'number') count = parsed.total;
+        else if (Array.isArray(parsed.results)) count = parsed.results.length;
+      } catch {
+        // ignore
+      }
+    } else {
+      const toonTotal = trimmed.match(/\btotal\s*[:=]\s*(\d+)/im);
+      if (toonTotal?.[1]) count = parseInt(toonTotal[1], 10);
+      else if (/\bresults\s*\[/im.test(trimmed)) {
+        const resultsMatch = trimmed.match(/results\s*\[\s*(\d+)\s*\]/im);
+        if (resultsMatch) count = parseInt(resultsMatch[1], 10) + 1;
+      }
+    }
+    const text = count != null ? `${base} — ${count} result${count !== 1 ? 's' : ''}` : base;
+    return { resultsCount: count, summaryText: text };
+  }, [output, labelWithPattern, humanizedDisplayName, localize]);
+
   const isTasksTool = function_name?.startsWith('tasks_') || function_name?.startsWith('tasks.');
 
   const getFinishedText = () => {
@@ -406,6 +436,8 @@ export default function ToolCall({
   }
 
   const showApprovalBar = approvalStatus !== null;
+  const isPending = approvalStatus === 'pending';
+  const useToolResultLayout = !showApprovalBar || !isPending;
 
   return (
     <>
@@ -417,14 +449,14 @@ export default function ToolCall({
           cancelled && 'bg-red-500/5 dark:bg-red-950/10',
         )}
       >
-        <div
-          className={cn(
-            'flex shrink-0 items-center',
-            isCompactSpacing ? 'gap-1' : 'gap-1.5',
-            showApprovalBar ? 'min-h-8 flex-wrap' : 'h-5',
-          )}
-        >
-          {showApprovalBar ? (
+        {showApprovalBar && isPending ? (
+          <div
+            className={cn(
+              'flex shrink-0 items-center',
+              isCompactSpacing ? 'gap-1' : 'gap-1.5',
+              'min-h-8 flex-wrap',
+            )}
+          >
             <ToolApprovalBar
               onApprove={handleApprove}
               onDeny={handleDeny}
@@ -436,53 +468,26 @@ export default function ToolCall({
                 approvalStatus === 'approved' ? 'approved' : approvalStatus === 'denied' ? 'denied' : undefined
               }
             />
-          ) : (
-            <ProgressText
-              muted
-              progress={displayProgress}
-              onClick={toggleShowInfo}
-              inProgressText={labelWithPattern || localize('com_assistants_running_action')}
-              authText={
-                !cancelled && authDomain.length > 0 ? localize('com_ui_requires_auth') : undefined
-              }
-              finishedText={getFinishedText()}
-              hasInput={hasInfo}
-              isExpanded={showInfo}
-              error={cancelled}
-            />
-          )}
-        </div>
-      </div>
-      <div
-        className={cn('relative', isCompactSpacing ? 'pl-2' : 'pl-4')}
-        style={{
-          height: showInfo ? contentHeight : 0,
-          overflow: 'hidden',
-          transition:
-            'height 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
-          opacity: showInfo ? 1 : 0,
-          transformOrigin: 'top',
-          willChange: 'height, opacity',
-          perspective: '1000px',
-          backfaceVisibility: 'hidden',
-          WebkitFontSmoothing: 'subpixel-antialiased',
-        }}
-      >
-        <div
-          className={cn(
-            'overflow-hidden rounded-xl border border-border-light bg-surface-secondary shadow-md',
-            showInfo && 'shadow-lg',
-            cancelled && 'bg-red-500/5 dark:bg-red-950/10',
-          )}
-          style={{
-            transform: showInfo ? 'translateY(0) scale(1)' : 'translateY(-8px) scale(0.98)',
-            opacity: showInfo ? 1 : 0,
-            transition:
-              'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
-          }}
-        >
-          <div ref={contentRef}>
-            {showInfo && hasInfo && (
+          </div>
+        ) : useToolResultLayout ? (
+          <ToolResultContainer
+            icon={<Plug className="size-5 shrink-0 text-text-secondary" aria-hidden="true" />}
+            summary={
+              cancelled
+                ? localize('com_ui_cancelled')
+                : !hasOutput && authDomain.length > 0
+                  ? localize('com_ui_requires_auth')
+                  : summaryText
+            }
+            resultsCount={resultsCount}
+            isExpanded={showInfo}
+            onToggle={toggleShowInfo}
+            isLoading={isSubmitting && !hasOutput}
+            error={cancelled}
+            hasExpandableContent={hasInfo}
+            minExpandHeight={120}
+          >
+            {hasInfo && (
               <ToolCallInfo
                 key="tool-call-info"
                 input={args ?? ''}
@@ -494,9 +499,55 @@ export default function ToolCall({
                 attachments={attachments}
               />
             )}
+          </ToolResultContainer>
+        ) : null}
+      </div>
+      {showApprovalBar && isPending && (
+        <div
+          className={cn('relative', isCompactSpacing ? 'pl-2' : 'pl-4')}
+          style={{
+            height: showInfo ? contentHeight : 0,
+            overflow: 'hidden',
+            transition:
+              'height 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+            opacity: showInfo ? 1 : 0,
+            transformOrigin: 'top',
+            willChange: 'height, opacity',
+            perspective: '1000px',
+            backfaceVisibility: 'hidden',
+            WebkitFontSmoothing: 'subpixel-antialiased',
+          }}
+        >
+          <div
+            className={cn(
+              'overflow-hidden rounded-xl border border-border-light bg-surface-secondary shadow-md',
+              showInfo && 'shadow-lg',
+              cancelled && 'bg-red-500/5 dark:bg-red-950/10',
+            )}
+            style={{
+              transform: showInfo ? 'translateY(0) scale(1)' : 'translateY(-8px) scale(0.98)',
+              opacity: showInfo ? 1 : 0,
+              transition:
+                'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          >
+            <div ref={contentRef}>
+              {showInfo && hasInfo && (
+                <ToolCallInfo
+                  key="tool-call-info"
+                  input={args ?? ''}
+                  output={output}
+                  domain={authDomain || (domain ?? '')}
+                  function_name={function_name}
+                  displayName={labelWithPattern}
+                  pendingAuth={authDomain.length > 0 && !cancelled && displayProgress < 1}
+                  attachments={attachments}
+                />
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
       {attachments && attachments.length > 0 && <AttachmentGroup attachments={attachments} />}
     </>
   );

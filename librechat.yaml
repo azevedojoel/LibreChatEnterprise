@@ -149,6 +149,7 @@ mcpSettings:
     - '*.monday.com'
     - '*.asana.com'
     - '*.zoho.com'
+    - '*.hubspot.com'
 
 # MCP Servers (example - uncomment and configure as needed)
 mcpServers:

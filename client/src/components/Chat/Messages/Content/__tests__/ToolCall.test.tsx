@@ -67,10 +67,15 @@ jest.mock('../ToolApprovalBar', () => ({
   default: () => <div data-testid="tool-approval-bar">ToolApprovalBar</div>,
 }));
 
-jest.mock('../ProgressText', () => ({
+jest.mock('../ToolResultContainer', () => ({
   __esModule: true,
-  default: ({ onClick, inProgressText, finishedText, _error, _hasInput, _isExpanded }: any) => (
-    <div onClick={onClick}>{finishedText || inProgressText}</div>
+  default: ({ summary, onToggle, isExpanded, children }: any) => (
+    <div>
+      <button type="button" onClick={onToggle} data-testid="tool-result-toggle">
+        {summary}
+      </button>
+      {isExpanded && children}
+    </div>
   ),
 }));
 
@@ -100,6 +105,11 @@ jest.mock('~/utils', () => ({
     error: jest.fn(),
   },
   cn: (...classes: any[]) => classes.filter(Boolean).join(' '),
+  getToolDisplayName: (name: string) =>
+    name
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (c: string) => c.toUpperCase())
+      .trim(),
 }));
 
 jest.mock('~/data-provider', () => ({
@@ -173,7 +183,7 @@ describe('ToolCall', () => {
 
       renderWithRecoil(<ToolCall {...mockProps} attachments={attachments} />);
 
-      fireEvent.click(screen.getByText('testFunction'));
+      fireEvent.click(screen.getByTestId('tool-result-toggle'));
 
       const toolCallInfo = screen.getByTestId('tool-call-info');
       expect(toolCallInfo).toBeInTheDocument();
@@ -185,7 +195,7 @@ describe('ToolCall', () => {
     it('should pass empty array when no attachments', () => {
       renderWithRecoil(<ToolCall {...mockProps} />);
 
-      fireEvent.click(screen.getByText('testFunction'));
+      fireEvent.click(screen.getByTestId('tool-result-toggle'));
 
       const toolCallInfo = screen.getByTestId('tool-call-info');
       const attachmentsData = toolCallInfo.getAttribute('data-attachments');
@@ -216,7 +226,7 @@ describe('ToolCall', () => {
 
       renderWithRecoil(<ToolCall {...mockProps} attachments={attachments} />);
 
-      fireEvent.click(screen.getByText('testFunction'));
+      fireEvent.click(screen.getByTestId('tool-result-toggle'));
 
       const toolCallInfo = screen.getByTestId('tool-call-info');
       const attachmentsData = toolCallInfo.getAttribute('data-attachments');
@@ -266,11 +276,11 @@ describe('ToolCall', () => {
       expect(screen.queryByTestId('tool-call-info')).not.toBeInTheDocument();
 
       // Click to open
-      fireEvent.click(screen.getByText('testFunction'));
+      fireEvent.click(screen.getByTestId('tool-result-toggle'));
       expect(screen.getByTestId('tool-call-info')).toBeInTheDocument();
 
       // Click to close
-      fireEvent.click(screen.getByText('testFunction'));
+      fireEvent.click(screen.getByTestId('tool-result-toggle'));
       expect(screen.queryByTestId('tool-call-info')).not.toBeInTheDocument();
     });
 
@@ -296,7 +306,7 @@ describe('ToolCall', () => {
 
       renderWithRecoil(<ToolCall {...propsWithDomain} />);
 
-      fireEvent.click(screen.getByText('test.domain.com'));
+      fireEvent.click(screen.getByTestId('tool-result-toggle'));
 
       const toolCallInfo = screen.getByTestId('tool-call-info');
       const props = JSON.parse(toolCallInfo.textContent!);
@@ -337,7 +347,7 @@ describe('ToolCall', () => {
         />,
       );
 
-      fireEvent.click(screen.getByText('testFunction'));
+      fireEvent.click(screen.getByTestId('tool-result-toggle'));
 
       const toolCallInfo = screen.getByTestId('tool-call-info');
       const props = JSON.parse(toolCallInfo.textContent!);
@@ -376,7 +386,7 @@ describe('ToolCall', () => {
     it('should handle undefined args', () => {
       renderWithRecoil(<ToolCall {...mockProps} args={undefined} />);
 
-      fireEvent.click(screen.getByText('testFunction'));
+      fireEvent.click(screen.getByTestId('tool-result-toggle'));
 
       const toolCallInfo = screen.getByTestId('tool-call-info');
       const props = JSON.parse(toolCallInfo.textContent!);
@@ -386,7 +396,7 @@ describe('ToolCall', () => {
     it('should handle null output', () => {
       renderWithRecoil(<ToolCall {...mockProps} output={null} />);
 
-      fireEvent.click(screen.getByText('testFunction'));
+      fireEvent.click(screen.getByTestId('tool-result-toggle'));
 
       const toolCallInfo = screen.getByTestId('tool-call-info');
       const props = JSON.parse(toolCallInfo.textContent!);
@@ -396,7 +406,7 @@ describe('ToolCall', () => {
     it('should handle missing domain', () => {
       renderWithRecoil(<ToolCall {...mockProps} domain={undefined} authDomain={undefined} />);
 
-      fireEvent.click(screen.getByText('testFunction'));
+      fireEvent.click(screen.getByTestId('tool-result-toggle'));
 
       const toolCallInfo = screen.getByTestId('tool-call-info');
       const props = JSON.parse(toolCallInfo.textContent!);
@@ -427,7 +437,7 @@ describe('ToolCall', () => {
 
       renderWithRecoil(<ToolCall {...mockProps} attachments={complexAttachments} />);
 
-      fireEvent.click(screen.getByText('testFunction'));
+      fireEvent.click(screen.getByTestId('tool-result-toggle'));
 
       const toolCallInfo = screen.getByTestId('tool-call-info');
       const attachmentsData = toolCallInfo.getAttribute('data-attachments');
@@ -453,7 +463,7 @@ describe('ToolCall', () => {
       renderWithRecoil(<ToolCall {...mockProps} toolCallId="tool-call-123" />);
 
       expect(screen.getByTestId('tool-approval-bar')).toBeInTheDocument();
-      expect(screen.queryByText('testFunction')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('tool-result-toggle')).not.toBeInTheDocument();
     });
 
     it('should render ProgressText when pendingMatches is false', () => {
@@ -462,7 +472,7 @@ describe('ToolCall', () => {
       renderWithRecoil(<ToolCall {...mockProps} toolCallId="tool-call-123" />);
 
       expect(screen.queryByTestId('tool-approval-bar')).not.toBeInTheDocument();
-      expect(screen.getByText('testFunction')).toBeInTheDocument();
+      expect(screen.getByTestId('tool-result-toggle')).toBeInTheDocument();
     });
 
     it('should pass toolCallId and output to useToolApproval', () => {

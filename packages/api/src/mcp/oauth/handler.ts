@@ -547,11 +547,81 @@ export class MCPOAuthHandler {
           `[MCPOAuth] Authorization URL generated: ${sanitizeUrlForLogging(authorizationUrl.toString())}`,
         );
         const fullAuthUrl = authorizationUrl.toString();
-        logger.debug(
-          `[MCPOAuth][${serverName}] Full authorization URL: ${fullAuthUrl}`,
-        );
+        logger.debug(`[MCPOAuth][${serverName}] Full authorization URL: ${fullAuthUrl}`);
         return {
           authorizationUrl: fullAuthUrl,
+          flowId,
+          flowMetadata,
+        };
+      }
+
+      // When we have client_id and client_secret but not auth/token URLs, discover metadata
+      // and use user credentials (skip dynamic registration - e.g. HubSpot doesn't support it)
+      if (config?.client_id && config?.client_secret && serverUrl) {
+        logger.debug(
+          `[MCPOAuth][${serverName}] Client credentials provided, discovering metadata (no dynamic registration)`,
+        );
+        const { metadata, resourceMetadata } = await this.discoverMetadata(serverUrl, oauthHeaders);
+
+        const redirectUri = config.redirect_uri || this.getDefaultRedirectUri(serverName);
+        const tokenEndpointAuthMethod =
+          this.getForcedTokenEndpointAuthMethod(config.token_exchange_method) ??
+          (metadata.token_endpoint_auth_methods_supported?.includes('client_secret_post')
+            ? 'client_secret_post'
+            : 'client_secret_basic');
+
+        const clientInfo: OAuthClientInformation = {
+          client_id: config.client_id,
+          client_secret: config.client_secret,
+          redirect_uris: [redirectUri],
+          scope: config.scope,
+          token_endpoint_auth_method: tokenEndpointAuthMethod,
+        };
+
+        const scope =
+          config.scope ||
+          resourceMetadata?.scopes_supported?.join(' ') ||
+          metadata.scopes_supported?.join(' ');
+
+        const { authorizationUrl, codeVerifier } = await startAuthorization(serverUrl, {
+          metadata: metadata as unknown as SDKOAuthMetadata,
+          clientInformation: clientInfo,
+          redirectUrl: redirectUri,
+          scope,
+        });
+
+        authorizationUrl.searchParams.set('state', flowId);
+
+        const additionalParams = (config as { additional_auth_params?: Record<string, string> })
+          .additional_auth_params;
+        if (additionalParams && Object.keys(additionalParams).length > 0) {
+          for (const [key, value] of Object.entries(additionalParams)) {
+            if (value != null && value !== '') {
+              authorizationUrl.searchParams.set(key, String(value));
+            }
+          }
+        }
+
+        if (resourceMetadata?.resource != null && resourceMetadata.resource) {
+          authorizationUrl.searchParams.set('resource', resourceMetadata.resource);
+        }
+
+        const flowMetadata: MCPOAuthFlowMetadata = {
+          serverName,
+          userId,
+          serverUrl,
+          state,
+          codeVerifier,
+          clientInfo,
+          metadata,
+          resourceMetadata,
+        };
+
+        logger.info(
+          `[MCPOAuth][${serverName}] OAuth initiated with discovered metadata + user credentials`,
+        );
+        return {
+          authorizationUrl: authorizationUrl.toString(),
           flowId,
           flowMetadata,
         };
@@ -662,9 +732,7 @@ export class MCPOAuthHandler {
       logger.debug(
         `[MCPOAuth] Authorization URL generated for ${serverName}: ${sanitizeUrlForLogging(fullAuthUrl)}`,
       );
-      logger.debug(
-        `[MCPOAuth][${serverName}] Full authorization URL: ${fullAuthUrl}`,
-      );
+      logger.debug(`[MCPOAuth][${serverName}] Full authorization URL: ${fullAuthUrl}`);
 
       const result = {
         authorizationUrl: fullAuthUrl,

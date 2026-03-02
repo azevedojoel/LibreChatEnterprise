@@ -166,7 +166,7 @@ export class MCPConnectionFactory {
   }
 
   protected async discoverToolsInternal(): Promise<ToolDiscoveryResult> {
-    const oauthUrl: string | null = null;
+    let oauthUrl: string | null = null;
     let oauthRequired = false;
 
     const oauthTokens = this.useOAuth ? await this.getOAuthTokens() : null;
@@ -211,28 +211,6 @@ export class MCPConnectionFactory {
       );
     }
 
-    try {
-      const { tools, oauthRequired: unauthOAuthRequired } =
-        await this.attemptUnauthenticatedToolListing();
-      if (this.useOAuth) {
-        connection.removeListener('oauthRequired', oauthHandler);
-      }
-      if (tools && tools.length > 0) {
-        logger.info(
-          `${this.logPrefix} [Discovery] Successfully discovered ${tools.length} tools without auth`,
-        );
-        try {
-          await connection.disconnect();
-        } catch {
-          // Ignore cleanup errors
-        }
-        return { tools, connection: null, oauthRequired, oauthUrl };
-      }
-      oauthRequired = oauthRequired || unauthOAuthRequired;
-    } catch (listError) {
-      logger.debug(`${this.logPrefix} [Discovery] Unauthenticated tool listing failed:`, listError);
-    }
-
     if (this.useOAuth) {
       connection.removeListener('oauthRequired', oauthHandler);
     }
@@ -241,6 +219,57 @@ export class MCPConnectionFactory {
       await connection.disconnect();
     } catch {
       // Ignore cleanup errors
+    }
+
+    // When we have OAuth context and server requires auth (e.g. HubSpot), initiate OAuth
+    // instead of falling back to unauthenticated discovery which will fail for auth-only servers.
+    const canInitiateOAuth =
+      this.useOAuth &&
+      this.userId &&
+      this.flowManager &&
+      this.oauthStart &&
+      this.getServerUrlForOAuth();
+
+    if (oauthRequired && canInitiateOAuth) {
+      try {
+        const { authorizationUrl, flowId, flowMetadata } =
+          await MCPOAuthHandler.initiateOAuthFlow(
+            this.serverName,
+            this.getServerUrlForOAuth(),
+            this.userId!,
+            this.serverConfig.oauth_headers ?? {},
+            this.serverConfig.oauth,
+          );
+        // Delete any existing flow so we store fresh metadata (code verifier must match new auth)
+        await this.flowManager!.deleteFlow(flowId, 'mcp_oauth');
+        // Do not pass signal - OAuth flow must persist until callback; request abort would delete it
+        this.flowManager!.createFlow(flowId, 'mcp_oauth', flowMetadata, undefined).catch(() => {});
+        oauthUrl = authorizationUrl;
+        await this.oauthStart(authorizationUrl);
+        logger.info(
+          `${this.logPrefix} [Discovery] OAuth initiated for auth-only server, returning URL`,
+        );
+        return { tools: null, connection: null, oauthRequired: true, oauthUrl };
+      } catch (initError) {
+        logger.warn(
+          `${this.logPrefix} [Discovery] OAuth initiation failed, falling back to unauthenticated discovery:`,
+          initError,
+        );
+      }
+    }
+
+    try {
+      const { tools, oauthRequired: unauthOAuthRequired } =
+        await this.attemptUnauthenticatedToolListing();
+      if (tools && tools.length > 0) {
+        logger.info(
+          `${this.logPrefix} [Discovery] Successfully discovered ${tools.length} tools without auth`,
+        );
+        return { tools, connection: null, oauthRequired, oauthUrl };
+      }
+      oauthRequired = oauthRequired || unauthOAuthRequired;
+    } catch (listError) {
+      logger.debug(`${this.logPrefix} [Discovery] Unauthenticated tool listing failed:`, listError);
     }
 
     return { tools: null, connection: null, oauthRequired, oauthUrl };
@@ -530,7 +559,8 @@ export class MCPConnectionFactory {
             await this.flowManager!.deleteFlow(newFlowId, 'mcp_oauth');
           }
 
-          this.flowManager!.createFlow(newFlowId, 'mcp_oauth', flowMetadata, this.signal).catch(
+          // Do not pass signal - OAuth flow must persist until callback; request abort would delete it
+          this.flowManager!.createFlow(newFlowId, 'mcp_oauth', flowMetadata, undefined).catch(
             () => {},
           );
 
