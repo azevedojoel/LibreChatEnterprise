@@ -23,7 +23,6 @@ import { useGetMessagesByConvoId } from '~/data-provider';
 import MessagesView from './Messages/MessagesView';
 import Presentation from './Presentation';
 import ChatForm from './Input/ChatForm';
-import Landing from './Landing';
 import Header from './Header';
 import Footer from './Footer';
 import { cn } from '~/utils';
@@ -94,7 +93,7 @@ function ChatView({ index = 0 }: { index?: number }) {
   } else if (!isLandingPage) {
     content = <MessagesView messagesTree={messagesTree} />;
   } else {
-    content = <Landing centerFormOnLanding={centerFormOnLanding} />;
+    content = centerFormOnLanding ? null : <div className="min-h-0 flex-1" />;
   }
 
   return (
@@ -108,16 +107,14 @@ function ChatView({ index = 0 }: { index?: number }) {
                 <div
                   className={cn(
                     'flex flex-col overflow-y-auto',
-                    isLandingPage
-                      ? 'flex-1 items-center justify-end sm:justify-center'
-                      : 'h-full',
+                    isLandingPage ? 'flex-1 items-center justify-end sm:justify-center' : 'h-full',
                   )}
                 >
                   {isLandingPage &&
                     (agentsConfig?.inboundEmailAddress ||
                       user?.projectId ||
                       showIntegrationsGrid) && (
-                      <div className="mb-6 grid w-full max-w-3xl grid-cols-1 gap-4 px-4 pt-6 sm:grid-cols-2 [&>*:only-child]:sm:col-span-2 xl:max-w-4xl">
+                      <div className="mb-6 grid w-full max-w-3xl grid-cols-1 gap-4 px-4 pt-6 sm:grid-cols-2 xl:max-w-4xl [&>*:only-child]:sm:col-span-2">
                         <EmailEllisWidget />
                         <CRMWidget />
                         <IntegrationsWidget />
