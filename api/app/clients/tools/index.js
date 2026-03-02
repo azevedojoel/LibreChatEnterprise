@@ -13,6 +13,7 @@ const createOpenAIImageTools = require('./structured/OpenAIImageTools');
 const TavilySearchResults = require('./structured/TavilySearchResults');
 const createGeminiImageTool = require('./structured/GeminiImageGen');
 const PostmarkSendUserEmail = require('./structured/PostmarkSendUserEmail');
+const { createCRMTools } = require('./structured/CRMTools');
 
 module.exports = {
   ...manifest,
@@ -29,4 +30,5 @@ module.exports = {
   createOpenAIImageTools,
   createGeminiImageTool,
   PostmarkSendUserEmail,
+  createCRMTools,
 };

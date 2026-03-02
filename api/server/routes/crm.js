@@ -45,19 +45,34 @@ const router = express.Router();
  */
 async function canAccessProjectForCRM(userId, role, projectId) {
   if (!projectId || !mongoose.Types.ObjectId.isValid(projectId)) {
+    logger.warn('[CRM] canAccessProjectForCRM: invalid projectId', { userId, projectId });
     return false;
   }
   const project = await getProjectById(projectId);
-  if (!project) return false;
+  if (!project) {
+    logger.warn('[CRM] canAccessProjectForCRM: project not found', { userId, projectId });
+    return false;
+  }
 
   if (role === SystemRoles.ADMIN) {
     return true;
   }
 
   const user = await findUser({ _id: userId }, 'projectId');
-  if (!user) return false;
+  if (!user) {
+    logger.warn('[CRM] canAccessProjectForCRM: user not found', { userId, projectId });
+    return false;
+  }
   const userProjectId = user.projectId?.toString?.() ?? user.projectId;
-  return userProjectId === projectId;
+  const hasAccess = userProjectId === projectId;
+  if (!hasAccess) {
+    logger.warn('[CRM] canAccessProjectForCRM: projectId mismatch', {
+      userId,
+      projectId,
+      userProjectId: userProjectId ?? 'null',
+    });
+  }
+  return hasAccess;
 }
 
 /** Middleware: require projectId and verify access */
@@ -72,6 +87,10 @@ const requireProjectAccess = async (req, res, next) => {
     projectId,
   );
   if (!hasAccess) {
+    logger.warn('[CRM] requireProjectAccess: access denied', {
+      userId: req.user?.id,
+      projectId,
+    });
     return res.status(403).json({ error: 'Unable to access CRM data' });
   }
   req.crmProjectId = projectId;

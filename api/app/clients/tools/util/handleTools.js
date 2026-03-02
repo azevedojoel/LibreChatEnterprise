@@ -52,6 +52,8 @@ const { createMCPTool, createMCPTools } = require('~/server/services/MCP');
 const { loadAuthValues } = require('~/server/services/Tools/credentials');
 const { getMCPServerTools } = require('~/server/services/Config');
 const { getRoleByName } = require('~/models/Role');
+const { findUser } = require('~/models');
+const { createCRMTools } = require('../structured/CRMTools');
 
 /**
  * Validates the availability and authentication of tools for a user based on environment variables or user-specific plugin authentication values.
@@ -179,6 +181,20 @@ const loadTools = async ({
   imageOutputType,
 }) => {
   tools = [...new Set(tools.filter((t) => t != null && typeof t === 'string'))];
+
+  const CRM_TOOL_NAMES = new Set(
+    Object.values(Tools).filter((t) => typeof t === 'string' && t.startsWith('crm_')),
+  );
+  const hasCRMTools = tools.some((t) => CRM_TOOL_NAMES.has(t));
+  let userProjectId = null;
+  if (hasCRMTools) {
+    try {
+      const userDoc = await findUser({ _id: user }, 'projectId');
+      userProjectId = userDoc?.projectId?.toString?.() ?? userDoc?.projectId ?? null;
+    } catch (err) {
+      logger.debug('[handleTools] Could not resolve projectId for CRM tools:', err);
+    }
+  }
 
   const toolConstructors = {
     flux: FluxAPI,
@@ -471,6 +487,15 @@ const loadTools = async ({
           onGetHighlights,
           logger,
         });
+      };
+      continue;
+    } else if (CRM_TOOL_NAMES.has(tool)) {
+      if (!userProjectId) {
+        continue;
+      }
+      requestedTools[tool] = async () => {
+        const crmTools = createCRMTools({ userId: user, projectId: userProjectId });
+        return crmTools[tool];
       };
       continue;
     } else if (tool && mcpToolPattern.test(tool)) {

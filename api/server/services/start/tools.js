@@ -101,6 +101,20 @@ function loadAndFormatTools({ directory, adminFilter = [], adminIncluded = [] })
 
   tools.push(ImageVisionTool);
 
+  /* CRM native tools - factory returns Tool instances; add for tool picker / cache */
+  try {
+    const { createCRMTools } = require('~/app/clients/tools/structured/CRMTools');
+    const crmTools = createCRMTools({ userId: 'system', projectId: 'init' });
+    for (const toolInstance of Object.values(crmTools)) {
+      if (toolInstance?.name && toolInstance?.schema) {
+        const formattedTool = formatToOpenAIAssistantTool(toolInstance);
+        tools.push(formattedTool);
+      }
+    }
+  } catch (err) {
+    logger.warn('[loadAndFormatTools] Could not load CRM tools for picker:', err?.message);
+  }
+
   return tools.reduce((map, tool) => {
     map[tool.function.name] = tool;
     return map;
