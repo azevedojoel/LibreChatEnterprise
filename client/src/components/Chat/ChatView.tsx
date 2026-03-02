@@ -7,8 +7,17 @@ import { Constants, buildTree } from 'librechat-data-provider';
 import type { TMessage } from 'librechat-data-provider';
 import type { ChatFormValues } from '~/common';
 import { ChatContext, AddedChatContext, useFileMapContext, ChatFormProvider } from '~/Providers';
-import { useAddedResponse, useResumeOnLoad, useAdaptiveSSE, useChatHelpers, useOAuthCompleteListener } from '~/hooks';
+import {
+  useAddedResponse,
+  useResumeOnLoad,
+  useAdaptiveSSE,
+  useChatHelpers,
+  useOAuthCompleteListener,
+  useAuthContext,
+} from '~/hooks';
+import { useGetAgentsConfig } from '~/hooks/Agents';
 import ConversationStarters from './Input/ConversationStarters';
+import { EmailEllisWidget, CRMWidget } from './Dashboard';
 import { useGetMessagesByConvoId } from '~/data-provider';
 import MessagesView from './Messages/MessagesView';
 import Presentation from './Presentation';
@@ -31,6 +40,8 @@ function LoadingSpinner() {
 
 function ChatView({ index = 0 }: { index?: number }) {
   const { conversationId } = useParams();
+  const { user } = useAuthContext();
+  const { agentsConfig } = useGetAgentsConfig();
   const rootSubmission = useRecoilValue(store.submissionByIndex(index));
   const centerFormOnLanding = useRecoilValue(store.centerFormOnLanding);
 
@@ -89,12 +100,18 @@ function ChatView({ index = 0 }: { index?: number }) {
               <>
                 <div
                   className={cn(
-                    'flex flex-col',
+                    'flex flex-col overflow-y-auto',
                     isLandingPage
                       ? 'flex-1 items-center justify-end sm:justify-center'
-                      : 'h-full overflow-y-auto',
+                      : 'h-full',
                   )}
                 >
+                  {isLandingPage && (agentsConfig?.inboundEmailAddress || user?.projectId) && (
+                    <div className="mb-6 grid w-full max-w-3xl grid-cols-1 gap-4 px-4 pt-6 sm:grid-cols-2 [&>*:only-child]:sm:col-span-2 xl:max-w-4xl">
+                      <EmailEllisWidget />
+                      <CRMWidget />
+                    </div>
+                  )}
                   {content}
                   <div
                     className={cn(
