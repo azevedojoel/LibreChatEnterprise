@@ -104,27 +104,34 @@ function transformCalendarListEvents(parsed: unknown): string {
   return [header, sep, ...rows].join('\n');
 }
 
+// --- Google Docs ---
+/** Compact JSON for custom UI: d=documentId, t=title, e=error */
+function transformDocsCreate(parsed: unknown): string {
+  const data = parsed as { documentId?: string; title?: string; error?: string };
+  if (data?.error) return JSON.stringify({ e: data.error });
+  const o: { d?: string; t?: string } = {};
+  if (data?.documentId) o.d = data.documentId;
+  if (data?.title) o.t = String(data.title).trim();
+  return JSON.stringify(o);
+}
+
 // --- Google Drive ---
+/** Compact JSON for custom UI: f=files, f[].i=id, f[].n=name, f[].m=modifiedTime, e=error */
 function transformDriveSearch(parsed: unknown): string {
   const data = parsed as GoogleDriveSearchResponse;
-  if (data?.error) return data.error;
+  if (data?.error) return JSON.stringify({ e: data.error });
   const items = data?.files ?? [];
-  if (items.length === 0) {
-    const suffix = data?.nextPageToken ? `\nnextPageToken: ${data.nextPageToken}` : '';
-    return `(empty)${suffix}`;
-  }
-  const rows = items.map((f) => {
-    const id = f?.id ?? '-';
-    const name = escapeCell(String(f?.name ?? '-'));
-    const modified = formatDate(f?.modifiedTime);
-    const mime = f?.mimeType ?? '-';
-    return `${id} | ${name} | ${modified} | ${mime}`;
+  const f = items.map((file) => {
+    const o: { i?: string; n?: string; m?: string } = {};
+    if (file?.id) o.i = file.id;
+    if (file?.name) o.n = String(file.name).trim();
+    if (file?.modifiedTime) {
+      const m = formatDate(file.modifiedTime);
+      if (m !== '-') o.m = m;
+    }
+    return o;
   });
-  const header = 'id | name | modifiedTime | mimeType';
-  const sep = '---|------|-------------|---------';
-  let body = [header, sep, ...rows].join('\n');
-  if (data?.nextPageToken) body += `\nnextPageToken: ${data.nextPageToken}`;
-  return body;
+  return JSON.stringify({ f });
 }
 
 // --- Microsoft Calendar ---
@@ -198,50 +205,42 @@ function transformListFolderFiles(parsed: unknown): string {
 }
 
 // --- Microsoft To Do ---
+/** Compact JSON for custom UI: i=items, i[].id, i[].n=name, e=error */
 function transformListTodoTaskLists(parsed: unknown): string {
   const data = parsed as ODataValueResponse<GraphTodoTaskList>;
-  if (data?.error?.message) return data.error.message;
+  if (data?.error?.message) return JSON.stringify({ e: data.error.message });
   const items = data?.value ?? [];
-  if (items.length === 0) {
-    const suffix = data?.['@odata.nextLink'] ? `\n@odata.nextLink: (has more)` : '';
-    return `(empty)${suffix}`;
-  }
-  const rows = items.map((t) => {
-    const id = t?.id ?? '-';
-    const name = escapeCell(String(t?.displayName ?? '-'));
-    return `${id} | ${name}`;
+  const i = items.map((t) => {
+    const o: { id?: string; n?: string } = {};
+    if (t?.id) o.id = t.id;
+    const name = String(t?.displayName ?? '').trim();
+    if (name) o.n = name.slice(0, 200);
+    return o;
   });
-  const header = 'id | name';
-  const sep = '---|------';
-  let body = [header, sep, ...rows].join('\n');
-  if (data?.['@odata.nextLink']) body += '\n@odata.nextLink: (has more)';
-  return body;
+  return JSON.stringify({ i });
 }
 
+/** Compact JSON for custom UI: i=items, i[].id, i[].n=name, i[].s=status, i[].d=date, e=error */
 function transformListTodoTasks(parsed: unknown): string {
   const data = parsed as ODataValueResponse<GraphTodoTask>;
-  if (data?.error?.message) return data.error.message;
+  if (data?.error?.message) return JSON.stringify({ e: data.error.message });
   const items = data?.value ?? [];
-  if (items.length === 0) {
-    const suffix = data?.['@odata.nextLink'] ? `\n@odata.nextLink: (has more)` : '';
-    return `(empty)${suffix}`;
-  }
-  const rows = items.map((t) => {
-    const id = t?.id ?? '-';
-    const title = escapeCell(String(t?.title ?? '-'));
-    const status = t?.status ?? '-';
+  const i = items.map((t) => {
+    const o: { id?: string; n?: string; s?: string; d?: string } = {};
+    if (t?.id) o.id = t.id;
+    const name = String(t?.title ?? '').trim();
+    if (name) o.n = name.slice(0, 200);
+    if (t?.status) o.s = t.status;
     const date = formatDate(t?.dueDateTime?.dateTime ?? t?.dueDateTime);
-    return `${id} | ${title} | ${status} | ${date}`;
+    if (date !== '-') o.d = date;
+    return o;
   });
-  const header = 'id | name | status | date';
-  const sep = '---|------|--------|----------';
-  let body = [header, sep, ...rows].join('\n');
-  if (data?.['@odata.nextLink']) body += '\n@odata.nextLink: (has more)';
-  return body;
+  return JSON.stringify({ i });
 }
 
 export function registerCommonTransforms(): void {
   registerToolOnlyFallback('calendar_listEvents', transformCalendarListEvents);
+  registerToolOnlyFallback('docs_create', transformDocsCreate);
   registerToolOnlyFallback('drive_search', transformDriveSearch);
 
   const MS_CALENDAR_LIST_TOOLS = [

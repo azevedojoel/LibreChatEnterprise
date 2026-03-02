@@ -20,11 +20,21 @@ export function registerToolOnlyFallback(toolName: string, transform: TransformF
   TOOL_ONLY_FALLBACKS.add(toolName);
 }
 
+/** Extract base tool name when toolName is "gmail_search_mcp_Google" etc. */
+function getBaseToolName(toolName: string): string | null {
+  const idx = toolName.indexOf('_mcp_');
+  return idx >= 0 ? toolName.slice(0, idx) : null;
+}
+
 export function getTransform(serverName: string, toolName: string): TransformFn | undefined {
   const exact = TRANSFORM_REGISTRY.get(`${serverName}:${toolName}`);
   if (exact) return exact;
   if (TOOL_ONLY_FALLBACKS.has(toolName)) {
     return TRANSFORM_REGISTRY.get(`::${toolName}`);
+  }
+  const baseName = getBaseToolName(toolName);
+  if (baseName && TOOL_ONLY_FALLBACKS.has(baseName)) {
+    return TRANSFORM_REGISTRY.get(`::${baseName}`);
   }
   return undefined;
 }

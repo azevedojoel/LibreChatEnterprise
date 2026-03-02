@@ -15,6 +15,24 @@ import AgentHandoff from './AgentHandoff';
 import CodeAnalyze from './CodeAnalyze';
 import Container from './Container';
 import WebSearch from './WebSearch';
+import DriveSearch from './DriveSearch';
+import GmailSearch from './GmailSearch';
+import GmailGet from './GmailGet';
+import DocsCreate from './DocsCreate';
+import DiscoverySearch from './DiscoverySearch';
+import GoogleTasksList from './GoogleTasksList';
+import GoogleTaskLists from './GoogleTaskLists';
+import GoogleTaskCreate from './GoogleTaskCreate';
+import GoogleTaskListCreate from './GoogleTaskListCreate';
+import GoogleTaskUpdate from './GoogleTaskUpdate';
+import GoogleTaskListUpdate from './GoogleTaskListUpdate';
+import GoogleTaskDelete from './GoogleTaskDelete';
+import GoogleTaskListDelete from './GoogleTaskListDelete';
+import MicrosoftTodoTasks from './MicrosoftTodoTasks';
+import MicrosoftTodoTaskLists from './MicrosoftTodoTaskLists';
+import MicrosoftTodoTaskCreate from './MicrosoftTodoTaskCreate';
+import MicrosoftTodoTaskUpdate from './MicrosoftTodoTaskUpdate';
+import MicrosoftTodoTaskDelete from './MicrosoftTodoTaskDelete';
 import ToolCall from './ToolCall';
 import ImageGen from './ImageGen';
 import Image from './Image';
@@ -159,6 +177,276 @@ const Part = memo(
             output={toolCall.output ?? ''}
           />
         );
+      } else if (
+        isToolCall &&
+        (toolCall.name === 'drive_search' ||
+          (typeof toolCall.name === 'string' && toolCall.name.startsWith('drive_search_mcp_')))
+      ) {
+        return (
+          <DriveSearch
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (
+        isToolCall &&
+        (toolCall.name === 'gmail_search' ||
+          (typeof toolCall.name === 'string' && toolCall.name.startsWith('gmail_search_mcp_')))
+      ) {
+        return (
+          <GmailSearch
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (
+        isToolCall &&
+        (toolCall.name === 'gmail_get' ||
+          (typeof toolCall.name === 'string' && toolCall.name.startsWith('gmail_get_mcp_')))
+      ) {
+        return (
+          <GmailGet
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (
+        isToolCall &&
+        (toolCall.name === 'docs_create' ||
+          (typeof toolCall.name === 'string' && toolCall.name.startsWith('docs_create_mcp_')))
+      ) {
+        return (
+          <DocsCreate
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (
+        isToolCall &&
+        (toolCall.name === Constants.TOOL_SEARCH ||
+          (typeof toolCall.name === 'string' && toolCall.name.startsWith('tool_search_mcp_')))
+      ) {
+        return (
+          <DiscoverySearch
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (
+        isToolCall &&
+        (toolCall.name === 'tasks_listTasks' ||
+          (typeof toolCall.name === 'string' && toolCall.name.startsWith('tasks_listTasks_mcp_')))
+      ) {
+        return (
+          <GoogleTasksList
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (
+        isToolCall &&
+        (toolCall.name === 'tasks_listTaskLists' ||
+          (typeof toolCall.name === 'string' && toolCall.name.startsWith('tasks_listTaskLists_mcp_')))
+      ) {
+        return (
+          <GoogleTaskLists
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (
+        isToolCall &&
+        (toolCall.name === 'list-todo-tasks' ||
+          (typeof toolCall.name === 'string' && toolCall.name.startsWith('list-todo-tasks_mcp_')))
+      ) {
+        return (
+          <MicrosoftTodoTasks
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (
+        isToolCall &&
+        (toolCall.name === 'list-todo-task-lists' ||
+          (typeof toolCall.name === 'string' && toolCall.name.startsWith('list-todo-task-lists_mcp_')))
+      ) {
+        return (
+          <MicrosoftTodoTaskLists
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (
+        isToolCall &&
+        (toolCall.name === 'tasks_createTask' ||
+          (typeof toolCall.name === 'string' && toolCall.name.startsWith('tasks_createTask_mcp_')))
+      ) {
+        return (
+          <GoogleTaskCreate
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (
+        isToolCall &&
+        (toolCall.name === 'tasks_createTaskList' ||
+          (typeof toolCall.name === 'string' && toolCall.name.startsWith('tasks_createTaskList_mcp_')))
+      ) {
+        return (
+          <GoogleTaskListCreate
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (
+        isToolCall &&
+        (toolCall.name === 'tasks_updateTask' ||
+          (typeof toolCall.name === 'string' && toolCall.name.startsWith('tasks_updateTask_mcp_')))
+      ) {
+        return (
+          <GoogleTaskUpdate
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (
+        isToolCall &&
+        (toolCall.name === 'tasks_updateTaskList' ||
+          (typeof toolCall.name === 'string' && toolCall.name.startsWith('tasks_updateTaskList_mcp_')))
+      ) {
+        return (
+          <GoogleTaskListUpdate
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (
+        isToolCall &&
+        (toolCall.name === 'create-todo-task' ||
+          (typeof toolCall.name === 'string' && toolCall.name.startsWith('create-todo-task_mcp_')))
+      ) {
+        return (
+          <MicrosoftTodoTaskCreate
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (
+        isToolCall &&
+        (toolCall.name === 'update-todo-task' ||
+          (typeof toolCall.name === 'string' && toolCall.name.startsWith('update-todo-task_mcp_')))
+      ) {
+        return (
+          <MicrosoftTodoTaskUpdate
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (
+        isToolCall &&
+        (toolCall.name === 'tasks_deleteTask' ||
+          (typeof toolCall.name === 'string' && toolCall.name.startsWith('tasks_deleteTask_mcp_')))
+      ) {
+        return (
+          <GoogleTaskDelete
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (
+        isToolCall &&
+        (toolCall.name === 'tasks_deleteTaskList' ||
+          (typeof toolCall.name === 'string' && toolCall.name.startsWith('tasks_deleteTaskList_mcp_')))
+      ) {
+        return (
+          <GoogleTaskListDelete
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (
+        isToolCall &&
+        (toolCall.name === 'delete-todo-task' ||
+          (typeof toolCall.name === 'string' && toolCall.name.startsWith('delete-todo-task_mcp_')))
+      ) {
+        return (
+          <MicrosoftTodoTaskDelete
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
       } else if (isToolCall) {
         return (
           <ToolCall
@@ -212,6 +500,278 @@ const Part = memo(
             );
           }
           return null;
+        }
+
+        const funcName = toolCall.function?.name;
+        if (
+          funcName === 'drive_search' ||
+          (typeof funcName === 'string' && funcName.startsWith('drive_search_mcp_'))
+        ) {
+          return (
+            <DriveSearch
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
+            />
+          );
+        }
+        if (
+          funcName === 'gmail_search' ||
+          (typeof funcName === 'string' && funcName.startsWith('gmail_search_mcp_'))
+        ) {
+          return (
+            <GmailSearch
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
+            />
+          );
+        }
+        if (
+          funcName === 'gmail_get' ||
+          (typeof funcName === 'string' && funcName.startsWith('gmail_get_mcp_'))
+        ) {
+          return (
+            <GmailGet
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
+            />
+          );
+        }
+        if (
+          funcName === 'docs_create' ||
+          (typeof funcName === 'string' && funcName.startsWith('docs_create_mcp_'))
+        ) {
+          return (
+            <DocsCreate
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
+            />
+          );
+        }
+        if (
+          funcName === Constants.TOOL_SEARCH ||
+          (typeof funcName === 'string' && funcName.startsWith('tool_search_mcp_'))
+        ) {
+          return (
+            <DiscoverySearch
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
+            />
+          );
+        }
+        if (
+          funcName === 'tasks_listTasks' ||
+          (typeof funcName === 'string' && funcName.startsWith('tasks_listTasks_mcp_'))
+        ) {
+          return (
+            <GoogleTasksList
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
+            />
+          );
+        }
+        if (
+          funcName === 'tasks_listTaskLists' ||
+          (typeof funcName === 'string' && funcName.startsWith('tasks_listTaskLists_mcp_'))
+        ) {
+          return (
+            <GoogleTaskLists
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
+            />
+          );
+        }
+        if (
+          funcName === 'list-todo-tasks' ||
+          (typeof funcName === 'string' && funcName.startsWith('list-todo-tasks_mcp_'))
+        ) {
+          return (
+            <MicrosoftTodoTasks
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
+            />
+          );
+        }
+        if (
+          funcName === 'list-todo-task-lists' ||
+          (typeof funcName === 'string' && funcName.startsWith('list-todo-task-lists_mcp_'))
+        ) {
+          return (
+            <MicrosoftTodoTaskLists
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
+            />
+          );
+        }
+        if (
+          funcName === 'tasks_createTask' ||
+          (typeof funcName === 'string' && funcName.startsWith('tasks_createTask_mcp_'))
+        ) {
+          return (
+            <GoogleTaskCreate
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
+            />
+          );
+        }
+        if (
+          funcName === 'tasks_createTaskList' ||
+          (typeof funcName === 'string' && funcName.startsWith('tasks_createTaskList_mcp_'))
+        ) {
+          return (
+            <GoogleTaskListCreate
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
+            />
+          );
+        }
+        if (
+          funcName === 'tasks_updateTask' ||
+          (typeof funcName === 'string' && funcName.startsWith('tasks_updateTask_mcp_'))
+        ) {
+          return (
+            <GoogleTaskUpdate
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
+            />
+          );
+        }
+        if (
+          funcName === 'tasks_updateTaskList' ||
+          (typeof funcName === 'string' && funcName.startsWith('tasks_updateTaskList_mcp_'))
+        ) {
+          return (
+            <GoogleTaskListUpdate
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
+            />
+          );
+        }
+        if (
+          funcName === 'create-todo-task' ||
+          (typeof funcName === 'string' && funcName.startsWith('create-todo-task_mcp_'))
+        ) {
+          return (
+            <MicrosoftTodoTaskCreate
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
+            />
+          );
+        }
+        if (
+          funcName === 'update-todo-task' ||
+          (typeof funcName === 'string' && funcName.startsWith('update-todo-task_mcp_'))
+        ) {
+          return (
+            <MicrosoftTodoTaskUpdate
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
+            />
+          );
+        }
+        if (
+          funcName === 'tasks_deleteTask' ||
+          (typeof funcName === 'string' && funcName.startsWith('tasks_deleteTask_mcp_'))
+        ) {
+          return (
+            <GoogleTaskDelete
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
+            />
+          );
+        }
+        if (
+          funcName === 'tasks_deleteTaskList' ||
+          (typeof funcName === 'string' && funcName.startsWith('tasks_deleteTaskList_mcp_'))
+        ) {
+          return (
+            <GoogleTaskListDelete
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
+            />
+          );
+        }
+        if (
+          funcName === 'delete-todo-task' ||
+          (typeof funcName === 'string' && funcName.startsWith('delete-todo-task_mcp_'))
+        ) {
+          return (
+            <MicrosoftTodoTaskDelete
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
+            />
+          );
         }
 
         return (

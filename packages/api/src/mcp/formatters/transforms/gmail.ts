@@ -4,6 +4,8 @@ import { stripHtml } from './utils';
 type GmailSearchMessage = {
   id?: string;
   threadId?: string;
+  subject?: string;
+  snippet?: string;
   [key: string]: unknown;
 };
 
@@ -39,62 +41,46 @@ function formatDate(val: unknown): string {
   return Number.isNaN(d.getTime()) ? String(val) : d.toISOString().split('T')[0];
 }
 
-function escapeCell(val: string): string {
-  return val.replace(/\|/g, '\\|').trim() || '-';
-}
-
+/** Compact JSON for custom UI: m=messages, m[].i=id, m[].t=threadId, m[].s=subject, m[].b=snippet, e=error */
 function transformGmailSearch(parsed: unknown): string {
   const data = parsed as GmailSearchResponse;
-  if (data?.error) return data.error;
+  if (data?.error) return JSON.stringify({ e: data.error });
   const items = data?.messages ?? [];
-  if (items.length === 0) {
-    const suffix = data?.nextPageToken
-      ? `\nnextPageToken: ${data.nextPageToken}`
-      : '';
-    const estimate =
-      data?.resultSizeEstimate != null
-        ? `\nresultSizeEstimate: ${data.resultSizeEstimate}`
-        : '';
-    return `(empty)${suffix}${estimate}`;
-  }
-  const rows = items.map((m) => {
-    const id = m?.id ?? '-';
-    const threadId = m?.threadId ?? '-';
-    return `${id} | ${threadId}`;
+  const m = items.map((msg) => {
+    const o: { i?: string; t?: string; s?: string; b?: string } = {};
+    if (msg?.id) o.i = msg.id;
+    if (msg?.threadId) o.t = msg.threadId;
+    const subject = msg?.subject ? String(msg.subject).trim() : '';
+    if (subject) o.s = subject.slice(0, 80);
+    const snippet = msg?.snippet ? String(msg.snippet).trim() : '';
+    if (snippet) o.b = snippet.slice(0, 100);
+    return o;
   });
-  const header = 'id | threadId';
-  const sep = '---|--------';
-  let body = [header, sep, ...rows].join('\n');
-  if (data?.nextPageToken) body += `\nnextPageToken: ${data.nextPageToken}`;
-  if (data?.resultSizeEstimate != null)
-    body += `\nresultSizeEstimate: ${data.resultSizeEstimate}`;
-  return body;
+  return JSON.stringify({ m });
 }
 
+/** Max chars for single-email body (gmail_get). Must match stripHtml + slice. */
+const GMAIL_GET_BODY_MAX_LENGTH = 5000;
+
+/** Compact JSON for custom UI: i=id, t=threadId, s=subject, f=from, d=date, b=body/snippet, e=error */
 function transformGmailGet(parsed: unknown): string {
   const data = parsed as GmailGetResponse;
-  if (data?.error) return data.error;
-  const parts: string[] = [];
-  parts.push(`id: ${data?.id ?? '-'}`);
-  parts.push(`subject: ${escapeCell(String(data?.subject ?? '-'))}`);
-  parts.push(`from: ${escapeCell(String(data?.from ?? '-'))}`);
-  parts.push(`to: ${escapeCell(String(data?.to ?? '-'))}`);
-  parts.push(`date: ${formatDate(data?.date ?? '-')}`);
-  const rawBody = data?.body ?? '';
+  if (data?.error) return JSON.stringify({ e: data.error });
+  const o: { i?: string; t?: string; s?: string; f?: string; d?: string; b?: string } = {};
+  if (data?.id) o.i = data.id;
+  if (data?.threadId) o.t = data.threadId as string;
+  if (data?.subject) o.s = String(data.subject).trim();
+  if (data?.from) o.f = String(data.from).trim();
+  if (data?.date) {
+    const d = formatDate(data.date);
+    if (d !== '-') o.d = d;
+  }
+  const rawBody = data?.body ?? data?.snippet ?? '';
   if (rawBody) {
-    const bodyText = stripHtml(rawBody, { maxLength: 2000 });
-    parts.push(`body: ${escapeCell(bodyText).slice(0, 2000)}`);
+    const bodyText = stripHtml(rawBody as string, { maxLength: GMAIL_GET_BODY_MAX_LENGTH });
+    if (bodyText) o.b = bodyText.slice(0, GMAIL_GET_BODY_MAX_LENGTH);
   }
-  if (data?.attachments?.length) {
-    const attList = data.attachments
-      .map(
-        (a) =>
-          `${a?.filename ?? a?.name ?? 'attachment'} (${a?.size ?? '?'} bytes)`,
-      )
-      .join(', ');
-    parts.push(`attachments: ${attList}`);
-  }
-  return parts.join('\n');
+  return JSON.stringify(o);
 }
 
 export function registerGmailTransforms(): void {

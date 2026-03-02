@@ -47,6 +47,19 @@ const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
   'tasks_deleteTask': 'Deleting Google Task',
   'tasks_clearCompletedTasks': 'Clearing Completed Google Tasks',
   'tasks_moveTask': 'Moving Google Task',
+  // Google Drive
+  'drive_search': 'Searched Google Drive',
+  // Gmail
+  'gmail_search': 'Searched Gmail',
+  'gmail_get': 'Retrieved email',
+  // Google Docs
+  'docs_create': 'Creating Google Doc',
+  // Microsoft To Do MCP tools (hyphen notation)
+  'list-todo-tasks': 'Listed To Do tasks',
+  'list-todo-task-lists': 'Listed To Do lists',
+  'create-todo-task': 'Creating To Do task',
+  'update-todo-task': 'Updating To Do task',
+  'delete-todo-task': 'Deleting To Do task',
 };
 import type { TAttachment } from 'librechat-data-provider';
 import { useLocalize, useProgress, useMCPConnectionStatus, useToolApproval } from '~/hooks';
@@ -398,9 +411,10 @@ export default function ToolCall({
     <>
       <div
         className={cn(
-          'relative flex flex-col',
+          'relative flex flex-col rounded-lg',
           isCompactSpacing ? 'my-0.5' : 'my-1',
           showApprovalBar ? 'gap-3' : 'gap-1',
+          cancelled && 'bg-red-500/5 dark:bg-red-950/10',
         )}
       >
         <div
@@ -458,6 +472,7 @@ export default function ToolCall({
           className={cn(
             'overflow-hidden rounded-xl border border-border-light bg-surface-secondary shadow-md',
             showInfo && 'shadow-lg',
+            cancelled && 'bg-red-500/5 dark:bg-red-950/10',
           )}
           style={{
             transform: showInfo ? 'translateY(0) scale(1)' : 'translateY(-8px) scale(0.98)',

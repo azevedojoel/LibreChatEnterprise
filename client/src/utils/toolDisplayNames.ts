@@ -20,6 +20,16 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   tasks_deleteTask: 'Deleting Google Task',
   tasks_clearCompletedTasks: 'Clearing Completed Google Tasks',
   tasks_moveTask: 'Moving Google Task',
+  drive_search: 'Searched Google Drive',
+  gmail_search: 'Searched Gmail',
+  gmail_get: 'Retrieved email',
+  docs_create: 'Creating Google Doc',
+  // Microsoft To Do MCP tools (hyphen notation)
+  'list-todo-tasks': 'Listed To Do tasks',
+  'list-todo-task-lists': 'Listed To Do lists',
+  'create-todo-task': 'Creating To Do task',
+  'update-todo-task': 'Updating To Do task',
+  'delete-todo-task': 'Deleting To Do task',
 };
 
 /**

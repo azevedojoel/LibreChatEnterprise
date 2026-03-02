@@ -20,6 +20,7 @@ const {
   Constants,
   ContentTypes,
   isAssistantsEndpoint,
+  Tools,
 } = require('librechat-data-provider');
 const {
   getOAuthReconnectionManager,
@@ -637,8 +638,22 @@ function createToolInstance({
       if (isAssistantsEndpoint(provider) && Array.isArray(result)) {
         return result[0];
       }
-      if (isGoogle && Array.isArray(result[0]) && result[0][0]?.type === ContentTypes.TEXT) {
-        return [result[0][0].text, result[1]];
+      // When formatToolContent returns [formattedContent, artifacts] for content-array providers
+      // (google, anthropic, openai, azureopenai), extract the text so tool_call.output gets the
+      // plain string. This lets DriveSearch, GmailSearch, GmailGet parse the compact JSON correctly.
+      if (Array.isArray(result[0]) && result[0][0]?.type === ContentTypes.TEXT) {
+        const text = result[0]
+          .map((block) => (block.type === ContentTypes.TEXT ? block.text : ''))
+          .filter(Boolean)
+          .join('\n\n');
+        const artifacts = result[1];
+        const hasArtifacts =
+          artifacts &&
+          (artifacts.content?.length > 0 || artifacts[Tools.ui_resources]);
+        if (!hasArtifacts) {
+          return text;
+        }
+        return [text, artifacts];
       }
       return result;
     } catch (error) {
@@ -689,11 +704,13 @@ function createToolInstance({
     }
   };
 
+  // MCP tools (gmail, drive, etc.) return plain text/JSON, not artifacts. Use 'content' so
+  // the framework accepts a string return instead of requiring a two-tuple.
   const toolInstance = tool(_call, {
     schema,
     name: normalizedToolKey,
     description: description || '',
-    responseFormat: AgentConstants.CONTENT_AND_ARTIFACT,
+    responseFormat: 'content',
   });
   toolInstance.mcp = true;
   toolInstance.mcpRawServerName = serverName;

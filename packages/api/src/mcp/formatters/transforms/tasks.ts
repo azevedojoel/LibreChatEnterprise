@@ -34,47 +34,49 @@ function formatDate(val: unknown): string {
   return Number.isNaN(d.getTime()) ? val : d.toISOString().split('T')[0];
 }
 
+/** Compact JSON for custom UI: i=items, i[].id, i[].n=name, i[].s=status, i[].d=date, e=error, p=nextPageToken */
 function transformListTasks(parsed: unknown): string {
   const data = parsed as TaskListResponse;
-  if (data?.error) {
-    return data.error;
-  }
+  if (data?.error) return JSON.stringify({ e: data.error });
   const items = data?.items ?? [];
   if (items.length === 0) {
-    return data?.nextPageToken ? `(empty)\nnextPageToken: ${data.nextPageToken}` : '(empty)';
+    return data?.nextPageToken ? JSON.stringify({ i: [], p: data.nextPageToken }) : JSON.stringify({ i: [] });
   }
-  const rows = items.map((t) => {
-    const id = t?.id ?? '-';
-    const name = (t?.title ?? '').replace(/\|/g, '\\|').trim() || '-';
-    const status = t?.status ?? '-';
+  const i = items.map((t) => {
+    const o: { id?: string; n?: string; s?: string; d?: string } = {};
+    if (t?.id) o.id = t.id;
+    const name = (t?.title ?? '').trim();
+    if (name) o.n = name.slice(0, 200);
+    if (t?.status) o.s = t.status;
     const date = formatDate(t?.due ?? t?.updated);
-    return `${id} | ${name} | ${status} | ${date}`;
+    if (date !== '-') o.d = date;
+    return o;
   });
-  const header = 'id | name | status | date';
-  const sep = '---|------|--------|----------';
-  const body = [header, sep, ...rows].join('\n');
-  return data?.nextPageToken ? `${body}\nnextPageToken: ${data.nextPageToken}` : body;
+  const out: { i: typeof i; p?: string } = { i };
+  if (data?.nextPageToken) out.p = data.nextPageToken;
+  return JSON.stringify(out);
 }
 
+/** Compact JSON for custom UI: i=items, i[].id, i[].n=name, i[].d=date, e=error, p=nextPageToken */
 function transformListTaskLists(parsed: unknown): string {
   const data = parsed as TaskListListResponse;
-  if (data?.error) {
-    return data.error;
-  }
+  if (data?.error) return JSON.stringify({ e: data.error });
   const items = data?.items ?? [];
   if (items.length === 0) {
-    return data?.nextPageToken ? `(empty)\nnextPageToken: ${data.nextPageToken}` : '(empty)';
+    return data?.nextPageToken ? JSON.stringify({ i: [], p: data.nextPageToken }) : JSON.stringify({ i: [] });
   }
-  const rows = items.map((t) => {
-    const id = t?.id ?? '-';
-    const name = (t?.title ?? '').replace(/\|/g, '\\|').trim() || '-';
+  const i = items.map((t) => {
+    const o: { id?: string; n?: string; d?: string } = {};
+    if (t?.id) o.id = t.id;
+    const name = (t?.title ?? '').trim();
+    if (name) o.n = name.slice(0, 200);
     const date = formatDate(t?.updated);
-    return `${id} | ${name} | ${date}`;
+    if (date !== '-') o.d = date;
+    return o;
   });
-  const header = 'id | name | date';
-  const sep = '---|------|----------';
-  const body = [header, sep, ...rows].join('\n');
-  return data?.nextPageToken ? `${body}\nnextPageToken: ${data.nextPageToken}` : body;
+  const out: { i: typeof i; p?: string } = { i };
+  if (data?.nextPageToken) out.p = data.nextPageToken;
+  return JSON.stringify(out);
 }
 
 export function registerTaskTransforms(): void {

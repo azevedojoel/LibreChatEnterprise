@@ -83,8 +83,8 @@ function transformGetMailMessage(parsed: unknown): string {
   const rawBody = data?.body?.content ?? '';
   if (rawBody) {
     const isHtml = data?.body?.contentType === 'html';
-    const bodyText = isHtml ? stripHtml(rawBody, { maxLength: 2000 }) : rawBody;
-    parts.push(`body: ${escapeCell(bodyText).slice(0, 2000)}`);
+    const bodyText = isHtml ? stripHtml(rawBody, { maxLength: 5000 }) : rawBody;
+    parts.push(`body: ${escapeCell(bodyText).slice(0, 5000)}`);
   }
   if (data?.hasAttachments && data?.attachments?.length) {
     const attList = data.attachments

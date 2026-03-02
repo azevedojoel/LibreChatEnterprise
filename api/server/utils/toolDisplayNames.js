@@ -21,6 +21,10 @@ const TOOL_DISPLAY_NAMES = {
   tasks_deleteTask: 'Delete Task',
   tasks_clearCompletedTasks: 'Clear Completed Tasks',
   tasks_moveTask: 'Move Task',
+  drive_search: 'Searched Google Drive',
+  gmail_search: 'Searched Gmail',
+  gmail_get: 'Retrieved email',
+  docs_create: 'Creating Google Doc',
 };
 
 /**

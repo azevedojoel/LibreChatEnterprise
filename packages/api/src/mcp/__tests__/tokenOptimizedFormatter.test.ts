@@ -6,7 +6,7 @@ import { tokenOptimizedFormatter } from '../formatters/token-optimized';
 
 describe('tokenOptimizedFormatter', () => {
   describe('tasks_listTasks (Google)', () => {
-    it('strips URLs and returns compact id|name|status|date format', () => {
+    it('returns compact JSON with i (items), n (name), s (status), d (date)', () => {
       const input = JSON.stringify({
         items: [
           {
@@ -41,18 +41,13 @@ describe('tokenOptimizedFormatter', () => {
       expect(result).not.toContain('selfLink');
       expect(result).not.toContain('webViewLink');
       expect(result).not.toContain('etag');
-      expect(result).toContain('id | name | status | date');
-      expect(result).toContain('abc123');
-      expect(result).toContain('Buy milk');
-      expect(result).toContain('needsAction');
-      expect(result).toContain('2025-02-20');
-      expect(result).toContain('def456');
-      expect(result).toContain('Review PR');
-      expect(result).toContain('completed');
-      expect(result).toContain('2025-02-17');
+      const parsed = JSON.parse(result) as { i?: Array<{ id?: string; n?: string; s?: string; d?: string }> };
+      expect(parsed.i).toHaveLength(2);
+      expect(parsed.i?.[0]).toMatchObject({ id: 'abc123', n: 'Buy milk', s: 'needsAction', d: '2025-02-20' });
+      expect(parsed.i?.[1]).toMatchObject({ id: 'def456', n: 'Review PR', s: 'completed', d: '2025-02-17' });
     });
 
-    it('includes nextPageToken when present', () => {
+    it('includes p (nextPageToken) when present', () => {
       const input = JSON.stringify({
         items: [{ id: 'x', title: 'Task', status: 'needsAction', updated: '2025-02-17' }],
         nextPageToken: 'token-xyz',
@@ -63,21 +58,24 @@ describe('tokenOptimizedFormatter', () => {
         toolName: 'tasks_listTasks',
       });
 
-      expect(result).toContain('nextPageToken: token-xyz');
+      const parsed = JSON.parse(result) as { p?: string };
+      expect(parsed.p).toBe('token-xyz');
     });
 
-    it('returns (empty) for no items without nextPageToken', () => {
+    it('returns empty items JSON for no items without nextPageToken', () => {
       const input = JSON.stringify({ items: [] });
       const result = tokenOptimizedFormatter(input, {
         serverName: 'Google',
         toolName: 'tasks_listTasks',
       });
-      expect(result).toBe('(empty)');
+      const parsed = JSON.parse(result) as { i?: unknown[] };
+      expect(parsed.i).toEqual([]);
+      expect(parsed).not.toHaveProperty('p');
     });
   });
 
   describe('tasks_listTaskLists (Google)', () => {
-    it('returns compact id|name|date format', () => {
+    it('returns compact JSON with i (items), n (name), d (date)', () => {
       const input = JSON.stringify({
         items: [
           { id: 'list1', title: 'Personal', updated: '2025-02-17T10:00:00.000Z' },
@@ -90,13 +88,10 @@ describe('tokenOptimizedFormatter', () => {
         toolName: 'tasks_listTaskLists',
       });
 
-      expect(result).toContain('id | name | date');
-      expect(result).toContain('list1');
-      expect(result).toContain('Personal');
-      expect(result).toContain('2025-02-17');
-      expect(result).toContain('list2');
-      expect(result).toContain('Work');
-      expect(result).toContain('2025-02-16');
+      const parsed = JSON.parse(result) as { i?: Array<{ id?: string; n?: string; d?: string }> };
+      expect(parsed.i).toHaveLength(2);
+      expect(parsed.i?.[0]).toMatchObject({ id: 'list1', n: 'Personal', d: '2025-02-17' });
+      expect(parsed.i?.[1]).toMatchObject({ id: 'list2', n: 'Work', d: '2025-02-16' });
     });
   });
 
@@ -117,8 +112,8 @@ describe('tokenOptimizedFormatter', () => {
         toolName: 'tasks_listTasks',
       });
 
-      expect(result).toContain('id | name | status | date');
-      expect(result).toContain('Test task');
+      const parsed = JSON.parse(result) as { i?: Array<{ n?: string }> };
+      expect(parsed.i?.[0]?.n).toBe('Test task');
       expect(result).not.toContain('https://');
     });
   });
@@ -132,7 +127,7 @@ describe('tokenOptimizedFormatter', () => {
       });
 
       expect(result).toContain('[TOON:');
-      expect(result).not.toContain('id | name | status | date');
+      expect(result).not.toMatch(/\{"i":/);
     });
 
     it('delegates when ctx is missing', () => {
@@ -154,7 +149,7 @@ describe('tokenOptimizedFormatter', () => {
   });
 
   describe('gmail_search (Google)', () => {
-    it('returns compact id|threadId table with nextPageToken and resultSizeEstimate', () => {
+    it('returns compact JSON with m (messages), i (id), t (threadId)', () => {
       const input = JSON.stringify({
         messages: [
           { id: 'msg1', threadId: 'th1' },
@@ -167,18 +162,60 @@ describe('tokenOptimizedFormatter', () => {
         serverName: 'Google',
         toolName: 'gmail_search',
       });
-      expect(result).toContain('id | threadId');
-      expect(result).toContain('msg1');
-      expect(result).toContain('th1');
-      expect(result).toContain('nextPageToken: page-xyz');
-      expect(result).toContain('resultSizeEstimate: 42');
+      const parsed = JSON.parse(result) as { m?: Array<{ i?: string; t?: string }> };
+      expect(parsed.m).toHaveLength(2);
+      expect(parsed.m?.[0]).toEqual({ i: 'msg1', t: 'th1' });
+      expect(parsed.m?.[1]).toEqual({ i: 'msg2', t: 'th2' });
+    });
+
+    it('includes s (subject) and b (snippet) when present, truncated', () => {
+      const input = JSON.stringify({
+        messages: [
+          {
+            id: 'msg1',
+            threadId: 'th1',
+            subject: 'Re: Project update',
+            snippet: 'Thanks for the update. I will review and get back to you soon.',
+          },
+          {
+            id: 'msg2',
+            threadId: 'th2',
+            subject: 'A'.repeat(100),
+            snippet: 'B'.repeat(150),
+          },
+        ],
+      });
+      const result = tokenOptimizedFormatter(input, {
+        serverName: 'Google',
+        toolName: 'gmail_search',
+      });
+      const parsed = JSON.parse(result) as { m?: Array<{ i?: string; s?: string; b?: string }> };
+      expect(parsed.m).toHaveLength(2);
+      expect(parsed.m?.[0]).toEqual({
+        i: 'msg1',
+        t: 'th1',
+        s: 'Re: Project update',
+        b: 'Thanks for the update. I will review and get back to you soon.',
+      });
+      expect(parsed.m?.[1].s).toHaveLength(80);
+      expect(parsed.m?.[1].b).toHaveLength(100);
+    });
+
+    it('returns plain error string for { error: "..." } (formatter short-circuits before transform)', () => {
+      const input = JSON.stringify({ error: 'Invalid query' });
+      const result = tokenOptimizedFormatter(input, {
+        serverName: 'Google',
+        toolName: 'gmail_search',
+      });
+      expect(result).toBe('Invalid query');
     });
   });
 
   describe('gmail_get (Google)', () => {
-    it('strips HTML from body and returns compact metadata', () => {
+    it('returns compact JSON with i, t, s, f, d, b (strips HTML from body)', () => {
       const input = JSON.stringify({
         id: 'msg123',
+        threadId: 'th123',
         subject: 'Hello',
         from: 'alice@example.com',
         to: 'bob@example.com',
@@ -190,21 +227,23 @@ describe('tokenOptimizedFormatter', () => {
         serverName: 'Google',
         toolName: 'gmail_get',
       });
-      expect(result).toContain('id: msg123');
-      expect(result).toContain('subject: Hello');
-      expect(result).toContain('from: alice@example.com');
-      expect(result).not.toContain('<html>');
-      expect(result).not.toContain('<p>');
-      expect(result).toContain('important');
-      expect(result).toContain('doc.pdf');
-      expect(result).toContain('1024');
+      const parsed = JSON.parse(result) as { i?: string; t?: string; s?: string; f?: string; d?: string; b?: string };
+      expect(parsed.i).toBe('msg123');
+      expect(parsed.t).toBe('th123');
+      expect(parsed.s).toBe('Hello');
+      expect(parsed.f).toBe('alice@example.com');
+      expect(parsed.d).toBe('2025-02-17');
+      expect(parsed.b).toBeDefined();
+      expect(parsed.b).toContain('important');
+      expect(parsed.b).not.toContain('<html>');
     });
 
-    it('strips hrefs from links, keeping only link text', () => {
+    it('strips hrefs from links, keeping only link text in body', () => {
       const longUrl =
         'https://example.com/very/long/path/with/many/segments?utm_source=newsletter&utm_medium=email&utm_campaign=promo123';
       const input = JSON.stringify({
         id: 'msg456',
+        threadId: 'th456',
         subject: 'Check this',
         from: 'sender@example.com',
         to: 'recipient@example.com',
@@ -215,10 +254,11 @@ describe('tokenOptimizedFormatter', () => {
         serverName: 'Google',
         toolName: 'gmail_get',
       });
-      expect(result).toContain('here');
-      expect(result).toContain('Click');
-      expect(result).not.toContain(longUrl);
-      expect(result).not.toContain('utm_source');
+      const parsed = JSON.parse(result) as { b?: string };
+      expect(parsed.b).toContain('here');
+      expect(parsed.b).toContain('Click');
+      expect(parsed.b).not.toContain(longUrl);
+      expect(parsed.b).not.toContain('utm_source');
     });
   });
 
@@ -245,7 +285,7 @@ describe('tokenOptimizedFormatter', () => {
   });
 
   describe('drive_search (Google)', () => {
-    it('returns compact id|name|modifiedTime|mimeType table', () => {
+    it('returns compact JSON with f (files), i (id), n (name), m (modifiedTime)', () => {
       const input = JSON.stringify({
         files: [
           { id: 'f1', name: 'Report.pdf', modifiedTime: '2025-02-17T12:00:00Z', mimeType: 'application/pdf' },
@@ -256,10 +296,18 @@ describe('tokenOptimizedFormatter', () => {
         serverName: 'Google',
         toolName: 'drive_search',
       });
-      expect(result).toContain('id | name | modifiedTime | mimeType');
-      expect(result).toContain('f1');
-      expect(result).toContain('Report.pdf');
-      expect(result).toContain('nextPageToken: tok');
+      const parsed = JSON.parse(result) as { f?: Array<{ i?: string; n?: string; m?: string }> };
+      expect(parsed.f).toHaveLength(1);
+      expect(parsed.f?.[0]).toEqual({ i: 'f1', n: 'Report.pdf', m: '2025-02-17' });
+    });
+
+    it('returns plain error string for { error: "..." } (formatter short-circuits before transform)', () => {
+      const input = JSON.stringify({ error: 'Access denied' });
+      const result = tokenOptimizedFormatter(input, {
+        serverName: 'Google',
+        toolName: 'drive_search',
+      });
+      expect(result).toBe('Access denied');
     });
   });
 
@@ -357,7 +405,7 @@ describe('tokenOptimizedFormatter', () => {
   });
 
   describe('list-todo-tasks (Microsoft)', () => {
-    it('returns compact id|name|status|date format', () => {
+    it('returns compact JSON with i (items), n (name), s (status), d (date)', () => {
       const input = JSON.stringify({
         value: [
           { id: 'task1', title: 'Review docs', status: 'notStarted', dueDateTime: { dateTime: '2025-02-20T17:00:00Z' } },
@@ -367,15 +415,14 @@ describe('tokenOptimizedFormatter', () => {
         serverName: 'Microsoft',
         toolName: 'list-todo-tasks',
       });
-      expect(result).toContain('id | name | status | date');
-      expect(result).toContain('task1');
-      expect(result).toContain('Review docs');
-      expect(result).toContain('notStarted');
+      const parsed = JSON.parse(result) as { i?: Array<{ id?: string; n?: string; s?: string; d?: string }> };
+      expect(parsed.i).toHaveLength(1);
+      expect(parsed.i?.[0]).toMatchObject({ id: 'task1', n: 'Review docs', s: 'notStarted', d: '2025-02-20' });
     });
   });
 
   describe('list-todo-task-lists (Microsoft)', () => {
-    it('returns compact id|name format', () => {
+    it('returns compact JSON with i (items), id, n (name)', () => {
       const input = JSON.stringify({
         value: [{ id: 'list1', displayName: 'Work' }],
       });
@@ -383,9 +430,9 @@ describe('tokenOptimizedFormatter', () => {
         serverName: 'Microsoft',
         toolName: 'list-todo-task-lists',
       });
-      expect(result).toContain('id | name');
-      expect(result).toContain('list1');
-      expect(result).toContain('Work');
+      const parsed = JSON.parse(result) as { i?: Array<{ id?: string; n?: string }> };
+      expect(parsed.i).toHaveLength(1);
+      expect(parsed.i?.[0]).toMatchObject({ id: 'list1', n: 'Work' });
     });
   });
 });
