@@ -121,7 +121,6 @@ export default function useResumableSSE(
     attachmentHandler,
     executeCodeOutputHandler,
     resetContentHandler,
-    handleAgentHandoff,
     onToolConfirmationRequired,
   } = useEventHandlers({
     setMessages,
@@ -231,14 +230,6 @@ export default function useResumableSSE(
               data: data.data,
               submission: currentSubmission as EventSubmission,
             });
-            return;
-          }
-
-          if (data.event === 'agent_handoff' && data.data?.agent_id) {
-            handleAgentHandoff(
-              data.data.agent_id,
-              currentSubmission.conversation?.conversationId,
-            );
             return;
           }
 
@@ -593,7 +584,6 @@ export default function useResumableSSE(
       setIsSubmitting,
       getMessages,
       setMessages,
-      handleAgentHandoff,
       startupConfig?.balance?.enabled,
       balanceQuery,
       removeActiveJob,

@@ -1,16 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
-import { EModelEndpoint, Constants, QueryKeys } from 'librechat-data-provider';
-import type { TConversation } from 'librechat-data-provider';
+import React, { useMemo, useState } from 'react';
+import { EModelEndpoint, Constants } from 'librechat-data-provider';
 import { ChevronDown } from 'lucide-react';
 import type { TMessage } from 'librechat-data-provider';
 import MessageIcon from '~/components/Share/MessageIcon';
 import { useAgentsMapContext } from '~/Providers';
 import { useLocalize } from '~/hooks';
-import { cn, updateConvoInAllQueries } from '~/utils';
-import { useMessageContext } from '~/Providers/MessageContext';
-import { useChatContext } from '~/Providers';
+import { cn } from '~/utils';
 
 interface AgentHandoffProps {
   name: string;
@@ -22,11 +17,6 @@ const AgentHandoff: React.FC<AgentHandoffProps> = ({ name, args: _args = '' }) =
   const localize = useLocalize();
   const agentsMap = useAgentsMapContext();
   const [showInfo, setShowInfo] = useState(false);
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const { setConversation } = useChatContext();
-  const { conversationId, isLatestMessage } = useMessageContext();
-  const handoffFiredRef = useRef(false);
 
   /** Extracted agent ID from tool name (e.g., "lc_transfer_to_agent_gUV0wMb7zHt3y3Xjz-8_4" -> "agent_gUV0wMb7zHt3y3Xjz-8_4") */
   const targetAgentId = useMemo(() => {
@@ -56,33 +46,6 @@ const AgentHandoff: React.FC<AgentHandoffProps> = ({ name, args: _args = '' }) =
 
   /** Requires more than 2 characters as can be an empty object: `{}` */
   const hasInfo = useMemo(() => (args?.trim()?.length ?? 0) > 2, [args]);
-
-  /** When handoff tool is displayed, update conversation to the new agent (UI + URL + caches) */
-  useEffect(() => {
-    if (!targetAgentId || !conversationId || isLatestMessage === false || handoffFiredRef.current) {
-      return;
-    }
-    handoffFiredRef.current = true;
-
-    navigate(`/c/${conversationId}?agent_id=${targetAgentId}`, { replace: true });
-    setConversation((prev) => (prev ? { ...prev, agent_id: targetAgentId, spec: '' } : prev));
-    queryClient.setQueryData<TConversation>([QueryKeys.conversation, conversationId], (prev) =>
-      prev ? { ...prev, agent_id: targetAgentId, spec: '' } : prev,
-    );
-    updateConvoInAllQueries(queryClient, conversationId, (c) => ({
-      ...c,
-      agent_id: targetAgentId,
-      spec: '',
-    }));
-
-  }, [
-    targetAgentId,
-    conversationId,
-    isLatestMessage,
-    navigate,
-    setConversation,
-    queryClient,
-  ]);
 
   return (
     <div className="my-3">

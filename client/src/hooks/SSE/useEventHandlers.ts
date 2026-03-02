@@ -39,9 +39,6 @@ import useContentHandler from '~/hooks/SSE/useContentHandler';
 import useStepHandler from '~/hooks/SSE/useStepHandler';
 import { useApplyAgentTemplate } from '~/hooks/Agents';
 import { useAuthContext } from '~/hooks/AuthContext';
-import { useLocalize } from '~/hooks';
-import { useAgentsMapContext } from '~/Providers/AgentsMapContext';
-import { useToastContext } from '@librechat/client';
 import { MESSAGE_UPDATE_INTERVAL } from '~/common';
 import { useLiveAnnouncer } from '~/Providers';
 import store from '~/store';
@@ -187,46 +184,12 @@ export default function useEventHandlers({
   const setPendingToolConfirmation = useSetRecoilState(store.pendingToolConfirmationAtom);
   const navigate = useNavigate();
   const location = useLocation();
-  const agentsMap = useAgentsMapContext();
-  const { showToast } = useToastContext();
-  const localize = useLocalize();
 
   const lastAnnouncementTimeRef = useRef(Date.now());
   const { conversationId: paramId } = useParams();
   const { token } = useAuthContext();
 
   const { contentHandler, resetContentHandler } = useContentHandler({ setMessages, getMessages });
-
-  const handleAgentHandoff = useCallback(
-    (agentId: string, conversationId: string | undefined) => {
-      if (setConversation) {
-        setConversation((prev) =>
-          prev ? { ...prev, agent_id: agentId, spec: '' } : prev,
-        );
-      }
-      if (conversationId) {
-        queryClient.setQueryData<TConversation>(
-          [QueryKeys.conversation, conversationId],
-          (prev) => (prev ? { ...prev, agent_id: agentId, spec: '' } : prev),
-        );
-        updateConvoInAllQueries(queryClient, conversationId, (c) => ({
-          ...c,
-          agent_id: agentId,
-          spec: '',
-        }));
-      }
-      const agentName = agentsMap?.[agentId]?.name ?? agentId;
-      const message = `${localize('com_ui_transferred_to')} ${agentName}`;
-      showToast({ message, status: 'success' });
-    },
-    [
-      setConversation,
-      queryClient,
-      agentsMap,
-      showToast,
-      localize,
-    ],
-  );
 
   const onAuthMerged = useCallback(
     (authUrl: string, toolName: string) => {
@@ -717,14 +680,11 @@ export default function useEventHandlers({
             if (prevState?.model != null && prevState.model !== submissionConvo.model) {
               update.model = prevState.model;
             }
+            // Preserve original conversation agent - don't switch to handoff target when server returns different agent_id
             const submissionAgentId = submissionConvo?.agent_id;
-            if (
-              prevState?.agent_id &&
-              prevState.agent_id !== submissionAgentId &&
-              update.agent_id !== prevState.agent_id
-            ) {
-              update.agent_id = prevState.agent_id;
-              update.spec = prevState.spec ?? '';
+            if (submissionAgentId && update.agent_id && update.agent_id !== submissionAgentId) {
+              update.agent_id = submissionAgentId;
+              update.spec = submissionConvo.spec ?? '';
             }
             const cachedConvo = queryClient.getQueryData<TConversation>([
               QueryKeys.conversation,
@@ -1015,7 +975,6 @@ export default function useEventHandlers({
     executeCodeOutputHandler,
     abortConversation,
     resetContentHandler,
-    handleAgentHandoff,
     onToolConfirmationRequired,
   };
 }
