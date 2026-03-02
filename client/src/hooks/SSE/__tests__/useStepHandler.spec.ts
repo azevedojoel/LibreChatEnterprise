@@ -790,6 +790,111 @@ describe('useStepHandler', () => {
       expect(mockSetMessages).not.toHaveBeenCalled();
     });
 
+    it('should update correct tool call slot by id when multiple tools complete (no duplicate loading/completed)', () => {
+      const responseMessage = createResponseMessage();
+      mockGetMessages.mockReturnValue([responseMessage]);
+
+      const { result } = renderHook(() => useStepHandler(createHookParams()));
+      const submission = createSubmission();
+
+      // One step with two tool calls - both share runStep.index
+      const runStepWithTwoTools: Agents.RunStep = {
+        id: 'step-two-tools',
+        runId: 'response-msg-1',
+        index: 0,
+        type: StepTypes.TOOL_CALLS,
+        stepDetails: {
+          type: StepTypes.TOOL_CALLS,
+          tool_calls: [
+            { id: 'tool-get-user', name: 'get_user_details', args: '{}', type: ToolCallTypes.TOOL_CALL },
+            { id: 'tool-search-crm', name: 'search_crm_objects', args: '{}', type: ToolCallTypes.TOOL_CALL },
+          ],
+        },
+        usage: null,
+      };
+
+      act(() => {
+        result.current.stepHandler({ event: 'on_run_step', data: runStepWithTwoTools }, submission);
+      });
+
+      mockSetMessages.mockClear();
+
+      // Complete first tool
+      act(() => {
+        result.current.stepHandler(
+          {
+            event: 'on_run_step_completed',
+            data: {
+              result: {
+                id: 'step-two-tools',
+                index: 0,
+                tool_call: {
+                  id: 'tool-get-user',
+                  name: 'get_user_details',
+                  args: '{}',
+                  output: 'User details result',
+                  type: ToolCallTypes.TOOL_CALL,
+                },
+              },
+            },
+          } as unknown as { event: string; data: Agents.ToolEndEvent },
+          submission,
+        );
+      });
+
+      // Complete second tool
+      act(() => {
+        result.current.stepHandler(
+          {
+            event: 'on_run_step_completed',
+            data: {
+              result: {
+                id: 'step-two-tools',
+                index: 0,
+                tool_call: {
+                  id: 'tool-search-crm',
+                  name: 'search_crm_objects',
+                  args: '{}',
+                  output: '0 results',
+                  type: ToolCallTypes.TOOL_CALL,
+                },
+              },
+            },
+          } as unknown as { event: string; data: Agents.ToolEndEvent },
+          submission,
+        );
+      });
+
+      expect(mockSetMessages).toHaveBeenCalled();
+      const lastCall = mockSetMessages.mock.calls[mockSetMessages.mock.calls.length - 1][0];
+      const responseMsg = lastCall.find((m: TMessage) => !m.isCreatedByUser);
+      const toolCallParts = (responseMsg?.content ?? []).filter(
+        (c: TMessageContentParts) => c.type === ContentTypes.TOOL_CALL,
+      );
+
+      expect(toolCallParts).toHaveLength(2);
+
+      const getUserPart = toolCallParts.find(
+        (p: TMessageContentParts) => (p as { tool_call?: { id?: string } }).tool_call?.id === 'tool-get-user',
+      );
+      const searchCrmPart = toolCallParts.find(
+        (p: TMessageContentParts) => (p as { tool_call?: { id?: string } }).tool_call?.id === 'tool-search-crm',
+      );
+
+      expect(getUserPart?.tool_call?.output).toBe('User details result');
+      expect(searchCrmPart?.tool_call?.output).toBe('0 results');
+      expect(getUserPart?.tool_call?.progress).toBe(1);
+      expect(searchCrmPart?.tool_call?.progress).toBe(1);
+
+      // No duplicate: each tool appears once with output
+      const loadingCount = toolCallParts.filter(
+        (p: TMessageContentParts) =>
+          (p as { tool_call?: { output?: string } }).tool_call?.output == null ||
+          (p as { tool_call?: { output?: string } }).tool_call?.output === '',
+      ).length;
+      expect(loadingCount).toBe(0);
+    });
+
   });
 
   describe('clearStepMaps', () => {

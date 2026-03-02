@@ -709,8 +709,29 @@ export default function useStepHandler({
             tool_call: toolCallResult,
           };
 
-          // Use server's index, offset by initialContent for edit scenarios
-          const currentIndex = runStep.index + initialContent.length;
+          // Resolve content index by tool_call.id (runStep.index misaligns when think/text are interleaved)
+          let currentIndex: number | undefined;
+          const toolCallId = toolCallResult.id;
+
+          if (toolCallId) {
+            const content = updatedResponse.content ?? [];
+            const foundIdx = content.findIndex((part) => {
+              if (part?.type !== ContentTypes.TOOL_CALL) return false;
+              const tc = (part as Agents.ToolCallContent).tool_call;
+              if (!tc || tc.id !== toolCallId) return false;
+              const hasOutput = tc.output != null && tc.output !== '';
+              return !hasOutput; // Match the slot that hasn't received output yet
+            });
+            if (foundIdx >= 0) currentIndex = foundIdx;
+          }
+
+          if (currentIndex == null && typeof result.index === 'number') {
+            currentIndex = result.index;
+          }
+          if (currentIndex == null) {
+            currentIndex = runStep.index + initialContent.length;
+          }
+
           updatedResponse = updateContent(
             updatedResponse,
             currentIndex,
