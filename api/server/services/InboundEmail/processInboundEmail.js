@@ -12,9 +12,11 @@ const { sendInboundReply } = require('~/server/services/sendInboundReply');
 const { initializeClient } = require('~/server/services/Endpoints/agents');
 const { buildOptions } = require('~/server/services/Endpoints/agents/build');
 const { runAgentGeneration } = require('~/server/controllers/agents/runAgentGeneration');
+const addTitle = require('~/server/services/Endpoints/agents/title');
 const { getConvoFiles } = require('~/models/Conversation');
 const { processEmailAttachments } = require('./processEmailAttachments');
 const db = require('~/models');
+const { Conversation } = require('~/db/models');
 
 const MAILBOX_HASH_DELIMITER = '__';
 
@@ -137,7 +139,7 @@ async function processInboundEmail(payload) {
   }
 
   const senderUserId = targetUser._id?.toString?.() ?? targetUser._id;
-  const senderUser = await findUser({ _id: senderUserId }, '_id role');
+  const senderUser = await findUser({ _id: senderUserId }, '_id role projectId');
   if (!senderUser) {
     logger.warn('[InboundEmail] Sender user not found');
     return;
@@ -233,7 +235,13 @@ async function processInboundEmail(payload) {
   };
 
   const syntheticReq = {
-    user: { id: senderUserId, role: senderUser.role },
+    user: {
+      id: senderUserId,
+      role: senderUser.role,
+      ...(senderUser.projectId && {
+        projectId: senderUser.projectId?.toString?.() ?? senderUser.projectId,
+      }),
+    },
     config: appConfig,
     body,
   };
@@ -304,6 +312,8 @@ async function processInboundEmail(payload) {
         parentMessageId,
         isHeadless: true,
         capturedOAuthUrls,
+        addTitle,
+        reqConversationId: parsedConversationId || 'new',
       },
     });
 
@@ -329,23 +339,6 @@ async function processInboundEmail(payload) {
         emailHtmlBody = null;
       }
     }
-
-    const { saveConvo } = require('~/models/Conversation');
-    const existingFileIds = (await getConvoFiles(conversationId)) ?? [];
-    const allFileIds = [...existingFileIds, ...requestFiles.map((f) => f.file_id)];
-
-    await saveConvo(
-      syntheticReq,
-      {
-        conversationId,
-        endpoint: EModelEndpoint.agents,
-        agentId: agent.id,
-        title: agent.name || `Email from ${fromEmail}`,
-        model: agent.model,
-        files: allFileIds,
-      },
-      { context: 'InboundEmail - save conversation' },
-    );
   } catch (err) {
     logger.error('[InboundEmail] Run failed', err);
     const baseUrl = process.env.DOMAIN_CLIENT || process.env.DOMAIN_SERVER || 'http://localhost:3080';
@@ -372,6 +365,7 @@ async function processInboundEmail(payload) {
     emailHtmlBody = errorHtml;
   }
 
+  // Send reply first so user receives it even if persistence hangs or fails
   logger.info(
     `[InboundEmail] Sending reply to=${fromEmail} bodyLength=${emailBody?.length ?? 0}`,
   );
@@ -385,6 +379,36 @@ async function processInboundEmail(payload) {
   logger.info(`[InboundEmail] Reply sent success=${sendResult.success}`);
   if (!sendResult.success) {
     logger.error('[InboundEmail] Failed to send reply:', sendResult.error);
+  }
+
+  // Persistence after send (non-blocking; failures logged but reply already sent)
+  try {
+    logger.info('[InboundEmail] Step: fetching convo files');
+    const { saveConvo } = require('~/models/Conversation');
+    const existingFileIds = (await getConvoFiles(conversationId)) ?? [];
+    const allFileIds = [...existingFileIds, ...requestFiles.map((f) => f.file_id)];
+
+    logger.info('[InboundEmail] Step: saving conversation');
+    await saveConvo(
+      syntheticReq,
+      {
+        conversationId,
+        endpoint: EModelEndpoint.agents,
+        agentId: agent.id,
+        model: agent.model,
+        files: allFileIds,
+      },
+      { context: 'InboundEmail - save conversation' },
+    );
+
+    logger.info('[InboundEmail] Step: updating conversation tags');
+    await Conversation.updateOne(
+      { conversationId, user: senderUserId },
+      { $addToSet: { tags: 'inbound_email' } },
+    );
+    logger.info('[InboundEmail] Step: persistence complete');
+  } catch (persistErr) {
+    logger.error('[InboundEmail] Persistence failed (reply already sent)', persistErr);
   }
 }
 

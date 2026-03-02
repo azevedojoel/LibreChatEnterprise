@@ -264,6 +264,23 @@ async function runAgentGeneration({
     }
   } else {
     GenerationJobManager.completeJob(streamId);
+
+    const isNewConvo = !reqConversationId || reqConversationId === 'new';
+    const shouldGenerateTitle =
+      addTitle &&
+      parentMessageId === Constants.NO_PARENT &&
+      isNewConvo &&
+      !wasAbortedBeforeComplete;
+
+    if (shouldGenerateTitle) {
+      await addTitle(req, {
+        text,
+        response: { ...response, conversationId },
+        client,
+      }).catch((err) => {
+        logger.error('[runAgentGeneration] Error in title generation (headless)', err);
+      });
+    }
   }
 
   if (client) {

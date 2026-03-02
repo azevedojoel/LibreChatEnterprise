@@ -126,9 +126,28 @@ function startInboundEmailWorker() {
   worker = new Worker(
     QUEUE_NAME,
     async (job) => {
-      const { payload } = job.data;
-      logger.info(`[InboundEmail] Processing job: jobId=${job.id}`);
-      await processInboundEmail(payload);
+      try {
+        const { payload } = job.data;
+        logger.info(`[InboundEmail] Processing job: jobId=${job.id}`);
+        let timeoutId;
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutId = setTimeout(
+            () => reject(new Error(`Job timed out after ${JOB_TIMEOUT_MS / 1000}s`)),
+            JOB_TIMEOUT_MS,
+          );
+        });
+        try {
+          await Promise.race([processInboundEmail(payload), timeoutPromise]);
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      } catch (err) {
+        logger.error(`[InboundEmail] Job handler error: jobId=${job?.id}`, {
+          message: err?.message,
+          stack: err?.stack,
+        });
+        throw err;
+      }
     },
     {
       connection,

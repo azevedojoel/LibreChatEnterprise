@@ -17,6 +17,7 @@ async function sendInboundReply({ to, subject, body, html, replyTo }) {
 
   if (!apiKey) {
     logger.error('[sendInboundReply] No Postmark API key configured');
+    logger.info('[sendInboundReply] Set POSTMARK_API_KEY to enable reply emails');
     return { success: false, error: 'Postmark not configured' };
   }
 
@@ -61,6 +62,10 @@ async function sendInboundReply({ to, subject, body, html, replyTo }) {
       };
     }
 
+    logger.info('[sendInboundReply] Sent successfully', {
+      to,
+      messageId: data.MessageID,
+    });
     return { success: true, messageId: data.MessageID };
   } catch (err) {
     logger.error('[sendInboundReply] Error sending email:', err);
