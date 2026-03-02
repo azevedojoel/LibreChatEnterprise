@@ -1204,9 +1204,18 @@ class AgentClient extends BaseClient {
           '[api/server/controllers/agents/client.js #sendCompletion] Unhandled error type',
           err,
         );
+        let errorContent = `An error occurred while processing the request${err?.message ? `: ${err.message}` : ''}`;
+        try {
+          const parsed = JSON.parse(err?.message);
+          if (parsed?.error?.type === 'overloaded_error') {
+            errorContent = JSON.stringify({ type: 'overloaded_error', ...parsed });
+          }
+        } catch (_) {
+          /* keep original */
+        }
         this.contentParts.push({
           type: ContentTypes.ERROR,
-          [ContentTypes.ERROR]: `An error occurred while processing the request${err?.message ? `: ${err.message}` : ''}`,
+          [ContentTypes.ERROR]: errorContent,
         });
       }
     } finally {

@@ -44,6 +44,8 @@ const errorMessages = {
   [ErrorTypes.INVALID_ACTION]: `com_error_${ErrorTypes.INVALID_ACTION}`,
   [ErrorTypes.INVALID_REQUEST]: `com_error_${ErrorTypes.INVALID_REQUEST}`,
   [ErrorTypes.REFUSAL]: 'com_error_refusal',
+  [ErrorTypes.OVERLOADED]: 'com_error_overloaded',
+  overloaded_error: 'com_error_overloaded',
   [ErrorTypes.MISSING_MODEL]: (json: TGenericError, localize: LocalizeFunction) => {
     const { info: endpoint } = json;
     const provider = (alternateName[endpoint ?? ''] as string | undefined) ?? endpoint ?? 'unknown';
@@ -133,7 +135,9 @@ const Error = ({ text }: { text: string }) => {
   }
 
   const json = JSON.parse(jsonString);
-  const errorKey = json.code || json.type;
+  // Resolve error key - support nested API error structure (e.g., Anthropic overloaded_error)
+  const errorKey =
+    json.type === 'error' && json.error?.type ? json.error.type : json.code || json.type;
   const keyExists = errorKey && errorMessages[errorKey];
 
   if (keyExists && typeof errorMessages[errorKey] === 'function') {

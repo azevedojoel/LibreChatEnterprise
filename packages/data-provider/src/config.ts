@@ -709,6 +709,8 @@ export const interfaceSchema = z
     scheduledAgents: z.boolean().optional(),
     toolCallDetails: z.boolean().optional(),
     toolCallSpacing: z.enum(['normal', 'compact']).optional(),
+    /** MCP server names to show in the dashboard integrations widget (e.g. ['Google', 'Microsoft']) */
+    dashboardIntegrations: z.array(z.string()).optional(),
   })
   .default({
     endpointsMenu: true,
@@ -1648,6 +1650,10 @@ export enum ErrorTypes {
    * Model refused to respond (content policy violation)
    */
   REFUSAL = 'refusal',
+  /**
+   * AI provider overloaded (e.g., Anthropic 529 - compute clusters saturated)
+   */
+  OVERLOADED = 'overloaded_error',
 }
 
 /**

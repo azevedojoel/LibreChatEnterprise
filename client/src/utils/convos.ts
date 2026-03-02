@@ -142,6 +142,21 @@ export type ConversationCursorData = {
   nextCursor?: string | null;
 };
 
+function queryHasTagsFilter(queryKey: unknown[]): string[] | null {
+  const params = queryKey[1];
+  if (params && typeof params === 'object' && 'tags' in params) {
+    const tags = (params as { tags?: string[] }).tags;
+    return Array.isArray(tags) && tags.length > 0 ? tags : null;
+  }
+  return null;
+}
+
+function conversationMatchesTagsFilter(convo: TConversation, requiredTags: string[]): boolean {
+  const convoTags = convo?.tags;
+  if (!Array.isArray(convoTags)) return false;
+  return requiredTags.every((t) => convoTags.includes(t));
+}
+
 // === InfiniteData helpers for cursor-based convo queries ===
 
 export function findConversationInInfinite(
@@ -208,6 +223,10 @@ export function addConversationToAllConversationsQueries(
     .findAll([QueryKeys.allConversations], { exact: false });
 
   for (const query of queries) {
+    const requiredTags = queryHasTagsFilter(query.queryKey);
+    if (requiredTags && !conversationMatchesTagsFilter(newConversation, requiredTags)) {
+      continue;
+    }
     queryClient.setQueryData<InfiniteData<ConversationCursorData>>(query.queryKey, (old) => {
       if (
         !old ||
@@ -322,6 +341,10 @@ export function addConvoToAllQueries(queryClient: QueryClient, newConvo: TConver
     .findAll([QueryKeys.allConversations], { exact: false });
 
   for (const query of queries) {
+    const requiredTags = queryHasTagsFilter(query.queryKey);
+    if (requiredTags && !conversationMatchesTagsFilter(newConvo, requiredTags)) {
+      continue;
+    }
     queryClient.setQueryData<InfiniteData<ConversationCursorData>>(query.queryKey, (oldData) => {
       if (!oldData) {
         return oldData;
@@ -359,6 +382,7 @@ export function updateConvoInAllQueries(
     .findAll([QueryKeys.allConversations], { exact: false });
 
   for (const query of queries) {
+    const requiredTags = queryHasTagsFilter(query.queryKey);
     queryClient.setQueryData<InfiniteData<ConversationCursorData>>(query.queryKey, (oldData) => {
       if (!oldData) {
         return oldData;
@@ -386,6 +410,18 @@ export function updateConvoInAllQueries(
       const updated = moveToTop
         ? { ...updater(found), updatedAt: new Date().toISOString() }
         : updater(found);
+
+      // For queries with tags filter: if updated conversation no longer matches, remove it
+      if (requiredTags && !conversationMatchesTagsFilter(updated, requiredTags)) {
+        const newPages = oldData.pages
+          .map((page, pi) =>
+            pi === pageIdx
+              ? { ...page, conversations: page.conversations.filter((_, ci) => ci !== convoIdx) }
+              : page,
+          )
+          .filter((page) => page.conversations.length > 0);
+        return { ...oldData, pages: newPages };
+      }
 
       // If not moving to top, or already at top of page 0, update in place
       if (!moveToTop || (pageIdx === 0 && convoIdx === 0)) {

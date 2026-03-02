@@ -16,8 +16,9 @@ import {
   useAuthContext,
 } from '~/hooks';
 import { useGetAgentsConfig } from '~/hooks/Agents';
+import { useGetStartupConfig } from '~/data-provider';
 import ConversationStarters from './Input/ConversationStarters';
-import { EmailEllisWidget, CRMWidget } from './Dashboard';
+import { EmailEllisWidget, CRMWidget, IntegrationsWidget } from './Dashboard';
 import { useGetMessagesByConvoId } from '~/data-provider';
 import MessagesView from './Messages/MessagesView';
 import Presentation from './Presentation';
@@ -38,10 +39,16 @@ function LoadingSpinner() {
   );
 }
 
+const DEFAULT_DASHBOARD_INTEGRATIONS = ['Google', 'Microsoft'];
+
 function ChatView({ index = 0 }: { index?: number }) {
   const { conversationId } = useParams();
   const { user } = useAuthContext();
   const { agentsConfig } = useGetAgentsConfig();
+  const { data: startupConfig } = useGetStartupConfig();
+  const dashboardIntegrations =
+    startupConfig?.interface?.dashboardIntegrations ?? DEFAULT_DASHBOARD_INTEGRATIONS;
+  const showIntegrationsGrid = dashboardIntegrations.length > 0;
   const rootSubmission = useRecoilValue(store.submissionByIndex(index));
   const centerFormOnLanding = useRecoilValue(store.centerFormOnLanding);
 
@@ -106,12 +113,16 @@ function ChatView({ index = 0 }: { index?: number }) {
                       : 'h-full',
                   )}
                 >
-                  {isLandingPage && (agentsConfig?.inboundEmailAddress || user?.projectId) && (
-                    <div className="mb-6 grid w-full max-w-3xl grid-cols-1 gap-4 px-4 pt-6 sm:grid-cols-2 [&>*:only-child]:sm:col-span-2 xl:max-w-4xl">
-                      <EmailEllisWidget />
-                      <CRMWidget />
-                    </div>
-                  )}
+                  {isLandingPage &&
+                    (agentsConfig?.inboundEmailAddress ||
+                      user?.projectId ||
+                      showIntegrationsGrid) && (
+                      <div className="mb-6 grid w-full max-w-3xl grid-cols-1 gap-4 px-4 pt-6 sm:grid-cols-2 [&>*:only-child]:sm:col-span-2 xl:max-w-4xl">
+                        <EmailEllisWidget />
+                        <CRMWidget />
+                        <IntegrationsWidget />
+                      </div>
+                    )}
                   {content}
                   <div
                     className={cn(

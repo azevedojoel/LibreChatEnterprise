@@ -688,6 +688,72 @@ describe('Conversation Utilities', () => {
         expect(mainData!.pages[0].conversations[0].conversationId).toBe('b');
         expect(otherData!.pages[0].conversations[0].conversationId).toBe('b');
       });
+
+      it('addConvoToAllQueries does NOT add to query with tags filter when conversation has no tags', () => {
+        const emailQueryKey = [
+          'allConversations',
+          { tags: ['inbound_email'], limit: 4, sortBy: 'updatedAt', sortDirection: 'desc' },
+        ];
+        queryClient.setQueryData(emailQueryKey, {
+          pages: [{ conversations: [convoA], nextCursor: null }],
+          pageParams: [],
+        });
+
+        const convoWithoutTags = { ...convoB } as TConversation;
+        delete (convoWithoutTags as any).tags;
+        addConvoToAllQueries(queryClient, convoWithoutTags);
+
+        const emailData = queryClient.getQueryData<InfiniteData<any>>(emailQueryKey);
+        expect(emailData!.pages[0].conversations).toHaveLength(1);
+        expect(emailData!.pages[0].conversations[0].conversationId).toBe('a');
+
+        const mainData = queryClient.getQueryData<InfiniteData<any>>(['allConversations']);
+        expect(mainData!.pages[0].conversations).toHaveLength(2);
+        expect(mainData!.pages[0].conversations[0].conversationId).toBe('b');
+      });
+
+      it('addConvoToAllQueries DOES add to query with tags filter when conversation has matching tag', () => {
+        const emailQueryKey = [
+          'allConversations',
+          { tags: ['inbound_email'], limit: 4, sortBy: 'updatedAt', sortDirection: 'desc' },
+        ];
+        queryClient.setQueryData(emailQueryKey, {
+          pages: [{ conversations: [convoA], nextCursor: null }],
+          pageParams: [],
+        });
+
+        const convoWithInboundEmail = {
+          ...convoB,
+          tags: ['inbound_email'],
+        } as TConversation;
+        addConvoToAllQueries(queryClient, convoWithInboundEmail);
+
+        const emailData = queryClient.getQueryData<InfiniteData<any>>(emailQueryKey);
+        expect(emailData!.pages[0].conversations).toHaveLength(2);
+        expect(emailData!.pages[0].conversations[0].conversationId).toBe('b');
+        expect(emailData!.pages[0].conversations[0].tags).toContain('inbound_email');
+      });
+
+      it('addConversationToAllConversationsQueries does NOT add to query with tags filter when conversation has no tags', () => {
+        const emailQueryKey = [
+          'allConversations',
+          { tags: ['inbound_email'], limit: 4, sortBy: 'updatedAt', sortDirection: 'desc' },
+        ];
+        queryClient.setQueryData(emailQueryKey, {
+          pages: [{ conversations: [], nextCursor: null }],
+          pageParams: [],
+        });
+
+        const convoWithoutTags = { ...convoB } as TConversation;
+        delete (convoWithoutTags as any).tags;
+        addConversationToAllConversationsQueries(queryClient, convoWithoutTags);
+
+        const emailData = queryClient.getQueryData<InfiniteData<any>>(emailQueryKey);
+        expect(emailData!.pages[0].conversations).toHaveLength(0);
+
+        const mainData = queryClient.getQueryData<InfiniteData<any>>(['allConversations']);
+        expect(mainData!.pages[0].conversations[0].conversationId).toBe('b');
+      });
     });
   });
 });
