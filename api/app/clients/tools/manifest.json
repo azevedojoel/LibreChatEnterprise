@@ -179,5 +179,138 @@
         "description": "Your Postmark Server API Token from Postmark."
       }
     ]
+  },
+  {
+    "name": "List Pipelines",
+    "pluginKey": "crm_list_pipelines",
+    "description": "List all CRM pipelines.",
+    "icon": "assets/crm.png",
+    "authConfig": []
+  },
+  {
+    "name": "Create Pipeline",
+    "pluginKey": "crm_create_pipeline",
+    "description": "Create a CRM pipeline.",
+    "icon": "assets/crm.png",
+    "authConfig": []
+  },
+  {
+    "name": "Update Pipeline",
+    "pluginKey": "crm_update_pipeline",
+    "description": "Update a CRM pipeline.",
+    "icon": "assets/crm.png",
+    "authConfig": []
+  },
+  {
+    "name": "Delete Pipeline",
+    "pluginKey": "crm_soft_delete_pipeline",
+    "description": "Soft delete a CRM pipeline.",
+    "icon": "assets/crm.png",
+    "authConfig": []
+  },
+  {
+    "name": "Create Contact",
+    "pluginKey": "crm_create_contact",
+    "description": "Create a CRM contact.",
+    "icon": "assets/crm.png",
+    "authConfig": []
+  },
+  {
+    "name": "Update Contact",
+    "pluginKey": "crm_update_contact",
+    "description": "Update a CRM contact.",
+    "icon": "assets/crm.png",
+    "authConfig": []
+  },
+  {
+    "name": "Get Contact",
+    "pluginKey": "crm_get_contact",
+    "description": "Get a CRM contact by ID, email, or name.",
+    "icon": "assets/crm.png",
+    "authConfig": []
+  },
+  {
+    "name": "List Contacts",
+    "pluginKey": "crm_list_contacts",
+    "description": "List CRM contacts with optional filters.",
+    "icon": "assets/crm.png",
+    "authConfig": []
+  },
+  {
+    "name": "Delete Contact",
+    "pluginKey": "crm_soft_delete_contact",
+    "description": "Soft delete a CRM contact.",
+    "icon": "assets/crm.png",
+    "authConfig": []
+  },
+  {
+    "name": "Create Organization",
+    "pluginKey": "crm_create_organization",
+    "description": "Create a CRM organization.",
+    "icon": "assets/crm.png",
+    "authConfig": []
+  },
+  {
+    "name": "Get Organization",
+    "pluginKey": "crm_get_organization",
+    "description": "Get a CRM organization by ID or name.",
+    "icon": "assets/crm.png",
+    "authConfig": []
+  },
+  {
+    "name": "List Organizations",
+    "pluginKey": "crm_list_organizations",
+    "description": "List CRM organizations.",
+    "icon": "assets/crm.png",
+    "authConfig": []
+  },
+  {
+    "name": "Delete Organization",
+    "pluginKey": "crm_soft_delete_organization",
+    "description": "Soft delete a CRM organization.",
+    "icon": "assets/crm.png",
+    "authConfig": []
+  },
+  {
+    "name": "Create Deal",
+    "pluginKey": "crm_create_deal",
+    "description": "Create a CRM deal.",
+    "icon": "assets/crm.png",
+    "authConfig": []
+  },
+  {
+    "name": "Update Deal",
+    "pluginKey": "crm_update_deal",
+    "description": "Update a CRM deal.",
+    "icon": "assets/crm.png",
+    "authConfig": []
+  },
+  {
+    "name": "List Deals",
+    "pluginKey": "crm_list_deals",
+    "description": "List CRM deals.",
+    "icon": "assets/crm.png",
+    "authConfig": []
+  },
+  {
+    "name": "Delete Deal",
+    "pluginKey": "crm_soft_delete_deal",
+    "description": "Soft delete a CRM deal.",
+    "icon": "assets/crm.png",
+    "authConfig": []
+  },
+  {
+    "name": "Log Activity",
+    "pluginKey": "crm_log_activity",
+    "description": "Log a CRM activity.",
+    "icon": "assets/crm.png",
+    "authConfig": []
+  },
+  {
+    "name": "List Activities",
+    "pluginKey": "crm_list_activities",
+    "description": "List CRM activities for a contact or deal.",
+    "icon": "assets/crm.png",
+    "authConfig": []
   }
 ]

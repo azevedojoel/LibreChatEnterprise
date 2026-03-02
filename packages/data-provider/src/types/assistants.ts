@@ -43,6 +43,8 @@ export enum Tools {
   crm_get_contact = 'crm_get_contact',
   crm_list_contacts = 'crm_list_contacts',
   crm_create_organization = 'crm_create_organization',
+  crm_get_organization = 'crm_get_organization',
+  crm_list_organizations = 'crm_list_organizations',
   crm_create_deal = 'crm_create_deal',
   crm_update_deal = 'crm_update_deal',
   crm_list_deals = 'crm_list_deals',

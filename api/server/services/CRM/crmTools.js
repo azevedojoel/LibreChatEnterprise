@@ -13,6 +13,8 @@ const {
   listContacts,
   createOrganization,
   getOrganizationByName,
+  getOrganizationById,
+  listOrganizations,
   createDeal,
   updateDeal,
   getDealById,
@@ -356,6 +358,70 @@ function createCRMTools({ projectId, userId, agentId, conversationId, messageId 
           metadata: { type: 'object', description: 'Additional metadata' },
         },
         required: ['name'],
+      },
+    },
+  );
+
+  const getOrganizationTool = tool(
+    async (rawInput) => {
+      const err = requireProject();
+      if (err) return toJson(err);
+      const { organizationId, name } = rawInput;
+      if (!organizationId && !name)
+        return toJson({ error: 'organizationId or name is required' });
+      try {
+        if (organizationId) {
+          const org = await getOrganizationById(projectId, organizationId);
+          if (!org) return toJson({ error: 'Organization not found' });
+          return toJson(org);
+        }
+        const org = await getOrganizationByName(projectId, name);
+        if (!org) return toJson({ error: 'Organization not found' });
+        return toJson(org);
+      } catch (e) {
+        return toJson({ error: e.message || 'Failed to get organization' });
+      }
+    },
+    {
+      name: Tools.crm_get_organization,
+      description:
+        'Get an organization by ID or name. Provide organizationId OR name (exact match, case-insensitive).',
+      schema: {
+        type: 'object',
+        properties: {
+          organizationId: { type: 'string', description: 'Organization ID' },
+          name: { type: 'string', description: 'Organization name (exact match, case-insensitive)' },
+        },
+        required: [],
+      },
+    },
+  );
+
+  const listOrganizationsTool = tool(
+    async (rawInput) => {
+      const err = requireProject();
+      if (err) return toJson(err);
+      const { limit, skip } = rawInput ?? {};
+      try {
+        const orgs = await listOrganizations(projectId, {
+          limit: limit ?? 50,
+          skip: skip ?? 0,
+        });
+        return toJson(orgs);
+      } catch (e) {
+        return toJson({ error: e.message || 'Failed to list organizations' });
+      }
+    },
+    {
+      name: Tools.crm_list_organizations,
+      description: 'List organizations. Optional: limit, skip.',
+      schema: {
+        type: 'object',
+        properties: {
+          limit: { type: 'number' },
+          skip: { type: 'number' },
+        },
+        required: [],
       },
     },
   );
@@ -706,6 +772,8 @@ function createCRMTools({ projectId, userId, agentId, conversationId, messageId 
     [Tools.crm_get_contact]: getContactTool,
     [Tools.crm_list_contacts]: listContactsTool,
     [Tools.crm_create_organization]: createOrganizationTool,
+    [Tools.crm_get_organization]: getOrganizationTool,
+    [Tools.crm_list_organizations]: listOrganizationsTool,
     [Tools.crm_create_deal]: createDealTool,
     [Tools.crm_update_deal]: updateDealTool,
     [Tools.crm_list_deals]: listDealsTool,

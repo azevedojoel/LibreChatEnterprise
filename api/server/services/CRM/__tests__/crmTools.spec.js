@@ -19,6 +19,8 @@ const mockFindContactsByName = jest.fn();
 const mockListContacts = jest.fn();
 const mockCreateOrganization = jest.fn();
 const mockGetOrganizationByName = jest.fn();
+const mockGetOrganizationById = jest.fn();
+const mockListOrganizations = jest.fn();
 const mockCreateDeal = jest.fn();
 const mockUpdateDeal = jest.fn();
 const mockGetDealById = jest.fn();
@@ -44,6 +46,8 @@ jest.mock('../index', () => ({
   listContacts: (...args) => mockListContacts(...args),
   createOrganization: (...args) => mockCreateOrganization(...args),
   getOrganizationByName: (...args) => mockGetOrganizationByName(...args),
+  getOrganizationById: (...args) => mockGetOrganizationById(...args),
+  listOrganizations: (...args) => mockListOrganizations(...args),
   createDeal: (...args) => mockCreateDeal(...args),
   updateDeal: (...args) => mockUpdateDeal(...args),
   getDealById: (...args) => mockGetDealById(...args),
@@ -72,6 +76,8 @@ const expectedToolKeys = [
   Tools.crm_get_contact,
   Tools.crm_list_contacts,
   Tools.crm_create_organization,
+  Tools.crm_get_organization,
+  Tools.crm_list_organizations,
   Tools.crm_create_deal,
   Tools.crm_update_deal,
   Tools.crm_list_deals,
@@ -406,6 +412,58 @@ describe('createCRMTools', () => {
           data: expect.objectContaining({ name: 'Acme Corp' }),
         }),
       );
+    });
+
+    it('crm_get_organization returns error when neither organizationId nor name provided', async () => {
+      const tools = createCRMTools({ projectId: PROJECT_ID, agentId: AGENT_ID });
+      const t = tools[Tools.crm_get_organization];
+      const result = await t.invoke({});
+      const parsed = JSON.parse(result);
+      expect(parsed.error).toBe('organizationId or name is required');
+      expect(mockGetOrganizationById).not.toHaveBeenCalled();
+      expect(mockGetOrganizationByName).not.toHaveBeenCalled();
+    });
+
+    it('crm_get_organization by organizationId invokes getOrganizationById', async () => {
+      mockGetOrganizationById.mockResolvedValue({ _id: 'o1', name: 'Acme Corp' });
+      const tools = createCRMTools({ projectId: PROJECT_ID, agentId: AGENT_ID });
+      const t = tools[Tools.crm_get_organization];
+      const result = await t.invoke({ organizationId: 'o1' });
+      const parsed = JSON.parse(result);
+      expect(parsed._id).toBe('o1');
+      expect(parsed.name).toBe('Acme Corp');
+      expect(mockGetOrganizationById).toHaveBeenCalledWith(PROJECT_ID, 'o1');
+    });
+
+    it('crm_get_organization by name invokes getOrganizationByName', async () => {
+      mockGetOrganizationByName.mockResolvedValue({ _id: 'o1', name: 'Acme Corp' });
+      const tools = createCRMTools({ projectId: PROJECT_ID, agentId: AGENT_ID });
+      const t = tools[Tools.crm_get_organization];
+      const result = await t.invoke({ name: 'Acme Corp' });
+      const parsed = JSON.parse(result);
+      expect(parsed._id).toBe('o1');
+      expect(parsed.name).toBe('Acme Corp');
+      expect(mockGetOrganizationByName).toHaveBeenCalledWith(PROJECT_ID, 'Acme Corp');
+    });
+
+    it('crm_get_organization returns error when organization not found', async () => {
+      mockGetOrganizationByName.mockResolvedValue(null);
+      const tools = createCRMTools({ projectId: PROJECT_ID, agentId: AGENT_ID });
+      const t = tools[Tools.crm_get_organization];
+      const result = await t.invoke({ name: 'Nonexistent Corp' });
+      const parsed = JSON.parse(result);
+      expect(parsed.error).toBe('Organization not found');
+    });
+
+    it('crm_list_organizations invokes listOrganizations', async () => {
+      mockListOrganizations.mockResolvedValue([{ _id: 'o1', name: 'Acme' }]);
+      const tools = createCRMTools({ projectId: PROJECT_ID, agentId: AGENT_ID });
+      const t = tools[Tools.crm_list_organizations];
+      await t.invoke({ limit: 20, skip: 5 });
+      expect(mockListOrganizations).toHaveBeenCalledWith(PROJECT_ID, {
+        limit: 20,
+        skip: 5,
+      });
     });
 
     it('crm_update_deal invokes getDealById then updateDeal', async () => {

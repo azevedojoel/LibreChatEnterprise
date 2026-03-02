@@ -400,6 +400,173 @@ export const sendUserEmailSchema: ExtendedJsonSchema = {
   required: ['subject', 'body'],
 };
 
+/** CRM tool JSON schemas */
+export const crmListPipelinesSchema: ExtendedJsonSchema = { type: 'object', properties: {} };
+export const crmCreatePipelineSchema: ExtendedJsonSchema = {
+  type: 'object',
+  properties: {
+    name: { type: 'string', description: 'Pipeline name' },
+    stages: { type: 'array', items: { type: 'string' }, description: 'Stage names in order' },
+    isDefault: { type: 'boolean', description: 'Set as default pipeline for new deals' },
+  },
+  required: ['name', 'stages'],
+};
+export const crmUpdatePipelineSchema: ExtendedJsonSchema = {
+  type: 'object',
+  properties: {
+    pipelineId: { type: 'string', description: 'Pipeline ID' },
+    name: { type: 'string' },
+    stages: { type: 'array', items: { type: 'string' } },
+    isDefault: { type: 'boolean' },
+  },
+  required: ['pipelineId'],
+};
+export const crmSoftDeletePipelineSchema: ExtendedJsonSchema = {
+  type: 'object',
+  properties: { pipelineId: { type: 'string' } },
+  required: ['pipelineId'],
+};
+export const crmCreateContactSchema: ExtendedJsonSchema = {
+  type: 'object',
+  properties: {
+    name: { type: 'string', description: 'Contact name' },
+    email: { type: 'string' },
+    phone: { type: 'string' },
+    tags: { type: 'array', items: { type: 'string' } },
+    source: { type: 'string' },
+    status: { type: 'string', enum: ['lead', 'prospect', 'customer'] },
+    organizationId: { type: 'string' },
+  },
+  required: ['name'],
+};
+export const crmUpdateContactSchema: ExtendedJsonSchema = {
+  type: 'object',
+  properties: {
+    contactId: { type: 'string', description: 'Contact ID' },
+    name: { type: 'string' },
+    email: { type: 'string' },
+    phone: { type: 'string' },
+    tags: { type: 'array', items: { type: 'string' } },
+    source: { type: 'string' },
+    status: { type: 'string', enum: ['lead', 'prospect', 'customer'] },
+    organizationId: { type: 'string' },
+  },
+  required: ['contactId'],
+};
+export const crmGetContactSchema: ExtendedJsonSchema = {
+  type: 'object',
+  properties: {
+    contactId: { type: 'string' },
+    email: { type: 'string' },
+    name: { type: 'string' },
+  },
+};
+export const crmListContactsSchema: ExtendedJsonSchema = {
+  type: 'object',
+  properties: {
+    status: { type: 'string', enum: ['lead', 'prospect', 'customer'] },
+    tags: { type: 'array', items: { type: 'string' } },
+    noActivitySinceDays: { type: 'number' },
+    limit: { type: 'number' },
+    skip: { type: 'number' },
+  },
+};
+export const crmSoftDeleteContactSchema: ExtendedJsonSchema = {
+  type: 'object',
+  properties: { contactId: { type: 'string' } },
+  required: ['contactId'],
+};
+export const crmCreateOrganizationSchema: ExtendedJsonSchema = {
+  type: 'object',
+  properties: {
+    name: { type: 'string', description: 'Organization name' },
+    domain: { type: 'string' },
+    metadata: { type: 'object' },
+  },
+  required: ['name'],
+};
+export const crmSoftDeleteOrganizationSchema: ExtendedJsonSchema = {
+  type: 'object',
+  properties: { organizationId: { type: 'string' } },
+  required: ['organizationId'],
+};
+export const crmGetOrganizationSchema: ExtendedJsonSchema = {
+  type: 'object',
+  properties: {
+    organizationId: { type: 'string', description: 'Organization ID' },
+    name: { type: 'string', description: 'Organization name (exact match, case-insensitive)' },
+  },
+};
+export const crmListOrganizationsSchema: ExtendedJsonSchema = {
+  type: 'object',
+  properties: {
+    limit: { type: 'number' },
+    skip: { type: 'number' },
+  },
+};
+export const crmCreateDealSchema: ExtendedJsonSchema = {
+  type: 'object',
+  properties: {
+    pipelineId: { type: 'string' },
+    stage: { type: 'string', description: 'Stage name from pipeline' },
+    contactId: { type: 'string' },
+    organizationId: { type: 'string' },
+    value: { type: 'number' },
+    expectedCloseDate: { type: 'string' },
+  },
+  required: ['stage'],
+};
+export const crmUpdateDealSchema: ExtendedJsonSchema = {
+  type: 'object',
+  properties: {
+    dealId: { type: 'string' },
+    stage: { type: 'string' },
+    contactId: { type: 'string' },
+    organizationId: { type: 'string' },
+    value: { type: 'number' },
+    expectedCloseDate: { type: 'string' },
+  },
+  required: ['dealId'],
+};
+export const crmListDealsSchema: ExtendedJsonSchema = {
+  type: 'object',
+  properties: {
+    pipelineId: { type: 'string' },
+    stage: { type: 'string' },
+    contactId: { type: 'string' },
+    limit: { type: 'number' },
+    skip: { type: 'number' },
+  },
+};
+export const crmSoftDeleteDealSchema: ExtendedJsonSchema = {
+  type: 'object',
+  properties: { dealId: { type: 'string' } },
+  required: ['dealId'],
+};
+export const crmLogActivitySchema: ExtendedJsonSchema = {
+  type: 'object',
+  properties: {
+    contactId: { type: 'string' },
+    dealId: { type: 'string' },
+    type: {
+      type: 'string',
+      enum: ['email_sent', 'email_received', 'call_logged', 'agent_action', 'doc_matched', 'stage_change'],
+    },
+    summary: { type: 'string' },
+    metadata: { type: 'object' },
+  },
+  required: ['type'],
+};
+export const crmListActivitiesSchema: ExtendedJsonSchema = {
+  type: 'object',
+  properties: {
+    contactId: { type: 'string' },
+    dealId: { type: 'string' },
+    limit: { type: 'number' },
+    skip: { type: 'number' },
+  },
+};
+
 /** File Search tool JSON schema */
 export const fileSearchSchema: ExtendedJsonSchema = {
   type: 'object',
@@ -606,6 +773,128 @@ export const toolDefinitions: Record<string, ToolRegistryDefinition> = {
     description:
       'Send an email to the current user via Postmark. Use when the user wants to receive an email (summary, report, reminder, etc.). The email is always sent to the logged-in user\'s address. Provide subject and body. Optional HTML body. Do NOT ask for recipient—it is determined automatically.',
     schema: sendUserEmailSchema,
+    toolType: 'builtin',
+  },
+  crm_list_pipelines: {
+    name: 'crm_list_pipelines',
+    description: 'List all CRM pipelines. Returns id, name, stages, isDefault.',
+    schema: crmListPipelinesSchema,
+    toolType: 'builtin',
+  },
+  crm_create_pipeline: {
+    name: 'crm_create_pipeline',
+    description:
+      'Create a CRM pipeline. Required: name, stages (array of stage names). Optional: isDefault.',
+    schema: crmCreatePipelineSchema,
+    toolType: 'builtin',
+  },
+  crm_update_pipeline: {
+    name: 'crm_update_pipeline',
+    description: 'Update a pipeline. Required: pipelineId. Optional: name, stages, isDefault.',
+    schema: crmUpdatePipelineSchema,
+    toolType: 'builtin',
+  },
+  crm_soft_delete_pipeline: {
+    name: 'crm_soft_delete_pipeline',
+    description: 'Soft delete a pipeline. Required: pipelineId. Fails if deals exist.',
+    schema: crmSoftDeletePipelineSchema,
+    toolType: 'builtin',
+  },
+  crm_create_contact: {
+    name: 'crm_create_contact',
+    description:
+      'Create a new CRM contact. Required: name. Optional: email, phone, tags, source, status (lead|prospect|customer), organizationId.',
+    schema: crmCreateContactSchema,
+    toolType: 'builtin',
+  },
+  crm_update_contact: {
+    name: 'crm_update_contact',
+    description:
+      'Update an existing contact. Required: contactId. Optional: name, email, phone, tags, source, status, organizationId.',
+    schema: crmUpdateContactSchema,
+    toolType: 'builtin',
+  },
+  crm_get_contact: {
+    name: 'crm_get_contact',
+    description: 'Get a contact by ID, email, or name (fuzzy). Provide contactId, email, OR name.',
+    schema: crmGetContactSchema,
+    toolType: 'builtin',
+  },
+  crm_list_contacts: {
+    name: 'crm_list_contacts',
+    description:
+      'List contacts with optional filters. Use noActivitySinceDays to find leads with no follow-up. Optional: status, tags, noActivitySinceDays, limit, skip.',
+    schema: crmListContactsSchema,
+    toolType: 'builtin',
+  },
+  crm_soft_delete_contact: {
+    name: 'crm_soft_delete_contact',
+    description: 'Soft delete a contact. Required: contactId.',
+    schema: crmSoftDeleteContactSchema,
+    toolType: 'builtin',
+  },
+  crm_create_organization: {
+    name: 'crm_create_organization',
+    description: 'Create an organization (company). Required: name. Optional: domain, metadata.',
+    schema: crmCreateOrganizationSchema,
+    toolType: 'builtin',
+  },
+  crm_get_organization: {
+    name: 'crm_get_organization',
+    description:
+      'Get an organization by ID or name. Provide organizationId OR name (exact match, case-insensitive).',
+    schema: crmGetOrganizationSchema,
+    toolType: 'builtin',
+  },
+  crm_list_organizations: {
+    name: 'crm_list_organizations',
+    description: 'List organizations. Optional: limit, skip.',
+    schema: crmListOrganizationsSchema,
+    toolType: 'builtin',
+  },
+  crm_soft_delete_organization: {
+    name: 'crm_soft_delete_organization',
+    description: 'Soft delete an organization. Required: organizationId.',
+    schema: crmSoftDeleteOrganizationSchema,
+    toolType: 'builtin',
+  },
+  crm_create_deal: {
+    name: 'crm_create_deal',
+    description:
+      'Create a deal. Required: pipelineId (or use default), stage. Optional: contactId, organizationId, value, expectedCloseDate.',
+    schema: crmCreateDealSchema,
+    toolType: 'builtin',
+  },
+  crm_update_deal: {
+    name: 'crm_update_deal',
+    description:
+      'Update a deal. Required: dealId. Optional: stage, contactId, organizationId, value, expectedCloseDate.',
+    schema: crmUpdateDealSchema,
+    toolType: 'builtin',
+  },
+  crm_list_deals: {
+    name: 'crm_list_deals',
+    description: 'List deals. Optional: pipelineId, stage, contactId, limit, skip.',
+    schema: crmListDealsSchema,
+    toolType: 'builtin',
+  },
+  crm_soft_delete_deal: {
+    name: 'crm_soft_delete_deal',
+    description: 'Soft delete a deal. Required: dealId.',
+    schema: crmSoftDeleteDealSchema,
+    toolType: 'builtin',
+  },
+  crm_log_activity: {
+    name: 'crm_log_activity',
+    description:
+      'Log an activity (e.g. call_logged, email_sent). Required: type, contactId or dealId. Optional: summary, metadata. Types: email_sent, email_received, call_logged, agent_action, doc_matched, stage_change.',
+    schema: crmLogActivitySchema,
+    toolType: 'builtin',
+  },
+  crm_list_activities: {
+    name: 'crm_list_activities',
+    description: 'List activities for a contact or deal. Provide contactId OR dealId. Optional: limit, skip.',
+    schema: crmListActivitiesSchema,
     toolType: 'builtin',
   },
   file_search: {
@@ -969,7 +1258,7 @@ const getRunDefinition: ToolRegistryDefinition = {
   toolType: 'builtin',
 };
 
-/** CRM tools - exposed via CRM MCP server */
+/** CRM tools - native builtin tools (no MCP) */
 const crmListPipelinesDefinition: ToolRegistryDefinition = {
   name: 'crm_list_pipelines',
   description: 'List all CRM pipelines. Returns id, name, stages, isDefault.',
@@ -1107,6 +1396,35 @@ const crmCreateOrganizationDefinition: ToolRegistryDefinition = {
       metadata: { type: 'object', description: 'Additional metadata' },
     },
     required: ['name'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const crmGetOrganizationDefinition: ToolRegistryDefinition = {
+  name: 'crm_get_organization',
+  description:
+    'Get an organization by ID or name. Provide organizationId OR name (exact match, case-insensitive).',
+  schema: {
+    type: 'object',
+    properties: {
+      organizationId: { type: 'string', description: 'Organization ID' },
+      name: { type: 'string', description: 'Organization name (exact match, case-insensitive)' },
+    },
+    required: [],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const crmListOrganizationsDefinition: ToolRegistryDefinition = {
+  name: 'crm_list_organizations',
+  description: 'List organizations. Optional: limit, skip.',
+  schema: {
+    type: 'object',
+    properties: {
+      limit: { type: 'number' },
+      skip: { type: 'number' },
+    },
+    required: [],
   } as ExtendedJsonSchema,
   toolType: 'builtin',
 };
@@ -1283,6 +1601,8 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
   crm_get_contact: crmGetContactDefinition,
   crm_list_contacts: crmListContactsDefinition,
   crm_create_organization: crmCreateOrganizationDefinition,
+  crm_get_organization: crmGetOrganizationDefinition,
+  crm_list_organizations: crmListOrganizationsDefinition,
   crm_create_deal: crmCreateDealDefinition,
   crm_update_deal: crmUpdateDealDefinition,
   crm_list_deals: crmListDealsDefinition,
