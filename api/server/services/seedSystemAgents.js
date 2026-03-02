@@ -51,6 +51,8 @@ async function seedSystemAgents(appConfig) {
 
   const Agent = require('~/db/models').Agent;
   const systemAuthorId = await ensureSystemUser();
+  const defaultAgentForChat = agentsConfig?.defaultAgentForChat;
+  const primaryAgentHandoffs = agentsConfig?.primaryAgentHandoffs;
 
   for (const def of systemAgents) {
     let agent = await Agent.findOne({ id: def.id }).lean();
@@ -62,6 +64,7 @@ async function seedSystemAgents(appConfig) {
         model: def.model || 'gpt-4o',
         instructions: def.instructions || 'You are a helpful assistant.',
         tools: def.tools || ['file_search', 'web_search'],
+        edges: def.edges ?? [],
       };
       try {
         const created = await createAgent({
@@ -106,6 +109,28 @@ async function seedSystemAgents(appConfig) {
           permErr?.message,
         );
       }
+    }
+  }
+
+  /** Apply primaryAgentHandoffs: update the default agent's edges when handoffs are defined */
+  if (
+    defaultAgentForChat &&
+    Array.isArray(primaryAgentHandoffs) &&
+    primaryAgentHandoffs.length > 0
+  ) {
+    const primaryAgent = await Agent.findOne({ id: defaultAgentForChat });
+    if (primaryAgent) {
+      const edges = primaryAgentHandoffs.map((h) => ({
+        from: defaultAgentForChat,
+        to: h.to,
+        description: h.description,
+        prompt: h.prompt,
+        edgeType: 'handoff',
+      }));
+      await Agent.updateOne({ id: defaultAgentForChat }, { $set: { edges } });
+      logger.info(
+        `[seedSystemAgents] Updated handoff edges for ${defaultAgentForChat} (${edges.length} handoffs)`,
+      );
     }
   }
 }

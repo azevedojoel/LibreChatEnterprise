@@ -294,17 +294,21 @@ export const agentsEndpointSchema = baseEndpointSchema
         .array(z.nativeEnum(AgentCapabilities))
         .optional()
         .default(defaultAgentCapabilities),
-      /** Domain for inbound email addresses (inbound+token@domain). Required for copy-to-clipboard. */
+      /** Domain for inbound email routing (e.g. inbound.postmarkapp.com for Postmark). */
       inboundEmailAddress: z.string().optional(),
+      /** Domain to show users for their agent email (e.g. dailythread.ai). Falls back to inboundEmailAddress if unset. */
+      inboundEmailDisplayDomain: z.string().optional(),
       /** System agents seeded on startup; shared by all users. */
       systemAgents: z
         .array(
           z.object({
             id: z.string(),
             name: z.string(),
+            provider: z.string().optional(),
             model: z.string(),
             instructions: z.string().optional().default('You are a helpful assistant.'),
             tools: z.array(z.string()).optional().default(['file_search', 'web_search']),
+            edges: z.array(z.record(z.any())).optional(),
           }),
         )
         .optional(),
@@ -312,6 +316,16 @@ export const agentsEndpointSchema = baseEndpointSchema
       defaultAgentForInboundEmail: z.string().optional(),
       /** ID of system agent used as default for new chat conversations. Must match a systemAgents[].id. */
       defaultAgentForChat: z.string().optional(),
+      /** Handoff edges from the default agent to other system agents. Applied on startup. */
+      primaryAgentHandoffs: z
+        .array(
+          z.object({
+            to: z.string(),
+            description: z.string().optional(),
+            prompt: z.string().optional(),
+          }),
+        )
+        .optional(),
     }),
   )
   .default({

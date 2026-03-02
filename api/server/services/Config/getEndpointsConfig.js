@@ -97,6 +97,7 @@ async function getEndpointsConfig(req) {
 
     mergedConfig[EModelEndpoint.agents] = {
       ...mergedConfig[EModelEndpoint.agents],
+      ..._rest,
       allowedProviders,
       disableBuilder,
       capabilities,

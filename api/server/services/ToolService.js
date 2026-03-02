@@ -468,6 +468,8 @@ const isBuiltInTool = (toolName) =>
  * @param {ServerResponse} [params.res] - The response object for SSE events
  * @param {Object} params.agent - The agent configuration
  * @param {string|null} [params.streamId] - Stream ID for resumable mode
+ * @param {string} [params.primaryAgentId] - When provided, ephemeralAgent filtering is applied
+ *   only for this agent; handoff targets receive their full agent config tools
  * @returns {Promise<{
  *   toolDefinitions?: import('@librechat/api').LCTool[];
  *   toolRegistry?: Map<string, import('@librechat/api').LCTool>;
@@ -475,7 +477,14 @@ const isBuiltInTool = (toolName) =>
  *   hasDeferredTools?: boolean;
  * }>}
  */
-async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, tool_resources }) {
+async function loadToolDefinitionsWrapper({
+  req,
+  res,
+  agent,
+  streamId = null,
+  tool_resources,
+  primaryAgentId,
+}) {
   if (!agent.tools || agent.tools.length === 0) {
     return { toolDefinitions: [] };
   }
@@ -532,15 +541,10 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
     toolsToFilter = [...new Set([...toolsToFilter, ...schedulingTools])];
   }
 
-  /** Filter CRM tools when user has no projectId - CRM requires user.projectId */
+  /** Filter CRM native tools when user has no projectId - CRM requires user.projectId */
   const hasCRMTools = toolsToFilter.some(
-    (t) =>
-      t === 'CRM' ||
-      (typeof t === 'string' &&
-        t.includes(Constants.mcp_delimiter) &&
-        t.endsWith(Constants.mcp_delimiter + 'CRM')),
+    (t) => typeof t === 'string' && t.startsWith('crm_'),
   );
-  /** tool_search can discover and call CRM tools at runtime, so we need PROJECT_ID when agent has it */
   const hasToolSearch = toolsToFilter.some(
     (t) =>
       t === Constants.TOOL_SEARCH || (typeof t === 'string' && t.startsWith('tool_search_mcp_')),
@@ -550,20 +554,13 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
     const userDoc = await findUser({ _id: req.user.id }, 'projectId');
     userProjectId = userDoc?.projectId;
     if (hasCRMTools && !userProjectId) {
-      toolsToFilter = toolsToFilter.filter(
-        (t) =>
-          t !== 'CRM' &&
-          !(
-            typeof t === 'string' &&
-            t.includes(Constants.mcp_delimiter) &&
-            t.endsWith(Constants.mcp_delimiter + 'CRM')
-          ),
-      );
+      toolsToFilter = toolsToFilter.filter((t) => typeof t !== 'string' || !t.startsWith('crm_'));
     }
   }
 
-  /** Filter by ephemeralAgent (chat badge overrides) */
-  const ephemeralAgent = req?.body?.ephemeralAgent;
+  /** Filter by ephemeralAgent (chat badge overrides) - only for primary agent; handoff targets get full tools */
+  const ephemeralAgent =
+    primaryAgentId && agent?.id !== primaryAgentId ? undefined : req?.body?.ephemeralAgent;
   const isPersistentAgent = !isEphemeralAgentId(agent?.id);
   if (Array.isArray(ephemeralAgent?.tools)) {
     const toolsSet = new Set(ephemeralAgent.tools);
@@ -664,17 +661,6 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
       findPluginAuthsByKeys,
     });
   }
-  /** Inject PROJECT_ID from user.projectId for CRM MCP when user has project (CRM or tool_search can discover CRM) */
-  if (userProjectId && (hasCRMTools || hasToolSearch)) {
-    const crmKey = Constants.mcp_prefix + 'CRM';
-    const projectIdStr = userProjectId.toString?.() ?? String(userProjectId);
-    userMCPAuthMap[crmKey] = {
-      ...userMCPAuthMap[crmKey],
-      PROJECT_ID: projectIdStr,
-    };
-    logger.debug('[ToolService] CRM PROJECT_ID injected', { userProjectId: projectIdStr, crmKey });
-  }
-
   const flowsCache = getLogStores(CacheKeys.FLOWS);
   const flowManager = getFlowStateManager(flowsCache);
   const pendingOAuthServers = new Set();
@@ -1040,6 +1026,8 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
  * @param {boolean} [params.definitionsOnly=true] - When true, returns only serializable
  *   tool definitions without creating full tool instances. Use for event-driven mode
  *   where tools are loaded on-demand during execution.
+ * @param {string} [params.primaryAgentId] - When provided, ephemeralAgent filtering is applied
+ *   only for this agent; handoff targets receive their full agent config tools
  */
 async function loadAgentTools({
   req,
@@ -1050,9 +1038,17 @@ async function loadAgentTools({
   openAIApiKey,
   streamId = null,
   definitionsOnly = true,
+  primaryAgentId,
 }) {
   if (definitionsOnly) {
-    return loadToolDefinitionsWrapper({ req, res, agent, streamId, tool_resources });
+    return loadToolDefinitionsWrapper({
+      req,
+      res,
+      agent,
+      streamId,
+      tool_resources,
+      primaryAgentId,
+    });
   }
 
   if (!agent.tools || agent.tools.length === 0) {
@@ -1122,15 +1118,10 @@ async function loadAgentTools({
     toolsToFilter = [...new Set([...toolsToFilter, ...schedulingTools])];
   }
 
-  /** Filter CRM tools when user has no projectId - CRM requires user.projectId */
+  /** Filter CRM native tools when user has no projectId - CRM requires user.projectId */
   const hasCRMToolsLoadAgent = toolsToFilter.some(
-    (t) =>
-      t === 'CRM' ||
-      (typeof t === 'string' &&
-        t.includes(Constants.mcp_delimiter) &&
-        t.endsWith(Constants.mcp_delimiter + 'CRM')),
+    (t) => typeof t === 'string' && t.startsWith('crm_'),
   );
-  /** tool_search can discover and call CRM tools at runtime */
   const hasToolSearchLoadAgent = toolsToFilter.some(
     (t) =>
       t === Constants.TOOL_SEARCH || (typeof t === 'string' && t.startsWith('tool_search_mcp_')),
@@ -1140,20 +1131,13 @@ async function loadAgentTools({
     const userDoc = await findUser({ _id: req.user.id }, 'projectId');
     userProjectIdLoadAgent = userDoc?.projectId;
     if (hasCRMToolsLoadAgent && !userProjectIdLoadAgent) {
-      toolsToFilter = toolsToFilter.filter(
-        (t) =>
-          t !== 'CRM' &&
-          !(
-            typeof t === 'string' &&
-            t.includes(Constants.mcp_delimiter) &&
-            t.endsWith(Constants.mcp_delimiter + 'CRM')
-          ),
-      );
+      toolsToFilter = toolsToFilter.filter((t) => typeof t !== 'string' || !t.startsWith('crm_'));
     }
   }
 
-  /** Filter by ephemeralAgent (chat badge overrides) */
-  const ephemeralAgent = req?.body?.ephemeralAgent;
+  /** Filter by ephemeralAgent (chat badge overrides) - only for primary agent; handoff targets get full tools */
+  const ephemeralAgent =
+    primaryAgentId && agent?.id !== primaryAgentId ? undefined : req?.body?.ephemeralAgent;
   const isPersistentAgent = !isEphemeralAgentId(agent?.id);
   if (Array.isArray(ephemeralAgent?.tools)) {
     const toolsSet = new Set(ephemeralAgent.tools);
@@ -1261,20 +1245,6 @@ async function loadAgentTools({
       findPluginAuthsByKeys,
     });
   }
-  /** Inject PROJECT_ID from user.projectId for CRM MCP when user has project (CRM or tool_search) */
-  if (userProjectIdLoadAgent && (hasCRMToolsLoadAgent || hasToolSearchLoadAgent)) {
-    const crmKey = Constants.mcp_prefix + 'CRM';
-    const projectIdStr = userProjectIdLoadAgent.toString?.() ?? String(userProjectIdLoadAgent);
-    userMCPAuthMap[crmKey] = {
-      ...userMCPAuthMap[crmKey],
-      PROJECT_ID: projectIdStr,
-    };
-    logger.debug('[ToolService] loadAgentTools CRM PROJECT_ID injected', {
-      userProjectId: projectIdStr,
-      crmKey,
-    });
-  }
-
   const { loadedTools, toolContextMap } = await loadTools({
     agent,
     signal,

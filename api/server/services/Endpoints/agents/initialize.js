@@ -41,8 +41,10 @@ const { ToolApprovalLink } = require('~/db/models');
  * @param {string | null} [streamId] - The stream ID for resumable mode
  * @param {boolean} [definitionsOnly=false] - When true, returns only serializable
  *   tool definitions without creating full tool instances (for event-driven mode)
+ * @param {string} [primaryAgentId] - When provided, ephemeralAgent filtering is applied
+ *   only for this agent; handoff targets receive their full agent config tools
  */
-function createToolLoader(signal, streamId = null, definitionsOnly = false) {
+function createToolLoader(signal, streamId = null, definitionsOnly = false, primaryAgentId = null) {
   /**
    * @param {object} params
    * @param {ServerRequest} params.req
@@ -88,6 +90,7 @@ function createToolLoader(signal, streamId = null, definitionsOnly = false) {
         streamId,
         tool_resources,
         definitionsOnly,
+        primaryAgentId,
       });
     } catch (error) {
       logger.error('Error loading tools for agent ' + agentId, error);
@@ -301,7 +304,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
   const allowedProviders = new Set(appConfig?.endpoints?.[EModelEndpoint.agents]?.allowedProviders);
 
   /** Event-driven mode: only load tool definitions, not full instances */
-  const loadTools = createToolLoader(signal, streamId, true);
+  const loadTools = createToolLoader(signal, streamId, true, primaryAgent.id);
   /** @type {Array<MongoFile>} */
   const requestFiles = req.body.files ?? [];
   /** @type {string} */
