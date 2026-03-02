@@ -39,7 +39,14 @@ const { seedDatabase } = require('~/models');
 const { seedSystemAgents } = require('./services/seedSystemAgents');
 const routes = require('./routes');
 
-const { PORT, HOST, ALLOW_SOCIAL_LOGIN, DISABLE_COMPRESSION, TRUST_PROXY } = process.env ?? {};
+const {
+  PORT,
+  HOST,
+  ALLOW_SOCIAL_LOGIN,
+  DISABLE_COMPRESSION,
+  DISABLE_BACKGROUND_JOBS,
+  TRUST_PROXY,
+} = process.env ?? {};
 
 // Allow PORT=0 to be used for automatic free port assignment
 const port = isNaN(Number(PORT)) ? 3080 : Number(PORT);
@@ -71,7 +78,10 @@ const startServer = async () => {
   await seedDatabase();
   const appConfig = await getAppConfig();
   await seedSystemAgents(appConfig);
-  requireRedisAtStartup(appConfig?.interfaceConfig?.scheduledAgents);
+  const backgroundJobsDisabled = isEnabled(DISABLE_BACKGROUND_JOBS);
+  requireRedisAtStartup(
+    backgroundJobsDisabled ? false : appConfig?.interfaceConfig?.scheduledAgents,
+  );
   initializeFileStorage(appConfig);
   await performStartupChecks(appConfig);
   await updateInterfacePermissions(appConfig);
@@ -217,9 +227,15 @@ const startServer = async () => {
     await initializeMCPs();
     await initializeOAuthReconnectManager();
     await checkMigrations();
-    startScheduler();
-    startWorker();
-    startInboundEmailWorker();
+    if (backgroundJobsDisabled) {
+      logger.info(
+        '[Background Jobs] Scheduler and workers disabled (DISABLE_BACKGROUND_JOBS=true). Safe for local dev with prod MongoDB.',
+      );
+    } else {
+      startScheduler();
+      startWorker();
+      startInboundEmailWorker();
+    }
 
     // Configure stream services (auto-detects Redis from USE_REDIS env var)
     const streamServices = createStreamServices();
