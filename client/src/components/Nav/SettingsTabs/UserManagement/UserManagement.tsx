@@ -586,7 +586,8 @@ function EditUserDialog({
   const localize = useLocalize();
   const { showToast } = useToastContext();
   const { agentsConfig } = useGetAgentsConfig();
-  const inboundEmailAddress = agentsConfig?.inboundEmailAddress;
+  const displayDomain =
+    agentsConfig?.inboundEmailDisplayDomain ?? agentsConfig?.inboundEmailAddress;
 
   const [email, setEmail] = useState(user.email);
   const [name, setName] = useState(user.name || '');
@@ -618,8 +619,8 @@ function EditUserDialog({
   );
 
   const fullEmail =
-    inboundEmailAddress && inboundEmailToken.trim()
-      ? `${inboundEmailToken.trim()}@${inboundEmailAddress}`
+    displayDomain && inboundEmailToken.trim()
+      ? `${inboundEmailToken.trim()}@${displayDomain}`
       : '';
 
   const handleGenerateToken = () => {
