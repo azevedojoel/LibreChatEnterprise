@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
+const { logger } = require('@librechat/data-schemas');
 const { resizeImageBuffer } = require('../images/resize');
 const { updateUser, updateFile } = require('~/models');
 
@@ -98,6 +99,11 @@ async function prepareImagesLocal(req, file) {
     fs.mkdirSync(userPath, { recursive: true });
   }
   const filepath = path.join(publicPath, file.filepath);
+
+  if (!fs.existsSync(filepath)) {
+    logger.warn('Image file not found, skipping:', filepath);
+    return [file, null];
+  }
 
   const promises = [];
   promises.push(updateFile({ file_id: file.file_id }));

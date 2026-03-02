@@ -144,8 +144,14 @@ async function encodeAndFormat(req, files, params, mode) {
       const [_file, imageURL] = await preparePayload(req, file);
       promises.push([_file, await fetchImageToBase64(imageURL)]);
       continue;
+    } else {
+      promises.push(
+        preparePayload(req, file).catch((err) => {
+          logger.warn('Skipping missing or unreadable image:', file?.filepath, err?.message);
+          return [file, null];
+        }),
+      );
     }
-    promises.push(preparePayload(req, file));
   }
 
   const detail = req.body.imageDetail ?? ImageDetail.auto;

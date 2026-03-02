@@ -1,6 +1,7 @@
 import getStream from 'get-stream';
 import { Providers } from '@librechat/agents';
 import { FileSources, mergeFileConfig, getEndpointFileConfig } from 'librechat-data-provider';
+import { logger } from '@librechat/data-schemas';
 import type { IMongoFile } from '@librechat/data-schemas';
 import type { ServerRequest, StrategyFunctions, ProcessedFile } from '~/types';
 
@@ -54,20 +55,29 @@ export async function getFileStream(
     encodingMethods[source] = getStrategyFunctions(source);
   }
 
-  const { getDownloadStream } = encodingMethods[source];
-  const stream = await getDownloadStream(req, file.filepath);
-  const buffer = await getStream.buffer(stream);
+  try {
+    const { getDownloadStream } = encodingMethods[source];
+    const stream = await getDownloadStream(req, file.filepath);
+    const buffer = await getStream.buffer(stream);
 
-  return {
-    file,
-    content: buffer.toString('base64'),
-    metadata: {
-      file_id: file.file_id,
-      temp_file_id: file.temp_file_id,
-      filepath: file.filepath,
-      source: file.source,
-      filename: file.filename,
-      type: file.type,
-    },
-  };
+    return {
+      file,
+      content: buffer.toString('base64'),
+      metadata: {
+        file_id: file.file_id,
+        temp_file_id: file.temp_file_id,
+        filepath: file.filepath,
+        source: file.source,
+        filename: file.filename,
+        type: file.type,
+      },
+    };
+  } catch (err) {
+    const nodeErr = err as NodeJS.ErrnoException;
+    if (nodeErr?.code === 'ENOENT' || (nodeErr?.message ?? '').includes('ENOENT')) {
+      logger.warn('Skipping missing file:', file?.filepath);
+      return null;
+    }
+    throw err;
+  }
 }
