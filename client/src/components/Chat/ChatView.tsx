@@ -3,7 +3,13 @@ import { useRecoilValue } from 'recoil';
 import { useForm } from 'react-hook-form';
 import { Spinner } from '@librechat/client';
 import { useParams } from 'react-router-dom';
-import { Constants, buildTree } from 'librechat-data-provider';
+import {
+  Constants,
+  EModelEndpoint,
+  Permissions,
+  PermissionTypes,
+  buildTree,
+} from 'librechat-data-provider';
 import type { TMessage } from 'librechat-data-provider';
 import type { ChatFormValues } from '~/common';
 import { ChatContext, AddedChatContext, useFileMapContext, ChatFormProvider } from '~/Providers';
@@ -16,9 +22,19 @@ import {
   useAuthContext,
 } from '~/hooks';
 import { useGetAgentsConfig } from '~/hooks/Agents';
-import { useGetStartupConfig } from '~/data-provider';
+import { useHasAccess } from '~/hooks';
+import {
+  useGetStartupConfig,
+  useGetEndpointsQuery,
+  useMCPServersQuery,
+} from '~/data-provider';
 import ConversationStarters from './Input/ConversationStarters';
-import { EmailEllisWidget, CRMWidget, IntegrationsWidget } from './Dashboard';
+import {
+  EmailEllisWidget,
+  CRMWidget,
+  IntegrationsWidget,
+  ScheduledAgentsWidget,
+} from './Dashboard';
 import { useGetMessagesByConvoId } from '~/data-provider';
 import MessagesView from './Messages/MessagesView';
 import Presentation from './Presentation';
@@ -38,16 +54,24 @@ function LoadingSpinner() {
   );
 }
 
-const DEFAULT_DASHBOARD_INTEGRATIONS = ['Google', 'Microsoft'];
-
 function ChatView({ index = 0 }: { index?: number }) {
   const { conversationId } = useParams();
   const { user } = useAuthContext();
   const { agentsConfig } = useGetAgentsConfig();
   const { data: startupConfig } = useGetStartupConfig();
-  const dashboardIntegrations =
-    startupConfig?.interface?.dashboardIntegrations ?? DEFAULT_DASHBOARD_INTEGRATIONS;
-  const showIntegrationsGrid = dashboardIntegrations.length > 0;
+  const { data: endpointsConfig } = useGetEndpointsQuery();
+  const { data: mcpServers } = useMCPServersQuery();
+  const hasAccessToAgents = useHasAccess({
+    permissionType: PermissionTypes.AGENTS,
+    permission: Permissions.USE,
+  });
+  const showIntegrationsGrid =
+    !!mcpServers && Object.keys(mcpServers).length > 0;
+  const interfaceConfig = startupConfig?.interface ?? {};
+  const showScheduledAgentsWidget =
+    interfaceConfig.scheduledAgents !== false &&
+    !!endpointsConfig?.[EModelEndpoint.agents] &&
+    hasAccessToAgents;
   const rootSubmission = useRecoilValue(store.submissionByIndex(index));
   const centerFormOnLanding = useRecoilValue(store.centerFormOnLanding);
 
@@ -101,23 +125,38 @@ function ChatView({ index = 0 }: { index?: number }) {
       <ChatContext.Provider value={chatHelpers}>
         <AddedChatContext.Provider value={addedChatHelpers}>
           <Presentation>
-            <div className="relative flex h-full w-full flex-col">
+            <div className="relative flex min-h-0 h-full w-full flex-col">
               {!isLoading && <Header />}
               <>
                 <div
                   className={cn(
-                    'flex flex-col overflow-y-auto',
-                    isLandingPage ? 'flex-1 items-center justify-end sm:justify-center' : 'h-full',
+                    'flex min-h-0 flex-col overflow-y-auto',
+                    isLandingPage ? 'flex-1 items-center' : 'h-full',
+                    isLandingPage &&
+                      !(
+                        agentsConfig?.inboundEmailAddress ||
+                        user?.projectId ||
+                        showIntegrationsGrid ||
+                        showScheduledAgentsWidget
+                      ) && 'justify-end sm:justify-center',
+                    isLandingPage &&
+                      (agentsConfig?.inboundEmailAddress ||
+                        user?.projectId ||
+                        showIntegrationsGrid ||
+                        showScheduledAgentsWidget) &&
+                      'justify-start',
                   )}
                 >
                   {isLandingPage &&
                     (agentsConfig?.inboundEmailAddress ||
                       user?.projectId ||
-                      showIntegrationsGrid) && (
+                      showIntegrationsGrid ||
+                      showScheduledAgentsWidget) && (
                       <div className="mb-6 grid w-full max-w-3xl grid-cols-1 gap-4 px-4 pt-6 sm:grid-cols-2 xl:max-w-4xl [&>*:only-child]:sm:col-span-2">
                         <EmailEllisWidget />
                         <CRMWidget />
                         <IntegrationsWidget />
+                        <ScheduledAgentsWidget />
                       </div>
                     )}
                   {content}
