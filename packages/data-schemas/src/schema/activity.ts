@@ -59,6 +59,18 @@ const activitySchema = new Schema<IActivity>(
     metadata: {
       type: Schema.Types.Mixed,
     },
+    dueDate: {
+      type: Date,
+    },
+    status: {
+      type: String,
+    },
+    priority: {
+      type: String,
+    },
+    assignedUserId: {
+      type: String,
+    },
   },
   { timestamps: true },
 );

@@ -14,6 +14,7 @@ export interface IContact extends Document {
   ownerType: OwnerType;
   ownerId: string;
   organizationId?: Types.ObjectId;
+  customFields?: Record<string, string | number | boolean>;
   lastActivityAt?: Date;
   deletedAt?: Date;
   createdAt?: Date;

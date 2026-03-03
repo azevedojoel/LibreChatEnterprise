@@ -26,6 +26,10 @@ export interface IActivity extends Document {
   toolName?: string;
   summary?: string;
   metadata?: Record<string, unknown>;
+  dueDate?: Date;
+  status?: string;
+  priority?: string;
+  assignedUserId?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }

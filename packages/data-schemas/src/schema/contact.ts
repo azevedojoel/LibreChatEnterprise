@@ -47,6 +47,9 @@ const contactSchema = new Schema<IContact>(
       type: Schema.Types.ObjectId,
       ref: 'Organization',
     },
+    customFields: {
+      type: Schema.Types.Mixed,
+    },
     lastActivityAt: {
       type: Date,
     },

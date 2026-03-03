@@ -19,6 +19,9 @@ const organizationSchema = new Schema<IOrganization>(
     metadata: {
       type: Schema.Types.Mixed,
     },
+    customFields: {
+      type: Schema.Types.Mixed,
+    },
     deletedAt: {
       type: Date,
     },

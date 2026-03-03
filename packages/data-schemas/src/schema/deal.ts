@@ -20,6 +20,13 @@ const dealSchema = new Schema<IDeal>(
       required: true,
       index: true,
     },
+    title: {
+      type: String,
+      default: 'Untitled Deal',
+    },
+    description: {
+      type: String,
+    },
     contactId: {
       type: Schema.Types.ObjectId,
       ref: 'Contact',
@@ -33,6 +40,14 @@ const dealSchema = new Schema<IDeal>(
     },
     expectedCloseDate: {
       type: Date,
+    },
+    probability: {
+      type: Number,
+      min: 0,
+      max: 100,
+    },
+    customFields: {
+      type: Schema.Types.Mixed,
     },
     ownerType: {
       type: String,
