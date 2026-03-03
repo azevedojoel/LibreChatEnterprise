@@ -1,11 +1,12 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useRecoilValue } from 'recoil';
+import { TerminalSquareIcon } from 'lucide-react';
 import type { TAttachment } from 'librechat-data-provider';
-import ProgressText from '~/components/Chat/Messages/Content/ProgressText';
 import MarkdownLite from '~/components/Chat/Messages/Content/MarkdownLite';
+import ToolResultContainer from '~/components/Chat/Messages/Content/ToolResultContainer';
+import ToolApprovalBar from '~/components/Chat/Messages/Content/ToolApprovalBar';
 import { useProgress, useLocalize, useToolApproval } from '~/hooks';
 import { AttachmentGroup } from './Attachment';
-import ToolApprovalBar from '~/components/Chat/Messages/Content/ToolApprovalBar';
 import Stdout from './Stdout';
 import { cn } from '~/utils';
 import store from '~/store';
@@ -151,16 +152,41 @@ export default function ExecuteCode({
 
   const cancelled = !isSubmitting && progress < 1;
   const showApprovalBar = approvalStatus !== null;
+  const isComplete = progress >= 1;
+  let summaryText: string;
+  if (cancelled) {
+    summaryText = localize('com_ui_cancelled');
+  } else if (isComplete) {
+    summaryText = localize('com_ui_analyzing_finished');
+  } else {
+    summaryText = localize('com_ui_analyzing');
+  }
+  const hasExpandableContent = (code?.length ?? 0) > 0 || hasOutput;
 
-  return (
-    <>
-      <div
-        className={cn(
-          'relative flex shrink-0 items-center gap-2.5',
-          showApprovalBar ? 'my-3 min-h-8' : 'my-2.5 size-5',
-        )}
-      >
-        {showApprovalBar ? (
+  const codeContent = (
+    <div className="code-analyze-block overflow-hidden rounded-lg border border-border-light bg-surface-tertiary">
+      <MarkdownLite
+        content={code ? `\`\`\`${lang}\n${code}\n\`\`\`` : ''}
+        codeExecution={false}
+        showCodeToggle
+      />
+      {hasOutput && (
+        <div
+          ref={outputContainerRef}
+          className="max-h-96 overflow-y-auto border-t border-border-light bg-surface-secondary p-4 text-xs"
+        >
+          <div className="prose">
+            <Stdout output={output} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  if (showApprovalBar) {
+    return (
+      <>
+        <div className="relative flex shrink-0 items-center gap-2.5 my-3 min-h-8">
           <ToolApprovalBar
             onApprove={handleApprove}
             onDeny={handleDeny}
@@ -170,86 +196,94 @@ export default function ExecuteCode({
             toolName="execute_code"
             resolved={approvalStatus === 'approved' ? 'approved' : approvalStatus === 'denied' ? 'denied' : undefined}
           />
-        ) : (
-          <ProgressText
-            progress={progress}
-            onClick={() => setShowCode((prev) => !prev)}
-            inProgressText={localize('com_ui_analyzing')}
-            finishedText={
-              cancelled ? localize('com_ui_cancelled') : localize('com_ui_analyzing_finished')
-            }
-            hasInput={!!code?.length}
-            isExpanded={showCode}
-            error={cancelled}
-          />
-        )}
-      </div>
-      <div
-        className={cn('relative mb-2', showCode && 'mt-2')}
-        style={{
-          height: showCode ? contentHeight : 0,
-          overflow: 'hidden',
-          transition:
-            'height 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
-          opacity: showCode ? 1 : 0,
-          transformOrigin: 'top',
-          willChange: 'height, opacity',
-          perspective: '1000px',
-          backfaceVisibility: 'hidden',
-          WebkitFontSmoothing: 'subpixel-antialiased',
-        }}
-      >
+        </div>
         <div
-          className={cn(
-            'code-analyze-block mt-0.5 overflow-hidden rounded-xl bg-surface-primary',
-            showCode && 'shadow-lg',
-          )}
-          ref={codeContentRef}
+          className={cn('relative mb-2', showCode && 'mt-2')}
           style={{
-            transform: showCode ? 'translateY(0) scale(1)' : 'translateY(-8px) scale(0.98)',
-            opacity: showCode ? 1 : 0,
+            height: showCode ? contentHeight : 0,
+            overflow: 'hidden',
             transition:
-              'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+              'height 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+            opacity: showCode ? 1 : 0,
+            transformOrigin: 'top',
+            willChange: 'height, opacity',
+            perspective: '1000px',
+            backfaceVisibility: 'hidden',
+            WebkitFontSmoothing: 'subpixel-antialiased',
           }}
         >
-          {showCode && (
-            <div
-              style={{
-                transform: showCode ? 'translateY(0)' : 'translateY(-4px)',
-                opacity: showCode ? 1 : 0,
-                transition:
-                  'transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
-              }}
-            >
-              <MarkdownLite
-                content={code ? `\`\`\`${lang}\n${code}\n\`\`\`` : ''}
-                codeExecution={false}
-                showCodeToggle
-              />
-            </div>
-          )}
-          {hasOutput && (
-            <div
-              ref={outputContainerRef}
-              className={cn(
-                'bg-surface-tertiary max-h-96 overflow-y-auto p-4 text-xs',
-                showCode ? 'border-t border-surface-primary-contrast' : '',
-              )}
-              style={{
-                transform: showCode ? 'translateY(0)' : 'translateY(-6px)',
-                opacity: showCode ? 1 : 0,
-                transition:
-                  'transform 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.05s, opacity 0.45s cubic-bezier(0.19, 1, 0.22, 1) 0.05s',
-                boxShadow: showCode ? '0 -1px 0 rgba(0,0,0,0.05)' : 'none',
-              }}
-            >
-              <div className="prose">
-                <Stdout output={output} />
+          <div
+            ref={codeContentRef}
+            className={cn(
+              'code-analyze-block mt-0.5 overflow-hidden rounded-xl bg-surface-primary',
+              showCode && 'shadow-lg',
+            )}
+            style={{
+              transform: showCode ? 'translateY(0) scale(1)' : 'translateY(-8px) scale(0.98)',
+              opacity: showCode ? 1 : 0,
+              transition:
+                'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          >
+            {showCode && (
+              <div
+                style={{
+                  transform: showCode ? 'translateY(0)' : 'translateY(-4px)',
+                  opacity: showCode ? 1 : 0,
+                  transition:
+                    'transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+                }}
+              >
+                <MarkdownLite
+                  content={code ? `\`\`\`${lang}\n${code}\n\`\`\`` : ''}
+                  codeExecution={false}
+                  showCodeToggle
+                />
               </div>
-            </div>
-          )}
+            )}
+            {hasOutput && (
+              <div
+                ref={outputContainerRef}
+                className={cn(
+                  'bg-surface-tertiary max-h-96 overflow-y-auto p-4 text-xs',
+                  showCode ? 'border-t border-surface-primary-contrast' : '',
+                )}
+                style={{
+                  transform: showCode ? 'translateY(0)' : 'translateY(-6px)',
+                  opacity: showCode ? 1 : 0,
+                  transition:
+                    'transform 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.05s, opacity 0.45s cubic-bezier(0.19, 1, 0.22, 1) 0.05s',
+                  boxShadow: showCode ? '0 -1px 0 rgba(0,0,0,0.05)' : 'none',
+                }}
+              >
+                <div className="prose">
+                  <Stdout output={output} />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+        {attachments && attachments.length > 0 && <AttachmentGroup attachments={attachments} />}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <ToolResultContainer
+        icon={
+          <TerminalSquareIcon className="size-5 shrink-0 text-text-secondary" aria-hidden="true" />
+        }
+        summary={summaryText}
+        isExpanded={showCode}
+        onToggle={() => setShowCode((prev) => !prev)}
+        isLoading={!isComplete && !cancelled}
+        error={cancelled}
+        hasExpandableContent={hasExpandableContent}
+        minExpandHeight={120}
+      >
+        {codeContent}
+      </ToolResultContainer>
       {attachments && attachments.length > 0 && <AttachmentGroup attachments={attachments} />}
     </>
   );

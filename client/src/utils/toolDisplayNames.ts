@@ -4,8 +4,13 @@ import { Constants, Tools } from 'librechat-data-provider';
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
   [Tools.search_user_files]: 'Grepped',
   [Tools.workspace_glob_files]: 'Globbed',
-  [Tools.execute_code]: 'Code Interpreter',
+  [Tools.workspace_read_file]: 'Read File',
+  [Tools.workspace_edit_file]: 'Edit File',
   [Tools.workspace_create_file]: 'Create File',
+  [Tools.workspace_delete_file]: 'Delete File',
+  [Tools.workspace_list_files]: 'List Files',
+  [Tools.workspace_send_file_to_user]: 'Send File to User',
+  [Tools.execute_code]: 'Code Interpreter',
   [Constants.TOOL_SEARCH]: 'Discovery',
   // Google Workspace MCP tools (underscore notation)
   tasks_listTaskLists: 'Listing Google Task Lists',
@@ -30,6 +35,13 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   'create-todo-task': 'Creating To Do task',
   'update-todo-task': 'Updating To Do task',
   'delete-todo-task': 'Deleting To Do task',
+  // Project tools
+  project_read: 'Project Context',
+  project_write: 'Update Project Context',
+  project_log: 'Append to Changelog',
+  project_log_tail: 'Recent Changelog Entries',
+  project_log_search: 'Search Changelog',
+  project_log_range: 'Changelog by Date Range',
 };
 
 /**

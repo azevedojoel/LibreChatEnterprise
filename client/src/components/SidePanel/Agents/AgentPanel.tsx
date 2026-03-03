@@ -454,6 +454,7 @@ export default function AgentPanel() {
           Tools.workspace_list_files,
           Tools.search_user_files,
           Tools.workspace_glob_files,
+          Tools.workspace_send_file_to_user,
         ].filter((t): t is string => t != null && t !== '');
         tools.push(...workspaceTools);
       }

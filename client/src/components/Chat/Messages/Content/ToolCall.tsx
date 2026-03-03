@@ -13,6 +13,12 @@ import store from '~/store';
 const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
   [Tools.search_user_files]: 'Grepped',
   [Tools.workspace_glob_files]: 'Globbed',
+  [Tools.workspace_read_file]: 'Read File',
+  [Tools.workspace_edit_file]: 'Edit File',
+  [Tools.workspace_create_file]: 'Create File',
+  [Tools.workspace_delete_file]: 'Delete File',
+  [Tools.workspace_list_files]: 'List Files',
+  [Tools.workspace_send_file_to_user]: 'Send File to User',
   [Constants.TOOL_SEARCH]: 'Discovery',
   // CRM tools
   'crm_list_pipelines': 'List Pipelines',
@@ -60,9 +66,49 @@ const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
   'create-todo-task': 'Creating To Do task',
   'update-todo-task': 'Updating To Do task',
   'delete-todo-task': 'Deleting To Do task',
+  // Project tools
+  project_read: 'Project Context',
+  project_write: 'Update Project Context',
+  project_log: 'Append to Changelog',
+  project_log_tail: 'Recent Changelog Entries',
+  project_log_search: 'Search Changelog',
+  project_log_range: 'Changelog by Date Range',
 };
+
+/** Icons for project tools */
+const PROJECT_TOOL_ICONS: Partial<Record<string, React.ComponentType<{ className?: string }>>> = {
+  project_read: FileText,
+  project_write: FileEdit,
+  project_log: ListPlus,
+  project_log_tail: List,
+  project_log_search: Search,
+  project_log_range: CalendarRange,
+};
+
+/** Icons for workspace file edit tools */
+const WORKSPACE_TOOL_ICONS: Partial<Record<string, React.ComponentType<{ className?: string }>>> = {
+  [Tools.workspace_read_file]: FileText,
+  [Tools.workspace_edit_file]: FileEdit,
+  [Tools.workspace_create_file]: FilePlus,
+  [Tools.workspace_delete_file]: FileX,
+  [Tools.workspace_list_files]: FolderOpen,
+  [Tools.workspace_glob_files]: Search,
+  [Tools.workspace_send_file_to_user]: FilePlus,
+};
+
 import type { TAttachment } from 'librechat-data-provider';
-import { Plug } from 'lucide-react';
+import {
+  Plug,
+  FileText,
+  FileEdit,
+  FilePlus,
+  FileX,
+  FolderOpen,
+  ListPlus,
+  List,
+  Search,
+  CalendarRange,
+} from 'lucide-react';
 import { useLocalize, useProgress, useMCPConnectionStatus, useToolApproval } from '~/hooks';
 import { useMessageContext } from '~/Providers';
 import { useGetStartupConfig } from '~/data-provider';
@@ -169,6 +215,16 @@ export default function ToolCall({
   );
 
   const humanizedDisplayName = useMemo(() => getToolDisplayName(name), [name]);
+
+  const ToolIcon = useMemo(() => {
+    if (function_name && PROJECT_TOOL_ICONS[function_name]) {
+      return PROJECT_TOOL_ICONS[function_name] as React.ComponentType<{ className?: string }>;
+    }
+    if (function_name && WORKSPACE_TOOL_ICONS[function_name]) {
+      return WORKSPACE_TOOL_ICONS[function_name] as React.ComponentType<{ className?: string }>;
+    }
+    return Plug;
+  }, [function_name]);
 
   const inlinePattern = useMemo(() => {
     if (function_name !== Tools.search_user_files && function_name !== Tools.workspace_glob_files) {
@@ -471,7 +527,7 @@ export default function ToolCall({
           </div>
         ) : useToolResultLayout ? (
           <ToolResultContainer
-            icon={<Plug className="size-5 shrink-0 text-text-secondary" aria-hidden="true" />}
+            icon={<ToolIcon className="size-5 shrink-0 text-text-secondary" aria-hidden="true" />}
             summary={
               cancelled
                 ? localize('com_ui_cancelled')

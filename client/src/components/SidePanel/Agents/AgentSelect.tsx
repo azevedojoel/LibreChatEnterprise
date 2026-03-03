@@ -97,7 +97,8 @@ export default function AgentSelect({
           tool === Tools.workspace_delete_file ||
           tool === Tools.workspace_list_files ||
           tool === Tools.search_user_files ||
-          tool === Tools.workspace_glob_files
+          tool === Tools.workspace_glob_files ||
+          tool === Tools.workspace_send_file_to_user
         ) {
           capabilities[AgentCapabilities.execute_code] = true;
           return;

@@ -1,6 +1,20 @@
 import React, { useMemo } from 'react';
 import * as Ariakit from '@ariakit/react';
-import { Globe, TerminalSquareIcon, Box, Wrench } from 'lucide-react';
+import {
+  Globe,
+  TerminalSquareIcon,
+  Box,
+  Wrench,
+  FileText,
+  FileEdit,
+  FilePlus,
+  FileX,
+  FolderOpen,
+  ListPlus,
+  List,
+  Search,
+  CalendarRange,
+} from 'lucide-react';
 import { VectorIcon } from '@librechat/client';
 import { EModelEndpoint, Tools, AgentCapabilities } from 'librechat-data-provider';
 import type { TMessage, TConversation } from 'librechat-data-provider';
@@ -18,6 +32,22 @@ const BUILT_IN_ICONS: Record<string, React.ComponentType<{ className?: string; s
   [Tools.web_search]: Globe,
   [Tools.execute_code]: TerminalSquareIcon,
   [AgentCapabilities.artifacts]: Box,
+  // Project tools
+  project_read: FileText,
+  project_write: FileEdit,
+  project_log: ListPlus,
+  project_log_tail: List,
+  project_log_search: Search,
+  project_log_range: CalendarRange,
+  // Workspace tools
+  [Tools.workspace_read_file]: FileText,
+  [Tools.workspace_edit_file]: FileEdit,
+  [Tools.workspace_create_file]: FilePlus,
+  [Tools.workspace_delete_file]: FileX,
+  [Tools.workspace_list_files]: FolderOpen,
+  [Tools.workspace_glob_files]: Search,
+  [Tools.workspace_send_file_to_user]: FilePlus,
+  [Tools.search_user_files]: Search,
 };
 
 function getToolIcon(toolId: string): React.ComponentType<{ className?: string; size?: number }> {
@@ -39,6 +69,22 @@ function getToolDisplayName(
     [Tools.web_search]: 'Web Search',
     [Tools.execute_code]: 'Code Interpreter',
     [AgentCapabilities.artifacts]: 'Artifacts',
+    // Project tools
+    project_read: 'Project Context',
+    project_write: 'Update Project Context',
+    project_log: 'Append to Changelog',
+    project_log_tail: 'Recent Changelog Entries',
+    project_log_search: 'Search Changelog',
+    project_log_range: 'Changelog by Date Range',
+    // Workspace tools
+    [Tools.workspace_read_file]: 'Read File',
+    [Tools.workspace_edit_file]: 'Edit File',
+    [Tools.workspace_create_file]: 'Create File',
+    [Tools.workspace_delete_file]: 'Delete File',
+    [Tools.workspace_list_files]: 'List Files',
+    [Tools.workspace_glob_files]: 'Globbed',
+    [Tools.workspace_send_file_to_user]: 'Send File to User',
+    [Tools.search_user_files]: 'Grepped',
   };
   return labels[toolId] ?? toolId;
 }

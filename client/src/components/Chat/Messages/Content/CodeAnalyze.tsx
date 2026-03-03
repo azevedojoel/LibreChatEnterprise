@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useRecoilValue } from 'recoil';
+import { TerminalSquareIcon } from 'lucide-react';
 import { useProgress, useLocalize } from '~/hooks';
-import ProgressText from './ProgressText';
+import ToolResultContainer from './ToolResultContainer';
 import MarkdownLite from './MarkdownLite';
 import store from '~/store';
 
@@ -26,39 +27,38 @@ export default function CodeAnalyze({
     return acc;
   }, '');
 
+  const isComplete = progress >= 1;
+  const summaryText = isComplete
+    ? localize('com_ui_analyzing_finished')
+    : localize('com_ui_analyzing');
+  const hasExpandableContent = code.length > 0 || logs.length > 0;
+
   return (
-    <>
-      <div className="my-2.5 flex items-center gap-2.5">
-        <ProgressText
-          progress={progress}
-          onClick={() => setShowCode((prev) => !prev)}
-          inProgressText={localize('com_ui_analyzing')}
-          finishedText={localize('com_ui_analyzing_finished')}
-          hasInput={!!code.length}
-          isExpanded={showCode}
+    <ToolResultContainer
+      icon={
+        <TerminalSquareIcon className="size-5 shrink-0 text-text-secondary" aria-hidden="true" />
+      }
+      summary={summaryText}
+      isExpanded={showCode}
+      onToggle={() => setShowCode((prev) => !prev)}
+      isLoading={!isComplete}
+      hasExpandableContent={hasExpandableContent}
+      minExpandHeight={120}
+    >
+      <div className="code-analyze-block overflow-hidden rounded-lg border border-border-light bg-surface-tertiary">
+        <MarkdownLite
+          content={code ? `\`\`\`python\n${code}\n\`\`\`` : ''}
+          showCodeToggle
         />
-      </div>
-      {showCode && (
-        <div className="code-analyze-block mb-3 mt-0.5 overflow-hidden rounded-xl bg-black">
-          <MarkdownLite
-            content={code ? `\`\`\`python\n${code}\n\`\`\`` : ''}
-            showCodeToggle
-          />
-          {logs && (
-            <div className="bg-gray-700 p-4 text-xs">
-              <div className="mb-1 text-gray-400">{localize('com_ui_result')}</div>
-              <div
-                className="prose flex flex-col-reverse text-white"
-                style={{
-                  color: 'white',
-                }}
-              >
-                <pre className="shrink-0">{logs}</pre>
-              </div>
+        {logs && (
+          <div className="border-t border-border-light bg-surface-secondary p-4 text-xs">
+            <div className="mb-1 text-text-secondary">{localize('com_ui_result')}</div>
+            <div className="prose flex flex-col-reverse text-text-primary">
+              <pre className="shrink-0">{logs}</pre>
             </div>
-          )}
-        </div>
-      )}
-    </>
+          </div>
+        )}
+      </div>
+    </ToolResultContainer>
   );
 }
