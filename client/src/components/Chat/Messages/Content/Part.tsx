@@ -33,9 +33,30 @@ import MicrosoftTodoTaskLists from './MicrosoftTodoTaskLists';
 import MicrosoftTodoTaskCreate from './MicrosoftTodoTaskCreate';
 import MicrosoftTodoTaskUpdate from './MicrosoftTodoTaskUpdate';
 import MicrosoftTodoTaskDelete from './MicrosoftTodoTaskDelete';
+import CalendarList from './CalendarList';
+import CalendarListEvents from './CalendarListEvents';
+import CalendarCreateEvent from './CalendarCreateEvent';
+import CalendarGetEvent from './CalendarGetEvent';
+import CalendarUpdateEvent from './CalendarUpdateEvent';
+import CalendarDeleteEvent from './CalendarDeleteEvent';
+import CalendarRespondToEvent from './CalendarRespondToEvent';
+import CalendarFindFreeTime from './CalendarFindFreeTime';
+import MSCalendarListEvents from './MSCalendarListEvents';
+import MSCalendarGetEvent from './MSCalendarGetEvent';
+import MSCalendarCreateEvent from './MSCalendarCreateEvent';
+import MSCalendarDeleteEvent from './MSCalendarDeleteEvent';
+import MSCalendarUpdateEvent from './MSCalendarUpdateEvent';
+import CRMList from './CRMList';
+import CRMCard from './CRMCard';
+import CRMLogActivity from './CRMLogActivity';
+import CRMDelete from './CRMDelete';
 import ToolCall from './ToolCall';
 import ImageGen from './ImageGen';
 import Image from './Image';
+
+function isToolMatch(name: string | undefined, base: string): boolean {
+  return name === base || (typeof name === 'string' && name.startsWith(`${base}_mcp_`));
+}
 
 type PartProps = {
   part?: TMessageContentParts;
@@ -445,6 +466,432 @@ const Part = memo(
             isSubmitting={isSubmitting}
             isLast={isLast}
             toolCallId={toolCall.id}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'calendar_list')) {
+        return (
+          <CalendarList
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'calendar_listEvents')) {
+        return (
+          <CalendarListEvents
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'calendar_createEvent')) {
+        return (
+          <CalendarCreateEvent
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            toolName={toolCall.name}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'calendar_getEvent')) {
+        return (
+          <CalendarGetEvent
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'calendar_updateEvent')) {
+        return (
+          <CalendarUpdateEvent
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            toolName={toolCall.name}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'calendar_deleteEvent')) {
+        return (
+          <CalendarDeleteEvent
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            toolName={toolCall.name}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'calendar_respondToEvent')) {
+        return (
+          <CalendarRespondToEvent
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            toolName={toolCall.name}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'calendar_findFreeTime')) {
+        return (
+          <CalendarFindFreeTime
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (
+        isToolCall &&
+        [
+          'list-calendar-events',
+          'get-calendar-view',
+          'get-specific-calendar-view',
+          'list-calendar-event-instances',
+          'list-specific-calendar-events',
+        ].some(
+          (b) =>
+            toolCall.name === b ||
+            (typeof toolCall.name === 'string' && toolCall.name.startsWith(`${b}_mcp_`)),
+        )
+      ) {
+        return (
+          <MSCalendarListEvents
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (
+        isToolCall &&
+        ['get-calendar-event', 'get-specific-calendar-event'].some(
+          (b) =>
+            toolCall.name === b ||
+            (typeof toolCall.name === 'string' && toolCall.name.startsWith(`${b}_mcp_`)),
+        )
+      ) {
+        return (
+          <MSCalendarGetEvent
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (
+        isToolCall &&
+        ['create-calendar-event', 'create-specific-calendar-event'].some(
+          (b) =>
+            toolCall.name === b ||
+            (typeof toolCall.name === 'string' && toolCall.name.startsWith(`${b}_mcp_`)),
+        )
+      ) {
+        return (
+          <MSCalendarCreateEvent
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            toolName={toolCall.name}
+          />
+        );
+      } else if (
+        isToolCall &&
+        ['update-calendar-event', 'update-specific-calendar-event'].some(
+          (b) =>
+            toolCall.name === b ||
+            (typeof toolCall.name === 'string' && toolCall.name.startsWith(`${b}_mcp_`)),
+        )
+      ) {
+        return (
+          <MSCalendarUpdateEvent
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            toolName={toolCall.name}
+          />
+        );
+      } else if (
+        isToolCall &&
+        ['delete-calendar-event', 'delete-specific-calendar-event'].some(
+          (b) =>
+            toolCall.name === b ||
+            (typeof toolCall.name === 'string' && toolCall.name.startsWith(`${b}_mcp_`)),
+        )
+      ) {
+        return (
+          <MSCalendarDeleteEvent
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            toolName={toolCall.name}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'crm_list_pipelines')) {
+        return (
+          <CRMList
+            itemType="pipelines"
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'crm_list_contacts')) {
+        return (
+          <CRMList
+            itemType="contacts"
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'crm_list_organizations')) {
+        return (
+          <CRMList
+            itemType="organizations"
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'crm_list_deals')) {
+        return (
+          <CRMList
+            itemType="deals"
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'crm_list_activities')) {
+        return (
+          <CRMList
+            itemType="activities"
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'crm_create_pipeline')) {
+        return (
+          <CRMCard
+            entityType="pipeline"
+            action="create"
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            toolName={toolCall.name}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'crm_update_pipeline')) {
+        return (
+          <CRMCard
+            entityType="pipeline"
+            action="update"
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            toolName={toolCall.name}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'crm_create_contact')) {
+        return (
+          <CRMCard
+            entityType="contact"
+            action="create"
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            toolName={toolCall.name}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'crm_update_contact')) {
+        return (
+          <CRMCard
+            entityType="contact"
+            action="update"
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            toolName={toolCall.name}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'crm_get_contact')) {
+        return (
+          <CRMCard
+            entityType="contact"
+            action="get"
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            toolName={toolCall.name}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'crm_create_organization')) {
+        return (
+          <CRMCard
+            entityType="organization"
+            action="create"
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            toolName={toolCall.name}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'crm_get_organization')) {
+        return (
+          <CRMCard
+            entityType="organization"
+            action="get"
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            toolName={toolCall.name}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'crm_create_deal')) {
+        return (
+          <CRMCard
+            entityType="deal"
+            action="create"
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            toolName={toolCall.name}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'crm_update_deal')) {
+        return (
+          <CRMCard
+            entityType="deal"
+            action="update"
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            toolName={toolCall.name}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'crm_log_activity')) {
+        return (
+          <CRMLogActivity
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'crm_soft_delete_contact')) {
+        return (
+          <CRMDelete
+            entityType="contact"
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            toolName={toolCall.name}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'crm_soft_delete_organization')) {
+        return (
+          <CRMDelete
+            entityType="organization"
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            toolName={toolCall.name}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'crm_soft_delete_deal')) {
+        return (
+          <CRMDelete
+            entityType="deal"
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            toolName={toolCall.name}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'crm_soft_delete_pipeline')) {
+        return (
+          <CRMDelete
+            entityType="pipeline"
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            toolName={toolCall.name}
           />
         );
       } else if (isToolCall) {

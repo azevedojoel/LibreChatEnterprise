@@ -60,6 +60,27 @@ const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
   'gmail_get': 'Retrieved email',
   // Google Docs
   'docs_create': 'Creating Google Doc',
+  // Google Calendar MCP tools
+  calendar_list: 'Listed calendars',
+  calendar_listEvents: 'Listed events',
+  calendar_createEvent: 'Created event',
+  calendar_getEvent: 'Retrieved event',
+  calendar_updateEvent: 'Updated event',
+  calendar_deleteEvent: 'Deleted event',
+  calendar_respondToEvent: 'Responded to event',
+  calendar_findFreeTime: 'Found free time',
+  // Microsoft 365 Calendar tools
+  'list-calendar-events': 'Listed events',
+  'get-calendar-view': 'Listed calendar view',
+  'get-specific-calendar-view': 'Listed calendar view',
+  'list-calendar-event-instances': 'Listed event instances',
+  'list-specific-calendar-events': 'Listed events',
+  'get-calendar-event': 'Retrieved event',
+  'get-specific-calendar-event': 'Retrieved event',
+  'create-calendar-event': 'Created event',
+  'create-specific-calendar-event': 'Created event',
+  'update-calendar-event': 'Updated event',
+  'update-specific-calendar-event': 'Updated event',
   // Microsoft To Do MCP tools (hyphen notation)
   'list-todo-tasks': 'Listed To Do tasks',
   'list-todo-task-lists': 'Listed To Do lists',
@@ -115,6 +136,52 @@ const SCHEDULER_TOOL_ICONS: Partial<Record<string, React.ComponentType<{ classNa
   [Tools.run_schedule]: Play,
   [Tools.list_runs]: List,
   [Tools.get_run]: FileSearch,
+};
+
+/** Icons for Google Calendar and MS 365 Calendar tools */
+const CALENDAR_TOOL_ICONS: Partial<Record<string, React.ComponentType<{ className?: string }>>> = {
+  calendar_list: Calendar,
+  calendar_listEvents: Calendar,
+  calendar_createEvent: Calendar,
+  calendar_getEvent: Calendar,
+  calendar_updateEvent: Calendar,
+  calendar_deleteEvent: Calendar,
+  calendar_respondToEvent: Calendar,
+  calendar_findFreeTime: Calendar,
+  'list-calendar-events': Calendar,
+  'get-calendar-view': Calendar,
+  'get-specific-calendar-view': Calendar,
+  'list-calendar-event-instances': Calendar,
+  'list-specific-calendar-events': Calendar,
+  'get-calendar-event': Calendar,
+  'get-specific-calendar-event': Calendar,
+  'create-calendar-event': Calendar,
+  'create-specific-calendar-event': Calendar,
+  'update-calendar-event': Calendar,
+  'update-specific-calendar-event': Calendar,
+};
+
+/** Icons for CRM tools */
+const CRM_TOOL_ICONS: Partial<Record<string, React.ComponentType<{ className?: string }>>> = {
+  crm_list_pipelines: List,
+  crm_create_pipeline: List,
+  crm_update_pipeline: List,
+  crm_soft_delete_pipeline: List,
+  crm_list_contacts: Plug,
+  crm_create_contact: Plug,
+  crm_update_contact: Plug,
+  crm_get_contact: Plug,
+  crm_soft_delete_contact: Plug,
+  crm_list_organizations: Plug,
+  crm_create_organization: Plug,
+  crm_get_organization: Plug,
+  crm_soft_delete_organization: Plug,
+  crm_list_deals: Plug,
+  crm_create_deal: Plug,
+  crm_update_deal: Plug,
+  crm_soft_delete_deal: Plug,
+  crm_log_activity: List,
+  crm_list_activities: List,
 };
 
 import type { TAttachment } from 'librechat-data-provider';
@@ -252,6 +319,12 @@ export default function ToolCall({
     }
     if (function_name && SCHEDULER_TOOL_ICONS[function_name]) {
       return SCHEDULER_TOOL_ICONS[function_name] as React.ComponentType<{ className?: string }>;
+    }
+    if (function_name && CALENDAR_TOOL_ICONS[function_name]) {
+      return CALENDAR_TOOL_ICONS[function_name] as React.ComponentType<{ className?: string }>;
+    }
+    if (function_name && CRM_TOOL_ICONS[function_name]) {
+      return CRM_TOOL_ICONS[function_name] as React.ComponentType<{ className?: string }>;
     }
     return Plug;
   }, [function_name]);

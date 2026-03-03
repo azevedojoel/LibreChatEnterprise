@@ -34,16 +34,17 @@ export default function ToolResultContainer({
   const contentRef = useRef<HTMLDivElement>(null);
   const [contentHeight, setContentHeight] = useState<number>(0);
 
-  const MAX_RESULTS_HEIGHT = 400; // Tall enough for multiple rows of pills/lists, scrollable
+  const MAX_RESULTS_HEIGHT = 600; // Auto-height up to 600px, then scroll
+  const MIN_HEIGHT = minExpandHeight ?? 0;
 
   const computeHeight = (raw: number) => {
-    const capped = Math.min(raw, MAX_RESULTS_HEIGHT);
-    return minExpandHeight != null ? Math.max(capped, minExpandHeight) : capped;
+    const withMin = Math.max(raw + 4, MIN_HEIGHT);
+    return Math.min(withMin, MAX_RESULTS_HEIGHT);
   };
 
   useLayoutEffect(() => {
     if (isExpanded && contentRef.current) {
-      const fullHeight = contentRef.current.scrollHeight + 4;
+      const fullHeight = contentRef.current.scrollHeight;
       setContentHeight(computeHeight(fullHeight));
     } else {
       setContentHeight(0);
@@ -55,7 +56,7 @@ export default function ToolResultContainer({
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         if (entry.target === contentRef.current) {
-          const fullHeight = entry.contentRect.height + 4;
+          const fullHeight = entry.target.scrollHeight;
           setContentHeight(computeHeight(fullHeight));
         }
       }
@@ -117,7 +118,7 @@ export default function ToolResultContainer({
       >
         <div
           ref={contentRef}
-          className="max-h-[400px] overflow-y-auto border-t border-border-light px-3 py-2"
+          className="max-h-[600px] overflow-y-auto border-t border-border-light px-3 py-2"
         >
           {children}
         </div>
