@@ -3,6 +3,8 @@ const assistants = require('./assistants');
 const categories = require('./categories');
 const adminAuth = require('./admin/auth');
 const adminUsers = require('./admin/users');
+const adminWorkspaces = require('./admin/workspaces');
+const workspace = require('./workspace');
 const endpoints = require('./endpoints');
 const staticRoute = require('./static');
 const messages = require('./messages');
@@ -36,6 +38,8 @@ module.exports = {
   auth,
   adminAuth,
   adminUsers,
+  adminWorkspaces,
+  workspace,
   keys,
   apiKeys,
   user,
