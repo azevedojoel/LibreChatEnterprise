@@ -53,7 +53,9 @@ const { loadAuthValues } = require('~/server/services/Tools/credentials');
 const { getMCPServerTools } = require('~/server/services/Config');
 const { getRoleByName } = require('~/models/Role');
 const { findUser } = require('~/models');
+const { getConvo } = require('~/models/Conversation');
 const { createCRMTools } = require('../structured/CRMTools');
+const { createProjectTools } = require('../structured/ProjectTools');
 
 /**
  * Validates the availability and authentication of tools for a user based on environment variables or user-specific plugin authentication values.
@@ -185,7 +187,11 @@ const loadTools = async ({
   const CRM_TOOL_NAMES = new Set(
     Object.values(Tools).filter((t) => typeof t === 'string' && t.startsWith('crm_')),
   );
+  const PROJECT_TOOL_NAMES = new Set(
+    Object.values(Tools).filter((t) => typeof t === 'string' && t.startsWith('project_')),
+  );
   const hasCRMTools = tools.some((t) => CRM_TOOL_NAMES.has(t));
+  const hasProjectTools = tools.some((t) => PROJECT_TOOL_NAMES.has(t));
   let userProjectId = null;
   if (hasCRMTools) {
     try {
@@ -193,6 +199,36 @@ const loadTools = async ({
       userProjectId = userDoc?.projectId?.toString?.() ?? userDoc?.projectId ?? null;
     } catch (err) {
       logger.debug('[handleTools] Could not resolve projectId for CRM tools:', err);
+    }
+  }
+  let conversationUserProjectId = null;
+  if (hasProjectTools) {
+    try {
+      const conversationId = options.req?.body?.conversationId;
+      logger.debug(
+        `[handleTools] Project tools requested | conversationId=${conversationId} | req.body.userProjectId=${options.req?.body?.userProjectId ?? 'undefined'}`,
+      );
+      if (conversationId && conversationId !== 'new') {
+        const convo = await getConvo(user, conversationId);
+        conversationUserProjectId =
+          convo?.userProjectId?.toString?.() ?? convo?.userProjectId ?? null;
+        logger.debug(
+          `[handleTools] getConvo result | convo.userProjectId=${convo?.userProjectId ?? 'undefined'} | resolved=${conversationUserProjectId ?? 'null'}`,
+        );
+      }
+    } catch (err) {
+      logger.debug('[handleTools] Could not resolve userProjectId for project tools:', err);
+    }
+    conversationUserProjectId =
+      conversationUserProjectId ?? options.req?.body?.userProjectId ?? null;
+    if (!conversationUserProjectId) {
+      logger.warn(
+        `[handleTools] No userProjectId for project tools - will skip creating project tool instances`,
+      );
+    } else {
+      logger.debug(
+        `[handleTools] Creating project tools with conversationUserProjectId=${conversationUserProjectId}`,
+      );
     }
   }
 
@@ -335,7 +371,8 @@ const loadTools = async ({
       tool === Tools.workspace_delete_file ||
       tool === Tools.workspace_list_files ||
       tool === Tools.search_user_files ||
-      tool === Tools.workspace_glob_files
+      tool === Tools.workspace_glob_files ||
+      tool === Tools.workspace_send_file_to_user
     ) {
       const conversationId =
         options.req?.body?.conversationId ?? options.conversationId;
@@ -376,6 +413,7 @@ const loadTools = async ({
         listFilesTool,
         globFilesTool,
         searchFilesTool,
+        sendFileToUserTool,
       ] = createWorkspaceCodeEditTools({ workspaceRoot });
       const toolMap = {
         [Tools.workspace_read_file]: readFileTool,
@@ -385,6 +423,7 @@ const loadTools = async ({
         [Tools.workspace_list_files]: listFilesTool,
         [Tools.search_user_files]: searchFilesTool,
         [Tools.workspace_glob_files]: globFilesTool,
+        [Tools.workspace_send_file_to_user]: sendFileToUserTool,
       };
       requestedTools[tool] = async () => {
         await ensureWorkspaceInjected();
@@ -496,6 +535,18 @@ const loadTools = async ({
       requestedTools[tool] = async () => {
         const crmTools = createCRMTools({ userId: user, projectId: userProjectId });
         return crmTools[tool];
+      };
+      continue;
+    } else if (PROJECT_TOOL_NAMES.has(tool)) {
+      if (!conversationUserProjectId) {
+        continue;
+      }
+      requestedTools[tool] = async () => {
+        const projectTools = createProjectTools({
+          userId: user,
+          projectId: conversationUserProjectId,
+        });
+        return projectTools[tool];
       };
       continue;
     } else if (tool && mcpToolPattern.test(tool)) {

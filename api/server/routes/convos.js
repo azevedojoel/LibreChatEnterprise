@@ -10,7 +10,9 @@ const {
   createForkLimiters,
   configMiddleware,
 } = require('~/server/middleware');
+const mongoose = require('mongoose');
 const { getConvosByCursor, deleteConvos, getConvo, saveConvo } = require('~/models/Conversation');
+const { getUserProject } = require('~/models/UserProject');
 const { forkConversation, duplicateConversation } = require('~/server/utils/import/fork');
 const { storage, importFileFilter } = require('~/server/routes/files/multer');
 const { deleteAllSharedLinks, deleteConvoSharedLink } = require('~/models');
@@ -40,6 +42,8 @@ router.get('/', async (req, res) => {
     tags = Array.isArray(req.query.tags) ? req.query.tags : [req.query.tags];
   }
 
+  const userProjectId = req.query.userProjectId || undefined;
+
   try {
     const result = await getConvosByCursor(req.user.id, {
       cursor,
@@ -49,6 +53,7 @@ router.get('/', async (req, res) => {
       search,
       sortBy,
       sortDirection,
+      userProjectId,
     });
     res.status(200).json(result);
   } catch (error) {
@@ -187,35 +192,52 @@ router.post('/archive', validateConvoAccess, async (req, res) => {
 const MAX_CONVO_TITLE_LENGTH = 1024;
 
 /**
- * Updates a conversation's title.
+ * Updates a conversation's title and/or userProjectId.
  * @route POST /update
  * @param {string} req.body.arg.conversationId - The conversation ID to update.
- * @param {string} req.body.arg.title - The new title for the conversation.
+ * @param {string} [req.body.arg.title] - The new title for the conversation.
+ * @param {string|null} [req.body.arg.userProjectId] - The user project ID to assign to the conversation.
  * @returns {object} 201 - The updated conversation object.
  */
 router.post('/update', validateConvoAccess, async (req, res) => {
-  const { conversationId, title } = req.body?.arg ?? {};
+  const { conversationId, title, userProjectId } = req.body?.arg ?? {};
 
   if (!conversationId) {
     return res.status(400).json({ error: 'conversationId is required' });
   }
 
-  if (title === undefined) {
-    return res.status(400).json({ error: 'title is required' });
+  const update = { conversationId };
+
+  if (title !== undefined) {
+    if (typeof title !== 'string') {
+      return res.status(400).json({ error: 'title must be a string' });
+    }
+    update.title = title.trim().slice(0, MAX_CONVO_TITLE_LENGTH);
   }
 
-  if (typeof title !== 'string') {
-    return res.status(400).json({ error: 'title must be a string' });
+  if (userProjectId !== undefined) {
+    if (userProjectId === null || userProjectId === '') {
+      update.userProjectId = null;
+    } else {
+      if (!mongoose.Types.ObjectId.isValid(userProjectId)) {
+        return res.status(400).json({ error: 'userProjectId must be a valid project ID' });
+      }
+      const project = await getUserProject(req.user.id, userProjectId);
+      if (!project) {
+        return res.status(400).json({ error: 'Project not found or access denied' });
+      }
+      update.userProjectId = userProjectId;
+    }
   }
 
-  const sanitizedTitle = title.trim().slice(0, MAX_CONVO_TITLE_LENGTH);
+  if (Object.keys(update).length <= 1) {
+    return res.status(400).json({ error: 'At least one of title or userProjectId is required' });
+  }
 
   try {
-    const dbResponse = await saveConvo(
-      req,
-      { conversationId, title: sanitizedTitle },
-      { context: `POST /api/convos/update ${conversationId}` },
-    );
+    const dbResponse = await saveConvo(req, update, {
+      context: `POST /api/convos/update ${conversationId}`,
+    });
     res.status(201).json(dbResponse);
   } catch (error) {
     logger.error('Error updating conversation', error);

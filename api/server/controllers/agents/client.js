@@ -46,7 +46,8 @@ const {
 const { spendTokens, spendStructuredTokens } = require('~/models/spendTokens');
 const { encodeAndFormat } = require('~/server/services/Files/images/encode');
 const { createContextHandlers } = require('~/app/clients/prompts');
-const { getConvoFiles } = require('~/models/Conversation');
+const { getConvoFiles, getConvo } = require('~/models/Conversation');
+const { getUserProject } = require('~/models/UserProject');
 const BaseClient = require('~/app/clients/BaseClient');
 const { getRoleByName } = require('~/models/Role');
 const { loadAgent } = require('~/models/Agent');
@@ -360,6 +361,7 @@ class AgentClient extends BaseClient {
           imageDetail: this.options.imageDetail,
           spec: this.options.spec,
           iconURL: this.options.iconURL,
+          userProjectId: this.options.req?.body?.userProjectId ?? undefined,
         },
         // TODO: PARSE OPTIONS BY PROVIDER, MAY CONTAIN SENSITIVE DATA
         runOptions,
@@ -540,9 +542,53 @@ class AgentClient extends BaseClient {
 
     /**
      * Build shared run context - applies to ALL agents in the run.
-     * This includes: file context (latest message), augmented prompt (RAG), memory context.
+     * This includes: project context, file context (latest message), augmented prompt (RAG), memory context.
      */
     const sharedRunContextParts = [];
+
+    /** Project context - curated context doc, always injected when conversation has a project */
+    const conversationId = this.conversationId + '';
+    const userId = this.user ?? this.options.req?.user?.id;
+    if (userId) {
+      try {
+        let userProjectId = null;
+        if (conversationId && conversationId !== 'new') {
+          const convo = await getConvo(userId, conversationId);
+          userProjectId = convo?.userProjectId?.toString?.() ?? convo?.userProjectId ?? null;
+        }
+        userProjectId = userProjectId ?? this.options.req?.body?.userProjectId ?? null;
+        if (userProjectId) {
+          const project = await getUserProject(userId, userProjectId);
+          if (project) {
+            const projectName = project.name?.trim() || 'Untitled';
+            const projectContext =
+              project.context?.trim() || '(No context set yet. Use project_write to add context.)';
+            const projectPrompt = `# Project
+
+You are working in a project. Projects are user-scoped workspaces that organize work and persist context across conversations. This conversation is assigned to the project "${projectName}".
+
+## Current project: ${projectName}
+
+## Project context
+
+${projectContext}
+
+## Project tools
+
+You have these tools to manage the project:
+- project_read: Read the curated context document
+- project_write: Update the context document (budget, state, key facts). Required: content
+- project_log: Append an entry to the project changelog. Required: entry
+- project_log_tail: Get the last n changelog entries. Optional: n (default 10, max 100)
+- project_log_search: Search the changelog by keyword. Required: query
+- project_log_range: Get changelog entries between two timestamps. Required: from, to (ISO date strings)`;
+            sharedRunContextParts.unshift(projectPrompt);
+          }
+        }
+      } catch (err) {
+        logger.debug('[AgentClient] Could not load project context:', err?.message);
+      }
+    }
 
     /** File context from the latest message (attachments) */
     const latestMessage = orderedMessages[orderedMessages.length - 1];

@@ -78,9 +78,26 @@ async function buildEndpointOption(req, res, next) {
       ? (...args) => buildFunction[EModelEndpoint.agents](req, ...args)
       : buildFunction[endpointType ?? endpoint];
 
+    // Preserve userProjectId before any mutations (needed for project tools)
+    const originalUserProjectId = req.body?.userProjectId;
+    if (isAgents) {
+      logger.debug(
+        `[buildEndpointOption] Agents request | conversationId=${req.body?.conversationId} | userProjectId=${originalUserProjectId ?? 'undefined'}`,
+      );
+      if (originalUserProjectId != null) {
+        logger.debug(
+          `[buildEndpointOption] Preserving userProjectId for project tools | userProjectId=${originalUserProjectId}`,
+        );
+      }
+    }
+
     // TODO: use object params
     req.body = req.body || {}; // Express 5: ensure req.body exists
     req.body.endpointOption = await builder(endpoint, parsedBody, endpointType);
+
+    if (originalUserProjectId != null) {
+      req.body.userProjectId = originalUserProjectId;
+    }
 
     if (req.body.files && !isAgents) {
       req.body.endpointOption.attachments = updateFilesUsage(req.body.files);

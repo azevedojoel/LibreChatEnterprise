@@ -165,6 +165,7 @@ module.exports = {
       search,
       sortBy = 'updatedAt',
       sortDirection = 'desc',
+      userProjectId,
     } = {},
   ) => {
     const filters = [{ user }];
@@ -176,6 +177,10 @@ module.exports = {
 
     if (Array.isArray(tags) && tags.length > 0) {
       filters.push({ tags: { $in: tags } });
+    }
+
+    if (userProjectId) {
+      filters.push({ userProjectId: userProjectId });
     }
 
     filters.push({ $or: [{ expiredAt: null }, { expiredAt: { $exists: false } }] });
@@ -248,7 +253,7 @@ module.exports = {
 
       const convos = await Conversation.find(query)
         .select(
-          'conversationId endpoint title createdAt updatedAt user model agent_id assistant_id spec iconURL',
+          'conversationId endpoint title createdAt updatedAt user model agent_id assistant_id spec iconURL userProjectId',
         )
         .sort(sortObj)
         .limit(limit + 1)

@@ -147,6 +147,7 @@ async function processRequiredActions(client, requiredActions) {
     options: {
       processFileURL,
       req: client.req,
+      conversationId: client.req.body?.conversationId,
       uploadImageBuffer,
       openAIApiKey: client.apiKey,
       returnMetadata: true,
@@ -440,6 +441,7 @@ const nativeTools = new Set([
   Tools.workspace_list_files,
   Tools.search_user_files,
   Tools.workspace_glob_files,
+  Tools.workspace_send_file_to_user,
   Tools.list_schedules,
   Tools.create_schedule,
   Tools.update_schedule,
@@ -447,6 +449,12 @@ const nativeTools = new Set([
   Tools.run_schedule,
   Tools.list_runs,
   Tools.get_run,
+  Tools.project_read,
+  Tools.project_write,
+  Tools.project_log,
+  Tools.project_log_tail,
+  Tools.project_log_search,
+  Tools.project_log_range,
 ]);
 
 const { isDestructiveTool } = require('./destructiveTools');
@@ -523,6 +531,7 @@ async function loadToolDefinitionsWrapper({
       Tools.workspace_list_files,
       Tools.search_user_files,
       Tools.workspace_glob_files,
+      Tools.workspace_send_file_to_user,
     ];
     toolsToFilter = [...new Set([...toolsToFilter, ...workspaceTools])];
   }
@@ -545,6 +554,9 @@ async function loadToolDefinitionsWrapper({
   const hasCRMTools = toolsToFilter.some(
     (t) => typeof t === 'string' && t.startsWith('crm_'),
   );
+  const hasProjectTools = toolsToFilter.some(
+    (t) => typeof t === 'string' && t.startsWith('project_'),
+  );
   const hasToolSearch = toolsToFilter.some(
     (t) =>
       t === Constants.TOOL_SEARCH || (typeof t === 'string' && t.startsWith('tool_search_mcp_')),
@@ -556,6 +568,40 @@ async function loadToolDefinitionsWrapper({
     if (hasCRMTools && !userProjectId) {
       toolsToFilter = toolsToFilter.filter((t) => typeof t !== 'string' || !t.startsWith('crm_'));
     }
+  }
+
+  /** Resolve userProjectId for project tools - inject when conversation has project */
+  let conversationUserProjectId = null;
+  const { getConvo } = require('~/models/Conversation');
+  try {
+    const conversationId = req.body?.conversationId;
+    if (conversationId && conversationId !== 'new') {
+      const convo = await getConvo(req.user.id, conversationId);
+      conversationUserProjectId =
+        convo?.userProjectId?.toString?.() ?? convo?.userProjectId ?? null;
+    }
+    conversationUserProjectId = conversationUserProjectId ?? req.body?.userProjectId ?? null;
+  } catch (err) {
+    logger.debug('[ToolService] Could not resolve userProjectId for project tools:', err);
+  }
+
+  if (hasProjectTools && !conversationUserProjectId) {
+    toolsToFilter = toolsToFilter.filter(
+      (t) => typeof t !== 'string' || !t.startsWith('project_'),
+    );
+  }
+
+  /** Inject project tools when conversation has userProjectId */
+  if (conversationUserProjectId && !toolsToFilter.some((t) => typeof t === 'string' && t.startsWith('project_'))) {
+    const projectTools = [
+      Tools.project_read,
+      Tools.project_write,
+      Tools.project_log,
+      Tools.project_log_tail,
+      Tools.project_log_search,
+      Tools.project_log_range,
+    ];
+    toolsToFilter = [...new Set([...toolsToFilter, ...projectTools])];
   }
 
   /** Filter by ephemeralAgent (chat badge overrides) - only for primary agent; handoff targets get full tools */
@@ -619,7 +665,8 @@ async function loadToolDefinitionsWrapper({
       tool === Tools.workspace_delete_file ||
       tool === Tools.workspace_list_files ||
       tool === Tools.search_user_files ||
-      tool === Tools.workspace_glob_files
+      tool === Tools.workspace_glob_files ||
+      tool === Tools.workspace_send_file_to_user
     ) {
       if (isPersistentAgent) {
         if (ephemeralAgent?.execute_code === false) return false;
@@ -649,8 +696,18 @@ async function loadToolDefinitionsWrapper({
   });
 
   if (!filteredTools || filteredTools.length === 0) {
+    logger.debug(
+      `[ToolService.loadToolDefinitionsWrapper] Returning 0 tools | agentId=${agent?.id} | filteredToolsCount=0`,
+    );
     return { toolDefinitions: [] };
   }
+
+  const projectToolsInFiltered = filteredTools.filter(
+    (t) => typeof t === 'string' && t.startsWith('project_'),
+  );
+  logger.debug(
+    `[ToolService.loadToolDefinitionsWrapper] Tools after filter | total=${filteredTools.length} | project_*=${projectToolsInFiltered.length} | names=${filteredTools.slice(0, 20).join(',')}${filteredTools.length > 20 ? '...' : ''}`,
+  );
 
   /** @type {Record<string, Record<string, string>>} */
   let userMCPAuthMap = {};
@@ -895,7 +952,8 @@ async function loadToolDefinitionsWrapper({
       filteredTools.includes(Tools.workspace_delete_file) ||
       filteredTools.includes(Tools.workspace_list_files) ||
       filteredTools.includes(Tools.search_user_files) ||
-      filteredTools.includes(Tools.workspace_glob_files));
+      filteredTools.includes(Tools.workspace_glob_files) ||
+      filteredTools.includes(Tools.workspace_send_file_to_user));
 
   if (hasWebSearch) {
     toolContextMap[Tools.web_search] = buildWebSearchContext();
@@ -917,6 +975,7 @@ async function loadToolDefinitionsWrapper({
       toolContextMap[Tools.workspace_list_files] =
       toolContextMap[Tools.search_user_files] =
       toolContextMap[Tools.workspace_glob_files] =
+      toolContextMap[Tools.workspace_send_file_to_user] =
         '- Workspace tools: operate on the conversation-scoped workspace (shared with execute_code). Files from email attachments or file_search are NOT in the workspace—use file_search for those.';
   }
 
@@ -1101,6 +1160,7 @@ async function loadAgentTools({
       Tools.workspace_list_files,
       Tools.search_user_files,
       Tools.workspace_glob_files,
+      Tools.workspace_send_file_to_user,
     ];
     toolsToFilter = [...new Set([...toolsToFilter, ...workspaceTools])];
   }
@@ -1122,6 +1182,9 @@ async function loadAgentTools({
   const hasCRMToolsLoadAgent = toolsToFilter.some(
     (t) => typeof t === 'string' && t.startsWith('crm_'),
   );
+  const hasProjectToolsLoadAgent = toolsToFilter.some(
+    (t) => typeof t === 'string' && t.startsWith('project_'),
+  );
   const hasToolSearchLoadAgent = toolsToFilter.some(
     (t) =>
       t === Constants.TOOL_SEARCH || (typeof t === 'string' && t.startsWith('tool_search_mcp_')),
@@ -1133,6 +1196,41 @@ async function loadAgentTools({
     if (hasCRMToolsLoadAgent && !userProjectIdLoadAgent) {
       toolsToFilter = toolsToFilter.filter((t) => typeof t !== 'string' || !t.startsWith('crm_'));
     }
+  }
+
+  /** Resolve userProjectId for project tools - inject when conversation has project */
+  let conversationUserProjectIdLoadAgent = null;
+  const { getConvo } = require('~/models/Conversation');
+  try {
+    const conversationId = req.body?.conversationId;
+    if (conversationId && conversationId !== 'new') {
+      const convo = await getConvo(req.user.id, conversationId);
+      conversationUserProjectIdLoadAgent =
+        convo?.userProjectId?.toString?.() ?? convo?.userProjectId ?? null;
+    }
+    conversationUserProjectIdLoadAgent =
+      conversationUserProjectIdLoadAgent ?? req.body?.userProjectId ?? null;
+  } catch (err) {
+    logger.debug('[ToolService] Could not resolve userProjectId for project tools:', err);
+  }
+
+  if (hasProjectToolsLoadAgent && !conversationUserProjectIdLoadAgent) {
+    toolsToFilter = toolsToFilter.filter(
+      (t) => typeof t !== 'string' || !t.startsWith('project_'),
+    );
+  }
+
+  /** Inject project tools when conversation has userProjectId */
+  if (conversationUserProjectIdLoadAgent && !toolsToFilter.some((t) => typeof t === 'string' && t.startsWith('project_'))) {
+    const projectTools = [
+      Tools.project_read,
+      Tools.project_write,
+      Tools.project_log,
+      Tools.project_log_tail,
+      Tools.project_log_search,
+      Tools.project_log_range,
+    ];
+    toolsToFilter = [...new Set([...toolsToFilter, ...projectTools])];
   }
 
   /** Filter by ephemeralAgent (chat badge overrides) - only for primary agent; handoff targets get full tools */
@@ -1199,7 +1297,8 @@ async function loadAgentTools({
       tool === Tools.workspace_delete_file ||
       tool === Tools.workspace_list_files ||
       tool === Tools.search_user_files ||
-      tool === Tools.workspace_glob_files
+      tool === Tools.workspace_glob_files ||
+      tool === Tools.workspace_send_file_to_user
     ) {
       if (isPersistentAgent) {
         if (ephemeralAgent?.execute_code === false) return false;
@@ -1255,6 +1354,7 @@ async function loadAgentTools({
     options: {
       req,
       res,
+      conversationId: req.body?.conversationId,
       openAIApiKey,
       tool_resources,
       processFileURL,
@@ -1292,7 +1392,8 @@ async function loadAgentTools({
         tool.name === Tools.workspace_delete_file ||
         tool.name === Tools.workspace_list_files ||
         tool.name === Tools.search_user_files ||
-        tool.name === Tools.workspace_glob_files)
+        tool.name === Tools.workspace_glob_files ||
+        tool.name === Tools.workspace_send_file_to_user)
     ) {
       agentTools.push(tool);
       continue;
@@ -1642,6 +1743,7 @@ async function loadToolsForExecution({
       options: {
         req,
         res,
+        conversationId: req.body?.conversationId,
         tool_resources,
         processFileURL,
         uploadImageBuffer,

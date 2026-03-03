@@ -14,6 +14,7 @@ const TavilySearchResults = require('./structured/TavilySearchResults');
 const createGeminiImageTool = require('./structured/GeminiImageGen');
 const PostmarkSendUserEmail = require('./structured/PostmarkSendUserEmail');
 const { createCRMTools } = require('./structured/CRMTools');
+const { createProjectTools } = require('./structured/ProjectTools');
 
 module.exports = {
   ...manifest,
@@ -31,4 +32,5 @@ module.exports = {
   createGeminiImageTool,
   PostmarkSendUserEmail,
   createCRMTools,
+  createProjectTools,
 };
