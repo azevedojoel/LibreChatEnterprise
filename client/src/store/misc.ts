@@ -59,6 +59,12 @@ const chatBadges = atomWithLocalStorage<Array<{ id: string }>>('chatBadges', [
   { id: 'artifacts' },
 ]);
 
+/** Selected user project ID for filtering conversations in sidebar (null = all) */
+export const selectedProjectIdAtom = atom<string | null>({
+  key: 'selectedProjectId',
+  default: null,
+});
+
 /** Pending OAuth for MCP or Action tools - overlay shows Sign-in/Cancel (bypasses cache update delay) */
 export interface PendingMCPOAuth {
   authUrl: string;
@@ -111,6 +117,7 @@ export default {
   conversationAttachmentsSelector,
   queriesEnabled,
   chatBadges,
+  selectedProjectIdAtom,
   pendingMCPOAuthAtom,
   pendingToolConfirmationAtom,
   expandedToolCallsAtom,

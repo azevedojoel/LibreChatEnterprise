@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react';
 import { QueryKeys, isAssistantsEndpoint } from 'librechat-data-provider';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRecoilState, useResetRecoilState, useSetRecoilState } from 'recoil';
+import { useRecoilState, useResetRecoilState, useSetRecoilState, useRecoilCallback } from 'recoil';
+import type { TConversation } from 'librechat-data-provider';
 import type { TMessage } from 'librechat-data-provider';
 import type { ActiveJobsResponse } from '~/data-provider';
 import { useGetMessagesByConvoId, useAbortStreamMutation } from '~/data-provider';
@@ -79,6 +80,13 @@ export default function useChatHelpers(index = 0, paramId?: string) {
 
   const setSubmission = useSetRecoilState(store.submissionByIndex(index));
 
+  const getLatestConversation = useRecoilCallback(
+    ({ snapshot }) =>
+      (): TConversation | null =>
+        snapshot.getLoadable(store.conversationByIndex(index)).getValue(),
+    [index],
+  );
+
   const { ask, regenerate } = useChatFunctions({
     index,
     files,
@@ -90,6 +98,7 @@ export default function useChatHelpers(index = 0, paramId?: string) {
     latestMessage,
     setSubmission,
     setLatestMessage,
+    getLatestConversation,
   });
 
   const continueGeneration = () => {

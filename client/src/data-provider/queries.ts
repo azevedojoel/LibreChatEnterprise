@@ -29,6 +29,8 @@ import type {
   TCheckUserKeyResponse,
   SharedLinksListParams,
   SharedLinksResponse,
+  TUserProject,
+  TUserProjectsListResponse,
 } from 'librechat-data-provider';
 import type { ConversationCursorData } from '~/utils/convos';
 import { findConversationInInfinite } from '~/utils';
@@ -80,12 +82,12 @@ export const useConversationsInfiniteQuery = (
   params: ConversationListParams,
   config?: UseInfiniteQueryOptions<ConversationListResponse, unknown>,
 ) => {
-  const { isArchived, limit, sortBy, sortDirection, tags, search } = params;
+  const { isArchived, limit, sortBy, sortDirection, tags, search, userProjectId } = params;
 
   return useInfiniteQuery<ConversationListResponse>({
     queryKey: [
       isArchived ? QueryKeys.archivedConversations : QueryKeys.allConversations,
-      { isArchived, limit, sortBy, sortDirection, tags, search },
+      { isArchived, limit, sortBy, sortDirection, tags, search, userProjectId },
     ],
     queryFn: ({ pageParam }) =>
       dataService.listConversations({
@@ -95,6 +97,7 @@ export const useConversationsInfiniteQuery = (
         sortDirection,
         tags,
         search,
+        userProjectId,
         cursor: pageParam?.toString(),
       }),
     getNextPageParam: (lastPage) => lastPage?.nextCursor ?? undefined,
@@ -157,6 +160,37 @@ export const useSharedLinksQuery = (
     cacheTime: 30 * 60 * 1000, // 30 minutes
     ...config,
   });
+};
+
+export const useUserProjectsQuery = (
+  params?: { limit?: number; cursor?: string },
+  config?: UseQueryOptions<TUserProjectsListResponse>,
+): QueryObserverResult<TUserProjectsListResponse> => {
+  return useQuery<TUserProjectsListResponse>(
+    [QueryKeys.userProjects, params],
+    () => dataService.listUserProjects(params),
+    {
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      ...config,
+    },
+  );
+};
+
+export const useUserProjectQuery = (
+  id: string | null | undefined,
+  config?: UseQueryOptions<TUserProject>,
+): QueryObserverResult<TUserProject> => {
+  return useQuery<TUserProject>(
+    [QueryKeys.userProject, id],
+    () => (id ? dataService.getUserProject(id) : Promise.reject(new Error('No project ID'))),
+    {
+      enabled: !!id,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      ...config,
+    },
+  );
 };
 
 export const useConversationTagsQuery = (

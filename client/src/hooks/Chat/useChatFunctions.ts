@@ -49,6 +49,7 @@ export default function useChatFunctions({
   setSubmission,
   setLatestMessage,
   conversation: immutableConversation,
+  getLatestConversation,
 }: {
   index?: number;
   isSubmitting: boolean;
@@ -61,6 +62,7 @@ export default function useChatFunctions({
   setFiles?: SetterOrUpdater<Map<string, ExtendedFile>>;
   setSubmission: SetterOrUpdater<TSubmission | null>;
   setLatestMessage?: SetterOrUpdater<TMessage | null>;
+  getLatestConversation?: () => TConversation | null;
 }) {
   const navigate = useNavigate();
   const getSender = useGetSender();
@@ -182,12 +184,15 @@ export default function useChatFunctions({
     });
 
     const { modelDisplayLabel } = endpointsConfig?.[endpoint ?? ''] ?? {};
+    const latestConvo = getLatestConversation?.();
+    const userProjectId = conversation?.userProjectId ?? latestConvo?.userProjectId;
     const endpointOption = Object.assign(
       {
         endpoint,
         endpointType,
         overrideConvoId,
         overrideUserMessageId,
+        ...(userProjectId != null && { userProjectId }),
       },
       convo,
     ) as TEndpointOption;
@@ -307,11 +312,13 @@ export default function useChatFunctions({
     }
 
     logger.log('message_state', initialResponse);
+    const conversationForSubmission = {
+      ...conversation,
+      conversationId,
+      userProjectId: conversation?.userProjectId ?? latestConvo?.userProjectId ?? userProjectId,
+    };
     const submission: TSubmission = {
-      conversation: {
-        ...conversation,
-        conversationId,
-      },
+      conversation: conversationForSubmission,
       endpointOption,
       userMessage: {
         ...currentMsg,

@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QueryKeys } from 'librechat-data-provider';
 import { useQueryClient } from '@tanstack/react-query';
+import { useRecoilValue } from 'recoil';
 import { TooltipAnchor, NewChatIcon, MobileSidebar, Sidebar, Button } from '@librechat/client';
 import { CLOSE_SIDEBAR_ID, OPEN_SIDEBAR_ID } from '~/components/Chat/Menus/OpenSidebar';
 import { useLocalize, useNewConvo } from '~/hooks';
@@ -27,6 +28,7 @@ export default function NewChat({
   const navigate = useNavigate();
   const localize = useLocalize();
   const { conversation } = store.useCreateConversationAtom(index);
+  const selectedProjectId = useRecoilValue(store.selectedProjectIdAtom);
 
   const handleToggleNav = useCallback(() => {
     toggleNav();
@@ -44,13 +46,15 @@ export default function NewChat({
       }
       clearMessagesCache(queryClient, conversation?.conversationId);
       queryClient.invalidateQueries([QueryKeys.messages]);
-      newConvo();
+      newConvo({
+        template: selectedProjectId ? { userProjectId: selectedProjectId } : undefined,
+      });
       navigate('/c/new', { state: { focusChat: true } });
       if (isSmallScreen) {
         toggleNav();
       }
     },
-    [queryClient, conversation, newConvo, navigate, toggleNav, isSmallScreen],
+    [queryClient, conversation, newConvo, navigate, toggleNav, isSmallScreen, selectedProjectId],
   );
 
   return (

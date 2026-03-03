@@ -142,6 +142,54 @@ export const useArchiveConvoMutation = (
   );
 };
 
+export const useCreateUserProjectMutation = (
+  options?: t.MutationOptions<t.TUserProject, { name: string }>,
+): UseMutationResult<t.TUserProject, unknown, { name: string }, unknown> => {
+  const queryClient = useQueryClient();
+  const { onSuccess, ..._options } = options || {};
+  return useMutation((payload: { name: string }) => dataService.createUserProject(payload), {
+    onSuccess: (data, _vars, context) => {
+      queryClient.invalidateQueries([QueryKeys.userProjects]);
+      onSuccess?.(data, _vars, context);
+    },
+    ..._options,
+  });
+};
+
+export const useUpdateUserProjectMutation = (
+  id: string,
+  options?: t.MutationOptions<t.TUserProject, { name?: string; context?: string }>,
+): UseMutationResult<t.TUserProject, unknown, { name?: string; context?: string }, unknown> => {
+  const queryClient = useQueryClient();
+  const { onSuccess, ..._options } = options || {};
+  return useMutation(
+    (payload: { name?: string; context?: string }) => dataService.updateUserProject(id, payload),
+    {
+      onSuccess: (data, _vars, context) => {
+        queryClient.invalidateQueries([QueryKeys.userProjects]);
+        queryClient.invalidateQueries([QueryKeys.userProject, id]);
+        onSuccess?.(data, _vars, context);
+      },
+      ..._options,
+    },
+  );
+};
+
+export const useDeleteUserProjectMutation = (
+  options?: t.MutationOptions<{ deleted: boolean }, string>,
+): UseMutationResult<{ deleted: boolean }, unknown, string, unknown> => {
+  const queryClient = useQueryClient();
+  const { onSuccess, ..._options } = options || {};
+  return useMutation((id: string) => dataService.deleteUserProject(id), {
+    onSuccess: (_data, id, context) => {
+      queryClient.invalidateQueries([QueryKeys.userProjects]);
+      queryClient.removeQueries([QueryKeys.userProject, id]);
+      onSuccess?.(_data, id, context);
+    },
+    ..._options,
+  });
+};
+
 export const useCreateSharedLinkMutation = (
   options?: t.MutationOptions<
     t.TCreateShareLinkRequest,

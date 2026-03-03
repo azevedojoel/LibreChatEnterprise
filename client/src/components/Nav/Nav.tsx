@@ -23,10 +23,15 @@ import {
   useLocalStorage,
   useNavScrolling,
 } from '~/hooks';
-import { useConversationsInfiniteQuery, useTitleGeneration } from '~/data-provider';
+import {
+  useConversationsInfiniteQuery,
+  useTitleGeneration,
+} from '~/data-provider';
 import { Conversations } from '~/components/Conversations';
 import SearchBar from './SearchBar';
 import NewChat from './NewChat';
+import AgentMarketplaceNav from './AgentMarketplaceNav';
+import ProjectNav from './Projects/ProjectNav';
 import { cn } from '~/utils';
 import store from '~/store';
 
@@ -90,12 +95,14 @@ const Nav = memo(
     });
 
     const search = useRecoilValue(store.search);
+    const selectedProjectId = useRecoilValue(store.selectedProjectIdAtom);
 
     const { data, fetchNextPage, isFetchingNextPage, isLoading, isFetching, refetch } =
       useConversationsInfiniteQuery(
         {
           tags: tags.length === 0 ? undefined : tags,
           search: search.debouncedQuery || undefined,
+          userProjectId: selectedProjectId ?? undefined,
         },
         {
           enabled: isAuthenticated,
@@ -233,6 +240,8 @@ const Nav = memo(
               headerButtons={headerButtons}
               isSmallScreen={isSmallScreen}
             />
+            <AgentMarketplaceNav isSmallScreen={isSmallScreen} toggleNav={itemToggleNav} />
+            <ProjectNav />
             <div className="flex min-h-0 flex-grow flex-col overflow-hidden">
               <Conversations
                 conversations={conversations}

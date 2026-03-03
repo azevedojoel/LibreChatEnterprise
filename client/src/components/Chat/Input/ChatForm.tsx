@@ -33,6 +33,7 @@ import StopButton from './StopButton';
 import SendButton from './SendButton';
 import Mention from './Mention';
 import BadgeRow from './BadgeRow';
+import ProjectIndicator from './ProjectIndicator';
 import store from '~/store';
 
 const ChatForm = memo(({ index = 0 }: { index?: number }) => {
@@ -292,6 +293,7 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
               </div>
               {isAgentsEndpoint(endpoint) && (
                 <BadgeRowProvider conversationId={conversationId} isSubmitting={isSubmitting}>
+                  <ProjectIndicator />
                   <BadgeRow
                     showEphemeralBadges={true}
                     conversationId={conversationId}
