@@ -42,6 +42,15 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   project_log_tail: 'Recent Changelog Entries',
   project_log_search: 'Search Changelog',
   project_log_range: 'Changelog by Date Range',
+  // Scheduler tools
+  [Tools.list_schedules]: 'List Schedules',
+  [Tools.list_user_projects]: 'List Projects',
+  [Tools.create_schedule]: 'Create Schedule',
+  [Tools.update_schedule]: 'Update Schedule',
+  [Tools.delete_schedule]: 'Delete Schedule',
+  [Tools.run_schedule]: 'Run Schedule Now',
+  [Tools.list_runs]: 'List Run History',
+  [Tools.get_run]: 'Get Run Details',
 };
 
 /**

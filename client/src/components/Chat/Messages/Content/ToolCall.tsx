@@ -73,6 +73,15 @@ const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
   project_log_tail: 'Recent Changelog Entries',
   project_log_search: 'Search Changelog',
   project_log_range: 'Changelog by Date Range',
+  // Scheduler tools
+  [Tools.list_schedules]: 'List Schedules',
+  [Tools.list_user_projects]: 'List Projects',
+  [Tools.create_schedule]: 'Create Schedule',
+  [Tools.update_schedule]: 'Update Schedule',
+  [Tools.delete_schedule]: 'Delete Schedule',
+  [Tools.run_schedule]: 'Run Schedule Now',
+  [Tools.list_runs]: 'List Run History',
+  [Tools.get_run]: 'Get Run Details',
 };
 
 /** Icons for project tools */
@@ -96,6 +105,18 @@ const WORKSPACE_TOOL_ICONS: Partial<Record<string, React.ComponentType<{ classNa
   [Tools.workspace_send_file_to_user]: FilePlus,
 };
 
+/** Icons for scheduler tools */
+const SCHEDULER_TOOL_ICONS: Partial<Record<string, React.ComponentType<{ className?: string }>>> = {
+  [Tools.list_schedules]: Calendar,
+  [Tools.list_user_projects]: FolderOpen,
+  [Tools.create_schedule]: CalendarPlus,
+  [Tools.update_schedule]: CalendarCheck,
+  [Tools.delete_schedule]: Trash2,
+  [Tools.run_schedule]: Play,
+  [Tools.list_runs]: List,
+  [Tools.get_run]: FileSearch,
+};
+
 import type { TAttachment } from 'librechat-data-provider';
 import {
   Plug,
@@ -108,6 +129,12 @@ import {
   List,
   Search,
   CalendarRange,
+  Calendar,
+  CalendarPlus,
+  CalendarCheck,
+  Trash2,
+  Play,
+  FileSearch,
 } from 'lucide-react';
 import { useLocalize, useProgress, useMCPConnectionStatus, useToolApproval } from '~/hooks';
 import { useMessageContext } from '~/Providers';
@@ -222,6 +249,9 @@ export default function ToolCall({
     }
     if (function_name && WORKSPACE_TOOL_ICONS[function_name]) {
       return WORKSPACE_TOOL_ICONS[function_name] as React.ComponentType<{ className?: string }>;
+    }
+    if (function_name && SCHEDULER_TOOL_ICONS[function_name]) {
+      return SCHEDULER_TOOL_ICONS[function_name] as React.ComponentType<{ className?: string }>;
     }
     return Plug;
   }, [function_name]);
