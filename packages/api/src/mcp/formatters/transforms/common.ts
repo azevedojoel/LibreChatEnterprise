@@ -36,10 +36,12 @@ type GraphEvent = {
   id?: string;
   subject?: string;
   body?: { contentType?: string; content?: string };
+  bodyPreview?: string;
   start?: { dateTime?: string };
   end?: { dateTime?: string };
   location?: { displayName?: string };
   locationDisplayName?: string;
+  webLink?: string;
   status?: string;
   [key: string]: unknown;
 };
@@ -88,20 +90,100 @@ function extractDateTime(obj: { dateTime?: string; date?: string } | undefined):
 }
 
 // --- Google Calendar ---
-function transformCalendarListEvents(parsed: unknown): string {
+/** Compact JSON for custom UI: c=calendars, c[].i=id, c[].s=summary, e=error */
+function transformCalendarList(parsed: unknown): string {
+  const data = parsed as { error?: string } | unknown[];
+  if (
+    data &&
+    typeof data === 'object' &&
+    !Array.isArray(data) &&
+    'error' in data &&
+    typeof (data as { error?: string }).error === 'string'
+  ) {
+    return JSON.stringify({ e: (data as { error: string }).error });
+  }
   const arr = Array.isArray(parsed) ? parsed : [];
-  if (arr.length === 0) return '(empty)';
-  const rows = arr.map((e: GoogleCalendarEvent) => {
-    const id = e?.id ?? '-';
-    const summary = escapeCell(String(e?.summary ?? '-'));
-    const start = extractDateTime(e?.start);
-    const end = extractDateTime(e?.end);
-    const status = e?.status ?? '-';
-    return `${id} | ${summary} | ${start} | ${end} | ${status}`;
+  const c = arr.map((cal: { id?: string; summary?: string }) => {
+    const o: { i?: string; s?: string } = {};
+    if (cal?.id) o.i = cal.id;
+    const summary = (cal?.summary ?? '').trim();
+    if (summary) o.s = summary.slice(0, 200);
+    return o;
   });
-  const header = 'id | summary | start | end | status';
-  const sep = '---|--------|------|----|--------';
-  return [header, sep, ...rows].join('\n');
+  return JSON.stringify({ c });
+}
+
+/** Compact JSON for custom UI: ev=events, ev[].i=id, ev[].s=summary, ev[].st=start, ev[].en=end, ev[].d=description, ev[].h=htmlLink, ev[].l=location, e=error */
+function transformCalendarListEvents(parsed: unknown): string {
+  const data = parsed as { error?: string } | unknown[];
+  if (
+    data &&
+    typeof data === 'object' &&
+    !Array.isArray(data) &&
+    'error' in data &&
+    typeof (data as { error?: string }).error === 'string'
+  ) {
+    return JSON.stringify({ e: (data as { error: string }).error });
+  }
+  const arr = Array.isArray(parsed) ? parsed : [];
+  const ev = arr.map((e: GoogleCalendarEvent) => {
+    const o: Record<string, unknown> = {};
+    if (e?.id) o.i = e.id;
+    const summary = (e?.summary ?? '').trim();
+    if (summary) o.s = summary.slice(0, 200);
+    if (e?.start) o.st = e.start;
+    if (e?.end) o.en = e.end;
+    if (e?.description) o.d = String(e.description).slice(0, 500);
+    if (e?.htmlLink) o.h = e.htmlLink;
+    if (e?.location) o.l = typeof e.location === 'string' ? e.location : (e.location as { displayName?: string })?.displayName;
+    return o;
+  });
+  return JSON.stringify({ ev });
+}
+
+/** Compact JSON for single event: i=id, s=summary, st=start, en=end, d=description, h=htmlLink, l=location, e=error */
+function transformCalendarEvent(parsed: unknown): string {
+  const data = parsed as GoogleCalendarEvent & { error?: string };
+  if (data?.error) return JSON.stringify({ e: data.error });
+  const o: Record<string, unknown> = {};
+  if (data?.id) o.i = data.id;
+  const summary = (data?.summary ?? '').trim();
+  if (summary) o.s = summary.slice(0, 200);
+  if (data?.start) o.st = data.start;
+  if (data?.end) o.en = data.end;
+  if (data?.description) o.d = String(data.description).slice(0, 500);
+  if (data?.htmlLink) o.h = data.htmlLink;
+  if (data?.location) o.l = typeof data.location === 'string' ? data.location : (data.location as { displayName?: string })?.displayName;
+  return JSON.stringify(o);
+}
+
+/** Compact JSON for find free time: st=start, en=end, sl=slots, e=error */
+function transformCalendarFindFreeTime(parsed: unknown): string {
+  const data = parsed as { start?: string; end?: string; slots?: Array<{ start?: string; end?: string }>; error?: string };
+  if (data?.error) return JSON.stringify({ e: data.error });
+  if (data?.start && data?.end) return JSON.stringify({ st: data.start, en: data.end });
+  const sl = data?.slots ?? [];
+  const slots = sl.map((s: { start?: string; end?: string }) => ({ st: s?.start, en: s?.end }));
+  return JSON.stringify({ sl: slots });
+}
+
+/** Compact JSON for respond: i=eventId, s=summary, r=responseStatus, m=message, e=error */
+function transformCalendarRespond(parsed: unknown): string {
+  const data = parsed as { eventId?: string; summary?: string; responseStatus?: string; message?: string; error?: string };
+  if (data?.error) return JSON.stringify({ e: data.error });
+  const o: Record<string, unknown> = {};
+  if (data?.eventId) o.i = data.eventId;
+  if (data?.summary) o.s = String(data.summary).slice(0, 200);
+  if (data?.responseStatus) o.r = data.responseStatus;
+  if (data?.message) o.m = String(data.message).slice(0, 500);
+  return JSON.stringify(o);
+}
+
+/** Compact JSON for delete: ok=success, e=error */
+function transformCalendarDelete(parsed: unknown): string {
+  const data = parsed as { message?: string; error?: string };
+  if (data?.error) return JSON.stringify({ e: data.error });
+  return JSON.stringify({ ok: true });
 }
 
 // --- Google Docs ---
@@ -135,49 +217,61 @@ function transformDriveSearch(parsed: unknown): string {
 }
 
 // --- Microsoft Calendar ---
-function transformMicrosoftCalendarList(parsed: unknown): string {
-  const data = parsed as ODataValueResponse<GraphEvent>;
-  if (data?.error?.message) return data.error.message;
-  const items = data?.value ?? [];
-  if (items.length === 0) {
-    const suffix = data?.['@odata.nextLink'] ? `\n@odata.nextLink: (has more)` : '';
-    return `(empty)${suffix}`;
+/** Compact JSON for single event: i=id, s=subject, st=start, en=end, d=bodyPreview, h=webLink, l=location, e=error */
+function transformMSCalendarEvent(parsed: unknown): string {
+  const data = parsed as GraphEvent & { error?: string | { message?: string } };
+  const err = data?.error;
+  if (err) {
+    const msg = typeof err === 'string' ? err : err?.message;
+    return JSON.stringify({ e: msg ?? 'Unknown error' });
   }
-  const rows = items.map((e) => {
-    const id = e?.id ?? '-';
-    const subject = escapeCell(String(e?.subject ?? '-'));
-    const start = extractDateTime(e?.start);
-    const end = extractDateTime(e?.end);
-    const loc = escapeCell(String(e?.location?.displayName ?? e?.locationDisplayName ?? '-'));
-    return `${id} | ${subject} | ${start} | ${end} | ${loc}`;
-  });
-  const header = 'id | subject | start | end | location';
-  const sep = '---|--------|------|----|---------';
-  let body = [header, sep, ...rows].join('\n');
-  if (data?.['@odata.nextLink']) body += '\n@odata.nextLink: (has more)';
-  return body;
-}
-
-function transformGetCalendarEvent(parsed: unknown): string {
-  const data = parsed as GraphEvent & { error?: { message?: string } };
-  if (data?.error) {
-    const msg = typeof data.error === 'string' ? data.error : data.error?.message;
-    return msg ?? 'Unknown error';
-  }
-  const parts: string[] = [];
-  parts.push(`id: ${data?.id ?? '-'}`);
-  parts.push(`subject: ${escapeCell(String(data?.subject ?? '-'))}`);
-  parts.push(`start: ${extractDateTime(data?.start)}`);
-  parts.push(`end: ${extractDateTime(data?.end)}`);
-  const loc = data?.location?.displayName ?? data?.locationDisplayName ?? '-';
-  parts.push(`location: ${escapeCell(String(loc))}`);
-  const rawBody = data?.body?.content ?? '';
+  const o: Record<string, unknown> = {};
+  if (data?.id) o.i = data.id;
+  const subject = String(data?.subject ?? '').trim();
+  if (subject) o.s = subject.slice(0, 200);
+  if (data?.start) o.st = data.start;
+  if (data?.end) o.en = data.end;
+  const rawBody = data?.body?.content ?? data?.bodyPreview ?? '';
   if (rawBody) {
     const isHtml = data?.body?.contentType === 'html';
-    const bodyText = isHtml ? stripHtml(rawBody, { maxLength: 500 }) : rawBody;
-    parts.push(`body: ${escapeCell(bodyText).slice(0, 500)}`);
+    const bodyText = isHtml ? stripHtml(rawBody, { maxLength: 500 }) : String(rawBody).slice(0, 500);
+    if (bodyText) o.d = bodyText;
   }
-  return parts.join('\n');
+  if (data?.webLink) o.h = data.webLink;
+  const loc = data?.location?.displayName ?? data?.locationDisplayName ?? '';
+  if (loc) o.l = String(loc).slice(0, 200);
+  return JSON.stringify(o);
+}
+
+/** Compact JSON for list: ev=events, ev[].i, ev[].s, ev[].st, ev[].en, ev[].l, ev[].h, e=error */
+function transformMSCalendarList(parsed: unknown): string {
+  const data = parsed as ODataValueResponse<GraphEvent>;
+  if (data?.error?.message) return JSON.stringify({ e: data.error.message });
+  const items = data?.value ?? [];
+  const ev = items.map((e) => {
+    const o: Record<string, unknown> = {};
+    if (e?.id) o.i = e.id;
+    const subject = String(e?.subject ?? '').trim();
+    if (subject) o.s = subject.slice(0, 200);
+    if (e?.start) o.st = e.start;
+    if (e?.end) o.en = e.end;
+    const loc = e?.location?.displayName ?? e?.locationDisplayName ?? '';
+    if (loc) o.l = String(loc).slice(0, 200);
+    if (e?.webLink) o.h = e.webLink;
+    return o;
+  });
+  return JSON.stringify({ ev });
+}
+
+/** Compact JSON for delete: ok=success, e=error */
+function transformMSCalendarDelete(parsed: unknown): string {
+  if (parsed == null) return JSON.stringify({ ok: true });
+  const data = parsed as { message?: string; error?: string | { message?: string } };
+  if (data?.error) {
+    const msg = typeof data.error === 'string' ? data.error : data.error?.message;
+    return JSON.stringify({ e: msg ?? 'Unknown error' });
+  }
+  return JSON.stringify({ ok: true });
 }
 
 // --- Microsoft OneDrive / Files ---
@@ -239,21 +333,43 @@ function transformListTodoTasks(parsed: unknown): string {
 }
 
 export function registerCommonTransforms(): void {
+  registerToolOnlyFallback('calendar_list', transformCalendarList);
   registerToolOnlyFallback('calendar_listEvents', transformCalendarListEvents);
+  registerToolOnlyFallback('calendar_createEvent', transformCalendarEvent);
+  registerToolOnlyFallback('calendar_getEvent', transformCalendarEvent);
+  registerToolOnlyFallback('calendar_updateEvent', transformCalendarEvent);
+  registerToolOnlyFallback('calendar_findFreeTime', transformCalendarFindFreeTime);
+  registerToolOnlyFallback('calendar_respondToEvent', transformCalendarRespond);
+  registerToolOnlyFallback('calendar_deleteEvent', transformCalendarDelete);
   registerToolOnlyFallback('docs_create', transformDocsCreate);
   registerToolOnlyFallback('drive_search', transformDriveSearch);
 
   const MS_CALENDAR_LIST_TOOLS = [
     'list-calendar-events',
+    'list-specific-calendar-events',
     'get-calendar-view',
     'get-specific-calendar-view',
+    'list-calendar-event-instances',
   ];
   const MS_CALENDAR_GET_TOOLS = ['get-calendar-event', 'get-specific-calendar-event'];
+  const MS_CALENDAR_EVENT_TOOLS = [
+    'create-calendar-event',
+    'update-calendar-event',
+    'create-specific-calendar-event',
+    'update-specific-calendar-event',
+  ];
+  const MS_CALENDAR_DELETE_TOOLS = ['delete-calendar-event', 'delete-specific-calendar-event'];
   for (const tool of MS_CALENDAR_LIST_TOOLS) {
-    registerToolOnlyFallback(tool, transformMicrosoftCalendarList);
+    registerToolOnlyFallback(tool, transformMSCalendarList);
   }
   for (const tool of MS_CALENDAR_GET_TOOLS) {
-    registerToolOnlyFallback(tool, transformGetCalendarEvent);
+    registerToolOnlyFallback(tool, transformMSCalendarEvent);
+  }
+  for (const tool of MS_CALENDAR_EVENT_TOOLS) {
+    registerToolOnlyFallback(tool, transformMSCalendarEvent);
+  }
+  for (const tool of MS_CALENDAR_DELETE_TOOLS) {
+    registerToolOnlyFallback(tool, transformMSCalendarDelete);
   }
   registerToolOnlyFallback('list-folder-files', transformListFolderFiles);
   registerToolOnlyFallback('list-todo-task-lists', transformListTodoTaskLists);

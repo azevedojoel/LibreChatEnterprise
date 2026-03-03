@@ -262,8 +262,47 @@ describe('tokenOptimizedFormatter', () => {
     });
   });
 
+  describe('calendar_list (Google)', () => {
+    it('returns compact JSON with c (calendars), i (id), s (summary)', () => {
+      const input = JSON.stringify([
+        { id: 'primary', summary: 'Primary Calendar' },
+        { id: 'work@group.calendar.google.com', summary: 'Work' },
+        { id: 'personal', summary: 'Personal' },
+      ]);
+      const result = tokenOptimizedFormatter(input, {
+        serverName: 'Google',
+        toolName: 'calendar_list',
+      });
+      const parsed = JSON.parse(result) as { c?: Array<{ i?: string; s?: string }> };
+      expect(parsed.c).toHaveLength(3);
+      expect(parsed.c?.[0]).toEqual({ i: 'primary', s: 'Primary Calendar' });
+      expect(parsed.c?.[1]).toEqual({ i: 'work@group.calendar.google.com', s: 'Work' });
+      expect(parsed.c?.[2]).toEqual({ i: 'personal', s: 'Personal' });
+    });
+
+    it('returns plain error string for { error: "..." } (formatter short-circuits before transform)', () => {
+      const input = JSON.stringify({ error: 'Calendar access denied' });
+      const result = tokenOptimizedFormatter(input, {
+        serverName: 'Google',
+        toolName: 'calendar_list',
+      });
+      expect(result).toBe('Calendar access denied');
+    });
+
+    it('transforms calendar_list_mcp_Google via tool-only fallback', () => {
+      const input = JSON.stringify([{ id: 'cal1', summary: 'My Calendar' }]);
+      const result = tokenOptimizedFormatter(input, {
+        serverName: 'Google',
+        toolName: 'calendar_list_mcp_Google',
+      });
+      const parsed = JSON.parse(result) as { c?: Array<{ i?: string; s?: string }> };
+      expect(parsed.c).toHaveLength(1);
+      expect(parsed.c?.[0]).toEqual({ i: 'cal1', s: 'My Calendar' });
+    });
+  });
+
   describe('calendar_listEvents (Google)', () => {
-    it('returns compact id|summary|start|end|status table for raw array', () => {
+    it('returns compact JSON with ev (events), i, s, st, en', () => {
       const input = JSON.stringify([
         {
           id: 'ev1',
@@ -277,10 +316,80 @@ describe('tokenOptimizedFormatter', () => {
         serverName: 'Google',
         toolName: 'calendar_listEvents',
       });
-      expect(result).toContain('id | summary | start | end | status');
-      expect(result).toContain('ev1');
-      expect(result).toContain('Meeting');
-      expect(result).toContain('2025-02-18');
+      const parsed = JSON.parse(result) as { ev?: Array<{ i?: string; s?: string; st?: unknown; en?: unknown }> };
+      expect(parsed.ev).toHaveLength(1);
+      expect(parsed.ev?.[0]).toMatchObject({ i: 'ev1', s: 'Meeting' });
+      expect(parsed.ev?.[0].st).toEqual({ dateTime: '2025-02-18T09:00:00Z' });
+      expect(parsed.ev?.[0].en).toEqual({ dateTime: '2025-02-18T10:00:00Z' });
+    });
+  });
+
+  describe('calendar_createEvent, getEvent, updateEvent (Google)', () => {
+    it('returns compact JSON with i, s, st, en for single event', () => {
+      const input = JSON.stringify({
+        id: 'ev123',
+        summary: 'Team Standup',
+        start: { dateTime: '2025-02-18T09:00:00Z' },
+        end: { dateTime: '2025-02-18T09:30:00Z' },
+        htmlLink: 'https://calendar.google.com/event/ev123',
+      });
+      const result = tokenOptimizedFormatter(input, {
+        serverName: 'Google',
+        toolName: 'calendar_createEvent',
+      });
+      const parsed = JSON.parse(result) as { i?: string; s?: string; st?: unknown; en?: unknown; h?: string };
+      expect(parsed.i).toBe('ev123');
+      expect(parsed.s).toBe('Team Standup');
+      expect(parsed.st).toEqual({ dateTime: '2025-02-18T09:00:00Z' });
+      expect(parsed.h).toBe('https://calendar.google.com/event/ev123');
+    });
+  });
+
+  describe('calendar_findFreeTime (Google)', () => {
+    it('returns compact JSON with st, en for single slot', () => {
+      const input = JSON.stringify({
+        start: '2025-02-18T09:00:00Z',
+        end: '2025-02-18T10:00:00Z',
+      });
+      const result = tokenOptimizedFormatter(input, {
+        serverName: 'Google',
+        toolName: 'calendar_findFreeTime',
+      });
+      const parsed = JSON.parse(result) as { st?: string; en?: string };
+      expect(parsed.st).toBe('2025-02-18T09:00:00Z');
+      expect(parsed.en).toBe('2025-02-18T10:00:00Z');
+    });
+  });
+
+  describe('calendar_respondToEvent (Google)', () => {
+    it('returns compact JSON with i, s, r, m', () => {
+      const input = JSON.stringify({
+        eventId: 'ev456',
+        summary: 'Project Review',
+        responseStatus: 'accepted',
+        message: 'Successfully accepted the meeting invitation',
+      });
+      const result = tokenOptimizedFormatter(input, {
+        serverName: 'Google',
+        toolName: 'calendar_respondToEvent',
+      });
+      const parsed = JSON.parse(result) as { i?: string; s?: string; r?: string; m?: string };
+      expect(parsed.i).toBe('ev456');
+      expect(parsed.s).toBe('Project Review');
+      expect(parsed.r).toBe('accepted');
+      expect(parsed.m).toContain('Successfully accepted');
+    });
+  });
+
+  describe('calendar_deleteEvent (Google)', () => {
+    it('returns compact JSON with ok for success', () => {
+      const input = JSON.stringify({ message: 'Successfully deleted event ev123' });
+      const result = tokenOptimizedFormatter(input, {
+        serverName: 'Google',
+        toolName: 'calendar_deleteEvent',
+      });
+      const parsed = JSON.parse(result) as { ok?: boolean };
+      expect(parsed.ok).toBe(true);
     });
   });
 
