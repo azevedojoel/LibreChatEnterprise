@@ -29,6 +29,7 @@ const keys = require('./keys');
 const user = require('./user');
 const mcp = require('./mcp');
 const crm = require('./crm');
+const userProjects = require('./userProjects');
 
 module.exports = {
   mcp,
@@ -62,4 +63,5 @@ module.exports = {
   accessPermissions,
   scheduledAgents,
   crm,
+  userProjects,
 };
