@@ -111,6 +111,7 @@ export default function FavoritesList({
   onHeightChange?: () => void;
 }) {
   const search = useRecoilValue(store.search);
+  const selectedProjectId = useRecoilValue(store.selectedProjectIdAtom);
   const { favorites, reorderFavorites, isLoading: isFavoritesLoading } = useFavorites();
 
   const { newConversation } = useNewConvo();
@@ -126,6 +127,7 @@ export default function FavoritesList({
     endpointsConfig,
     newConversation,
     returnHandlers: true,
+    userProjectId: selectedProjectId ?? undefined,
   });
 
   const listContainerRef = useRef<HTMLDivElement>(null);

@@ -27,6 +27,7 @@ export default function useSelectMention({
   returnHandlers,
   endpointsConfig,
   newConversation,
+  userProjectId,
 }: {
   conversation: TConversation | null;
   presets?: TPreset[];
@@ -35,6 +36,7 @@ export default function useSelectMention({
   newConversation: ConvoGenerator;
   endpointsConfig: TEndpointsConfig;
   returnHandlers?: boolean;
+  userProjectId?: string | null;
 }) {
   const getDefaultConversation = useDefaultConvo();
   const modularChat = useRecoilValue(store.modularChat);
@@ -165,6 +167,9 @@ export default function useSelectMention({
       template.spec = null;
       template.iconURL = null;
       template.modelLabel = null;
+      if (userProjectId) {
+        template.userProjectId = userProjectId;
+      }
       if (isExistingConversation && isCurrentModular && isNewModular && shouldSwitch) {
         template.endpointType = newEndpointType;
 
@@ -179,6 +184,10 @@ export default function useSelectMention({
           },
           preset: template,
         });
+
+        if (userProjectId) {
+          currentConvo.userProjectId = userProjectId;
+        }
 
         /* We don't reset the latest message, only when changing settings mid-converstion */
         logger.info(
@@ -202,7 +211,7 @@ export default function useSelectMention({
         keepAddedConvos: isNewModular,
       });
     },
-    [conversation, getDefaultConversation, modularChat, newConversation, endpointsConfig],
+    [conversation, getDefaultConversation, modularChat, newConversation, endpointsConfig, userProjectId],
   );
 
   const onSelectPreset = useCallback(

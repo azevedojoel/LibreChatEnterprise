@@ -1,16 +1,13 @@
-import { useMemo, memo, type FC, useCallback, useEffect, useRef } from 'react';
+import { useMemo, memo, type FC, useCallback, useRef } from 'react';
 import throttle from 'lodash/throttle';
 import { ChevronDown } from 'lucide-react';
-import { useRecoilValue } from 'recoil';
 import { Spinner, useMediaQuery } from '@librechat/client';
 import { List, AutoSizer, CellMeasurer, CellMeasurerCache } from 'react-virtualized';
 import type { TConversation } from 'librechat-data-provider';
-import { useLocalize, TranslationKeys, useFavorites } from '~/hooks';
-import FavoritesList from '~/components/Nav/Favorites/FavoritesList';
+import { useLocalize, TranslationKeys } from '~/hooks';
 import { useActiveJobs } from '~/data-provider';
 import { groupConversationsByDate, cn } from '~/utils';
 import Convo from './Convo';
-import store from '~/store';
 
 export type CellPosition = {
   columnIndex: number;
@@ -110,7 +107,6 @@ const DateLabel: FC<{ groupName: string; isFirst?: boolean }> = memo(({ groupNam
 DateLabel.displayName = 'DateLabel';
 
 type FlattenedItem =
-  | { type: 'favorites' }
   | { type: 'chats-header' }
   | { type: 'header'; groupName: string }
   | { type: 'convo'; convo: TConversation }
@@ -159,8 +155,6 @@ const Conversations: FC<ConversationsProps> = ({
   setIsChatsExpanded,
 }) => {
   const localize = useLocalize();
-  const search = useRecoilValue(store.search);
-  const { favorites, isLoading: isFavoritesLoading } = useFavorites();
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
   const convoHeight = isSmallScreen ? 44 : 34;
 
@@ -170,10 +164,6 @@ const Conversations: FC<ConversationsProps> = ({
     () => new Set(activeJobsData?.activeJobIds ?? []),
     [activeJobsData?.activeJobIds],
   );
-
-  // Determine if FavoritesList will render content
-  const shouldShowFavorites =
-    !search.query && (isFavoritesLoading || favorites.length > 0);
 
   const filteredConversations = useMemo(
     () => rawConversations.filter(Boolean) as TConversation[],
@@ -187,10 +177,6 @@ const Conversations: FC<ConversationsProps> = ({
 
   const flattenedItems = useMemo(() => {
     const items: FlattenedItem[] = [];
-    // Only include favorites row if FavoritesList will render content
-    if (shouldShowFavorites) {
-      items.push({ type: 'favorites' });
-    }
     items.push({ type: 'chats-header' });
 
     if (isChatsExpanded) {
@@ -204,7 +190,7 @@ const Conversations: FC<ConversationsProps> = ({
       }
     }
     return items;
-  }, [groupedConversations, isLoading, isChatsExpanded, shouldShowFavorites]);
+  }, [groupedConversations, isLoading, isChatsExpanded]);
 
   // Store flattenedItems in a ref for keyMapper to access without recreating cache
   const flattenedItemsRef = useRef(flattenedItems);
@@ -220,9 +206,6 @@ const Conversations: FC<ConversationsProps> = ({
           const item = flattenedItemsRef.current[index];
           if (!item) {
             return `unknown-${index}`;
-          }
-          if (item.type === 'favorites') {
-            return 'favorites';
           }
           if (item.type === 'chats-header') {
             return 'chats-header';
@@ -242,30 +225,6 @@ const Conversations: FC<ConversationsProps> = ({
     [convoHeight],
   );
 
-  // Debounced function to clear cache and recompute heights
-  const clearFavoritesCache = useCallback(() => {
-    if (cache) {
-      cache.clear(0, 0);
-      if (containerRef.current && 'recomputeRowHeights' in containerRef.current) {
-        containerRef.current.recomputeRowHeights(0);
-      }
-    }
-  }, [cache, containerRef]);
-
-  // Clear cache when favorites change or when List first appears (e.g., after search closes)
-  useEffect(() => {
-    const frameId = requestAnimationFrame(() => {
-      clearFavoritesCache();
-    });
-    return () => cancelAnimationFrame(frameId);
-  }, [
-    favorites.length,
-    isFavoritesLoading,
-    shouldShowFavorites,
-    isSearchLoading,
-    clearFavoritesCache,
-  ]);
-
   const rowRenderer = useCallback(
     ({ index, key, parent, style }) => {
       const item = flattenedItems[index];
@@ -275,18 +234,6 @@ const Conversations: FC<ConversationsProps> = ({
         return (
           <MeasuredRow key={key} {...rowProps}>
             <LoadingSpinner />
-          </MeasuredRow>
-        );
-      }
-
-      if (item.type === 'favorites') {
-        return (
-          <MeasuredRow key={key} {...rowProps}>
-            <FavoritesList
-              isSmallScreen={isSmallScreen}
-              toggleNav={toggleNav}
-              onHeightChange={clearFavoritesCache}
-            />
           </MeasuredRow>
         );
       }
@@ -303,13 +250,9 @@ const Conversations: FC<ConversationsProps> = ({
       }
 
       if (item.type === 'header') {
-        // First date header index depends on whether favorites row is included
-        // With favorites: [favorites, chats-header, first-header] → index 2
-        // Without favorites: [chats-header, first-header] → index 1
-        const firstHeaderIndex = shouldShowFavorites ? 2 : 1;
         return (
           <MeasuredRow key={key} {...rowProps}>
-            <DateLabel groupName={item.groupName} isFirst={index === firstHeaderIndex} />
+            <DateLabel groupName={item.groupName} isFirst={index === 1} />
           </MeasuredRow>
         );
       }
@@ -335,25 +278,15 @@ const Conversations: FC<ConversationsProps> = ({
       flattenedItems,
       moveToTop,
       toggleNav,
-      clearFavoritesCache,
-      isSmallScreen,
       isChatsExpanded,
       setIsChatsExpanded,
-      shouldShowFavorites,
       activeJobIds,
     ],
   );
 
-  const FAVORITES_ROW_MIN_HEIGHT = 100;
   const getRowHeight = useCallback(
-    ({ index }: { index: number }) => {
-      const height = cache.getHeight(index, 0);
-      if (index === 0 && shouldShowFavorites && !cache.has(0, 0)) {
-        return Math.max(height, FAVORITES_ROW_MIN_HEIGHT);
-      }
-      return height;
-    },
-    [cache, shouldShowFavorites],
+    ({ index }: { index: number }) => cache.getHeight(index, 0),
+    [cache],
   );
 
   const throttledLoadMore = useMemo(

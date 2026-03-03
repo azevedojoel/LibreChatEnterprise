@@ -17,7 +17,6 @@ import { useLocalize, useHasAccess, useAgentCapabilities } from '~/hooks';
 import store from '~/store';
 import ArtifactsSubMenu from '~/components/Chat/Input/ArtifactsSubMenu';
 import MCPSubMenu from '~/components/Chat/Input/MCPSubMenu';
-import AddToProjectSubMenu from '~/components/Chat/Input/AddToProjectSubMenu';
 import { useGetStartupConfig } from '~/data-provider';
 import { useBadgeRowContext } from '~/Providers';
 import { cn } from '~/utils';
@@ -328,11 +327,6 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
       render: (props) => <MCPSubMenu {...props} placeholder={mcpPlaceholder} />,
     });
   }
-
-  dropdownItems.push({
-    hideOnClick: false,
-    render: (props) => <AddToProjectSubMenu {...props} />,
-  });
 
   if (dropdownItems.length === 0) {
     return null;

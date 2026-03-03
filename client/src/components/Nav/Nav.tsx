@@ -31,6 +31,7 @@ import { Conversations } from '~/components/Conversations';
 import SearchBar from './SearchBar';
 import NewChat from './NewChat';
 import AgentMarketplaceNav from './AgentMarketplaceNav';
+import FavoritesList from './Favorites/FavoritesList';
 import ProjectNav from './Projects/ProjectNav';
 import { cn } from '~/utils';
 import store from '~/store';
@@ -241,6 +242,7 @@ const Nav = memo(
               isSmallScreen={isSmallScreen}
             />
             <AgentMarketplaceNav isSmallScreen={isSmallScreen} toggleNav={itemToggleNav} />
+            <FavoritesList isSmallScreen={isSmallScreen} toggleNav={itemToggleNav} />
             <ProjectNav />
             <div className="flex min-h-0 flex-grow flex-col overflow-hidden">
               <Conversations
