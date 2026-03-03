@@ -45,6 +45,8 @@ export interface IUser extends Document {
   idOnTheSource?: string;
   /** CRM project assigned by admin; scopes CRM MCP tools for this user */
   projectId?: Types.ObjectId | null;
+  /** Workspace assigned by admin; one per user. Admin has null. Scopes CRM, workspace email. */
+  workspace_id?: Types.ObjectId | null;
   /** Token for inbound email routing; when set, user can receive email at token@domain */
   inboundEmailToken?: string;
 }
@@ -77,6 +79,7 @@ export interface UpdateUserRequest {
   };
   inboundEmailToken?: string | null;
   projectId?: string | Types.ObjectId | null;
+  workspace_id?: string | Types.ObjectId | null;
 }
 
 export interface UserDeleteResult {

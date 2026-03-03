@@ -14,6 +14,7 @@ export { default as messageSchema } from './message';
 export { default as pluginAuthSchema } from './pluginAuth';
 export { default as presetSchema } from './preset';
 export { default as projectSchema } from './project';
+export { default as workspaceSchema } from './workspace';
 export { default as promptSchema } from './prompt';
 export { default as promptGroupSchema } from './promptGroup';
 export { default as roleSchema } from './role';

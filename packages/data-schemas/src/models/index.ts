@@ -1,5 +1,6 @@
 import { createUserModel } from './user';
 import { createTokenModel } from './token';
+import { createInviteModel } from './invite';
 import { createSessionModel } from './session';
 import { createBalanceModel } from './balance';
 import { createConversationModel } from './convo';
@@ -14,6 +15,7 @@ import { createAssistantModel } from './assistant';
 import { createFileModel } from './file';
 import { createBannerModel } from './banner';
 import { createProjectModel } from './project';
+import { createWorkspaceModel } from './workspace';
 import { createKeyModel } from './key';
 import { createPluginAuthModel } from './pluginAuth';
 import { createTransactionModel } from './transaction';
@@ -46,6 +48,7 @@ export function createModels(mongoose: typeof import('mongoose')) {
   return {
     User: createUserModel(mongoose),
     Token: createTokenModel(mongoose),
+    Invite: createInviteModel(mongoose),
     Session: createSessionModel(mongoose),
     Balance: createBalanceModel(mongoose),
     Conversation: createConversationModel(mongoose),
@@ -60,6 +63,7 @@ export function createModels(mongoose: typeof import('mongoose')) {
     File: createFileModel(mongoose),
     Banner: createBannerModel(mongoose),
     Project: createProjectModel(mongoose),
+    Workspace: createWorkspaceModel(mongoose),
     Key: createKeyModel(mongoose),
     PluginAuth: createPluginAuthModel(mongoose),
     Transaction: createTransactionModel(mongoose),

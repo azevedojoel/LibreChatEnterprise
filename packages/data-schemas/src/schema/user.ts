@@ -163,6 +163,13 @@ const userSchema = new Schema<IUser>(
       ref: 'Project',
       default: null,
     },
+    /** Workspace assigned by admin; one per user. Admin has null. Scopes CRM, workspace email. */
+    workspace_id: {
+      type: Schema.Types.ObjectId,
+      ref: 'Workspace',
+      default: null,
+      index: true,
+    },
     /** Token for inbound email routing; when set, user can receive email at token@domain */
     inboundEmailToken: {
       type: String,
