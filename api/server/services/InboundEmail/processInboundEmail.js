@@ -8,7 +8,11 @@ const { EModelEndpoint, Constants } = require('librechat-data-provider');
 const { GenerationJobManager } = require('@librechat/api');
 const { getUserByInboundToken, findUser } = require('~/models');
 const { getWorkspaceBySlug } = require('~/models/Workspace');
-const { formatEmailContent } = require('~/server/utils/formatEmailHighlights');
+const {
+  formatEmailContent,
+  formatToolApprovalEmail,
+  buildToolApprovalSubject,
+} = require('~/server/utils/formatEmailHighlights');
 const { sendInboundReply } = require('~/server/services/sendInboundReply');
 const { initializeClient } = require('~/server/services/Endpoints/agents');
 const { buildOptions } = require('~/server/services/Endpoints/agents/build');
@@ -283,10 +287,12 @@ async function processInboundEmail(payload) {
     /** When set, sends approval email for destructive tools (headless flow) */
     syntheticReq._headlessSendApprovalEmail = async ({ toolName, argsSummary, approvalUrl }) => {
       const appName = process.env.APP_TITLE || 'Daily Thread';
-      const subject = `${appName}: Tool approval required`;
-      const body = `Your agent requested approval for a destructive action.\n\nTool: ${toolName}\n${argsSummary ? `Arguments: ${argsSummary}\n\n` : ''}To approve or deny, sign in and visit:\n${approvalUrl}\n\nThis link expires in 1 hour.`;
-      const html = `<p>Your agent requested approval for a destructive action.</p><p><strong>Tool:</strong> ${toolName}</p>${argsSummary ? `<p><strong>Arguments:</strong> <code>${argsSummary}</code></p>` : ''}<p>To approve or deny, <a href="${approvalUrl}">sign in and visit this link</a>.</p><p><em>This link expires in 1 hour.</em></p>`;
-      await sendInboundReply({ to: fromEmail, subject, body, html });
+      const { html, text } = formatToolApprovalEmail(
+        { toolName, argsSummary, approvalUrl },
+        { appName },
+      );
+      const subject = buildToolApprovalSubject({ toolName, argsSummary }, { appName });
+      await sendInboundReply({ to: fromEmail, subject, body: text, html });
     };
 
     const result = await initializeClient({

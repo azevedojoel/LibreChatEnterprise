@@ -1,7 +1,7 @@
 const { ContentTypes, Constants } = require('librechat-data-provider');
 const { marked, Renderer } = require('marked');
 const sanitizeHtml = require('sanitize-html');
-const { getToolDisplayName } = require('./toolDisplayNames');
+const { getToolDisplayName, humanizeToolName } = require('./toolDisplayNames');
 
 const MAX_TOOL_OUTPUT_LEN = 200;
 const MAX_ARGS_LEN = 100;
@@ -194,7 +194,7 @@ function formatEmailHtml(contentParts, capturedOAuthUrls = [], options = {}) {
 
   if (uniqueUrls.length > 0) {
     const btnBg = '#10a37f';
-    const appNameForLabel = options.appName || process.env.APP_TITLE || 'LibreChat';
+    const appNameForLabel = options.appName || process.env.APP_TITLE || 'Daily Thread';
     const btnHtml = uniqueUrls
       .map((url) => {
         let label = `Sign in via ${appNameForLabel}`;
@@ -323,7 +323,7 @@ function formatEmailText(contentParts, capturedOAuthUrls = [], options = {}) {
   }
 
   if (uniqueUrls.length > 0) {
-    const appNameForLabel = options.appName || process.env.APP_TITLE || 'LibreChat';
+    const appNameForLabel = options.appName || process.env.APP_TITLE || 'Daily Thread';
     for (const url of uniqueUrls) {
       let label = `Sign in via ${appNameForLabel}`;
       try {
@@ -424,6 +424,157 @@ function formatEmailHighlights({ text, reasoning, toolCalls }) {
   return sections.join('\n\n');
 }
 
+const MAX_ARG_VALUE_LENGTH = 60;
+
+/**
+ * Parse argsSummary JSON into key-value pairs for display. Falls back to raw when truncated or invalid.
+ * @param {string} argsSummary - JSON string or raw text
+ * @returns {Array<{ key: string, value: string }>}
+ */
+function parseArgsToBubbles(argsSummary) {
+  if (!argsSummary?.trim()) return [];
+  try {
+    const parsed = JSON.parse(argsSummary);
+    if (typeof parsed !== 'object' || parsed === null) return [];
+    const pairs = [];
+    for (const [key, val] of Object.entries(parsed)) {
+      if (key.startsWith('_') || key === '') continue;
+      let value = '';
+      if (val === null || val === undefined) value = '—';
+      else if (typeof val === 'object') value = JSON.stringify(val);
+      else value = String(val);
+      if (value.length > MAX_ARG_VALUE_LENGTH) value = value.slice(0, MAX_ARG_VALUE_LENGTH) + '…';
+      const humanKey = humanizeToolName(key);
+      pairs.push({ key: humanKey, value });
+    }
+    return pairs;
+  } catch {
+    const display = argsSummary.slice(0, MAX_ARG_VALUE_LENGTH) + (argsSummary.length > MAX_ARG_VALUE_LENGTH ? '…' : '');
+    return [{ key: 'Arguments', value: display }];
+  }
+}
+
+/**
+ * Build a friendly subject line for tool approval email.
+ * @param {Object} params
+ * @param {string} params.toolName
+ * @param {string} [params.argsSummary]
+ * @param {Object} [options]
+ * @param {string} [options.appName]
+ * @returns {string}
+ */
+function buildToolApprovalSubject({ toolName, argsSummary }, options = {}) {
+  const appName = options.appName || process.env.APP_TITLE || 'Daily Thread';
+  const toolDisplay = getToolDisplayName(toolName || 'Tool');
+
+  let context = '';
+  if (argsSummary?.trim()) {
+    try {
+      const parsed = JSON.parse(argsSummary);
+      if (typeof parsed === 'object' && parsed !== null) {
+        const priorityKeys = ['name', 'contact', 'to', 'record', 'subject', 'title', 'email'];
+        for (const k of priorityKeys) {
+          const v = parsed[k];
+          if (v != null && typeof v === 'string' && v.trim()) {
+            context = v.trim().slice(0, 40);
+            if (v.length > 40) context += '…';
+            break;
+          }
+        }
+      }
+    } catch {
+      /* fall through to tool display only */
+    }
+  }
+
+  const middle = context ? `${toolDisplay} for ${context}` : toolDisplay;
+  return `Approval needed: ${middle} — ${appName}`;
+}
+
+/**
+ * Format tool approval email (HTML and plain text). Dark theme matching reply emails.
+ * @param {Object} params
+ * @param {string} params.toolName
+ * @param {string} [params.argsSummary]
+ * @param {string} params.approvalUrl
+ * @param {Object} [options]
+ * @param {string} [options.appName]
+ * @returns {{ html: string, text: string }}
+ */
+function formatToolApprovalEmail({ toolName, argsSummary, approvalUrl }, options = {}) {
+  const appName = options.appName || process.env.APP_TITLE || 'Daily Thread';
+  const safeUrl = escapeHtml(approvalUrl || '#');
+  const displayName = getToolDisplayName(toolName || 'Tool');
+  const bubbles = parseArgsToBubbles(argsSummary || '');
+
+  const btnPrimary = '#10a37f';
+
+  const argBubblesHtml =
+    bubbles.length === 0
+      ? ''
+      : bubbles
+          .map(
+            ({ key, value }) =>
+              `<span style="display: inline-block; margin: 2px 4px 2px 0; padding: 4px 10px; background: ${STYLES.pillBg}; color: ${STYLES.textMuted}; border-radius: 6px; font-size: 13px;"><span style="font-weight: 500; color: ${STYLES.text};">${escapeHtml(key)}:</span> ${escapeHtml(value)}</span>`,
+          )
+          .join('');
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <meta name="supported-color-schemes" content="dark">
+</head>
+<body style="margin: 0; padding: 24px 16px; background: ${STYLES.bg}; color: ${STYLES.text}; font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 16px; line-height: 1.6;">
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width: 600px; margin: 0 auto;">
+  <tr>
+    <td style="background: ${STYLES.bgCard}; padding: 32px; border-radius: 8px; border: 1px solid ${STYLES.border};">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom: 24px;">
+        <tr>
+          <td style="font-size: 13px; color: ${STYLES.textMuted};">${escapeHtml(appName)}</td>
+        </tr>
+      </table>
+      <h1 style="margin: 0 0 12px 0; font-size: 1.25em; font-weight: 600; color: ${STYLES.text};">Tool approval required</h1>
+      <p style="margin: 0 0 16px 0; color: ${STYLES.text}; font-size: 16px; line-height: 1.6;">Your agent is requesting to run a potentially destructive tool. Approve or deny to continue.</p>
+      <div style="margin: 16px 0; padding: 12px 16px; background: ${STYLES.pillBg}; border-radius: 8px; border: 1px solid ${STYLES.border};">
+        <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: ${STYLES.text};">Tool: ${escapeHtml(displayName)}</p>
+        ${argBubblesHtml ? `<div style="margin-top: 8px;">${argBubblesHtml}</div>` : ''}
+      </div>
+      <div style="margin: 24px 0; text-align: center;">
+        <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 10px 20px; background: ${btnPrimary}; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; border-radius: 8px; margin-right: 12px;">Approve</a>
+        <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 10px 20px; background: transparent; color: ${STYLES.textMuted}; font-size: 14px; font-weight: 600; text-decoration: none; border-radius: 8px; border: 1px solid ${STYLES.border};">Deny</a>
+      </div>
+      <div style="margin: 20px 0; padding: 8px 12px; background: ${STYLES.codeBg}; border-radius: 6px; font-size: 13px; color: ${STYLES.textMuted}; display: inline-block;">⏱ Expires in 1 hour</div>
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid ${STYLES.border};">
+        <tr>
+          <td style="font-size: 12px; color: ${STYLES.textMuted};">— ${escapeHtml(appName)}</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>`.trim();
+
+  const argsText =
+    bubbles.length === 0
+      ? ''
+      : bubbles.map(({ key, value }) => `${key}: ${value}`).join('\n');
+
+  const text = `Your agent requested approval for a destructive action.
+
+Tool: ${displayName}
+${argsText ? `Arguments:\n${argsText}\n\n` : ''}To approve or deny, sign in and visit:
+${approvalUrl || ''}
+
+This link expires in 1 hour.`;
+
+  return { html, text };
+}
+
 /**
  * Format content parts (from message.content array) for email (legacy).
  */
@@ -454,4 +605,6 @@ module.exports = {
   formatEmailHtml,
   formatEmailText,
   markdownToEmailHtml,
+  formatToolApprovalEmail,
+  buildToolApprovalSubject,
 };
