@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { SystemRoles } from 'librechat-data-provider';
 import {
   Button,
@@ -9,7 +9,7 @@ import {
   Spinner,
   useToastContext,
 } from '@librechat/client';
-import { Copy, CopyCheck, Mail, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Copy, CopyCheck, Mail, Pencil, Plus, Trash2, UserPlus } from 'lucide-react';
 import MultiConvoAdminSettings from './MultiConvoAdminSettings';
 import PresetsAdminSettings from './PresetsAdminSettings';
 import EndpointsMenuAdminSettings from './EndpointsMenuAdminSettings';
@@ -19,6 +19,7 @@ import {
   useUpdateAdminUserMutation,
   useDeleteAdminUserMutation,
   useSendAdminPasswordResetMutation,
+  useInviteAdminUserMutation,
   useListProjectsQuery,
   useCreateProjectMutation,
 } from '~/data-provider';
@@ -45,6 +46,8 @@ function UserManagement() {
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [editUser, setEditUser] = useState<TAdminUser | null>(null);
   const [deleteUser, setDeleteUser] = useState<TAdminUser | null>(null);
 
@@ -84,6 +87,26 @@ function UserManagement() {
     },
     onError: (error: Error) => {
       const msg = (error as any)?.response?.data?.error ?? error.message;
+      showToast({ message: msg, status: 'error' });
+    },
+  });
+
+  const inviteMutation = useInviteAdminUserMutation({
+    onSuccess: (data) => {
+      if (data.link) {
+        setInviteLink(data.link);
+        showToast({
+          message: localize('com_ui_invite_user_email_not_configured'),
+          status: 'success',
+        });
+      } else {
+        showToast({ message: localize('com_ui_invite_user_success'), status: 'success' });
+        setInviteOpen(false);
+      }
+    },
+    onError: (error: Error) => {
+      const err = error as any;
+      const msg = err?.response?.data?.error ?? err?.response?.data?.message ?? error.message;
       showToast({ message: msg, status: 'error' });
     },
   });
@@ -165,6 +188,15 @@ function UserManagement() {
           <MultiConvoAdminSettings />
           <PresetsAdminSettings />
           <EndpointsMenuAdminSettings />
+          <Button
+            onClick={() => setInviteOpen(true)}
+            variant="outline"
+            className="gap-2"
+            aria-label={localize('com_ui_invite_user')}
+          >
+            <UserPlus className="size-5" />
+            {localize('com_ui_invite_user')}
+          </Button>
           <Button
             onClick={() => setCreateOpen(true)}
             className="gap-2"
@@ -276,6 +308,24 @@ function UserManagement() {
         </div>
       )}
 
+      {/* Invite User Dialog */}
+      <InviteUserDialog
+        open={inviteOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setInviteLink(null);
+          }
+          setInviteOpen(open);
+        }}
+        onSubmit={(email) => inviteMutation.mutate({ email })}
+        isLoading={inviteMutation.isLoading}
+        inviteLink={inviteLink}
+        onInviteLinkDone={() => {
+          setInviteLink(null);
+          setInviteOpen(false);
+        }}
+      />
+
       {/* Create User Dialog */}
       <CreateUserDialog
         open={createOpen}
@@ -335,6 +385,125 @@ function UserManagement() {
         </OGDialog>
       )}
     </div>
+  );
+}
+
+function InviteUserDialog({
+  open,
+  onOpenChange,
+  onSubmit,
+  isLoading,
+  inviteLink,
+  onInviteLinkDone,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (email: string) => void;
+  isLoading: boolean;
+  inviteLink: string | null;
+  onInviteLinkDone: () => void;
+}) {
+  const localize = useLocalize();
+  const { showToast } = useToastContext();
+  const [email, setEmail] = useState('');
+  const [isCopying, setIsCopying] = useState(false);
+
+  useEffect(() => {
+    if (open && !inviteLink) {
+      setEmail('');
+    }
+  }, [open, inviteLink]);
+
+  const handleSubmit = () => {
+    if (!email?.trim() || !email.includes('@')) return;
+    onSubmit(email.trim().toLowerCase());
+  };
+
+  const handleCopyLink = useCallback(async () => {
+    if (!inviteLink || isCopying) return;
+    setIsCopying(true);
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      showToast({ message: localize('com_ui_invite_user_link_copied'), status: 'success' });
+    } catch {
+      showToast({ message: localize('com_agents_link_copy_failed'), status: 'error' });
+    } finally {
+      setTimeout(() => setIsCopying(false), 3000);
+    }
+  }, [inviteLink, isCopying, showToast, localize]);
+
+  const handleClose = (open: boolean) => {
+    if (!open) {
+      if (inviteLink) {
+        onInviteLinkDone();
+      } else {
+        onOpenChange(false);
+      }
+    }
+  };
+
+  return (
+    <OGDialog open={open} onOpenChange={handleClose}>
+      <OGDialogTemplate
+        title={localize('com_ui_invite_user')}
+        showCloseButton
+        className="max-w-md"
+        main={
+          inviteLink ? (
+            <div className="flex flex-col gap-4">
+              <p className="text-sm text-text-secondary">
+                {localize('com_ui_invite_user_email_not_configured')}
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  readOnly
+                  value={inviteLink}
+                  className="flex-1 font-mono text-sm"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopyLink}
+                  disabled={isCopying}
+                  aria-label={localize('com_ui_copied_to_clipboard')}
+                >
+                  {isCopying ? <CopyCheck className="size-4" /> : <Copy className="size-4" />}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <div>
+                <Label className="text-text-primary">{localize('com_ui_user_email')} *</Label>
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="user@example.com"
+                  className="mt-1 w-full"
+                />
+              </div>
+            </div>
+          )
+        }
+        buttons={
+          inviteLink ? (
+            <Button variant="submit" onClick={onInviteLinkDone}>
+              {localize('com_ui_done')}
+            </Button>
+          ) : (
+            <Button
+              variant="submit"
+              onClick={handleSubmit}
+              disabled={isLoading || !email?.trim() || !email.includes('@')}
+            >
+              {isLoading ? <Spinner className="size-4" /> : localize('com_ui_send_invite')}
+            </Button>
+          )
+        }
+      />
+    </OGDialog>
   );
 }
 

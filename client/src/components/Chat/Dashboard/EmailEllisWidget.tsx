@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, useToastContext } from '@librechat/client';
+import { SystemRoles } from 'librechat-data-provider';
 import { useAuthContext, useLocalize } from '~/hooks';
 import { useGetAgentsConfig } from '~/hooks/Agents';
-import { useConversationsInfiniteQuery } from '~/data-provider';
+import { useConversationsInfiniteQuery, useGetWorkspaceMeQuery } from '~/data-provider';
 
 export default function EmailEllisWidget() {
   const { user } = useAuthContext();
@@ -12,11 +13,23 @@ export default function EmailEllisWidget() {
   const localize = useLocalize();
   const [isCopying, setIsCopying] = useState(false);
 
+  const { data: workspaceMeData } = useGetWorkspaceMeQuery({
+    enabled: !!user,
+  });
+  const workspace = workspaceMeData?.workspace ?? null;
+
   const displayDomain =
     agentsConfig?.inboundEmailDisplayDomain ?? agentsConfig?.inboundEmailAddress;
   const inboundEmailToken = user?.inboundEmailToken?.trim() ?? '';
-  const fullEmail =
-    displayDomain && inboundEmailToken ? `${inboundEmailToken}@${displayDomain}` : '';
+  const fullEmail = useMemo(() => {
+    if (!displayDomain) return '';
+    if (workspace?.slug) return `${workspace.slug}@${displayDomain}`;
+    if (inboundEmailToken) return `${inboundEmailToken}@${displayDomain}`;
+    return '';
+  }, [displayDomain, workspace?.slug, inboundEmailToken]);
+
+  const isAdminWithoutWorkspace =
+    user?.role === SystemRoles.ADMIN && !workspace && !inboundEmailToken;
 
   const { data: emailConvosData } = useConversationsInfiniteQuery(
     {
@@ -49,6 +62,10 @@ export default function EmailEllisWidget() {
   }, [fullEmail, isCopying, showToast, localize]);
 
   if (!agentsConfig?.inboundEmailAddress) {
+    return null;
+  }
+
+  if (isAdminWithoutWorkspace) {
     return null;
   }
 
