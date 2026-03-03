@@ -101,6 +101,25 @@ async function readFile({ workspaceRoot, relativePath, startLine, endLine }) {
  * @param {string} params.new_string - Replacement
  * @returns {Promise<{ success: true } | { error: string }>}
  */
+/**
+ * Normalizes line endings to \n for consistent matching (handles CRLF, CR, LF).
+ */
+function normalizeLineEndings(str) {
+  if (typeof str !== 'string') return str;
+  return str.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
+/**
+ * Escapes $ in replacement strings so they are treated as literal, not special patterns.
+ * In String.replace, $$ produces one $. When we call str.replace(/\$/g, '$$'), the
+ * inner replace processes '$$' to '$', so we get no escape. We need '$$$$' so the
+ * inner replace outputs '$$', which then produces one $ in the outer replace.
+ */
+function escapeReplacementString(str) {
+  if (typeof str !== 'string') return '';
+  return str.replace(/\$/g, '$$$$');
+}
+
 async function editFile({ workspaceRoot, relativePath, old_string, new_string }) {
   try {
     if (typeof old_string !== 'string' || old_string === '') {
@@ -111,15 +130,18 @@ async function editFile({ workspaceRoot, relativePath, old_string, new_string })
     if (!stat.isFile()) {
       return { error: `"${relativePath}" is not a file` };
     }
-    const content = await fs.readFile(absPath, 'utf8');
-    const count = (content.match(new RegExp(escapeRegex(old_string), 'g')) || []).length;
+    const rawContent = await fs.readFile(absPath, 'utf8');
+    const content = normalizeLineEndings(rawContent);
+    const normalizedOld = normalizeLineEndings(old_string);
+    const count = (content.match(new RegExp(escapeRegex(normalizedOld), 'g')) || []).length;
     if (count === 0) {
       return { error: 'old_string not found in file' };
     }
     if (count > 1) {
       return { error: 'old_string matched more than once; use a more specific match' };
     }
-    const newContent = content.replace(old_string, new_string);
+    const escapedNew = escapeReplacementString(new_string ?? '');
+    const newContent = content.replace(normalizedOld, escapedNew);
     await fs.writeFile(absPath, newContent, 'utf8');
     return { success: true };
   } catch (err) {
@@ -354,4 +376,58 @@ async function searchFiles({
   }
 }
 
-module.exports = { readFile, editFile, createFile, deleteFile, listFiles, globFiles, searchFiles };
+const SEND_FILE_MAX_BYTES =
+  parseInt(process.env.LIBRECHAT_SEND_FILE_MAX_BYTES, 10) || 10 * 1024 * 1024; // 10MB default
+
+/**
+ * Read files from workspace and return buffers for artifact delivery.
+ * @param {object} params
+ * @param {string} params.workspaceRoot - Absolute workspace path
+ * @param {string[]} params.paths - File paths relative to workspace root
+ * @returns {Promise<{ files: Array<{ name: string; buffer: Buffer }> } | { error: string }>}
+ */
+async function sendFilesToUser({ workspaceRoot, paths }) {
+  if (!Array.isArray(paths) || paths.length === 0) {
+    return { error: 'paths must be a non-empty array' };
+  }
+  const files = [];
+  for (const relativePath of paths) {
+    if (typeof relativePath !== 'string' || !relativePath.trim()) {
+      return { error: 'Each path must be a non-empty string' };
+    }
+    try {
+      const absPath = resolvePath(workspaceRoot, relativePath.trim());
+      const stat = await fs.stat(absPath);
+      if (!stat.isFile()) {
+        return { error: `"${relativePath}" is not a file` };
+      }
+      if (stat.size > SEND_FILE_MAX_BYTES) {
+        return {
+          error: `"${relativePath}" exceeds maximum size (${Math.round(SEND_FILE_MAX_BYTES / 1024 / 1024)}MB)`,
+        };
+      }
+      const buffer = await fs.readFile(absPath);
+      files.push({ name: relativePath.trim(), buffer });
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+        return { error: `"${relativePath}" not found` };
+      }
+      if (err.message?.includes('escapes workspace')) {
+        return { error: err.message };
+      }
+      return { error: `"${relativePath}": ${err.message}` };
+    }
+  }
+  return { files };
+}
+
+module.exports = {
+  readFile,
+  editFile,
+  createFile,
+  deleteFile,
+  listFiles,
+  globFiles,
+  searchFiles,
+  sendFilesToUser,
+};

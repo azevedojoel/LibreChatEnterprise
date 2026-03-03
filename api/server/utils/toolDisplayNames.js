@@ -7,6 +7,12 @@ const { Constants } = require('librechat-data-provider');
 const TOOL_DISPLAY_NAMES = {
   search_user_files: 'Grepped',
   workspace_glob_files: 'Globbed',
+  workspace_read_file: 'Read File',
+  workspace_edit_file: 'Edit File',
+  workspace_create_file: 'Create File',
+  workspace_delete_file: 'Delete File',
+  workspace_list_files: 'List Files',
+  workspace_send_file_to_user: 'Send File to User',
   [Constants.TOOL_SEARCH]: 'Discovery',
   // Google Workspace MCP tools (underscore notation)
   tasks_listTaskLists: 'Fetch Task Lists',
@@ -25,6 +31,13 @@ const TOOL_DISPLAY_NAMES = {
   gmail_search: 'Searched Gmail',
   gmail_get: 'Retrieved email',
   docs_create: 'Creating Google Doc',
+  // Project tools
+  project_read: 'Project Context',
+  project_write: 'Update Project Context',
+  project_log: 'Append to Changelog',
+  project_log_tail: 'Recent Changelog Entries',
+  project_log_search: 'Search Changelog',
+  project_log_range: 'Changelog by Date Range',
 };
 
 /**

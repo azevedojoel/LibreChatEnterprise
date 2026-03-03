@@ -529,11 +529,12 @@ function createToolEndCallback({
 
     const isCodeTool =
       output.name === Tools.execute_code || output.name === Constants.PROGRAMMATIC_TOOL_CALLING;
-    if (!isCodeTool) {
+    const isSendFileTool = output.name === Tools.workspace_send_file_to_user;
+    if (!isCodeTool && !isSendFileTool) {
       return;
     }
 
-    if (!output.artifact.files) {
+    if (!output.artifact?.files) {
       return;
     }
 
@@ -736,11 +737,12 @@ function createResponsesToolEndCallback({ req, res, tracker, artifactPromises })
 
     const isCodeTool =
       output.name === Tools.execute_code || output.name === Constants.PROGRAMMATIC_TOOL_CALLING;
-    if (!isCodeTool) {
+    const isSendFileTool = output.name === Tools.workspace_send_file_to_user;
+    if (!isCodeTool && !isSendFileTool) {
       return;
     }
 
-    if (!output.artifact.files) {
+    if (!output.artifact?.files) {
       return;
     }
 

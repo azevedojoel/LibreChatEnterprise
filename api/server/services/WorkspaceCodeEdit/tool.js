@@ -1,6 +1,7 @@
 /**
  * LangChain tools for workspace file editing (read, edit, create, list, search).
  */
+const path = require('path');
 const { tool } = require('@langchain/core/tools');
 const {
   readFile,
@@ -10,6 +11,7 @@ const {
   listFiles,
   globFiles,
   searchFiles,
+  sendFilesToUser,
 } = require('./executor');
 
 /**
@@ -71,7 +73,7 @@ function createWorkspaceCodeEditTools({ workspaceRoot }) {
       if (result.error) {
         return `Error: ${result.error}`;
       }
-      return 'File edited successfully.';
+      return `Edited ${rawInput.path} successfully.`;
     },
     {
       name: 'workspace_edit_file',
@@ -108,7 +110,7 @@ function createWorkspaceCodeEditTools({ workspaceRoot }) {
       if (result.error) {
         return `Error: ${result.error}`;
       }
-      return 'File created successfully.';
+      return `Created ${rawInput.path} successfully.`;
     },
     {
       name: 'workspace_create_file',
@@ -140,7 +142,7 @@ function createWorkspaceCodeEditTools({ workspaceRoot }) {
       if (result.error) {
         return `Error: ${result.error}`;
       }
-      return 'File deleted successfully.';
+      return `Deleted ${rawInput.path} successfully.`;
     },
     {
       name: 'workspace_delete_file',
@@ -317,6 +319,42 @@ function createWorkspaceCodeEditTools({ workspaceRoot }) {
     },
   );
 
+  const sessionId = path.basename(root);
+  const sendFileToUserTool = tool(
+    async (rawInput) => {
+      const paths = Array.isArray(rawInput.paths) ? rawInput.paths : [rawInput.paths].filter(Boolean);
+      const result = await sendFilesToUser({
+        workspaceRoot: root,
+        paths,
+      });
+      if (result.error) {
+        return `Error: ${result.error}`;
+      }
+      return [
+        `Sent ${result.files.length} file(s) to user: ${result.files.map((f) => f.name).join(', ')}.`,
+        { session_id: sessionId, files: result.files },
+      ];
+    },
+    {
+      name: 'workspace_send_file_to_user',
+      description:
+        'Send one or more files from the workspace to the user. Files are displayed in the chat and saved for download. Use after execute_code creates files (e.g. plots, CSVs) that the user should see. Paths are relative to workspace root.',
+      schema: {
+        type: 'object',
+        properties: {
+          paths: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'File paths relative to workspace root (e.g. ["output.csv", "chart.png"])',
+            minItems: 1,
+          },
+        },
+        required: ['paths'],
+      },
+      responseFormat: 'content_and_artifact',
+    },
+  );
+
   return [
     readFileTool,
     editFileTool,
@@ -325,6 +363,7 @@ function createWorkspaceCodeEditTools({ workspaceRoot }) {
     listFilesTool,
     globFilesTool,
     searchFilesTool,
+    sendFileToUserTool,
   ];
 }
 

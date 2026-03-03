@@ -12,6 +12,7 @@ const {
   listFiles,
   globFiles,
   searchFiles,
+  sendFilesToUser,
 } = require('../executor');
 
 describe('WorkspaceCodeEdit', () => {
@@ -224,6 +225,45 @@ describe('WorkspaceCodeEdit', () => {
         new_string: 'x',
       });
       expect(r.error).toContain('non-empty');
+    });
+
+    it('should treat $ in new_string as literal, not replacement pattern', async () => {
+      await fs.writeFile(path.join(workspaceRoot, 'dollar.txt'), 'price: X', 'utf8');
+      const r = await editFile({
+        workspaceRoot,
+        relativePath: 'dollar.txt',
+        old_string: 'price: X',
+        new_string: 'price: $1',
+      });
+      expect(r.success).toBe(true);
+      const content = await fs.readFile(path.join(workspaceRoot, 'dollar.txt'), 'utf8');
+      expect(content).toBe('price: $1');
+    });
+
+    it('should treat $& in new_string as literal', async () => {
+      await fs.writeFile(path.join(workspaceRoot, 'amp.txt'), 'match: foo', 'utf8');
+      const r = await editFile({
+        workspaceRoot,
+        relativePath: 'amp.txt',
+        old_string: 'foo',
+        new_string: '$&',
+      });
+      expect(r.success).toBe(true);
+      const content = await fs.readFile(path.join(workspaceRoot, 'amp.txt'), 'utf8');
+      expect(content).toBe('match: $&');
+    });
+
+    it('should match old_string when file has CRLF and model uses LF', async () => {
+      await fs.writeFile(path.join(workspaceRoot, 'crlf.txt'), 'line1\r\nline2\r\nline3', 'utf8');
+      const r = await editFile({
+        workspaceRoot,
+        relativePath: 'crlf.txt',
+        old_string: 'line2',
+        new_string: 'replaced',
+      });
+      expect(r.success).toBe(true);
+      const content = await fs.readFile(path.join(workspaceRoot, 'crlf.txt'), 'utf8');
+      expect(content).toBe('line1\nreplaced\nline3');
     });
   });
 
@@ -458,6 +498,41 @@ describe('WorkspaceCodeEdit', () => {
       expect(r.matches.length).toBe(1);
       expect(r.matches[0].contextBefore).toEqual(['line2']);
       expect(r.matches[0].contextAfter).toBeUndefined();
+    });
+  });
+
+  describe('sendFilesToUser', () => {
+    it('should read files and return buffers', async () => {
+      await fs.writeFile(path.join(workspaceRoot, 'a.txt'), 'hello', 'utf8');
+      await fs.writeFile(path.join(workspaceRoot, 'b.csv'), 'a,b\n1,2', 'utf8');
+      const r = await sendFilesToUser({ workspaceRoot, paths: ['a.txt', 'b.csv'] });
+      expect(r.error).toBeUndefined();
+      expect(r.files).toHaveLength(2);
+      expect(r.files[0].name).toBe('a.txt');
+      expect(r.files[0].buffer.toString('utf8')).toBe('hello');
+      expect(r.files[1].name).toBe('b.csv');
+      expect(r.files[1].buffer.toString('utf8')).toBe('a,b\n1,2');
+    });
+
+    it('should return error for empty paths', async () => {
+      const r = await sendFilesToUser({ workspaceRoot, paths: [] });
+      expect(r.error).toContain('non-empty array');
+    });
+
+    it('should return error for missing file', async () => {
+      const r = await sendFilesToUser({ workspaceRoot, paths: ['missing.txt'] });
+      expect(r.error).toContain('not found');
+    });
+
+    it('should return error when path escapes workspace', async () => {
+      const r = await sendFilesToUser({ workspaceRoot, paths: ['../etc/passwd'] });
+      expect(r.error).toContain('escapes workspace');
+    });
+
+    it('should return error for directory', async () => {
+      await fs.mkdir(path.join(workspaceRoot, 'dir'), { recursive: true });
+      const r = await sendFilesToUser({ workspaceRoot, paths: ['dir'] });
+      expect(r.error).toContain('not a file');
     });
   });
 });
