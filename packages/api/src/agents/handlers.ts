@@ -34,6 +34,10 @@ export type ToolEndCallback = (
 /** Marker for headless OAuth URL in error message (from MCP.js) */
 const HEADLESS_OAUTH_URL_MARKER = 'To authenticate, open this URL in your browser:\n';
 
+/** Message for agent when OAuth re-auth is needed in email context (link is in this email, user must reply after signing in) */
+export const HEADLESS_OAUTH_EMAIL_MESSAGE =
+  'OAuth re-authentication required. The sign-in link is in this email. Tell the user to click it, sign in, then reply to this email to continue.';
+
 export interface ToolExecuteOptions {
   /** Loads tools by name, using agentId to look up agent-specific context */
   loadTools: (
@@ -231,8 +235,7 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
                 if (url) {
                   captureOAuthUrl(url, { serverName });
                 }
-                messageForModel =
-                  'OAuth re-authentication required. The authentication URL has been included in the email for you to complete sign-in.';
+                messageForModel = HEADLESS_OAUTH_EMAIL_MESSAGE;
               }
               return {
                 toolCallId: tc.id,
@@ -270,8 +273,7 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
             toolCallId: tc.id,
             status: 'error' as const,
             content: '',
-            errorMessage:
-              'OAuth re-authentication required. The authentication URL has been included in the email for you to complete sign-in.',
+            errorMessage: HEADLESS_OAUTH_EMAIL_MESSAGE,
           }));
           resolve(results);
         } else {

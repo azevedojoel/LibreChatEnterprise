@@ -2,7 +2,7 @@
  * Tests for createToolExecuteHandler - tool execution with destructive tool confirmation
  */
 import { Constants } from '@librechat/agents';
-import { createToolExecuteHandler } from '../handlers';
+import { createToolExecuteHandler, HEADLESS_OAUTH_EMAIL_MESSAGE } from '../handlers';
 
 jest.mock('@librechat/data-schemas', () => ({
   logger: {
@@ -28,6 +28,8 @@ describe('createToolExecuteHandler - destructive tool confirmation', () => {
   });
 
   const createHandler = (overrides?: {
+    loadTools?: typeof mockLoadTools;
+    captureOAuthUrl?: (url: string, options?: { serverName?: string }) => void;
     isDestructiveTool?: (name: string) => boolean;
     requestToolConfirmation?: (
       toolCall: { id: string; name: string; args: unknown },
@@ -145,5 +147,44 @@ describe('createToolExecuteHandler - destructive tool confirmation', () => {
     ]);
     expect(requestToolConfirmation).not.toHaveBeenCalled();
     expect(mockTool.invoke).toHaveBeenCalled();
+  });
+
+  describe('headless OAuth (email context)', () => {
+    const HEADLESS_OAUTH_URL_MARKER = 'To authenticate, open this URL in your browser:\n';
+
+    it('returns HEADLESS_OAUTH_EMAIL_MESSAGE when tool throws OAuth marker and captureOAuthUrl is provided', async () => {
+      const captureOAuthUrl = jest.fn();
+      const oauthTool = {
+        name: 'gmail_search_mcp_Google',
+        invoke: jest.fn().mockRejectedValue(
+          new Error(`${HEADLESS_OAUTH_URL_MARKER}https://accounts.google.com/oauth?state=xyz`),
+        ),
+      };
+      mockLoadTools.mockResolvedValue({
+        loadedTools: [oauthTool],
+        configurable: {},
+      });
+
+      const handler = createHandler({ captureOAuthUrl });
+      const data = createToolExecuteBatchRequest([
+        { id: 'tool-1', name: 'gmail_search_mcp_Google', args: {} },
+      ]);
+
+      await handler.handle!('ON_TOOL_EXECUTE', data);
+
+      expect(captureOAuthUrl).toHaveBeenCalledWith(
+        'https://accounts.google.com/oauth?state=xyz',
+        { serverName: 'Google' },
+      );
+      expect(data.resolve).toHaveBeenCalledWith([
+        {
+          toolCallId: 'tool-1',
+          status: 'error',
+          content: '',
+          errorMessage: HEADLESS_OAUTH_EMAIL_MESSAGE,
+        },
+      ]);
+    });
+
   });
 });
