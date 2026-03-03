@@ -35,6 +35,7 @@ export { default as getDefaultEndpoint } from './getDefaultEndpoint';
 export { default as createChatSearchParams } from './createChatSearchParams';
 export { getThemeFromEnv } from './getThemeFromEnv';
 export { getToolDisplayName, humanizeToolName } from './toolDisplayNames';
+export * from './parseToolOutput';
 export { openOAuthUrl, getOAuthRedirectUrl, isMobile } from './openOAuthUrl';
 
 export const languages = [
