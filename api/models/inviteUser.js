@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const { logger, hashToken, getRandomValues } = require('@librechat/data-schemas');
 const { createToken, findToken } = require('~/models');
+const { createInviteRecord } = require('~/models/Invite');
 
 /**
  * @module inviteUser
@@ -11,23 +12,36 @@ const { createToken, findToken } = require('~/models');
  * @function createInvite
  * @description This function creates a new user invite
  * @param {string} email - The email of the user to invite
- * @returns {Promise<Object>} A promise that resolves to the saved invite document
- * @throws {Error} If there is an error creating the invite
+ * @param {Object} [options] - Optional { workspaceId, invitedBy }
+ * @returns {Promise<string|Object>} Encoded token string, or error object
  */
-const createInvite = async (email) => {
+const createInvite = async (email, options = {}) => {
   try {
     const token = await getRandomValues(32);
     const hash = await hashToken(token);
     const encodedToken = encodeURIComponent(token);
 
     const fakeUserId = new mongoose.Types.ObjectId();
+    const { workspaceId, invitedBy } = options;
 
-    await createToken({
+    const tokenData = {
       userId: fakeUserId,
-      email,
+      email: email.trim().toLowerCase(),
       token: hash,
-      createdAt: Date.now(),
       expiresIn: 604800,
+    };
+
+    if (workspaceId) {
+      tokenData.metadata = new Map([['workspace_id', workspaceId]]);
+    }
+
+    await createToken(tokenData);
+
+    await createInviteRecord({
+      email: email.trim().toLowerCase(),
+      tokenHash: hash,
+      workspaceId: workspaceId || undefined,
+      invitedBy: invitedBy || undefined,
     });
 
     return encodedToken;
