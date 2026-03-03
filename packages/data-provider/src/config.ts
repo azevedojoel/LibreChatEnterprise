@@ -309,6 +309,7 @@ export const agentsEndpointSchema = baseEndpointSchema
             instructions: z.string().optional().default('You are a helpful assistant.'),
             tools: z.array(z.string()).optional().default(['file_search', 'web_search']),
             edges: z.array(z.record(z.any())).optional(),
+            schedulerTargetAgentIds: z.array(z.string()).optional(),
           }),
         )
         .optional(),

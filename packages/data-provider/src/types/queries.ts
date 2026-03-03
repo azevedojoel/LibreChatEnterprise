@@ -273,7 +273,10 @@ export type ScheduledAgentSchedule = {
   userId: string;
   agentId: string;
   name: string;
-  promptGroupId: string | { _id: string; name?: string; command?: string };
+  /** Free-text prompt. Required for new schedules. */
+  prompt?: string | null;
+  /** @deprecated Legacy; use prompt instead. */
+  promptGroupId?: string | { _id: string; name?: string; command?: string };
   scheduleType: ScheduleType;
   cronExpression?: string | null;
   runAt?: string | null;
@@ -285,13 +288,14 @@ export type ScheduledAgentSchedule = {
   lastRunStatus?: ScheduledRunStatus | null;
   conversationId?: string | null;
   emailOnComplete?: boolean;
+  userProjectId?: string | null;
   createdAt?: string;
   updatedAt?: string;
 };
 
 export type ScheduledRun = {
   _id: string;
-  scheduleId: string | { _id: string; name: string; agentId: string; promptGroupId?: string | object };
+  scheduleId: string | { _id: string; name: string; agentId: string; prompt?: string; promptGroupId?: string | object };
   userId: string;
   conversationId: string;
   /** Actual merged prompt sent to AI (set when run executes) */

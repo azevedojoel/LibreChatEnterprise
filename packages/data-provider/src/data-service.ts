@@ -1102,13 +1102,14 @@ export const listScheduledAgents = (opts?: {
 export const createScheduledAgent = (data: {
   name: string;
   agentId: string;
-  promptGroupId: string;
+  prompt: string;
   scheduleType: 'recurring' | 'one-off';
   cronExpression?: string;
   runAt?: string;
   timezone?: string;
   selectedTools?: string[] | null;
   emailOnComplete?: boolean;
+  userProjectId?: string | null;
 }): Promise<q.ScheduledAgentSchedule> => request.post(endpoints.scheduledAgents(), data);
 
 export const updateScheduledAgent = (
@@ -1116,7 +1117,7 @@ export const updateScheduledAgent = (
   data: Partial<{
     name: string;
     agentId: string;
-    promptGroupId: string;
+    prompt: string;
     scheduleType: 'recurring' | 'one-off';
     cronExpression: string;
     runAt: string;
@@ -1124,6 +1125,7 @@ export const updateScheduledAgent = (
     timezone: string;
     selectedTools: string[] | null;
     emailOnComplete: boolean;
+    userProjectId: string | null;
   }>,
 ): Promise<q.ScheduledAgentSchedule> =>
   request.patch(`${endpoints.scheduledAgents()}/${id}`, data);
