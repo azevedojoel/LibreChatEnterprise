@@ -6,6 +6,7 @@ import {
   EmptyPromptPreview,
 } from '~/components/Prompts';
 import { UsersView } from '~/components/Users';
+import { WorkspacesView } from '~/components/Workspaces';
 import DashboardRoute from './Layouts/Dashboard';
 
 const dashboardRoutes = {
@@ -76,6 +77,10 @@ const dashboardRoutes = {
     {
       path: 'users/*',
       element: <UsersView />,
+    },
+    {
+      path: 'workspaces/*',
+      element: <WorkspacesView />,
     },
     {
       path: '*',

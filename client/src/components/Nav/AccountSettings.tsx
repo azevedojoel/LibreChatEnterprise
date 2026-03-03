@@ -1,7 +1,7 @@
 import { useState, memo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as Select from '@ariakit/react/select';
-import { FileText, LogOut, Users } from 'lucide-react';
+import { Building2, FileText, LogOut, Users } from 'lucide-react';
 import { SystemRoles } from 'librechat-data-provider';
 import { LinkIcon, GearIcon, DropdownMenuSeparator, Avatar } from '@librechat/client';
 import { MyFilesModal } from '~/components/Chat/Input/Files/MyFilesModal';
@@ -63,14 +63,24 @@ function AccountSettings() {
           </>
         )}
         {user?.role === SystemRoles.ADMIN && (
-          <Select.SelectItem
-            value=""
-            onClick={() => navigate('/d/users')}
-            className="select-item text-sm"
-          >
-            <Users className="icon-md" aria-hidden="true" />
-            {localize('com_nav_user_management')}
-          </Select.SelectItem>
+          <>
+            <Select.SelectItem
+              value=""
+              onClick={() => navigate('/d/users')}
+              className="select-item text-sm"
+            >
+              <Users className="icon-md" aria-hidden="true" />
+              {localize('com_nav_user_management')}
+            </Select.SelectItem>
+            <Select.SelectItem
+              value=""
+              onClick={() => navigate('/d/workspaces')}
+              className="select-item text-sm"
+            >
+              <Building2 className="icon-md" aria-hidden="true" />
+              {localize('com_nav_workspaces')}
+            </Select.SelectItem>
+          </>
         )}
         <Select.SelectItem
           value=""
