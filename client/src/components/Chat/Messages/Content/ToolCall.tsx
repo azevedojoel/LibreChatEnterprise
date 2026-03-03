@@ -55,11 +55,52 @@ const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
   'tasks_moveTask': 'Moving Google Task',
   // Google Drive
   'drive_search': 'Searched Google Drive',
+  'drive_createFolder': 'Created folder',
   // Gmail
   'gmail_search': 'Searched Gmail',
   'gmail_get': 'Retrieved email',
+  'gmail_send': 'Sent email',
+  'gmail_sendDraft': 'Sent draft',
+  'gmail_createDraft': 'Created draft',
+  'gmail_downloadAttachment': 'Downloaded attachment',
+  'gmail_modify': 'Modified email labels',
+  'gmail_batchModify': 'Batch modified emails',
+  'gmail_listLabels': 'Listed Gmail labels',
+  'gmail_createLabel': 'Created Gmail label',
   // Google Docs
   'docs_create': 'Creating Google Doc',
+  'docs_insertText': 'Inserted text in Doc',
+  'docs_find': 'Searched Google Docs',
+  'docs_move': 'Moved Doc',
+  'docs_getText': 'Retrieved Doc content',
+  'docs_appendText': 'Appended text to Doc',
+  'docs_replaceText': 'Replaced text in Doc',
+  'docs_extractIdFromUrl': 'Extracted Doc ID',
+  // Google Slides
+  'slides_getText': 'Retrieved Slides content',
+  'slides_find': 'Searched Google Slides',
+  'slides_getMetadata': 'Retrieved Slides metadata',
+  'slides_getImages': 'Downloaded Slides images',
+  'slides_getSlideThumbnail': 'Downloaded slide thumbnail',
+  // Google Sheets
+  'sheets_getText': 'Retrieved Sheets content',
+  'sheets_getRange': 'Retrieved Sheets range',
+  'sheets_find': 'Searched Google Sheets',
+  'sheets_getMetadata': 'Retrieved Sheets metadata',
+  // Google Drive (additional)
+  'drive_findFolder': 'Found folder',
+  'drive_downloadFile': 'Downloaded file',
+  // Google Auth
+  'auth_clear': 'Cleared authentication',
+  'auth_refreshToken': 'Refreshed token',
+  // Google Time
+  'time_getCurrentDate': 'Retrieved current date',
+  'time_getCurrentTime': 'Retrieved current time',
+  'time_getTimeZone': 'Retrieved timezone',
+  // Google People
+  'people_getUserProfile': 'Retrieved user profile',
+  'people_getMe': 'Retrieved my profile',
+  'people_getUserRelations': 'Retrieved user relations',
   // Google Calendar MCP tools
   calendar_list: 'Listed calendars',
   calendar_listEvents: 'Listed events',
