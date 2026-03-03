@@ -146,6 +146,10 @@ function createCRMTools({ userId, projectId }) {
         source: { type: 'string' },
         status: { type: 'string', enum: ['lead', 'prospect', 'customer'] },
         organizationId: { type: 'string' },
+        customFields: {
+          type: 'object',
+          description: 'Additional key-value pairs (e.g. "Farm Size": "240 acres")',
+        },
       },
       required: ['name'],
     };
@@ -153,8 +157,17 @@ function createCRMTools({ userId, projectId }) {
       return this.prototype.schema;
     }
     async _call(args) {
-      const { name, email, phone, tags, source, status, organizationId } = args || {};
+      const { name, email, phone, tags, source, status, organizationId, customFields } = args || {};
       if (!name) return toJson({ error: 'name is required' });
+      if (email) {
+        const existing = await getContactByEmail(pid, email);
+        if (existing)
+          return toJson({
+            error: 'Duplicate contact: A contact with this email already exists.',
+            existingContactId: existing._id?.toString?.() ?? existing._id,
+            suggestion: 'Use crm_get_contact to retrieve it or crm_update_contact to update.',
+          });
+      }
       try {
         const contact = await createContact({
           projectId: pid,
@@ -168,6 +181,7 @@ function createCRMTools({ userId, projectId }) {
             ownerType: 'user',
             ownerId: actorId,
             organizationId,
+            customFields,
           },
           actorId,
           actorType: 'user',
@@ -194,6 +208,10 @@ function createCRMTools({ userId, projectId }) {
         source: { type: 'string' },
         status: { type: 'string', enum: ['lead', 'prospect', 'customer'] },
         organizationId: { type: 'string' },
+        customFields: {
+          type: 'object',
+          description: 'Additional key-value pairs (e.g. "Farm Size": "240 acres")',
+        },
       },
       required: ['contactId'],
     };
@@ -257,13 +275,17 @@ function createCRMTools({ userId, projectId }) {
   tools.crm_list_contacts = new (class extends Tool {
     name = 'crm_list_contacts';
     description =
-      'List contacts with optional filters. Use noActivitySinceDays to find leads with no follow-up (e.g. 3 for 3 days). Optional: status (lead|prospect|customer), tags, noActivitySinceDays, limit, skip.';
+      'List contacts with optional filters. Use query to search by name or email. Use noActivitySinceDays to find leads with no follow-up (e.g. 3 for 3 days). Optional: status (lead|prospect|customer), tags, noActivitySinceDays, query, limit, skip.';
     schema = {
       type: 'object',
       properties: {
         status: { type: 'string', enum: ['lead', 'prospect', 'customer'] },
         tags: { type: 'array', items: { type: 'string' } },
         noActivitySinceDays: { type: 'number' },
+        query: {
+          type: 'string',
+          description: 'Search by name or email (case-insensitive partial match)',
+        },
         limit: { type: 'number' },
         skip: { type: 'number' },
       },
@@ -278,6 +300,7 @@ function createCRMTools({ userId, projectId }) {
           status: args.status,
           tags: args.tags,
           noActivitySinceDays: args.noActivitySinceDays,
+          query: args.query,
           limit: args.limit ?? 50,
           skip: args.skip ?? 0,
         });
@@ -290,13 +313,18 @@ function createCRMTools({ userId, projectId }) {
 
   tools.crm_create_organization = new (class extends Tool {
     name = 'crm_create_organization';
-    description = 'Create an organization (company). Required: name. Optional: domain, metadata.';
+    description =
+      'Create an organization (company). Required: name. Optional: domain, metadata, customFields (e.g. "Size": "240 acres", "Industry": "Agriculture").';
     schema = {
       type: 'object',
       properties: {
         name: { type: 'string', description: 'Organization name' },
         domain: { type: 'string' },
         metadata: { type: 'object' },
+        customFields: {
+          type: 'object',
+          description: 'Additional key-value pairs (e.g. "Industry": "Agriculture")',
+        },
       },
       required: ['name'],
     };
@@ -304,10 +332,13 @@ function createCRMTools({ userId, projectId }) {
       return this.prototype.schema;
     }
     async _call(args) {
-      const { name } = args || {};
+      const { name, domain, metadata, customFields } = args || {};
       if (!name) return toJson({ error: 'name is required' });
       try {
-        const org = await createOrganization({ projectId: pid, data: args });
+        const org = await createOrganization({
+          projectId: pid,
+          data: { name, domain, metadata, customFields },
+        });
         return toJson(org);
       } catch (e) {
         return toJson({ error: sanitizeError(e?.message) || 'Failed to create organization' });
@@ -318,11 +349,15 @@ function createCRMTools({ userId, projectId }) {
   tools.crm_get_organization = new (class extends Tool {
     name = 'crm_get_organization';
     description =
-      'Get an organization by ID or name. Provide organizationId OR name (exact match, case-insensitive).';
+      'Get an organization by ID or name. Provide organizationId OR name (exact match, case-insensitive). Use the _id or id returned from crm_create_organization when calling by organizationId.';
     schema = {
       type: 'object',
       properties: {
-        organizationId: { type: 'string', description: 'Organization ID' },
+        organizationId: {
+          type: 'string',
+          description:
+            'Organization ID. Use the _id or id returned from crm_create_organization when calling by ID.',
+        },
         name: { type: 'string', description: 'Organization name (exact match, case-insensitive)' },
       },
     };
@@ -351,10 +386,14 @@ function createCRMTools({ userId, projectId }) {
 
   tools.crm_list_organizations = new (class extends Tool {
     name = 'crm_list_organizations';
-    description = 'List organizations. Optional: limit, skip.';
+    description = 'List organizations. Use query to search by name. Optional: query, limit, skip.';
     schema = {
       type: 'object',
       properties: {
+        query: {
+          type: 'string',
+          description: 'Search by organization name (case-insensitive partial match)',
+        },
         limit: { type: 'number' },
         skip: { type: 'number' },
       },
@@ -365,6 +404,7 @@ function createCRMTools({ userId, projectId }) {
     async _call(args = {}) {
       try {
         const orgs = await listOrganizations(pid, {
+          query: args.query,
           limit: args.limit ?? 50,
           skip: args.skip ?? 0,
         });
@@ -378,16 +418,27 @@ function createCRMTools({ userId, projectId }) {
   tools.crm_create_deal = new (class extends Tool {
     name = 'crm_create_deal';
     description =
-      'Create a deal. Required: pipelineId (or use default), stage. Optional: contactId, organizationId, value, expectedCloseDate (ISO).';
+      'Create a deal. Required: pipelineId (or use default), stage. Optional: title, description, contactId, organizationId, value, expectedCloseDate (ISO), probability (0-100%), customFields.';
     schema = {
       type: 'object',
       properties: {
         pipelineId: { type: 'string' },
         stage: { type: 'string', description: 'Stage name from pipeline' },
+        title: {
+          type: 'string',
+          description:
+            'Human-readable deal title (e.g. "Farm Liability & Property Insurance Package"). Defaults to "Untitled Deal" if omitted.',
+        },
+        description: { type: 'string', description: 'Additional context or notes for the deal' },
         contactId: { type: 'string' },
         organizationId: { type: 'string' },
         value: { type: 'number' },
         expectedCloseDate: { type: 'string' },
+        probability: { type: 'number', description: 'Win probability 0-100%' },
+        customFields: {
+          type: 'object',
+          description: 'Additional key-value pairs (e.g. "Product": "Enterprise Plan")',
+        },
       },
       required: ['stage'],
     };
@@ -395,7 +446,18 @@ function createCRMTools({ userId, projectId }) {
       return this.prototype.schema;
     }
     async _call(args) {
-      const { pipelineId, stage, contactId, organizationId, value, expectedCloseDate } = args || {};
+      const {
+        pipelineId,
+        stage,
+        title,
+        description,
+        contactId,
+        organizationId,
+        value,
+        expectedCloseDate,
+        probability,
+        customFields,
+      } = args || {};
       if (!stage) return toJson({ error: 'stage is required' });
       try {
         let resolvedPipelineId = pipelineId;
@@ -409,10 +471,14 @@ function createCRMTools({ userId, projectId }) {
           data: {
             pipelineId: resolvedPipelineId,
             stage,
+            title,
+            description,
             contactId,
             organizationId,
             value,
             expectedCloseDate,
+            probability,
+            customFields,
             ownerType: 'user',
             ownerId: actorId,
           },
@@ -429,16 +495,23 @@ function createCRMTools({ userId, projectId }) {
   tools.crm_update_deal = new (class extends Tool {
     name = 'crm_update_deal';
     description =
-      'Update a deal. Required: dealId. Optional: stage, contactId, organizationId, value, expectedCloseDate.';
+      'Update a deal. Required: dealId. Optional: stage, title, description, contactId, organizationId, value, expectedCloseDate, probability (0-100%), customFields.';
     schema = {
       type: 'object',
       properties: {
         dealId: { type: 'string' },
         stage: { type: 'string' },
+        title: { type: 'string', description: 'Human-readable deal title' },
+        description: { type: 'string', description: 'Additional context or notes' },
         contactId: { type: 'string' },
         organizationId: { type: 'string' },
         value: { type: 'number' },
         expectedCloseDate: { type: 'string' },
+        probability: { type: 'number', description: 'Win probability 0-100%' },
+        customFields: {
+          type: 'object',
+          description: 'Additional key-value pairs',
+        },
       },
       required: ['dealId'],
     };
@@ -467,13 +540,18 @@ function createCRMTools({ userId, projectId }) {
 
   tools.crm_list_deals = new (class extends Tool {
     name = 'crm_list_deals';
-    description = 'List deals. Optional: pipelineId, stage, contactId, limit, skip.';
+    description =
+      'List deals. Use query to search by title or description. Optional: pipelineId, stage, contactId, query, limit, skip.';
     schema = {
       type: 'object',
       properties: {
         pipelineId: { type: 'string' },
         stage: { type: 'string' },
         contactId: { type: 'string' },
+        query: {
+          type: 'string',
+          description: 'Search by deal title or description (case-insensitive partial match)',
+        },
         limit: { type: 'number' },
         skip: { type: 'number' },
       },
@@ -488,6 +566,7 @@ function createCRMTools({ userId, projectId }) {
           pipelineId: args.pipelineId,
           stage: args.stage,
           contactId: args.contactId,
+          query: args.query,
           limit: args.limit ?? 50,
           skip: args.skip ?? 0,
         });
@@ -513,6 +592,10 @@ function createCRMTools({ userId, projectId }) {
         },
         summary: { type: 'string' },
         metadata: { type: 'object' },
+        dueDate: { type: 'string', description: 'When the activity/task is due (ISO date)' },
+        status: { type: 'string', description: 'e.g. pending, completed, cancelled' },
+        priority: { type: 'string', description: 'e.g. low, medium, high, urgent' },
+        assignedUserId: { type: 'string', description: 'User ID for follow-up assignment' },
       },
       required: ['type'],
     };
@@ -520,7 +603,7 @@ function createCRMTools({ userId, projectId }) {
       return this.prototype.schema;
     }
     async _call(args) {
-      const { contactId, dealId, type, summary, metadata } = args || {};
+      const { contactId, dealId, type, summary, metadata, dueDate, status, priority, assignedUserId } = args || {};
       if (!type) return toJson({ error: 'type is required' });
       if (!contactId && !dealId) return toJson({ error: 'contactId or dealId is required' });
       try {
@@ -533,6 +616,10 @@ function createCRMTools({ userId, projectId }) {
           actorId,
           summary,
           metadata,
+          dueDate,
+          status,
+          priority,
+          assignedUserId,
         });
         if (contactId) await touchContactLastActivity(contactId);
         return toJson(activity);

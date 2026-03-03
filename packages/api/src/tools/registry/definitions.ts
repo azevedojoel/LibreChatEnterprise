@@ -436,6 +436,10 @@ export const crmCreateContactSchema: ExtendedJsonSchema = {
     source: { type: 'string' },
     status: { type: 'string', enum: ['lead', 'prospect', 'customer'] },
     organizationId: { type: 'string' },
+    customFields: {
+      type: 'object',
+      description: 'Additional key-value pairs (e.g. "Farm Size": "240 acres", "Policy Type": "Health")',
+    },
   },
   required: ['name'],
 };
@@ -450,6 +454,10 @@ export const crmUpdateContactSchema: ExtendedJsonSchema = {
     source: { type: 'string' },
     status: { type: 'string', enum: ['lead', 'prospect', 'customer'] },
     organizationId: { type: 'string' },
+    customFields: {
+      type: 'object',
+      description: 'Additional key-value pairs (e.g. "Farm Size": "240 acres")',
+    },
   },
   required: ['contactId'],
 };
@@ -467,6 +475,10 @@ export const crmListContactsSchema: ExtendedJsonSchema = {
     status: { type: 'string', enum: ['lead', 'prospect', 'customer'] },
     tags: { type: 'array', items: { type: 'string' } },
     noActivitySinceDays: { type: 'number' },
+    query: {
+      type: 'string',
+      description: 'Search by name or email (case-insensitive partial match)',
+    },
     limit: { type: 'number' },
     skip: { type: 'number' },
   },
@@ -482,6 +494,10 @@ export const crmCreateOrganizationSchema: ExtendedJsonSchema = {
     name: { type: 'string', description: 'Organization name' },
     domain: { type: 'string' },
     metadata: { type: 'object' },
+    customFields: {
+      type: 'object',
+      description: 'Additional key-value pairs (e.g. "Industry": "Agriculture", "Employee Count": 50)',
+    },
   },
   required: ['name'],
 };
@@ -493,13 +509,21 @@ export const crmSoftDeleteOrganizationSchema: ExtendedJsonSchema = {
 export const crmGetOrganizationSchema: ExtendedJsonSchema = {
   type: 'object',
   properties: {
-    organizationId: { type: 'string', description: 'Organization ID' },
+    organizationId: {
+      type: 'string',
+      description:
+        'Organization ID. Use the _id or id returned from crm_create_organization when calling by ID.',
+    },
     name: { type: 'string', description: 'Organization name (exact match, case-insensitive)' },
   },
 };
 export const crmListOrganizationsSchema: ExtendedJsonSchema = {
   type: 'object',
   properties: {
+    query: {
+      type: 'string',
+      description: 'Search by organization name (case-insensitive partial match)',
+    },
     limit: { type: 'number' },
     skip: { type: 'number' },
   },
@@ -509,10 +533,20 @@ export const crmCreateDealSchema: ExtendedJsonSchema = {
   properties: {
     pipelineId: { type: 'string' },
     stage: { type: 'string', description: 'Stage name from pipeline' },
+    title: {
+      type: 'string',
+      description: 'Human-readable deal title (e.g. "Farm Liability & Property Insurance Package"). Defaults to "Untitled Deal" if omitted.',
+    },
+    description: { type: 'string', description: 'Additional context or notes for the deal' },
     contactId: { type: 'string' },
     organizationId: { type: 'string' },
     value: { type: 'number' },
     expectedCloseDate: { type: 'string' },
+    probability: { type: 'number', description: 'Win probability 0-100%' },
+    customFields: {
+      type: 'object',
+      description: 'Additional key-value pairs (e.g. "Product": "Enterprise Plan")',
+    },
   },
   required: ['stage'],
 };
@@ -521,10 +555,17 @@ export const crmUpdateDealSchema: ExtendedJsonSchema = {
   properties: {
     dealId: { type: 'string' },
     stage: { type: 'string' },
+    title: { type: 'string', description: 'Human-readable deal title' },
+    description: { type: 'string', description: 'Additional context or notes' },
     contactId: { type: 'string' },
     organizationId: { type: 'string' },
     value: { type: 'number' },
     expectedCloseDate: { type: 'string' },
+    probability: { type: 'number', description: 'Win probability 0-100%' },
+    customFields: {
+      type: 'object',
+      description: 'Additional key-value pairs',
+    },
   },
   required: ['dealId'],
 };
@@ -534,6 +575,10 @@ export const crmListDealsSchema: ExtendedJsonSchema = {
     pipelineId: { type: 'string' },
     stage: { type: 'string' },
     contactId: { type: 'string' },
+    query: {
+      type: 'string',
+      description: 'Search by deal title or description (case-insensitive partial match)',
+    },
     limit: { type: 'number' },
     skip: { type: 'number' },
   },
@@ -554,6 +599,10 @@ export const crmLogActivitySchema: ExtendedJsonSchema = {
     },
     summary: { type: 'string' },
     metadata: { type: 'object' },
+    dueDate: { type: 'string', description: 'When the activity/task is due (ISO date)' },
+    status: { type: 'string', description: 'e.g. pending, completed, cancelled' },
+    priority: { type: 'string', description: 'e.g. low, medium, high, urgent' },
+    assignedUserId: { type: 'string', description: 'User ID for follow-up assignment' },
   },
   required: ['type'],
 };
@@ -1419,45 +1468,16 @@ const crmUpdatePipelineDefinition: ToolRegistryDefinition = {
 const crmCreateContactDefinition: ToolRegistryDefinition = {
   name: 'crm_create_contact',
   description:
-    'Create a new CRM contact. Required: name. Optional: email, phone, tags, source, status (lead|prospect|customer), organizationId.',
-  schema: {
-    type: 'object',
-    properties: {
-      name: { type: 'string', description: 'Contact name' },
-      email: { type: 'string', description: 'Contact email' },
-      phone: { type: 'string', description: 'Contact phone' },
-      tags: { type: 'array', items: { type: 'string' }, description: 'Tags' },
-      source: { type: 'string', description: 'Source e.g. inbound_email, manual, agent' },
-      status: {
-        type: 'string',
-        enum: ['lead', 'prospect', 'customer'],
-        description: 'Contact status',
-      },
-      organizationId: { type: 'string', description: 'Organization ID' },
-    },
-    required: ['name'],
-  } as ExtendedJsonSchema,
+    'Create a new CRM contact. Required: name. Optional: email, phone, tags, source, status (lead|prospect|customer), organizationId, customFields.',
+  schema: crmCreateContactSchema,
   toolType: 'builtin',
 };
 
 const crmUpdateContactDefinition: ToolRegistryDefinition = {
   name: 'crm_update_contact',
   description:
-    'Update an existing contact. Required: contactId. Optional: name, email, phone, tags, source, status, organizationId.',
-  schema: {
-    type: 'object',
-    properties: {
-      contactId: { type: 'string', description: 'Contact ID' },
-      name: { type: 'string' },
-      email: { type: 'string' },
-      phone: { type: 'string' },
-      tags: { type: 'array', items: { type: 'string' } },
-      source: { type: 'string' },
-      status: { type: 'string', enum: ['lead', 'prospect', 'customer'] },
-      organizationId: { type: 'string' },
-    },
-    required: ['contactId'],
-  } as ExtendedJsonSchema,
+    'Update an existing contact. Required: contactId. Optional: name, email, phone, tags, source, status, organizationId, customFields.',
+  schema: crmUpdateContactSchema,
   toolType: 'builtin',
 };
 
@@ -1501,31 +1521,16 @@ const crmListContactsDefinition: ToolRegistryDefinition = {
 const crmCreateOrganizationDefinition: ToolRegistryDefinition = {
   name: 'crm_create_organization',
   description:
-    'Create an organization (company). Required: name. Optional: domain, metadata.',
-  schema: {
-    type: 'object',
-    properties: {
-      name: { type: 'string', description: 'Organization name' },
-      domain: { type: 'string', description: 'Company domain' },
-      metadata: { type: 'object', description: 'Additional metadata' },
-    },
-    required: ['name'],
-  } as ExtendedJsonSchema,
+    'Create an organization (company). Required: name. Optional: domain, metadata, customFields.',
+  schema: crmCreateOrganizationSchema,
   toolType: 'builtin',
 };
 
 const crmGetOrganizationDefinition: ToolRegistryDefinition = {
   name: 'crm_get_organization',
   description:
-    'Get an organization by ID or name. Provide organizationId OR name (exact match, case-insensitive).',
-  schema: {
-    type: 'object',
-    properties: {
-      organizationId: { type: 'string', description: 'Organization ID' },
-      name: { type: 'string', description: 'Organization name (exact match, case-insensitive)' },
-    },
-    required: [],
-  } as ExtendedJsonSchema,
+    'Get an organization by ID or name. Provide organizationId OR name (exact match, case-insensitive). Use the _id or id returned from crm_create_organization when calling by organizationId.',
+  schema: crmGetOrganizationSchema,
   toolType: 'builtin',
 };
 
@@ -1546,38 +1551,16 @@ const crmListOrganizationsDefinition: ToolRegistryDefinition = {
 const crmCreateDealDefinition: ToolRegistryDefinition = {
   name: 'crm_create_deal',
   description:
-    'Create a deal. Required: pipelineId (or use default), stage. Optional: contactId, organizationId, value, expectedCloseDate (ISO).',
-  schema: {
-    type: 'object',
-    properties: {
-      pipelineId: { type: 'string', description: 'Pipeline ID' },
-      stage: { type: 'string', description: 'Stage name from pipeline' },
-      contactId: { type: 'string' },
-      organizationId: { type: 'string' },
-      value: { type: 'number', description: 'Deal value' },
-      expectedCloseDate: { type: 'string', description: 'ISO date' },
-    },
-    required: ['stage'],
-  } as ExtendedJsonSchema,
+    'Create a deal. Required: pipelineId (or use default), stage. Optional: title, description, contactId, organizationId, value, expectedCloseDate (ISO), probability (0-100%), customFields.',
+  schema: crmCreateDealSchema,
   toolType: 'builtin',
 };
 
 const crmUpdateDealDefinition: ToolRegistryDefinition = {
   name: 'crm_update_deal',
   description:
-    'Update a deal. Required: dealId. Optional: stage, contactId, organizationId, value, expectedCloseDate.',
-  schema: {
-    type: 'object',
-    properties: {
-      dealId: { type: 'string', description: 'Deal ID' },
-      stage: { type: 'string' },
-      contactId: { type: 'string' },
-      organizationId: { type: 'string' },
-      value: { type: 'number' },
-      expectedCloseDate: { type: 'string' },
-    },
-    required: ['dealId'],
-  } as ExtendedJsonSchema,
+    'Update a deal. Required: dealId. Optional: stage, title, description, contactId, organizationId, value, expectedCloseDate, probability (0-100%), customFields.',
+  schema: crmUpdateDealSchema,
   toolType: 'builtin',
 };
 
@@ -1601,28 +1584,8 @@ const crmListDealsDefinition: ToolRegistryDefinition = {
 const crmLogActivityDefinition: ToolRegistryDefinition = {
   name: 'crm_log_activity',
   description:
-    'Log an activity (e.g. call_logged, email_sent). Required: type, contactId or dealId. Optional: summary, metadata. Types: email_sent, email_received, call_logged, agent_action, doc_matched, stage_change.',
-  schema: {
-    type: 'object',
-    properties: {
-      contactId: { type: 'string' },
-      dealId: { type: 'string' },
-      type: {
-        type: 'string',
-        enum: [
-          'email_sent',
-          'email_received',
-          'call_logged',
-          'agent_action',
-          'doc_matched',
-          'stage_change',
-        ],
-      },
-      summary: { type: 'string' },
-      metadata: { type: 'object' },
-    },
-    required: ['type'],
-  } as ExtendedJsonSchema,
+    'Log an activity (e.g. call_logged, email_sent). Required: type, contactId or dealId. Optional: summary, metadata, dueDate, status, priority, assignedUserId. Types: email_sent, email_received, call_logged, agent_action, doc_matched, stage_change.',
+  schema: crmLogActivitySchema,
   toolType: 'builtin',
 };
 
