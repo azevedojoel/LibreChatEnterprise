@@ -7,6 +7,7 @@ import useOpenInArtifact from '~/hooks/Artifacts/useOpenInArtifact';
 import { Tools } from 'librechat-data-provider';
 import { UIResourceRenderer } from '@mcp-ui/client';
 import UIResourceCarousel from './UIResourceCarousel';
+import { RunScheduleNowWidget } from './RunScheduleNowWidget';
 import { cn } from '~/utils';
 import type { TAttachment, UIResource } from 'librechat-data-provider';
 
@@ -718,21 +719,33 @@ export default function ToolCallInfo({
       );
     } else if (schedulerData && 'runId' in schedulerData) {
       const { runId, status, conversationId } = schedulerData;
-      schedulerContent = (
-        <div className="rounded-lg border border-border-light bg-surface-tertiary p-2 text-sm">
-          <div className="flex items-center gap-2">
-            <SchedulerStatusBadge status={status ?? 'queued'} />
-            <span className="text-text-secondary">
-              {localize('com_scheduler_run_queued' as TranslationKeys)} {runId}
-            </span>
-          </div>
-          {conversationId && (
-            <div className="mt-1 text-xs text-text-secondary">
-              {localize('com_sidepanel_scheduled_agents_conversation_created')}
+      if (runId && conversationId) {
+        schedulerContent = (
+          <RunScheduleNowWidget
+            runId={runId}
+            conversationId={conversationId}
+            initialStatus={status ?? 'queued'}
+          />
+        );
+      } else {
+        schedulerContent = (
+          <div className="rounded-lg border border-border-light bg-surface-tertiary p-2 text-sm">
+            <div className="flex items-center gap-2">
+              <SchedulerStatusBadge status={status ?? 'queued'} />
+              <span className="text-text-secondary">
+                {runId
+                  ? `${localize('com_scheduler_run_queued' as TranslationKeys)} ${runId}`
+                  : localize('com_ui_error' as TranslationKeys)}
+              </span>
             </div>
-          )}
-        </div>
-      );
+            {conversationId && (
+              <div className="mt-1 text-xs text-text-secondary">
+                {localize('com_sidepanel_scheduled_agents_conversation_created')}
+              </div>
+            )}
+          </div>
+        );
+      }
     } else if (schedulerData && 'runs' in schedulerData) {
       const runs = schedulerData.runs as Array<{
         _id?: string;

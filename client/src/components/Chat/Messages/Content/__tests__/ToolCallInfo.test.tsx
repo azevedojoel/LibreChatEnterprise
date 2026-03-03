@@ -36,6 +36,10 @@ jest.mock('../UIResourceCarousel', () => ({
   default: jest.fn(() => null),
 }));
 
+jest.mock('../RunScheduleNowWidget', () => ({
+  RunScheduleNowWidget: jest.fn(() => <div data-testid="run-schedule-now-widget">Run Schedule Widget</div>),
+}));
+
 // Add TextEncoder/TextDecoder polyfill for Jest environment
 import { TextEncoder, TextDecoder } from 'util';
 
