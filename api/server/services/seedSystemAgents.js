@@ -65,6 +65,7 @@ async function seedSystemAgents(appConfig) {
         instructions: def.instructions || 'You are a helpful assistant.',
         tools: def.tools || ['file_search', 'web_search'],
         edges: def.edges ?? [],
+        ...(def.schedulerTargetAgentIds && { schedulerTargetAgentIds: def.schedulerTargetAgentIds }),
       };
       try {
         const created = await createAgent({

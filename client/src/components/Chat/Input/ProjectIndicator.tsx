@@ -115,7 +115,7 @@ export default function ProjectIndicator() {
         aria-label={localize('com_ui_projects')}
         className={cn(
           'z-40 flex min-w-[200px] max-w-[280px] flex-col rounded-xl',
-          'border border-border-light bg-presentation p-1.5 shadow-lg',
+          'border border-border-medium bg-surface-primary text-text-primary p-1.5 shadow-lg',
         )}
       >
         <div className="flex max-h-[280px] flex-col gap-0.5 overflow-y-auto">
@@ -123,13 +123,13 @@ export default function ProjectIndicator() {
             type="button"
             onClick={() => handleSelectProject(null)}
             className={cn(
-              'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-surface-hover',
+              'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-text-primary hover:bg-surface-hover',
               !currentProjectId && 'bg-surface-hover',
             )}
           >
-            {!currentProjectId && <Check className="h-4 w-4 shrink-0" />}
-            <span className={!currentProjectId ? 'ml-6' : 'ml-6'}>
-              {localize('com_ui_remove_from_project')}
+            {!currentProjectId && <Check className="h-4 w-4 shrink-0 text-text-primary" />}
+            <span className={!currentProjectId ? 'ml-2' : 'ml-6'}>
+              {localize('com_ui_no_project')}
             </span>
           </button>
           {isLoading ? (
@@ -143,14 +143,14 @@ export default function ProjectIndicator() {
                 type="button"
                 onClick={() => handleSelectProject(project._id)}
                 className={cn(
-                  'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-surface-hover',
+                  'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-text-primary hover:bg-surface-hover',
                   currentProjectId === project._id && 'bg-surface-hover',
                 )}
               >
                 {currentProjectId === project._id ? (
-                  <Check className="h-4 w-4 shrink-0" />
+                  <Check className="h-4 w-4 shrink-0 text-text-primary" />
                 ) : (
-                  <FolderIcon className="h-4 w-4 shrink-0 opacity-50" />
+                  <FolderIcon className="h-4 w-4 shrink-0 text-text-secondary" />
                 )}
                 <span className={currentProjectId === project._id ? 'ml-2' : 'ml-6'}>
                   {project.name}
