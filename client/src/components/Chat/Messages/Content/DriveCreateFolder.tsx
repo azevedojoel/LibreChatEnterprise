@@ -1,0 +1,187 @@
+import { useMemo, useCallback, useState } from 'react';
+import { useRecoilValue, useSetRecoilState } from 'recoil';
+import { ExternalLink } from 'lucide-react';
+import store from '~/store';
+import { useMessageContext } from '~/Providers';
+import { useLocalize, useProgress, useToolApproval } from '~/hooks';
+import { parseDriveCreateFolderOutput } from '~/utils/parseToolOutput';
+import ToolResultContainer from './ToolResultContainer';
+import ToolApprovalBar from './ToolApprovalBar';
+import { cn } from '~/utils';
+
+const DRIVE_ICON = '/assets/google_drive.svg';
+
+type DriveCreateFolderProps = {
+  args: string | Record<string, unknown>;
+  output?: string | null;
+  initialProgress?: number;
+  isSubmitting: boolean;
+  isLast?: boolean;
+  toolCallId?: string;
+  toolName?: string;
+};
+
+type DriveCreateFolderArgs = {
+  name?: string;
+  parentId?: string;
+};
+
+function parseArgs(args: string | Record<string, unknown>): DriveCreateFolderArgs {
+  try {
+    const parsed = typeof args === 'string' ? JSON.parse(args) : args;
+    if (!parsed || typeof parsed !== 'object') return {};
+    return {
+      name: typeof parsed.name === 'string' ? parsed.name : undefined,
+      parentId: typeof parsed.parentId === 'string' ? parsed.parentId : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+const DRIVE_URL = 'https://drive.google.com/drive';
+
+export default function DriveCreateFolder({
+  args,
+  output,
+  initialProgress = 0.1,
+  isSubmitting,
+  isLast,
+  toolCallId,
+  toolName,
+}: DriveCreateFolderProps) {
+  const localize = useLocalize();
+  const { conversationId, messageId } = useMessageContext();
+  const expandedToolCalls = useRecoilValue(store.expandedToolCallsAtom);
+  const setExpandedToolCalls = useSetRecoilState(store.expandedToolCallsAtom);
+  const [localExpanded, setLocalExpanded] = useState(false);
+
+  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting } =
+    useToolApproval(toolCallId, output ?? '');
+
+  const expandedKey =
+    conversationId && messageId && toolCallId
+      ? `${conversationId}:${messageId}:${toolCallId}`
+      : null;
+
+  const isExpanded = expandedKey ? expandedToolCalls.has(expandedKey) : localExpanded;
+
+  const toggleExpand = useCallback(() => {
+    if (expandedKey) {
+      setExpandedToolCalls((prev) => {
+        const next = new Set(prev);
+        if (next.has(expandedKey)) next.delete(expandedKey);
+        else next.add(expandedKey);
+        return next;
+      });
+    } else {
+      setLocalExpanded((prev) => !prev);
+    }
+  }, [expandedKey, setExpandedToolCalls]);
+
+  const progress = useProgress(initialProgress);
+  const hasOutput = output != null && output !== '';
+  const error =
+    typeof output === 'string' && output.toLowerCase().includes('error processing tool');
+  const cancelled = !hasOutput && !isSubmitting && progress < 1;
+  const isLoading = isSubmitting && !hasOutput;
+
+  const parsedArgs = useMemo(() => parseArgs(args), [args]);
+  const parsedOutput = useMemo(() => parseDriveCreateFolderOutput(output), [output]);
+  const outputError = parsedOutput?.error;
+  const folderId = parsedOutput?.id;
+  const folderName = parsedOutput?.name ?? parsedArgs.name ?? 'Untitled';
+
+  const summary =
+    isLoading || !hasOutput
+      ? `Creating folder: ${folderName.length > 40 ? `${folderName.slice(0, 40)}...` : folderName}`
+      : outputError
+        ? `Failed to create folder: ${folderName.length > 40 ? `${folderName.slice(0, 40)}...` : folderName}`
+        : `Created folder: ${folderName.length > 40 ? `${folderName.slice(0, 40)}...` : folderName}`;
+
+  const hasError = error || cancelled || !!outputError;
+
+  const driveFolderUrl = folderId ? `${DRIVE_URL}/folders/${folderId}` : DRIVE_URL;
+
+  const showApprovalBar = approvalStatus !== null;
+  const isPending = approvalStatus === 'pending';
+
+  if (!isLast && !hasOutput && !pendingMatches && !output) {
+    return null;
+  }
+
+  if (showApprovalBar && isPending) {
+    return (
+      <div className="my-2 flex flex-col gap-2">
+        <ToolApprovalBar
+          onApprove={handleApprove}
+          onDeny={handleDeny}
+          onToggleExpand={toggleExpand}
+          isExpanded={isExpanded}
+          isSubmitting={approvalSubmitting}
+          toolName={toolName}
+        />
+        <div
+          className={cn(
+            'overflow-hidden rounded-lg border border-border-light bg-surface-secondary transition-all duration-300',
+            isExpanded ? 'max-h-[300px]' : 'max-h-0',
+          )}
+        >
+          <div className="max-h-[296px] overflow-y-auto border-t border-border-light px-4 py-3">
+            <div className="space-y-2 text-sm">
+              <p className="text-text-secondary">
+                <span className="font-medium">Folder name:</span> {folderName}
+              </p>
+              {parsedArgs.parentId && (
+                <p className="text-xs text-text-secondary">
+                  <span className="font-medium">Parent ID:</span> {parsedArgs.parentId}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <ToolResultContainer
+      icon={<img src={DRIVE_ICON} alt="" className="size-5 shrink-0" aria-hidden="true" />}
+      summary={summary}
+      isExpanded={isExpanded}
+      onToggle={toggleExpand}
+      isLoading={isLoading}
+      error={hasError}
+      hasExpandableContent={!!parsedArgs.name || !!parsedOutput?.id || hasOutput}
+      minExpandHeight={80}
+    >
+      {outputError ? (
+        <p className="text-sm text-red-500">{outputError}</p>
+      ) : (
+        <div className="space-y-2 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-text-secondary">-</span>
+            <span className="min-w-0 flex-1 truncate font-medium text-text-primary">
+              {folderName}
+            </span>
+            <a
+              href={driveFolderUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex shrink-0 items-center gap-1 text-primary hover:underline"
+              title={folderName}
+            >
+              <ExternalLink className="size-3.5" aria-hidden="true" />
+              {localize('com_ui_drive_open')}
+            </a>
+          </div>
+          {folderId && (
+            <div className="pl-4 font-mono text-xs text-text-secondary break-all">
+              ID: {folderId}
+            </div>
+          )}
+        </div>
+      )}
+    </ToolResultContainer>
+  );
+}

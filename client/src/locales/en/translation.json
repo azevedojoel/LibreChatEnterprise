@@ -1757,5 +1757,7 @@
   "com_ui_calendar_end": "End",
   "com_ui_calendar_location": "Location",
   "com_ui_calendar_open": "Open",
+  "com_ui_gmail_open": "Open in Gmail",
+  "com_ui_drive_open": "Open in Drive",
   "com_user_message": "You"
 }

@@ -374,3 +374,97 @@ export function parseCRMDeleteOutput(output: string | null | undefined): {
     return text ? { success: false, error: text } : null;
   }
 }
+
+// --- Drive & Gmail tool output (shared parse logic) ---
+
+/** Extract key-value pairs from text like "id: xxx name: yyy" */
+function extractKeyValues(
+  text: string,
+  keys: { regex: RegExp; name: string }[],
+): Record<string, string | undefined> {
+  const result: Record<string, string | undefined> = {};
+  for (const { regex, name } of keys) {
+    const m = text.match(regex);
+    if (m?.[1]) result[name] = m[1].trim();
+  }
+  return result;
+}
+
+export type DriveCreateFolderOutput = { id?: string; name?: string; error?: string };
+
+export function parseDriveCreateFolderOutput(
+  output: string | null | undefined,
+): DriveCreateFolderOutput | null {
+  const text = extractText(output);
+  if (!text) return null;
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  try {
+    if (trimmed.startsWith('{')) {
+      const parsed = JSON.parse(trimmed) as { id?: string; name?: string; error?: string };
+      if (!parsed || typeof parsed !== 'object') return null;
+      if (parsed.error) return { error: parsed.error };
+      return { id: parsed.id, name: parsed.name };
+    }
+    const kv = extractKeyValues(trimmed, [
+      { regex: /\bid\s*[=:]\s*["']?([A-Za-z0-9_-]+)["']?/i, name: 'id' },
+      { regex: /\bname\s*[=:]\s*["']?([^"'\n]+)["']?/i, name: 'name' },
+    ]);
+    if (kv.id || kv.name) return { id: kv.id, name: kv.name };
+    return trimmed ? { error: trimmed } : null;
+  } catch {
+    const kv = extractKeyValues(trimmed, [
+      { regex: /\bid\s*[=:]\s*["']?([A-Za-z0-9_-]+)["']?/i, name: 'id' },
+      { regex: /\bname\s*[=:]\s*["']?([^"'\n]+)["']?/i, name: 'name' },
+    ]);
+    if (kv.id || kv.name) return { id: kv.id, name: kv.name };
+    return trimmed ? { error: trimmed } : null;
+  }
+}
+
+export type GmailSendOutput = { id?: string; threadId?: string; status?: string; error?: string };
+
+export function parseGmailSendOutput(output: string | null | undefined): GmailSendOutput | null {
+  const text = extractText(output);
+  if (!text) return null;
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  try {
+    if (trimmed.startsWith('{')) {
+      const parsed = JSON.parse(trimmed) as {
+        id?: string;
+        threadId?: string;
+        status?: string;
+        error?: string;
+      };
+      if (!parsed || typeof parsed !== 'object') return null;
+      if (parsed.error) return { error: parsed.error };
+      return {
+        id: parsed.id,
+        threadId: parsed.threadId,
+        status: parsed.status,
+      };
+    }
+    const kv = extractKeyValues(trimmed, [
+      { regex: /\bid\s*[=:]\s*["']?([A-Za-z0-9_-]+)["']?/i, name: 'id' },
+      { regex: /\bthreadId\s*[=:]\s*["']?([A-Za-z0-9_-]+)["']?/i, name: 'threadId' },
+      { regex: /\bstatus\s*[=:]\s*["']?(\w+)["']?/i, name: 'status' },
+    ]);
+    const { id, threadId, status } = kv;
+    if (status === 'sent' || (id && threadId)) {
+      return { id, threadId, status: status ?? undefined };
+    }
+    return trimmed ? { error: trimmed } : null;
+  } catch {
+    const kv = extractKeyValues(trimmed, [
+      { regex: /\bid\s*[=:]\s*["']?([A-Za-z0-9_-]+)["']?/i, name: 'id' },
+      { regex: /\bthreadId\s*[=:]\s*["']?([A-Za-z0-9_-]+)["']?/i, name: 'threadId' },
+      { regex: /\bstatus\s*[=:]\s*["']?(\w+)["']?/i, name: 'status' },
+    ]);
+    const { id, threadId, status } = kv;
+    if (status === 'sent' || (id && threadId)) {
+      return { id, threadId, status: status ?? undefined };
+    }
+    return trimmed ? { error: trimmed } : null;
+  }
+}

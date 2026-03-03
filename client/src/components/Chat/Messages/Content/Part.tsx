@@ -18,7 +18,10 @@ import WebSearch from './WebSearch';
 import DriveSearch from './DriveSearch';
 import GmailSearch from './GmailSearch';
 import GmailGet from './GmailGet';
+import GmailSend from './GmailSend';
+import GmailSendDraft from './GmailSendDraft';
 import DocsCreate from './DocsCreate';
+import DriveCreateFolder from './DriveCreateFolder';
 import DiscoverySearch from './DiscoverySearch';
 import GoogleTasksList from './GoogleTasksList';
 import GoogleTaskLists from './GoogleTaskLists';
@@ -256,6 +259,42 @@ const Part = memo(
             isSubmitting={isSubmitting}
             isLast={isLast}
             toolCallId={toolCall.id}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'gmail_send')) {
+        return (
+          <GmailSend
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            toolName={toolCall.name}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'gmail_sendDraft')) {
+        return (
+          <GmailSendDraft
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            toolName={toolCall.name}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'drive_createFolder')) {
+        return (
+          <DriveCreateFolder
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            toolName={toolCall.name}
           />
         );
       } else if (
@@ -1007,6 +1046,54 @@ const Part = memo(
               isSubmitting={isSubmitting}
               isLast={isLast}
               toolCallId={toolCall.id}
+            />
+          );
+        }
+        if (
+          funcName === 'gmail_send' ||
+          (typeof funcName === 'string' && funcName.startsWith('gmail_send_mcp_'))
+        ) {
+          return (
+            <GmailSend
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
+              toolName={funcName}
+            />
+          );
+        }
+        if (
+          funcName === 'gmail_sendDraft' ||
+          (typeof funcName === 'string' && funcName.startsWith('gmail_sendDraft_mcp_'))
+        ) {
+          return (
+            <GmailSendDraft
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
+              toolName={funcName}
+            />
+          );
+        }
+        if (
+          funcName === 'drive_createFolder' ||
+          (typeof funcName === 'string' && funcName.startsWith('drive_createFolder_mcp_'))
+        ) {
+          return (
+            <DriveCreateFolder
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
+              toolName={funcName}
             />
           );
         }
