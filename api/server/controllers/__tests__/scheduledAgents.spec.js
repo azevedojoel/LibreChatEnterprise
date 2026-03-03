@@ -98,9 +98,6 @@ jest.mock('~/models/Agent', () => ({
   getAgent: jest.fn().mockResolvedValue({ _id: 'agent-1', id: 'agent-1' }),
 }));
 
-jest.mock('~/models/Prompt', () => ({
-  getPromptGroup: jest.fn().mockResolvedValue({ _id: 'pg-1', name: 'Test Prompt' }),
-}));
 
 jest.mock('~/server/services/PermissionService', () => ({
   checkPermission: jest.fn().mockResolvedValue(true),
@@ -194,7 +191,7 @@ describe('scheduledAgents controller - selectedTools', () => {
         userId: 'user-1',
         agentId: 'agent-1',
         name: 'Test',
-        promptGroupId: 'pg-1',
+        prompt: 'Run daily summary',
         scheduleType: 'recurring',
         cronExpression: '0 0 * * *',
         selectedTools: ['tool_a', 'tool_b'],
@@ -206,7 +203,7 @@ describe('scheduledAgents controller - selectedTools', () => {
         body: {
           name: 'Test',
           agentId: 'agent-1',
-          promptGroupId: 'pg-1',
+          prompt: 'Run daily summary',
           scheduleType: 'recurring',
           cronExpression: '0 0 * * *',
           selectedTools: ['tool_a', 'tool_b'],
@@ -229,7 +226,7 @@ describe('scheduledAgents controller - selectedTools', () => {
         userId: 'user-1',
         agentId: 'agent-1',
         name: 'Test',
-        promptGroupId: 'pg-1',
+        prompt: 'Run daily summary',
         scheduleType: 'recurring',
         cronExpression: '0 0 * * *',
         selectedTools: null,
@@ -241,7 +238,7 @@ describe('scheduledAgents controller - selectedTools', () => {
         body: {
           name: 'Test',
           agentId: 'agent-1',
-          promptGroupId: 'pg-1',
+          prompt: 'Run daily summary',
           scheduleType: 'recurring',
           cronExpression: '0 0 * * *',
           selectedTools: null,
@@ -264,7 +261,7 @@ describe('scheduledAgents controller - selectedTools', () => {
         userId: 'user-1',
         agentId: 'agent-1',
         name: 'Test',
-        promptGroupId: 'pg-1',
+        prompt: 'Run daily summary',
         scheduleType: 'recurring',
         cronExpression: '0 0 * * *',
         selectedTools: [],
@@ -276,7 +273,7 @@ describe('scheduledAgents controller - selectedTools', () => {
         body: {
           name: 'Test',
           agentId: 'agent-1',
-          promptGroupId: 'pg-1',
+          prompt: 'Run daily summary',
           scheduleType: 'recurring',
           cronExpression: '0 0 * * *',
           selectedTools: [],
@@ -289,6 +286,27 @@ describe('scheduledAgents controller - selectedTools', () => {
       expect(dbModels.ScheduledPrompt.create).toHaveBeenCalledWith(
         expect.objectContaining({
           selectedTools: [],
+        }),
+      );
+    });
+
+    it('should return 400 when prompt is missing', async () => {
+      const req = mockReq({
+        body: {
+          name: 'Test',
+          agentId: 'agent-1',
+          scheduleType: 'recurring',
+          cronExpression: '0 0 * * *',
+        },
+      });
+      const res = mockRes();
+
+      await createSchedule(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: expect.stringContaining('prompt'),
         }),
       );
     });

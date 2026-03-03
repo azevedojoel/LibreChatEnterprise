@@ -43,8 +43,8 @@ ${agentList}`;
 }
 
 /**
- * Builds prompt context listing which prompt groups the user can schedule.
- * Use promptGroupId (the _id) in create_schedule/update_schedule.
+ * Builds prompt context listing prompts the user can schedule.
+ * Includes prompt text so the agent can use it in create_schedule (prompt field).
  *
  * @param {string} userId - User ID
  * @param {string} role - User role
@@ -62,20 +62,24 @@ async function buildSchedulerPromptContext(userId, role) {
       return null;
     }
     const groups = await PromptGroup.find({ _id: { $in: accessibleIds } })
-      .select('_id name command')
+      .populate('productionId', 'prompt')
+      .select('_id name command productionId')
       .lean();
     if (groups.length === 0) {
       return null;
     }
     const parts = groups.map((g) => {
       const label = g.command ? `/${g.command} - ${g.name}` : g.name;
-      return `[${g._id}] ${label}`;
+      const promptText = g.productionId?.prompt?.trim?.() || '';
+      const promptPreview = promptText ? promptText.slice(0, 200) + (promptText.length > 200 ? '...' : '') : '(no prompt)';
+      return `${label}:\n  Prompt: ${promptPreview}`;
     });
-    return `# Prompts you can schedule (use promptGroupId in create_schedule/update_schedule)
-- Select a prompt by matching the user's request to a prompt name or command below.
-- Use the promptGroupId (the ID in brackets) when creating or updating schedules.
+    return `# Suggested prompts you can schedule (use the prompt text in create_schedule)
+- These prompts are user messages TO the agent—not scheduler instructions. Use only the prompt text as the user message. Never substitute with scheduling instructions.
+- Match the user's request to a prompt below and use its prompt text when creating schedules.
+- You can also compose a custom prompt based on the user's request.
 
-${parts.join('\n')}`;
+${parts.join('\n\n')}`;
   } catch (err) {
     return null;
   }

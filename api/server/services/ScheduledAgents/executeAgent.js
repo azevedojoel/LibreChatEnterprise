@@ -7,7 +7,7 @@ const { initializeClient } = require('~/server/services/Endpoints/agents');
 const { getAgent } = require('~/models/Agent');
 const { checkPermission } = require('~/server/services/PermissionService');
 const { buildOptions } = require('~/server/services/Endpoints/agents/build');
-const { Conversation, PromptGroup, ScheduledPrompt, ScheduledRun, User } = require('~/db/models');
+const { Conversation, ScheduledPrompt, ScheduledRun, User } = require('~/db/models');
 const { disposeClient } = require('~/server/cleanup');
 const abortRegistry = require('./abortRegistry');
 const { resolveScheduledPrompt } = require('./resolvePrompt');
@@ -26,6 +26,7 @@ const { sendInboundReply } = require('~/server/services/sendInboundReply');
  * @param {string} params.agentId - Agent ID
  * @param {string} [params.conversationId] - Optional: continue in same thread
  * @param {string[] | null} [params.selectedTools] - Optional: tools to use (null = all, [] = none)
+ * @param {string} [params.userProjectId] - Optional: project to assign conversation to
  * @returns {Promise<{ success: boolean; conversationId?: string; error?: string }>}
  */
 async function executeScheduledAgent({
@@ -35,6 +36,7 @@ async function executeScheduledAgent({
   agentId,
   conversationId: existingConversationId,
   selectedTools,
+  userProjectId,
 }) {
   const conversationId = existingConversationId || crypto.randomUUID();
   const runAt = new Date();
@@ -76,28 +78,19 @@ async function executeScheduledAgent({
       throw new Error(`User ${userId} does not have permission to use agent ${agentId}`);
     }
 
-    const schedule = await ScheduledPrompt.findById(scheduleId).select('name promptGroupId emailOnComplete').lean();
+    const schedule = await ScheduledPrompt.findById(scheduleId)
+      .select('name prompt emailOnComplete')
+      .lean();
     if (!schedule) {
       throw new Error(`Schedule not found: ${scheduleId}`);
     }
 
-    const hasPromptGroupAccess = await checkPermission({
-      userId,
-      role: user.role,
-      resourceType: ResourceType.PROMPTGROUP,
-      resourceId: schedule.promptGroupId,
-      requiredPermission: PermissionBits.VIEW,
-    });
-    if (!hasPromptGroupAccess) {
-      throw new Error(`User ${userId} does not have permission to use prompt group ${schedule.promptGroupId}`);
+    const templatePrompt =
+      schedule.prompt && typeof schedule.prompt === 'string' ? schedule.prompt.trim() : null;
+    if (!templatePrompt) {
+      throw new Error(`Schedule ${scheduleId} has no prompt.`);
     }
 
-    const promptGroup = await PromptGroup.findById(schedule.promptGroupId).populate('productionId', 'prompt').lean();
-    if (!promptGroup?.productionId?.prompt) {
-      throw new Error(`Prompt group ${schedule.promptGroupId} has no production prompt`);
-    }
-
-    const templatePrompt = promptGroup.productionId.prompt;
     resolvedPrompt = resolveScheduledPrompt(templatePrompt, {
       user,
       runAt,
@@ -125,6 +118,10 @@ async function executeScheduledAgent({
       editedContent: null,
       overrideParentMessageId: null,
       responseMessageId: null,
+      ...(userProjectId && { userProjectId }),
+      scheduledRunContext: {
+        emailOnComplete: schedule.emailOnComplete !== false,
+      },
     };
     // Headless runs (scheduled agents) always include all agent tools - do not pass
     // ephemeralAgent.tools to restrict. This ensures scheduled runs have full tool access.
@@ -228,9 +225,14 @@ async function executeScheduledAgent({
     const runDocId = scheduledRunDoc?._id ?? existingRunId;
     const runTitle = `${schedule?.name ?? 'Scheduled run'} — ${runAt.toLocaleString()}`;
 
+    const conversationUpdate = {
+      scheduledRunId: runDocId,
+      title: runTitle,
+      ...(userProjectId && { userProjectId }),
+    };
     await Conversation.findOneAndUpdate(
       { conversationId, user: userId },
-      { $set: { scheduledRunId: runDocId, title: runTitle } },
+      { $set: conversationUpdate },
     );
 
     await ScheduledPrompt.findByIdAndUpdate(scheduleId, {

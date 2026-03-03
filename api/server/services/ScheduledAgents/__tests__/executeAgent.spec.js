@@ -13,22 +13,14 @@ jest.mock('~/db/models', () => ({
     }),
   },
   Conversation: { findOneAndUpdate: jest.fn().mockResolvedValue({}) },
-  PromptGroup: {
-    findById: jest.fn().mockReturnValue({
-      populate: jest.fn().mockReturnValue({
-        lean: jest.fn().mockResolvedValue({
-          productionId: { prompt: 'Hello' },
-        }),
-      }),
-    }),
-  },
   ScheduledPrompt: {
     findByIdAndUpdate: jest.fn().mockResolvedValue({}),
     findById: jest.fn().mockReturnValue({
       select: jest.fn().mockReturnValue({
         lean: jest.fn().mockResolvedValue({
           name: 'Test Schedule',
-          promptGroupId: 'pg-1',
+          prompt: 'Hello',
+          emailOnComplete: true,
         }),
       }),
     }),
@@ -80,7 +72,7 @@ describe('executeScheduledAgent', () => {
     });
   });
 
-  it('should resolve prompt from PromptGroup and send resolved prompt to agent', async () => {
+  it('should resolve prompt from schedule and send resolved prompt to agent', async () => {
     const result = await executeScheduledAgent({
       scheduleId: 'sched-1',
       userId: 'user-1',

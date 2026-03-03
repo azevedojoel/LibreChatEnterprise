@@ -546,6 +546,21 @@ class AgentClient extends BaseClient {
      */
     const sharedRunContextParts = [];
 
+    /** Scheduled run context - injected when this is a headless scheduled agent run */
+    const scheduledRunCtx = this.options.req?.body?.scheduledRunContext;
+    if (scheduledRunCtx) {
+      const emailOnComplete = scheduledRunCtx.emailOnComplete !== false;
+      const scheduledPrompt = `# Scheduled run context
+
+You are running in a headless scheduled agent run. No user is present in the chat.
+
+**Email on complete:** ${emailOnComplete}
+
+- If **true**: The user will be emailed a transcript of this conversation when it completes. Do NOT send them an email directly (e.g. do not use email/send tools to deliver results).
+- If **false**: The user will NOT receive an automatic transcript. If the task requires delivering results to the user, you may need to email them directly.`;
+      sharedRunContextParts.push(scheduledPrompt);
+    }
+
     /** Project context - curated context doc, always injected when conversation has a project */
     const conversationId = this.conversationId + '';
     const userId = this.user ?? this.options.req?.user?.id;

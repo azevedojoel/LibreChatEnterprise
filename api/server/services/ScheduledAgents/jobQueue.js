@@ -195,7 +195,7 @@ function startWorker() {
   worker = new Worker(
     QUEUE_NAME,
     async (job, token) => {
-      const { runId, scheduleId, userId, agentId, conversationId, selectedTools } =
+      const { runId, scheduleId, userId, agentId, conversationId, selectedTools, userProjectId } =
         job.data;
 
       logger.info(`[ScheduledAgents] Processing job: runId=${runId} scheduleId=${scheduleId}`);
@@ -215,6 +215,7 @@ function startWorker() {
           agentId,
           conversationId: conversationId || undefined,
           selectedTools,
+          userProjectId: userProjectId || undefined,
         });
       } finally {
         await releaseAgentLock(agentId, runId);

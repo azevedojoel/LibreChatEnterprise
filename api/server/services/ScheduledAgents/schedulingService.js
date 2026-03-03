@@ -71,23 +71,24 @@ async function listSchedulesForUser(userId, opts = {}) {
  * @param {Object} data - Schedule data
  * @param {string} data.name
  * @param {string} data.agentId
- * @param {string} data.promptGroupId
+ * @param {string} data.prompt - Free-text prompt (required for new schedules)
  * @param {string} data.scheduleType - 'recurring' | 'one-off'
  * @param {string} [data.cronExpression] - Required if recurring
  * @param {string|Date} [data.runAt] - Required if one-off
  * @param {string} [data.timezone]
  * @param {string[]|null} [data.selectedTools]
+ * @param {string|null} [data.userProjectId]
  * @returns {Promise<Object>} Created schedule
  */
 async function createScheduleForUser(userId, data) {
-  const { name, agentId, promptGroupId, scheduleType, cronExpression, runAt, timezone, selectedTools, emailOnComplete } =
+  const { name, agentId, prompt, scheduleType, cronExpression, runAt, timezone, selectedTools, emailOnComplete, userProjectId } =
     data;
 
   const schedule = await ScheduledPrompt.create({
     userId,
     agentId,
     name,
-    promptGroupId,
+    prompt: prompt != null ? String(prompt).trim() : null,
     scheduleType,
     cronExpression: scheduleType === 'recurring' ? cronExpression : null,
     runAt: scheduleType === 'one-off' ? new Date(runAt) : null,
@@ -95,6 +96,7 @@ async function createScheduleForUser(userId, data) {
     timezone: timezone || 'UTC',
     ...(selectedTools !== undefined && { selectedTools }),
     ...(emailOnComplete !== undefined && { emailOnComplete }),
+    ...(userProjectId !== undefined && { userProjectId: userProjectId || null }),
   });
 
   return typeof schedule.toObject === 'function' ? schedule.toObject() : schedule;
@@ -116,14 +118,20 @@ async function updateScheduleForUser(userId, scheduleId, updates) {
     return null;
   }
 
-  const { name, agentId, promptGroupId, scheduleType, cronExpression, runAt, enabled, timezone, selectedTools, emailOnComplete } =
+  const { name, agentId, prompt, scheduleType, cronExpression, runAt, enabled, timezone, selectedTools, emailOnComplete, userProjectId } =
     updates;
 
   const effectiveScheduleType = scheduleType ?? schedule.scheduleType;
 
   if (name != null) schedule.name = name;
   if (agentId != null) schedule.agentId = agentId;
-  if (promptGroupId != null) schedule.promptGroupId = promptGroupId;
+  if (prompt !== undefined) {
+    const trimmed = prompt != null ? String(prompt).trim() : '';
+    if (trimmed === '') {
+      throw new Error('Prompt cannot be empty');
+    }
+    schedule.prompt = trimmed;
+  }
   if (scheduleType != null) schedule.scheduleType = scheduleType;
   if (cronExpression != null) schedule.cronExpression = effectiveScheduleType === 'recurring' ? cronExpression : null;
   if (runAt != null) schedule.runAt = effectiveScheduleType === 'one-off' ? new Date(runAt) : null;
@@ -131,6 +139,7 @@ async function updateScheduleForUser(userId, scheduleId, updates) {
   if (timezone != null) schedule.timezone = timezone;
   if (selectedTools !== undefined) schedule.selectedTools = selectedTools;
   if (emailOnComplete !== undefined) schedule.emailOnComplete = emailOnComplete;
+  if (userProjectId !== undefined) schedule.userProjectId = userProjectId || null;
 
   await schedule.save();
   return typeof schedule.toObject === 'function' ? schedule.toObject() : schedule;
@@ -185,6 +194,7 @@ async function runScheduleForUser(userId, scheduleId) {
     agentId: schedule.agentId,
     conversationId,
     selectedTools: schedule.selectedTools,
+    userProjectId: schedule.userProjectId?.toString?.() ?? schedule.userProjectId ?? null,
   };
 
   if (isQueueAvailable()) {
@@ -227,7 +237,7 @@ async function listRunsForUser(userId, opts = {}) {
     query.scheduleId = { $in: scheduleIds };
   }
   const runs = await ScheduledRun.find(query)
-    .populate('scheduleId', 'name agentId promptGroupId')
+    .populate('scheduleId', 'name agentId prompt promptGroupId')
     .sort({ runAt: -1 })
     .limit(limit)
     .lean();
@@ -244,7 +254,7 @@ async function getRunForUser(userId, runId) {
     _id: runId,
     userId,
   })
-    .populate('scheduleId', 'name agentId promptGroupId')
+    .populate('scheduleId', 'name agentId prompt promptGroupId')
     .lean();
 
   if (!run) {

@@ -15,6 +15,7 @@ const {
   listRunsForUser,
   getRunForUser,
 } = require('./schedulingService');
+const { listUserProjects } = require('~/models/UserProject');
 
 /**
  * @param {object} params
@@ -44,8 +45,35 @@ function createSchedulingTools({ userId, agentId: currentAgentId, schedulerTarge
     {
       name: Tools.list_schedules,
       description:
-        "List the user's scheduled prompts. Returns schedules with id, name, agentId, promptGroupId, scheduleType, cronExpression, runAt, enabled, timezone.",
+        "List the user's scheduled prompts. Returns schedules with id, name, agentId, prompt, scheduleType, cronExpression, runAt, enabled, timezone, userProjectId.",
       schema: { type: 'object', properties: {}, required: [] },
+    },
+  );
+
+  const listUserProjectsTool = tool(
+    async (rawInput) => {
+      const limit = Math.min(parseInt(rawInput?.limit, 10) || 50, 100);
+      try {
+        const { projects, nextCursor } = await listUserProjects(userId, { limit });
+        return JSON.stringify({
+          projects: projects.map((p) => ({ _id: p._id?.toString?.() ?? p._id, name: p.name })),
+          nextCursor,
+        });
+      } catch (err) {
+        return JSON.stringify({ error: err.message || 'Failed to list projects' });
+      }
+    },
+    {
+      name: Tools.list_user_projects,
+      description:
+        "List the user's projects. Use this when the user wants to associate a schedule with a project or mentions a project by name. Returns projects with _id and name. Use _id as userProjectId in create_schedule or update_schedule.",
+      schema: {
+        type: 'object',
+        properties: {
+          limit: { type: 'number', description: 'Max number of projects to return (default 50, max 100)' },
+        },
+        required: [],
+      },
     },
   );
 
@@ -57,7 +85,7 @@ function createSchedulingTools({ userId, agentId: currentAgentId, schedulerTarge
         });
       }
 
-      const { name, agentId, promptGroupId, scheduleType, cronExpression, runAt, timezone, selectedTools } =
+      const { name, agentId, prompt, scheduleType, cronExpression, runAt, timezone, selectedTools, userProjectId } =
         rawInput;
 
       if (!isAgentAllowed(agentId)) {
@@ -69,9 +97,10 @@ function createSchedulingTools({ userId, agentId: currentAgentId, schedulerTarge
         });
       }
 
-      if (!name || !agentId || !promptGroupId || !scheduleType) {
+      const promptTrimmed = typeof prompt === 'string' ? prompt.trim() : '';
+      if (!name || !agentId || !promptTrimmed || !scheduleType) {
         return JSON.stringify({
-          error: 'Missing required fields: name, agentId, promptGroupId, scheduleType',
+          error: 'Missing required fields: name, agentId, prompt, scheduleType',
         });
       }
       if (scheduleType === 'recurring' && !cronExpression) {
@@ -85,12 +114,13 @@ function createSchedulingTools({ userId, agentId: currentAgentId, schedulerTarge
         const schedule = await createScheduleForUser(userId, {
           name,
           agentId,
-          promptGroupId,
+          prompt: promptTrimmed,
           scheduleType,
           cronExpression,
           runAt,
           timezone,
           selectedTools,
+          userProjectId,
         });
         return JSON.stringify(schedule);
       } catch (err) {
@@ -100,7 +130,7 @@ function createSchedulingTools({ userId, agentId: currentAgentId, schedulerTarge
     {
       name: Tools.create_schedule,
       description:
-        'Schedule a prompt to run with an agent on a given interval. Infer agentId from the user request. Required: name, agentId (from injected list), promptGroupId (from injected prompt list), scheduleType. For recurring: cronExpression. For one-off: runAt (ISO date). Optional: timezone, selectedTools.',
+        'Schedule a prompt to run with an agent on a given interval. ALWAYS call list_schedules first to check existing schedules before creating. Show the user the prompt and get confirmation before calling—unless they stated the exact prompt verbatim. Infer agentId from the user request. Required: name, agentId (from injected list), prompt (the exact user message sent to the agent—must read like a chat message TO the agent), scheduleType. For recurring: cronExpression. For one-off: runAt (ISO date). Optional: timezone, selectedTools, userProjectId. Use list_user_projects to fetch projects.',
       schema: {
         type: 'object',
         properties: {
@@ -110,7 +140,11 @@ function createSchedulingTools({ userId, agentId: currentAgentId, schedulerTarge
             description:
               'Agent ID from the injected target list. Infer from user request - NEVER ask the user. Match by name or purpose.',
           },
-          promptGroupId: { type: 'string', description: 'Prompt group ID from the injected prompt list. Match user request to prompt name/command.' },
+          prompt: {
+            type: 'string',
+            description:
+              'The exact user message sent to the agent when the schedule runs. Must read like a chat message TO the agent (e.g., "Hey Ellis, please share a joke"). NEVER use scheduling meta-instructions like "schedule agent" or "create a schedule".',
+          },
           scheduleType: {
             type: 'string',
             enum: ['recurring', 'one-off'],
@@ -124,8 +158,13 @@ function createSchedulingTools({ userId, agentId: currentAgentId, schedulerTarge
             items: { type: 'string' },
             description: 'Optional tool IDs to limit the scheduled run to',
           },
+          userProjectId: {
+            type: 'string',
+            description:
+              'Optional UserProject ID to associate the schedule with. Use list_user_projects to fetch available projects.',
+          },
         },
-        required: ['name', 'agentId', 'promptGroupId', 'scheduleType'],
+        required: ['name', 'agentId', 'prompt', 'scheduleType'],
       },
     },
   );
@@ -169,7 +208,7 @@ function createSchedulingTools({ userId, agentId: currentAgentId, schedulerTarge
     {
       name: Tools.update_schedule,
       description:
-        'Update an existing scheduled prompt. Provide scheduleId and any fields to update: name, agentId, promptGroupId, scheduleType, cronExpression, runAt, enabled, timezone, selectedTools.',
+        'Update an existing scheduled prompt. Provide scheduleId and any fields to update: name, agentId, prompt, scheduleType, cronExpression, runAt, enabled, timezone, selectedTools, userProjectId.',
       schema: {
         type: 'object',
         properties: {
@@ -180,13 +219,22 @@ function createSchedulingTools({ userId, agentId: currentAgentId, schedulerTarge
             description:
               'Agent ID from the injected target list. Infer from user request when changing agent - NEVER ask. Match by name or purpose.',
           },
-          promptGroupId: { type: 'string', description: 'Prompt group ID from the injected prompt list' },
+          prompt: {
+            type: 'string',
+            description:
+              'The exact user message sent to the agent when the schedule runs. Must read like a chat message TO the agent. NEVER use scheduling meta-instructions.',
+          },
           scheduleType: { type: 'string', enum: ['recurring', 'one-off'] },
           cronExpression: { type: 'string' },
           runAt: { type: 'string' },
           enabled: { type: 'boolean' },
           timezone: { type: 'string' },
           selectedTools: { type: 'array', items: { type: 'string' } },
+          userProjectId: {
+            type: 'string',
+            description:
+              'Optional UserProject ID to associate the schedule with. Use list_user_projects to fetch available projects.',
+          },
         },
         required: ['scheduleId'],
       },
@@ -295,6 +343,7 @@ function createSchedulingTools({ userId, agentId: currentAgentId, schedulerTarge
 
   return {
     [Tools.list_schedules]: listSchedulesTool,
+    [Tools.list_user_projects]: listUserProjectsTool,
     [Tools.create_schedule]: createScheduleTool,
     [Tools.update_schedule]: updateScheduleTool,
     [Tools.delete_schedule]: deleteScheduleTool,
