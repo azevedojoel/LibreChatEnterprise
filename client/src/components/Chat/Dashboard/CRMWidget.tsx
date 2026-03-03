@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useAuthContext, useLocalize, useSubmitMessage } from '~/hooks';
+import CollapsibleWidget from './CollapsibleWidget';
 
 const QUICK_PROMPTS = [
   'com_ui_dashboard_crm_prompt_followup',
@@ -30,10 +31,7 @@ export default function CRMWidget() {
   );
 
   return (
-    <div className="rounded-2xl border border-border-medium bg-white px-4 py-3 shadow-[0_0_2px_0_rgba(0,0,0,0.05),0_4px_6px_0_rgba(0,0,0,0.02)] transition-colors duration-300 dark:bg-surface-primary">
-      <h3 className="mb-2 text-sm font-medium text-text-primary">
-        {localize('com_ui_dashboard_crm_title')}
-      </h3>
+    <CollapsibleWidget title={localize('com_ui_dashboard_crm_title')} storageKey="crm">
       <ul className="mb-3 space-y-1 text-sm text-text-secondary">
         {BULLET_PROMPTS.map(({ key, text }) => (
           <li key={key}>
@@ -64,6 +62,6 @@ export default function CRMWidget() {
           ))}
         </div>
       </div>
-    </div>
+    </CollapsibleWidget>
   );
 }

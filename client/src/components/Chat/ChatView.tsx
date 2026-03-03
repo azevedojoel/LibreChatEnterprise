@@ -152,7 +152,7 @@ function ChatView({ index = 0 }: { index?: number }) {
                       user?.projectId ||
                       showIntegrationsGrid ||
                       showScheduledAgentsWidget) && (
-                      <div className="mb-6 grid w-full max-w-3xl grid-cols-1 gap-4 px-4 pt-6 sm:grid-cols-2 xl:max-w-4xl [&>*:only-child]:sm:col-span-2">
+                      <div className="mb-6 grid w-full max-w-3xl grid-cols-1 gap-4 px-4 pt-16 sm:grid-cols-2 xl:max-w-4xl [&>*:only-child]:sm:col-span-2">
                         <EmailEllisWidget />
                         <CRMWidget />
                         <IntegrationsWidget />

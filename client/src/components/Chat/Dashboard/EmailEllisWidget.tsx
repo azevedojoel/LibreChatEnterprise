@@ -5,6 +5,7 @@ import { SystemRoles } from 'librechat-data-provider';
 import { useAuthContext, useLocalize } from '~/hooks';
 import { useGetAgentsConfig } from '~/hooks/Agents';
 import { useConversationsInfiniteQuery, useGetWorkspaceMeQuery } from '~/data-provider';
+import CollapsibleWidget from './CollapsibleWidget';
 
 export default function EmailEllisWidget() {
   const { user } = useAuthContext();
@@ -70,10 +71,7 @@ export default function EmailEllisWidget() {
   }
 
   return (
-    <div className="rounded-2xl border border-border-medium bg-white px-4 py-3 shadow-[0_0_2px_0_rgba(0,0,0,0.05),0_4px_6px_0_rgba(0,0,0,0.02)] transition-colors duration-300 dark:bg-surface-primary">
-      <h3 className="mb-1 text-sm font-medium text-text-primary">
-        {localize('com_ui_dashboard_email_ellis_title')}
-      </h3>
+    <CollapsibleWidget title={localize('com_ui_dashboard_email_ellis_title')} storageKey="email">
       <p className="mb-2 text-xs text-text-secondary">
         {localize('com_ui_dashboard_email_ellis_subtitle')}
       </p>
@@ -118,6 +116,6 @@ export default function EmailEllisWidget() {
           {localize('com_ui_dashboard_email_ellis_configure')}
         </p>
       )}
-    </div>
+    </CollapsibleWidget>
   );
 }

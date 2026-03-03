@@ -41,6 +41,7 @@ import {
 } from '~/hooks';
 import ScheduleForm from '~/components/SidePanel/ScheduledAgents/ScheduleForm';
 import { ScheduledRunProgress } from '~/components/SidePanel/ScheduledAgents/ScheduledRunProgress';
+import CollapsibleWidget from './CollapsibleWidget';
 import { cn } from '~/utils';
 import store from '~/store';
 
@@ -285,10 +286,7 @@ export default function ScheduledAgentsWidget() {
   }
 
   return (
-    <div className="rounded-2xl border border-border-medium bg-white px-4 py-3 shadow-[0_0_2px_0_rgba(0,0,0,0.05),0_4px_6px_0_rgba(0,0,0,0.02)] transition-colors duration-300 dark:bg-surface-primary">
-      <h3 className="mb-1 text-sm font-medium text-text-primary">
-        {localize('com_ui_dashboard_scheduled_title')}
-      </h3>
+    <CollapsibleWidget title={localize('com_ui_dashboard_scheduled_title')} storageKey="scheduled">
       <div className="mb-3">
         <p className="mb-1.5 text-xs font-medium text-text-secondary">
           {localize('com_sidepanel_scheduled_agents_upcoming')}
@@ -667,6 +665,6 @@ export default function ScheduledAgentsWidget() {
           }
         />
       </OGDialog>
-    </div>
+    </CollapsibleWidget>
   );
 }

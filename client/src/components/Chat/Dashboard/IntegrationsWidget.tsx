@@ -6,6 +6,7 @@ import { useLocalize, useMCPServerManager, useHasAccess } from '~/hooks';
 import MCPConfigDialog from '~/components/MCP/MCPConfigDialog';
 import MCPServerDialog from '~/components/SidePanel/MCPBuilder/MCPServerDialog';
 import MCPServerList from '~/components/SidePanel/MCPBuilder/MCPServerList';
+import CollapsibleWidget from './CollapsibleWidget';
 
 export default function IntegrationsWidget() {
   const localize = useLocalize();
@@ -39,10 +40,7 @@ export default function IntegrationsWidget() {
   }
 
   return (
-    <div className="rounded-2xl border border-border-medium bg-white px-4 py-3 shadow-[0_0_2px_0_rgba(0,0,0,0.05),0_4px_6px_0_rgba(0,0,0,0.02)] transition-colors duration-300 dark:bg-surface-primary">
-      <h3 className="mb-1 text-sm font-medium text-text-primary">
-        {localize('com_ui_dashboard_integrations_title')}
-      </h3>
+    <CollapsibleWidget title={localize('com_ui_dashboard_integrations_title')} storageKey="integrations">
       <p className="mb-3 text-xs text-text-secondary">
         {localize('com_ui_dashboard_integrations_subtitle')}
       </p>
@@ -102,6 +100,6 @@ export default function IntegrationsWidget() {
         {/* Config Dialog for custom user vars */}
         {configDialogProps && <MCPConfigDialog {...configDialogProps} />}
       </div>
-    </div>
+    </CollapsibleWidget>
   );
 }
