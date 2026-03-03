@@ -856,86 +856,72 @@ async function loadToolDefinitionsWrapper({
   );
 
   if (pendingOAuthServers.size > 0 && (res || streamId)) {
-    const serverNames = Array.from(pendingOAuthServers);
     const isHeadless = Array.isArray(req._headlessOAuthUrls);
-    logger.info(
-      `[Tool Definitions] OAuth required for ${serverNames.length} server(s): ${serverNames.join(', ')}. ${isHeadless ? 'Headless mode: capturing link for email.' : 'Emitting events and waiting.'}`,
-    );
-
-    const oauthWaitPromises = serverNames.map(async (serverName) => {
-      try {
-        const oauthStart = isHeadless
-          ? async () => {
-              const servers = req._headlessOAuthServers;
-              if (servers?.has(serverName)) {
-                logger.info(
-                  `[Tool Definitions] Headless: skipping duplicate reauth link for ${serverName}`,
-                );
-                return;
-              }
-              const reauthToken = await createReauthToken({
-                userId: req.user.id,
-                serverName,
-              });
-              const appLink = buildReauthLink(reauthToken);
-              if (Array.isArray(req._headlessOAuthUrls)) {
-                req._headlessOAuthUrls.push(appLink);
-                if (servers) {
-                  servers.add(serverName);
-                }
-                logger.info(`[Tool Definitions] Headless: captured reauth link for ${serverName}`);
-              }
-            }
-          : createOAuthEmitter(serverName);
-
-        const result = await reinitMCPServer({
-          user: req.user,
-          serverName,
-          userMCPAuthMap,
-          flowManager,
-          returnOnOAuth: isHeadless,
-          oauthStart,
-          connectionTimeout: Time.TWO_MINUTES,
-        });
-
-        if (result?.availableTools) {
-          logger.info(`[Tool Definitions] OAuth completed for ${serverName}, tools available`);
-          return { serverName, success: true };
-        }
-        return { serverName, success: false };
-      } catch (error) {
-        logger.debug(`[Tool Definitions] OAuth wait failed for ${serverName}:`, error?.message);
-        return { serverName, success: false };
-      }
-    });
-
-    const results = await Promise.allSettled(oauthWaitPromises);
-    const successfulServers = results
-      .filter((r) => r.status === 'fulfilled' && r.value.success)
-      .map((r) => r.value.serverName);
-
-    if (successfulServers.length > 0) {
+    if (isHeadless) {
+      // Lazy OAuth capture: don't capture during tool load.
+      // URLs will be captured when a tool is actually invoked and fails with OAuth error.
       logger.info(
-        `[Tool Definitions] Reloading tools after OAuth for: ${successfulServers.join(', ')}`,
+        `[Tool Definitions] Headless: skipping OAuth capture for ${pendingOAuthServers.size} server(s) - will capture on tool invocation if needed`,
       );
-      const reloadResult = await loadToolDefinitions(
-        {
-          userId: req.user.id,
-          agentId: agent.id,
-          tools: filteredTools,
-          toolOptions: agent.tool_options,
-          deferredToolsEnabled,
-        },
-        {
-          isBuiltInTool,
-          loadAuthValues,
-          getOrFetchMCPServerTools,
-          getActionToolDefinitions,
-        },
+    } else {
+      const serverNames = Array.from(pendingOAuthServers);
+      logger.info(
+        `[Tool Definitions] OAuth required for ${serverNames.length} server(s): ${serverNames.join(', ')}. Emitting events and waiting.`,
       );
-      toolDefinitions = reloadResult.toolDefinitions;
-      toolRegistry = reloadResult.toolRegistry;
-      hasDeferredTools = reloadResult.hasDeferredTools;
+
+      const oauthWaitPromises = serverNames.map(async (serverName) => {
+        try {
+          const oauthStart = createOAuthEmitter(serverName);
+
+          const result = await reinitMCPServer({
+            user: req.user,
+            serverName,
+            userMCPAuthMap,
+            flowManager,
+            returnOnOAuth: false,
+            oauthStart,
+            connectionTimeout: Time.TWO_MINUTES,
+          });
+
+          if (result?.availableTools) {
+            logger.info(`[Tool Definitions] OAuth completed for ${serverName}, tools available`);
+            return { serverName, success: true };
+          }
+          return { serverName, success: false };
+        } catch (error) {
+          logger.debug(`[Tool Definitions] OAuth wait failed for ${serverName}:`, error?.message);
+          return { serverName, success: false };
+        }
+      });
+
+      const results = await Promise.allSettled(oauthWaitPromises);
+      const successfulServers = results
+        .filter((r) => r.status === 'fulfilled' && r.value.success)
+        .map((r) => r.value.serverName);
+
+      if (successfulServers.length > 0) {
+        logger.info(
+          `[Tool Definitions] Reloading tools after OAuth for: ${successfulServers.join(', ')}`,
+        );
+        const reloadResult = await loadToolDefinitions(
+          {
+            userId: req.user.id,
+            agentId: agent.id,
+            tools: filteredTools,
+            toolOptions: agent.tool_options,
+            deferredToolsEnabled,
+          },
+          {
+            isBuiltInTool,
+            loadAuthValues,
+            getOrFetchMCPServerTools,
+            getActionToolDefinitions,
+          },
+        );
+        toolDefinitions = reloadResult.toolDefinitions;
+        toolRegistry = reloadResult.toolRegistry;
+        hasDeferredTools = reloadResult.hasDeferredTools;
+      }
     }
   }
 
