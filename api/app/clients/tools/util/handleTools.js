@@ -432,6 +432,7 @@ const loadTools = async ({
       continue;
     } else if (
       tool === Tools.list_schedules ||
+      tool === Tools.list_user_projects ||
       tool === Tools.create_schedule ||
       tool === Tools.update_schedule ||
       tool === Tools.delete_schedule ||

@@ -443,6 +443,7 @@ const nativeTools = new Set([
   Tools.workspace_glob_files,
   Tools.workspace_send_file_to_user,
   Tools.list_schedules,
+  Tools.list_user_projects,
   Tools.create_schedule,
   Tools.update_schedule,
   Tools.delete_schedule,
@@ -540,6 +541,7 @@ async function loadToolDefinitionsWrapper({
   if (toolsToFilter.includes(AgentCapabilities.manage_scheduling)) {
     const schedulingTools = [
       Tools.list_schedules,
+      Tools.list_user_projects,
       Tools.create_schedule,
       Tools.update_schedule,
       Tools.delete_schedule,
@@ -679,6 +681,7 @@ async function loadToolDefinitionsWrapper({
     }
     if (
       tool === Tools.list_schedules ||
+      tool === Tools.list_user_projects ||
       tool === Tools.create_schedule ||
       tool === Tools.update_schedule ||
       tool === Tools.delete_schedule ||
@@ -1154,6 +1157,7 @@ async function loadAgentTools({
   if (toolsToFilter.includes(AgentCapabilities.manage_scheduling)) {
     const schedulingTools = [
       Tools.list_schedules,
+      Tools.list_user_projects,
       Tools.create_schedule,
       Tools.update_schedule,
       Tools.delete_schedule,
@@ -1296,6 +1300,7 @@ async function loadAgentTools({
       return checkCapability(AgentCapabilities.execute_code);
     } else if (
       tool === Tools.list_schedules ||
+      tool === Tools.list_user_projects ||
       tool === Tools.create_schedule ||
       tool === Tools.update_schedule ||
       tool === Tools.delete_schedule ||

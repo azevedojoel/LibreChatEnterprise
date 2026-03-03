@@ -240,6 +240,7 @@ describe('definitions.ts', () => {
       it('should include scheduling tools when manage_scheduling capability is enabled', async () => {
         const schedulingTools = [
           'list_schedules',
+          'list_user_projects',
           'create_schedule',
           'update_schedule',
           'delete_schedule',
@@ -265,7 +266,7 @@ describe('definitions.ts', () => {
 
         const result = await loadToolDefinitions(params, deps);
 
-        expect(result.toolDefinitions).toHaveLength(7);
+        expect(result.toolDefinitions).toHaveLength(8);
         const createScheduleDef = result.toolDefinitions.find(
           (d) => d.name === 'create_schedule',
         );

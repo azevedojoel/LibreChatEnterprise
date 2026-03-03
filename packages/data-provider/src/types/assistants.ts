@@ -39,6 +39,7 @@ export enum Tools {
   run_schedule = 'run_schedule',
   list_runs = 'list_runs',
   get_run = 'get_run',
+  list_user_projects = 'list_user_projects',
   crm_create_contact = 'crm_create_contact',
   crm_update_contact = 'crm_update_contact',
   crm_get_contact = 'crm_get_contact',
