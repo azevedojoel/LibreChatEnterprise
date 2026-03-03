@@ -94,6 +94,11 @@ async function injectAgentFiles(workspaceDir, agentFiles, req) {
       continue;
     }
     const dest = path.join(workspaceDir, path.basename(f.filename));
+    const stat = await fs.stat(dest).catch(() => null);
+    if (stat?.isFile()) {
+      logger.debug('[LocalCodeExecution] Skipping inject (file exists, agent may have edited):', f.filename);
+      continue;
+    }
     try {
       if (req) {
         const source = f.source ?? FileSources.local;
@@ -152,27 +157,11 @@ async function runCodeLocally({
     onOutput,
   });
 
-  const files = [];
-  try {
-    const entries = await fs.readdir(sessionDir, { withFileTypes: true });
-    for (const ent of entries) {
-      if (ent.isFile() && ent.name !== 'script.py') {
-        const fp = path.join(sessionDir, ent.name);
-        const buf = await fs.readFile(fp);
-        if (buf.length <= 50 * 1024 * 1024) {
-          files.push({ name: ent.name, buffer: buf });
-        }
-      }
-    }
-  } catch (e) {
-    logger.warn('[LocalCodeExecution] Error reading generated files:', e);
-  }
-
   return {
     session_id,
     stdout: truncateOutput(stdout, MAX_OUTPUT_BYTES),
     stderr: truncateOutput(stderr, MAX_OUTPUT_BYTES),
-    files,
+    files: [],
   };
 }
 

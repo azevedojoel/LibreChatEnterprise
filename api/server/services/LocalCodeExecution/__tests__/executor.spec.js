@@ -3,8 +3,35 @@
  */
 const fs = require('fs').promises;
 const path = require('path');
+const os = require('os');
+
+jest.mock('@librechat/data-schemas', () => ({
+  logger: {
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  },
+}));
+
+jest.mock('~/server/services/Files/strategies', () => {
+  const { Readable } = require('stream');
+  return {
+    getStrategyFunctions: jest.fn(() => ({
+      getDownloadStream: jest.fn(() => {
+        const stream = new Readable({ read() {} });
+        stream.push('overwrite content from agent attachment');
+        stream.push(null);
+        return Promise.resolve(stream);
+      }),
+    })),
+  };
+});
+
+let realInjectAgentFiles;
 jest.mock('../executor', () => {
   const actual = jest.requireActual('../executor');
+  realInjectAgentFiles = actual.injectAgentFiles;
   return {
     ...actual,
     injectAgentFiles: jest.fn().mockResolvedValue(undefined),
@@ -23,20 +50,24 @@ describe('LocalCodeExecution', () => {
       expect(r.files).toEqual([]);
     });
 
-    it('should capture file output', async () => {
+    it('should write files to workspace (not surfaced in result)', async () => {
       const code = 'with open("out.txt", "w") as f:\n  f.write("hello")';
       const r = await runCodeLocally({ lang: 'py', code });
-      expect(r.files).toHaveLength(1);
-      expect(r.files[0].name).toBe('out.txt');
-      expect(r.files[0].buffer.toString()).toBe('hello');
+      expect(r.files).toEqual([]);
+      const sessionDir = path.join(getSessionBaseDir(), r.session_id);
+      const content = await fs.readFile(path.join(sessionDir, 'out.txt'), 'utf8');
+      expect(content).toBe('hello');
+      await fs.rm(sessionDir, { recursive: true, force: true }).catch(() => {});
     });
 
     it('should redirect /mnt/data/ paths to workspace dir', async () => {
       const code = 'with open("/mnt/data/x.txt", "w") as f:\n  f.write("from mnt data")';
       const r = await runCodeLocally({ lang: 'py', code });
-      expect(r.files).toHaveLength(1);
-      expect(r.files[0].name).toBe('x.txt');
-      expect(r.files[0].buffer.toString()).toBe('from mnt data');
+      expect(r.files).toEqual([]);
+      const sessionDir = path.join(getSessionBaseDir(), r.session_id);
+      const content = await fs.readFile(path.join(sessionDir, 'x.txt'), 'utf8');
+      expect(content).toBe('from mnt data');
+      await fs.rm(sessionDir, { recursive: true, force: true }).catch(() => {});
     });
 
     it('should redirect /mnt/data (no trailing slash) in os.path.join', async () => {
@@ -47,9 +78,11 @@ with open(p, "w") as f:
   f.write("joined")
 `;
       const r = await runCodeLocally({ lang: 'py', code });
-      expect(r.files).toHaveLength(1);
-      expect(r.files[0].name).toBe('y.txt');
-      expect(r.files[0].buffer.toString()).toBe('joined');
+      expect(r.files).toEqual([]);
+      const sessionDir = path.join(getSessionBaseDir(), r.session_id);
+      const content = await fs.readFile(path.join(sessionDir, 'y.txt'), 'utf8');
+      expect(content).toBe('joined');
+      await fs.rm(sessionDir, { recursive: true, force: true }).catch(() => {});
     });
 
     it('should throw for non-Python', async () => {
@@ -67,8 +100,7 @@ with open(p, "w") as f:
           session_id,
         });
         expect(r1.session_id).toBe(session_id);
-        expect(r1.files).toHaveLength(1);
-        expect(r1.files[0].buffer.toString()).toBe('from run 1');
+        expect(r1.files).toEqual([]);
 
         const r2 = await runCodeLocally({
           lang: 'py',
@@ -83,8 +115,10 @@ print("done")
         });
         expect(r2.session_id).toBe(session_id);
         expect(r2.stdout).toContain('done');
-        expect(r2.files).toHaveLength(1);
-        expect(r2.files[0].buffer.toString()).toBe('from run 1 + run 2');
+        expect(r2.files).toEqual([]);
+        const sessionDir = path.join(getSessionBaseDir(), session_id);
+        const content = await fs.readFile(path.join(sessionDir, 'persist.txt'), 'utf8');
+        expect(content).toBe('from run 1 + run 2');
       } finally {
         const sessionDir = path.join(getSessionBaseDir(), session_id);
         await fs.rm(sessionDir, { recursive: true, force: true }).catch(() => {});
@@ -102,7 +136,7 @@ print("done")
   });
 
   describe('createLocalCodeExecutionTool', () => {
-    it('should return ToolMessage with artifact when toolCall provided', async () => {
+    it('should return ToolMessage with artifact (no files surfaced)', async () => {
       const testTool = createLocalCodeExecutionTool({ files: [] });
       const code = 'with open("x.txt", "w") as f:\n  f.write("ok")';
       const result = await testTool.invoke(
@@ -111,10 +145,12 @@ print("done")
       );
       expect(result.content).toBeDefined();
       expect(result.artifact).toBeDefined();
-      expect(result.artifact.files).toHaveLength(1);
-      expect(result.artifact.files[0].buffer.toString()).toBe('ok');
+      expect(result.artifact.session_id).toBeDefined();
+      expect(result.artifact.files).toBeUndefined();
       if (result.artifact.session_id) {
         const sessionDir = path.join(getSessionBaseDir(), result.artifact.session_id);
+        const content = await fs.readFile(path.join(sessionDir, 'x.txt'), 'utf8');
+        expect(content).toBe('ok');
         await fs.rm(sessionDir, { recursive: true, force: true }).catch(() => {});
       }
     });
@@ -134,7 +170,7 @@ print("done")
           { toolCall: { id: 'tc-a' }, configurable: { thread_id: 'conv-aaa' } }
         );
         expect(result1.artifact.session_id).toBe(expectedSessionId);
-        expect(result1.artifact.files).toHaveLength(1);
+        expect(result1.artifact.files).toBeUndefined();
 
         const result2 = await testTool.invoke(
           {
@@ -151,76 +187,73 @@ print("done")
         );
         expect(result2.artifact.session_id).toBe(expectedSessionId);
         expect(result2.content).toContain('done');
-        expect(result2.artifact.files).toHaveLength(1);
-        expect(result2.artifact.files[0].buffer.toString()).toBe(
-          'from conv A + conv B'
-        );
+        expect(result2.artifact.files).toBeUndefined();
+        const sessionDir = path.join(getSessionBaseDir(), expectedSessionId);
+        const content = await fs.readFile(path.join(sessionDir, 'cross_conv.txt'), 'utf8');
+        expect(content).toBe('from conv A + conv B');
       } finally {
         const sessionDir = path.join(getSessionBaseDir(), expectedSessionId);
         await fs.rm(sessionDir, { recursive: true, force: true }).catch(() => {});
       }
     });
+  });
 
-    it('should exclude test.txt from artifact (blocklist)', async () => {
-      const testTool = createLocalCodeExecutionTool({ files: [] });
-      const code =
-        'with open("test.txt", "w") as f:\n  f.write("sample content")';
-      const result = await testTool.invoke(
-        { lang: 'py', code },
-        { toolCall: { id: 'tc-exclude' } }
+  describe('injectAgentFiles', () => {
+    it('should skip copying when file already exists (agent edits preserved)', async () => {
+      const workspaceDir = path.join(
+        os.tmpdir(),
+        `inject_test_${Date.now()}_${Math.random().toString(36).slice(2)}`,
       );
-      expect(result.artifact).toBeDefined();
-      expect(result.artifact.files).toHaveLength(0);
-      expect(result.content).not.toContain('test.txt');
-      if (result.artifact.session_id) {
-        const sessionDir = path.join(getSessionBaseDir(), result.artifact.session_id);
-        await fs.rm(sessionDir, { recursive: true, force: true }).catch(() => {});
+      await fs.mkdir(workspaceDir, { recursive: true });
+      try {
+        const existingContent = 'agent edited content - 23 categories';
+        const destPath = path.join(workspaceDir, 'parse_transactions.py');
+        await fs.writeFile(destPath, existingContent, 'utf8');
+
+        await realInjectAgentFiles(
+          workspaceDir,
+          [
+            {
+              filename: 'parse_transactions.py',
+              filepath: '/uploads/some/path',
+              source: 'local',
+            },
+          ],
+          {},
+        );
+
+        const content = await fs.readFile(destPath, 'utf8');
+        expect(content).toBe(existingContent);
+        expect(content).not.toContain('overwrite content from agent attachment');
+      } finally {
+        await fs.rm(workspaceDir, { recursive: true, force: true }).catch(() => {});
       }
     });
 
-    it('should exclude sample.txt from artifact (blocklist)', async () => {
-      const testTool = createLocalCodeExecutionTool({ files: [] });
-      const code =
-        'with open("sample.txt", "w") as f:\n  f.write("demo")';
-      const result = await testTool.invoke(
-        { lang: 'py', code },
-        { toolCall: { id: 'tc-sample' } }
+    it('should copy file when it does not exist', async () => {
+      const workspaceDir = path.join(
+        os.tmpdir(),
+        `inject_test_${Date.now()}_${Math.random().toString(36).slice(2)}`,
       );
-      expect(result.artifact).toBeDefined();
-      expect(result.artifact.files).toHaveLength(0);
-      expect(result.content).not.toContain('sample.txt');
-      if (result.artifact.session_id) {
-        const sessionDir = path.join(getSessionBaseDir(), result.artifact.session_id);
-        await fs.rm(sessionDir, { recursive: true, force: true }).catch(() => {});
-      }
-    });
+      await fs.mkdir(workspaceDir, { recursive: true });
+      try {
+        await realInjectAgentFiles(
+          workspaceDir,
+          [
+            {
+              filename: 'new_file.py',
+              filepath: '/uploads/some/path',
+              source: 'local',
+            },
+          ],
+          {},
+        );
 
-    it('should exclude agent-injected files from artifact', async () => {
-      const testTool = createLocalCodeExecutionTool({
-        files: [{ filename: 'input_data.txt', filepath: '/tmp/any' }],
-      });
-      const code = [
-        'with open("input_data.txt", "w") as f: f.write("would be input")',
-        'with open("output.txt", "w") as f: f.write("generated")',
-      ].join('\n');
-      const result = await testTool.invoke(
-        { lang: 'py', code },
-        { toolCall: { id: 'tc-agent' }, configurable: { thread_id: 'conv-agent' } }
-      );
-      expect(result.artifact).toBeDefined();
-      expect(result.artifact.files).toHaveLength(1);
-      expect(result.artifact.files[0].name).toBe('output.txt');
-      expect(result.artifact.files[0].buffer.toString()).toBe('generated');
-      expect(result.content).not.toContain('input_data.txt');
-      expect(result.content).toContain('output.txt');
-      if (result.artifact.session_id) {
-        const sessionDir = path.join(
-          getSessionBaseDir(),
-          result.artifact.session_id
-        );
-        await fs.rm(sessionDir, { recursive: true, force: true }).catch(
-          () => {}
-        );
+        const destPath = path.join(workspaceDir, 'new_file.py');
+        const content = await fs.readFile(destPath, 'utf8');
+        expect(content).toContain('overwrite content from agent attachment');
+      } finally {
+        await fs.rm(workspaceDir, { recursive: true, force: true }).catch(() => {});
       }
     });
   });
