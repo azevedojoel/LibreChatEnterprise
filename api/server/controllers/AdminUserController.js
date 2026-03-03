@@ -10,6 +10,7 @@ const {
   createToken,
   deleteTokens,
 } = require('~/models');
+const { createInvite } = require('~/models/inviteUser');
 const { getAppConfig } = require('~/server/services/Config');
 const { checkEmailConfig } = require('@librechat/api');
 const { sendEmail } = require('~/server/utils');
@@ -99,7 +100,8 @@ const getUser = async (req, res) => {
  */
 const createUser = async (req, res) => {
   try {
-    const { email, password, name, username, role, inboundEmailToken, projectId } = req.body;
+    const { email, password, name, username, role, inboundEmailToken, projectId, workspace_id } =
+      req.body;
     const appConfig = await getAppConfig();
 
     if (!email || !email.trim()) {
@@ -140,6 +142,14 @@ const createUser = async (req, res) => {
       projectIdObj = new mongoose.Types.ObjectId(projectId);
     }
 
+    let workspaceIdObj = null;
+    if (workspace_id != null && workspace_id !== '') {
+      if (!mongoose.Types.ObjectId.isValid(workspace_id)) {
+        return res.status(400).json({ message: 'Invalid workspace ID' });
+      }
+      workspaceIdObj = new mongoose.Types.ObjectId(workspace_id);
+    }
+
     const newUserData = {
       provider: 'local',
       email: normalizedEmail,
@@ -150,6 +160,7 @@ const createUser = async (req, res) => {
       ...(hashedPassword && { password: hashedPassword }),
       ...(tokenValue && { inboundEmailToken: tokenValue }),
       ...(projectIdObj && { projectId: projectIdObj }),
+      ...(workspaceIdObj && { workspace_id: workspaceIdObj }),
     };
 
     const result = await createUserModel(newUserData, appConfig?.balance, true, true);
@@ -173,7 +184,7 @@ const createUser = async (req, res) => {
 const updateUser = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { name, username, email, role, emailVerified, password, inboundEmailToken, projectId } =
+    const { name, username, email, role, emailVerified, password, inboundEmailToken, projectId, workspace_id } =
       req.body;
 
     const existingUser = await getUserById(userId);
@@ -237,6 +248,16 @@ const updateUser = async (req, res) => {
         updateData.projectId = new mongoose.Types.ObjectId(projectId);
       }
     }
+    if (workspace_id !== undefined) {
+      if (workspace_id === null || workspace_id === '') {
+        unsetData.workspace_id = '';
+      } else {
+        if (!mongoose.Types.ObjectId.isValid(workspace_id)) {
+          return res.status(400).json({ message: 'Invalid workspace ID' });
+        }
+        updateData.workspace_id = new mongoose.Types.ObjectId(workspace_id);
+      }
+    }
 
     if (Object.keys(updateData).length === 0 && Object.keys(unsetData).length === 0) {
       const { _id, password: _p, totpSecret: _t, ...rest } = existingUser;
@@ -290,6 +311,62 @@ const deleteUser = async (req, res) => {
   } catch (error) {
     logger.error('[AdminUserController.deleteUser]', error);
     return res.status(500).json({ message: 'Failed to delete user' });
+  }
+};
+
+/**
+ * Invite a new user by email (admin only)
+ * Creates invite token and sends email, or returns link if email not configured
+ */
+const inviteUser = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email || !email.trim()) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail.includes('@')) {
+      return res.status(400).json({ message: 'Invalid email address' });
+    }
+
+    const existingUser = await findUser({ email: normalizedEmail }, '_id');
+    if (existingUser) {
+      return res.status(400).json({ message: 'A user with that email already exists' });
+    }
+
+    const token = await createInvite(normalizedEmail, { invitedBy: req.user?.id });
+    if (token && typeof token === 'object' && token.message) {
+      return res.status(500).json({ message: token.message });
+    }
+
+    const domainClient = process.env.DOMAIN_CLIENT || 'http://localhost:3080';
+    const inviteLink = `${domainClient}/register?token=${token}`;
+    const appName = process.env.APP_TITLE || 'LibreChat';
+
+    if (checkEmailConfig()) {
+      await sendEmail({
+        email: normalizedEmail,
+        subject: `Invite to join ${appName}!`,
+        payload: {
+          appName,
+          inviteLink,
+          year: new Date().getFullYear(),
+        },
+        template: 'inviteUser.handlebars',
+      });
+      logger.info(`[AdminUserController.inviteUser] Invitation sent. [Email: ${normalizedEmail}]`);
+      return res.status(200).json({ message: 'Invitation sent successfully' });
+    }
+
+    return res.status(200).json({
+      message: 'Invitation created. Email is not configured. Share this link with the user.',
+      link: inviteLink,
+    });
+  } catch (error) {
+    logger.error('[AdminUserController.inviteUser]', error);
+    return res.status(500).json({ message: 'Failed to invite user' });
   }
 };
 
@@ -358,5 +435,6 @@ module.exports = {
   createUser,
   updateUser,
   deleteUser,
+  inviteUser,
   sendPasswordResetEmail,
 };

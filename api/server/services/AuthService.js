@@ -24,6 +24,8 @@ const {
   deleteUserById,
   generateRefreshToken,
 } = require('~/models');
+const { updateInviteStatusByTokenHash } = require('~/models/Invite');
+const { getWorkspaceById } = require('~/models/Workspace');
 const { registerSchema } = require('~/strategies/validators');
 const { getAppConfig } = require('~/server/services/Config');
 const { sendEmail } = require('~/server/utils');
@@ -221,11 +223,26 @@ const registerUser = async (user, additionalData = {}) => {
       ...additionalData,
     };
 
+    const invite = additionalData.invite;
+    const workspaceIdRaw =
+      invite?.metadata?.get?.('workspace_id') ?? invite?.metadata?.workspace_id;
+    if (workspaceIdRaw) {
+      const workspace = await getWorkspaceById(workspaceIdRaw);
+      if (workspace && workspace._id) {
+        newUserData.workspace_id = workspace._id;
+      }
+    }
+
     const emailEnabled = checkEmailConfig();
     const disableTTL = isEnabled(process.env.ALLOW_UNVERIFIED_EMAIL_LOGIN);
 
     const newUser = await createUser(newUserData, appConfig.balance, disableTTL, true);
     newUserId = newUser._id;
+
+    if (invite?.token) {
+      await updateInviteStatusByTokenHash(invite.token, 'accepted');
+    }
+
     if (emailEnabled && !newUser.emailVerified) {
       await sendVerificationEmail({
         _id: newUserId,

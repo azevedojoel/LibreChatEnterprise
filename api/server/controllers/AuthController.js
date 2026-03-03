@@ -23,7 +23,7 @@ const { getOpenIdConfig } = require('~/strategies');
 
 const registrationController = async (req, res) => {
   try {
-    const response = await registerUser(req.body);
+    const response = await registerUser(req.body, { invite: req.invite });
     const { status, message } = response;
     res.status(status).send({ message });
   } catch (err) {
