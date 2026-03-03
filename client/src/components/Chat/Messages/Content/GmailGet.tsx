@@ -38,7 +38,10 @@ function parseOutput(output: string | null | undefined): GmailGetOutput | null {
       const inner =
         typeof first === 'string'
           ? first
-          : first && typeof first === 'object' && 'text' in first && typeof (first as { text?: string }).text === 'string'
+          : first &&
+              typeof first === 'object' &&
+              'text' in first &&
+              typeof (first as { text?: string }).text === 'string'
             ? (first as { text: string }).text
             : null;
       if (inner) return parseOutput(inner);
@@ -90,9 +93,7 @@ export default function GmailGet({
       ? `${conversationId}:${messageId}:${toolCallId}`
       : null;
 
-  const isExpanded = expandedKey
-    ? expandedToolCalls.has(expandedKey)
-    : localExpanded;
+  const isExpanded = expandedKey ? expandedToolCalls.has(expandedKey) : localExpanded;
 
   const toggleExpand = useCallback(() => {
     if (expandedKey) {
@@ -121,9 +122,10 @@ export default function GmailGet({
   const threadId = parsed?.threadId ?? parsed?.id;
   const url = threadId ? `${GMAIL_MESSAGE_URL}/${threadId}` : null;
 
-  const summary = subject && subject !== 'Email'
-    ? `Retrieved email: ${subject.length > 50 ? `${subject.slice(0, 50)}...` : subject}`
-    : 'Retrieved email';
+  const summary =
+    subject && subject !== 'Email'
+      ? `Retrieved email: ${subject.length > 50 ? `${subject.slice(0, 50)}...` : subject}`
+      : 'Retrieved email';
 
   const hasError = error || cancelled || !!gmailError;
 
@@ -147,9 +149,7 @@ export default function GmailGet({
         <div className="space-y-0.5 text-sm">
           <div className="flex items-center gap-2">
             <span className="text-text-secondary">-</span>
-            <span className="min-w-0 flex-1 truncate font-medium text-text-primary">
-              {subject}
-            </span>
+            <span className="min-w-0 flex-1 truncate font-medium text-text-primary">{subject}</span>
             {url && (
               <a
                 href={url}
@@ -159,24 +159,13 @@ export default function GmailGet({
                 title={subject}
               >
                 <ExternalLink className="size-3.5" aria-hidden="true" />
-                Open
               </a>
             )}
           </div>
-          {parsed?.from && (
-            <div className="pl-4 text-text-secondary">
-              From: {parsed.from}
-            </div>
-          )}
-          {parsed?.date && (
-            <div className="pl-4 text-text-secondary">
-              Date: {parsed.date}
-            </div>
-          )}
+          {parsed?.from && <div className="pl-4 text-text-secondary">From: {parsed.from}</div>}
+          {parsed?.date && <div className="pl-4 text-text-secondary">Date: {parsed.date}</div>}
           {parsed?.snippet && parsed.snippet !== subject && (
-            <div className="pl-4 line-clamp-2 text-text-secondary">
-              {parsed.snippet}
-            </div>
+            <div className="line-clamp-2 pl-4 text-text-secondary">{parsed.snippet}</div>
           )}
         </div>
       )}
