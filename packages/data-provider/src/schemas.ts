@@ -763,6 +763,8 @@ export const tConversationSchema = z.object({
   expiredAt: z.string().nullable().optional(),
   /* scheduled agent run - excludes from main convo list */
   scheduledRunId: z.string().nullable().optional(),
+  /* user project - conversation-scoped workspace for agent context/changelog */
+  userProjectId: z.string().nullable().optional(),
   /* file token limits */
   fileTokenLimit: coerceNumber.optional(),
   /** @deprecated */

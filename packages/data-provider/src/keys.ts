@@ -69,6 +69,9 @@ export enum QueryKeys {
   scheduledAgentRuns = 'scheduledAgentRuns',
   /* CRM Projects */
   crmProjects = 'crmProjects',
+  /* User Projects (personal workspaces) */
+  userProjects = 'userProjects',
+  userProject = 'userProject',
   /* Admin Users */
   adminUsers = 'adminUsers',
   adminUser = 'adminUser',

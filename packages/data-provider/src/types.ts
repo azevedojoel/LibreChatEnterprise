@@ -114,6 +114,8 @@ export type TPayload = Partial<TMessage> &
     editedContent?: TEditedContent | null;
     /** Added conversation for multi-convo feature */
     addedConvo?: TConversation;
+    /** User project ID for project context and tools (first message / new conversation) */
+    userProjectId?: string | null;
   };
 
 export type TEditedContent =
@@ -208,6 +210,8 @@ export type TUser = {
     memories?: boolean;
   };
   inboundEmailToken?: string;
+  /** CRM project assigned by admin; scopes CRM MCP tools for this user */
+  projectId?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -268,7 +272,8 @@ export type TAgentApiKeyListResponse = {
 
 export type TUpdateConversationRequest = {
   conversationId: string;
-  title: string;
+  title?: string;
+  userProjectId?: string | null;
 };
 
 export type TUpdateConversationResponse = TConversation;
@@ -313,6 +318,21 @@ export type TSharedLinkGetResponse = TSharedLinkResponse & {
 
 // type for getting conversation tags
 export type TConversationTagsResponse = TConversationTag[];
+
+/** User Project (personal workspace for conversations) */
+export type TUserProject = {
+  _id: string;
+  name: string;
+  context?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type TUserProjectsListResponse = {
+  projects: TUserProject[];
+  nextCursor: string | null;
+};
+
 // type for creating conversation tag
 export type TConversationTagRequest = Partial<
   Omit<TConversationTag, 'createdAt' | 'updatedAt' | 'count' | 'user'>

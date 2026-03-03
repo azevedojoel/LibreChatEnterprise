@@ -40,6 +40,10 @@ export default function createPayload(submission: t.TSubmission) {
     conversationId,
     isContinued: !!(isEdited && isContinued),
     ephemeralAgent: s.isAssistantsEndpoint(endpoint) ? undefined : ephemeralAgent,
+    userProjectId:
+      conversation?.userProjectId ??
+      (endpointOption as { userProjectId?: string | null })?.userProjectId ??
+      undefined,
   };
 
   return { server, payload };

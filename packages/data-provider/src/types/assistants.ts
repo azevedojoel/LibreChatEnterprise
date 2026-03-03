@@ -31,6 +31,7 @@ export enum Tools {
   workspace_list_files = 'workspace_list_files',
   search_user_files = 'search_user_files',
   workspace_glob_files = 'workspace_glob_files',
+  workspace_send_file_to_user = 'workspace_send_file_to_user',
   list_schedules = 'list_schedules',
   create_schedule = 'create_schedule',
   update_schedule = 'update_schedule',
@@ -57,6 +58,12 @@ export enum Tools {
   crm_soft_delete_organization = 'crm_soft_delete_organization',
   crm_soft_delete_deal = 'crm_soft_delete_deal',
   crm_soft_delete_pipeline = 'crm_soft_delete_pipeline',
+  project_read = 'project_read',
+  project_write = 'project_write',
+  project_log = 'project_log',
+  project_log_tail = 'project_log_tail',
+  project_log_search = 'project_log_search',
+  project_log_range = 'project_log_range',
 }
 
 export enum EToolResources {

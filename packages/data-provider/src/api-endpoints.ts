@@ -412,6 +412,10 @@ export const scheduledAgentRunCancel = (id: string) => `${scheduledAgentRun(id)}
 export const memory = (key: string) => `${memories()}/${encodeURIComponent(key)}`;
 export const memoryPreferences = () => `${memories()}/preferences`;
 
+/* User Projects */
+export const userProjects = () => `${BASE_URL}/api/user-projects`;
+export const userProjectById = (id: string) => `${userProjects()}/${encodeURIComponent(id)}`;
+
 export const searchPrincipals = (params: q.PrincipalSearchParams) => {
   const { q: query, limit, types } = params;
   let url = `${BASE_URL}/api/permissions/search-principals?q=${encodeURIComponent(query)}`;

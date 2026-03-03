@@ -517,6 +517,38 @@ export const getProject = (projectId: string): Promise<{ _id: string; name: stri
   return request.get(endpoints.crmProjectById(projectId));
 };
 
+/* User Projects (conversation-scoped workspaces) */
+
+export const listUserProjects = (params?: {
+  limit?: number;
+  cursor?: string;
+}): Promise<t.TUserProjectsListResponse> => {
+  const query = new URLSearchParams();
+  if (params?.limit) query.set('limit', String(params.limit));
+  if (params?.cursor) query.set('cursor', params.cursor);
+  const qs = query.toString();
+  return request.get(`${endpoints.userProjects()}${qs ? `?${qs}` : ''}`);
+};
+
+export const createUserProject = (data: { name: string }): Promise<t.TUserProject> => {
+  return request.post(endpoints.userProjects(), data);
+};
+
+export const getUserProject = (id: string): Promise<t.TUserProject> => {
+  return request.get(endpoints.userProjectById(id));
+};
+
+export const updateUserProject = (
+  id: string,
+  data: { name?: string; context?: string },
+): Promise<t.TUserProject> => {
+  return request.patch(endpoints.userProjectById(id), data);
+};
+
+export const deleteUserProject = (id: string): Promise<{ deleted: boolean }> => {
+  return request.delete(endpoints.userProjectById(id));
+};
+
 export const revertAgentVersion = ({
   agent_id,
   version_index,
