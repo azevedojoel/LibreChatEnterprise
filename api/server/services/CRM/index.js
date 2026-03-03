@@ -7,6 +7,7 @@ const dealService = require('./dealService');
 const activityService = require('./activityService');
 const pipelineService = require('./pipelineService');
 const activityLogger = require('./activityLogger');
+const crmDataDeletion = require('./crmDataDeletion');
 
 module.exports = {
   ...contactService,
@@ -15,4 +16,5 @@ module.exports = {
   ...activityService,
   ...pipelineService,
   ...activityLogger,
+  ...crmDataDeletion,
 };

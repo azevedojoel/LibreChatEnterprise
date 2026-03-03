@@ -95,6 +95,7 @@ describe('contactService', () => {
         ownerType: 'agent',
         ownerId: 'agent-1',
         organizationId: undefined,
+        customFields: undefined,
       });
       expect(result._id).toBe('contact-1');
     });

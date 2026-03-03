@@ -105,6 +105,41 @@ describe('dealService', () => {
         }),
       );
     });
+
+    it('creates Deal with probability and customFields', async () => {
+      dbModels.Deal.create.mockResolvedValueOnce({
+        _id: 'deal-2',
+        stage: 'proposal',
+        probability: 75,
+        customFields: { Product: 'Enterprise' },
+        toObject: () => ({ _id: 'deal-2', stage: 'proposal', probability: 75 }),
+      });
+
+      const result = await createDeal({
+        projectId: 'proj-1',
+        data: {
+          pipelineId: 'pipeline-1',
+          stage: 'proposal',
+          value: 50000,
+          probability: 75,
+          customFields: { Product: 'Enterprise' },
+          ownerType: 'agent',
+          ownerId: 'agent-1',
+        },
+      });
+
+      expect(dbModels.Deal.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: 'proj-1',
+          pipelineId: 'pipeline-1',
+          stage: 'proposal',
+          value: 50000,
+          probability: 75,
+          customFields: { Product: 'Enterprise' },
+        }),
+      );
+      expect(result.id).toBe('deal-2');
+    });
   });
 
   describe('updateDeal', () => {

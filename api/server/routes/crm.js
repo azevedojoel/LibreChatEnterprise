@@ -35,6 +35,7 @@ const {
   softDeletePipeline,
   createActivity,
   touchContactLastActivity,
+  deleteAllCRMDataForProject,
 } = require('~/server/services/CRM');
 
 const router = express.Router();
@@ -98,6 +99,30 @@ const requireProjectAccess = async (req, res, next) => {
 };
 
 router.use(requireJwtAuth);
+
+// ========== Clear my CRM data (Data Controls) ==========
+router.delete('/my-data', async (req, res) => {
+  try {
+    const user = await findUser({ _id: req.user.id }, 'projectId');
+    const projectId = user?.projectId?.toString?.() ?? user?.projectId;
+    if (!projectId) {
+      return res.status(400).json({ error: 'You do not have a CRM project assigned' });
+    }
+    const hasAccess = await canAccessProjectForCRM(
+      req.user.id,
+      req.user.role ?? 'USER',
+      projectId,
+    );
+    if (!hasAccess) {
+      return res.status(403).json({ error: 'Unable to access CRM data' });
+    }
+    const deleted = await deleteAllCRMDataForProject(projectId);
+    res.json({ deleted });
+  } catch (err) {
+    logger.error('[CRM] deleteAllCRMDataForProject', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ========== Projects ==========
 router.get('/projects', async (req, res) => {

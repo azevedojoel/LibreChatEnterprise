@@ -15,10 +15,14 @@ const NOT_DELETED = { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null
  * @param {Object} params.data
  * @param {string} params.data.pipelineId
  * @param {string} params.data.stage
+ * @param {string} [params.data.title] - Human-readable deal title (default: Untitled Deal)
+ * @param {string} [params.data.description] - Additional context/notes
  * @param {string} [params.data.contactId]
  * @param {string} [params.data.organizationId]
  * @param {number} [params.data.value]
  * @param {string|Date} [params.data.expectedCloseDate]
+ * @param {number} [params.data.probability] - Win probability 0-100%
+ * @param {Record<string, string|number|boolean>} [params.data.customFields]
  * @param {string} params.data.ownerType
  * @param {string} params.data.ownerId
  * @param {string} [params.actorId]
@@ -32,10 +36,14 @@ async function createDeal({ projectId, data, actorId, actorType = 'agent', toolN
     projectId,
     pipelineId: data.pipelineId,
     stage: data.stage,
+    title: data.title || 'Untitled Deal',
+    description: data.description,
     contactId: data.contactId,
     organizationId: data.organizationId,
     value: data.value,
     expectedCloseDate: data.expectedCloseDate ? new Date(data.expectedCloseDate) : undefined,
+    probability: data.probability,
+    customFields: data.customFields,
     ownerType: data.ownerType,
     ownerId: data.ownerId,
   });
@@ -55,14 +63,18 @@ async function createDeal({ projectId, data, actorId, actorType = 'agent', toolN
     });
   }
 
-  return typeof deal.toObject === 'function' ? deal.toObject() : deal;
+  const obj = typeof deal.toObject === 'function' ? deal.toObject() : deal;
+  if (obj && obj._id) {
+    obj.id = obj._id?.toString?.() ?? obj._id;
+  }
+  return obj;
 }
 
 /**
  * @param {Object} params
  * @param {string} params.projectId
  * @param {string} params.dealId
- * @param {Object} params.updates - stage, contactId, organizationId, value, expectedCloseDate, ownerType, ownerId
+ * @param {Object} params.updates - stage, title, description, contactId, organizationId, value, expectedCloseDate, probability, customFields, ownerType, ownerId
  * @param {string} [params.previousStage] - For stage_change activity
  * @param {string} [params.actorId]
  * @param {string} [params.actorType]
@@ -83,11 +95,15 @@ async function updateDeal({
 }) {
   const setFields = {};
   if (updates.stage != null) setFields.stage = updates.stage;
+  if (updates.title !== undefined) setFields.title = updates.title;
+  if (updates.description !== undefined) setFields.description = updates.description;
   if (updates.contactId !== undefined) setFields.contactId = updates.contactId;
   if (updates.organizationId !== undefined) setFields.organizationId = updates.organizationId;
   if (updates.value !== undefined) setFields.value = updates.value;
   if (updates.expectedCloseDate !== undefined)
     setFields.expectedCloseDate = updates.expectedCloseDate ? new Date(updates.expectedCloseDate) : null;
+  if (updates.probability !== undefined) setFields.probability = updates.probability;
+  if (updates.customFields !== undefined) setFields.customFields = updates.customFields;
   if (updates.ownerType !== undefined) setFields.ownerType = updates.ownerType;
   if (updates.ownerId !== undefined) setFields.ownerId = updates.ownerId;
 
@@ -137,14 +153,22 @@ async function getDealById(projectId, dealId) {
  * @param {string} [params.pipelineId]
  * @param {string} [params.stage]
  * @param {string} [params.contactId]
+ * @param {string} [params.query] - Search by title or description (case-insensitive partial match)
  * @param {number} [params.limit]
  * @param {number} [params.skip]
  */
-async function listDeals({ projectId, pipelineId, stage, contactId, limit = 50, skip = 0 }) {
+async function listDeals({ projectId, pipelineId, stage, contactId, query: queryParam, limit = 50, skip = 0 }) {
   const query = { projectId, ...NOT_DELETED };
   if (pipelineId) query.pipelineId = pipelineId;
   if (stage) query.stage = stage;
   if (contactId) query.contactId = contactId;
+
+  if (queryParam && typeof queryParam === 'string' && queryParam.trim()) {
+    const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escaped = escapeRegex(queryParam.trim());
+    const regex = { $regex: escaped, $options: 'i' };
+    query.$or = [{ title: regex }, { description: regex }];
+  }
 
   return Deal.find(query)
     .populate('contactId', 'name email')

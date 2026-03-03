@@ -22,6 +22,7 @@ const NOT_DELETED = { $or: [{ deletedAt: { $exists: false } }, { deletedAt: null
  * @param {string} params.data.ownerType - user | agent
  * @param {string} params.data.ownerId
  * @param {string} [params.data.organizationId]
+ * @param {Record<string, string|number|boolean>} [params.data.customFields]
  * @param {string} [params.actorId] - For activity log (agentId or userId)
  * @param {string} [params.actorType] - 'user' | 'agent'
  * @param {string} [params.toolName]
@@ -40,6 +41,7 @@ async function createContact({ projectId, data, actorId, actorType = 'agent', to
     ownerType: data.ownerType,
     ownerId: data.ownerId,
     organizationId: data.organizationId,
+    customFields: data.customFields,
   });
 
   if (actorId) {
@@ -57,7 +59,11 @@ async function createContact({ projectId, data, actorId, actorType = 'agent', to
     await touchContactLastActivity(contact._id);
   }
 
-  return typeof contact.toObject === 'function' ? contact.toObject() : contact;
+  const obj = typeof contact.toObject === 'function' ? contact.toObject() : contact;
+  if (obj && obj._id) {
+    obj.id = obj._id?.toString?.() ?? obj._id;
+  }
+  return obj;
 }
 
 /**
@@ -85,6 +91,7 @@ async function updateContact({ projectId, contactId, updates, actorId, actorType
         ...(updates.ownerType !== undefined && { ownerType: updates.ownerType }),
         ...(updates.ownerId !== undefined && { ownerId: updates.ownerId }),
         ...(updates.organizationId !== undefined && { organizationId: updates.organizationId }),
+        ...(updates.customFields !== undefined && { customFields: updates.customFields }),
       },
     },
     { new: true },
@@ -152,10 +159,11 @@ async function findContactsByName(projectId, name, limit = 10) {
  * @param {string} [params.status] - lead | prospect | customer
  * @param {string[]} [params.tags]
  * @param {number} [params.noActivitySinceDays] - Contacts with no activity in last N days
+ * @param {string} [params.query] - Search by name or email (case-insensitive partial match)
  * @param {number} [params.limit]
  * @param {number} [params.skip]
  */
-async function listContacts({ projectId, status, tags, noActivitySinceDays, limit = 50, skip = 0 }) {
+async function listContacts({ projectId, status, tags, noActivitySinceDays, query: queryParam, limit = 50, skip = 0 }) {
   const query = { projectId, ...NOT_DELETED };
 
   if (status) {
@@ -179,6 +187,12 @@ async function listContacts({ projectId, status, tags, noActivitySinceDays, limi
         ],
       },
     ];
+  }
+
+  if (queryParam && typeof queryParam === 'string' && queryParam.trim()) {
+    const escaped = escapeRegex(queryParam.trim());
+    const regex = { $regex: escaped, $options: 'i' };
+    query.$and = [...(query.$and || []), { $or: [{ name: regex }, { email: regex }] }];
   }
 
   const contacts = await Contact.find(query).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean();

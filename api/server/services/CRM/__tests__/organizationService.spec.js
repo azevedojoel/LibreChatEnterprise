@@ -75,8 +75,40 @@ describe('organizationService', () => {
         name: 'Acme Corp',
         domain: 'acme.com',
         metadata: { industry: 'tech' },
+        customFields: undefined,
       });
       expect(result._id).toBe('org-1');
+      expect(result.id).toBe('org-1');
+    });
+
+    it('includes customFields in create data', async () => {
+      dbModels.Organization.create.mockResolvedValueOnce({
+        _id: 'org-2',
+        name: 'Farm Co',
+        customFields: { 'Farm Size': '240 acres' },
+        toObject: () => ({
+          _id: 'org-2',
+          name: 'Farm Co',
+          customFields: { 'Farm Size': '240 acres' },
+        }),
+      });
+
+      const result = await createOrganization({
+        projectId: 'proj-1',
+        data: {
+          name: 'Farm Co',
+          customFields: { 'Farm Size': '240 acres' },
+        },
+      });
+
+      expect(dbModels.Organization.create).toHaveBeenCalledWith({
+        projectId: 'proj-1',
+        name: 'Farm Co',
+        domain: undefined,
+        metadata: undefined,
+        customFields: { 'Farm Size': '240 acres' },
+      });
+      expect(result.id).toBe('org-2');
     });
   });
 
@@ -99,6 +131,24 @@ describe('organizationService', () => {
         { new: true },
       );
     });
+
+    it('updates customFields when provided', async () => {
+      dbModels.Organization.findOneAndUpdate.mockReturnValueOnce({
+        lean: jest.fn().mockResolvedValue({ _id: 'org-1', customFields: { Industry: 'Tech' } }),
+      });
+
+      await updateOrganization('proj-1', 'org-1', { customFields: { Industry: 'Tech' } });
+
+      expect(dbModels.Organization.findOneAndUpdate).toHaveBeenCalledWith(
+        { _id: 'org-1', projectId: 'proj-1', ...NOT_DELETED },
+        expect.objectContaining({
+          $set: expect.objectContaining({
+            customFields: { Industry: 'Tech' },
+          }),
+        }),
+        { new: true },
+      );
+    });
   });
 
   describe('getOrganizationById', () => {
@@ -110,6 +160,28 @@ describe('organizationService', () => {
       await getOrganizationById('proj-1', 'org-1');
 
       expect(dbModels.Organization.findOne).toHaveBeenCalledWith({ _id: 'org-1', projectId: 'proj-1', ...NOT_DELETED });
+    });
+
+    it('coerces valid 24-char hex string to ObjectId for lookup', async () => {
+      const mongoose = require('mongoose');
+      const validObjectId = '507f1f77bcf86cd799439011';
+      dbModels.Organization.findOne.mockReturnValueOnce({
+        lean: jest.fn().mockResolvedValue({ _id: validObjectId, name: 'Acme' }),
+      });
+
+      await getOrganizationById('proj-1', validObjectId);
+
+      expect(dbModels.Organization.findOne).toHaveBeenCalledWith({
+        _id: expect.any(mongoose.Types.ObjectId),
+        projectId: 'proj-1',
+        ...NOT_DELETED,
+      });
+    });
+
+    it('returns null when organizationId is null or empty', async () => {
+      expect(await getOrganizationById('proj-1', null)).toBeNull();
+      expect(await getOrganizationById('proj-1', '')).toBeNull();
+      expect(dbModels.Organization.findOne).not.toHaveBeenCalled();
     });
   });
 

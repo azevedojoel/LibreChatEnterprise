@@ -45,20 +45,54 @@ describe('activityLogger', () => {
       const result = await createActivity(params);
 
       expect(mockActivityCreate).toHaveBeenCalledTimes(1);
-      expect(mockActivityCreate).toHaveBeenCalledWith({
-        projectId: params.projectId,
-        contactId: params.contactId,
-        dealId: params.dealId,
-        type: params.type,
-        actorType: params.actorType,
-        actorId: params.actorId,
-        conversationId: params.conversationId,
-        messageId: params.messageId,
-        toolName: params.toolName,
-        summary: params.summary,
-        metadata: params.metadata,
-      });
+      expect(mockActivityCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: params.projectId,
+          contactId: params.contactId,
+          dealId: params.dealId,
+          type: params.type,
+          actorType: params.actorType,
+          actorId: params.actorId,
+          conversationId: params.conversationId,
+          messageId: params.messageId,
+          toolName: params.toolName,
+          summary: params.summary,
+          metadata: params.metadata,
+        }),
+      );
       expect(result._id).toBe('activity-1');
+    });
+
+    it('passes dueDate, status, priority, assignedUserId to Activity.create', async () => {
+      const params = {
+        projectId: 'proj-1',
+        contactId: 'contact-1',
+        type: 'call_logged',
+        actorType: 'agent',
+        actorId: 'agent-1',
+        summary: 'Follow-up call',
+        dueDate: '2025-03-15',
+        status: 'pending',
+        priority: 'high',
+        assignedUserId: 'user-123',
+      };
+
+      await createActivity(params);
+
+      expect(mockActivityCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: 'proj-1',
+          contactId: 'contact-1',
+          type: 'call_logged',
+          actorType: 'agent',
+          actorId: 'agent-1',
+          summary: 'Follow-up call',
+          dueDate: expect.any(Date),
+          status: 'pending',
+          priority: 'high',
+          assignedUserId: 'user-123',
+        }),
+      );
     });
 
     it('handles minimal params with optional fields omitted', async () => {
@@ -71,19 +105,21 @@ describe('activityLogger', () => {
 
       await createActivity(params);
 
-      expect(mockActivityCreate).toHaveBeenCalledWith({
-        projectId: 'proj-2',
-        contactId: undefined,
-        dealId: undefined,
-        type: 'agent_action',
-        actorType: 'user',
-        actorId: 'user-1',
-        conversationId: undefined,
-        messageId: undefined,
-        toolName: undefined,
-        summary: undefined,
-        metadata: undefined,
-      });
+      expect(mockActivityCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: 'proj-2',
+          contactId: undefined,
+          dealId: undefined,
+          type: 'agent_action',
+          actorType: 'user',
+          actorId: 'user-1',
+          conversationId: undefined,
+          messageId: undefined,
+          toolName: undefined,
+          summary: undefined,
+          metadata: undefined,
+        }),
+      );
     });
 
     it('throws when Activity model is not found', async () => {

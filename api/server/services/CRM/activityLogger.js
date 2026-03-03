@@ -17,6 +17,10 @@ const dbModels = require('~/db/models');
  * @param {string} [params.toolName]
  * @param {string} [params.summary]
  * @param {Record<string, unknown>} [params.metadata]
+ * @param {string|Date} [params.dueDate]
+ * @param {string} [params.status]
+ * @param {string} [params.priority]
+ * @param {string} [params.assignedUserId]
  * @returns {Promise<import('mongoose').Document>}
  */
 async function createActivity(params) {
@@ -37,6 +41,10 @@ async function createActivity(params) {
     toolName: params.toolName,
     summary: params.summary,
     metadata: params.metadata,
+    dueDate: params.dueDate ? new Date(params.dueDate) : undefined,
+    status: params.status,
+    priority: params.priority,
+    assignedUserId: params.assignedUserId,
   });
 
   return doc;
