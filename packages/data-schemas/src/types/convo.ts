@@ -55,6 +55,7 @@ export interface IConversation extends Document {
   files?: string[];
   expiredAt?: Date;
   scheduledRunId?: Types.ObjectId;
+  userProjectId?: Types.ObjectId | null;
   createdAt?: Date;
   updatedAt?: Date;
 }

@@ -42,6 +42,11 @@ const convoSchema: Schema<IConversation> = new Schema(
       ref: 'ScheduledRun',
       default: null,
     },
+    userProjectId: {
+      type: Schema.Types.ObjectId,
+      ref: 'UserProject',
+      default: null,
+    },
   },
   { timestamps: true },
 );
