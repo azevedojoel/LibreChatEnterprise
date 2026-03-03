@@ -9,7 +9,7 @@ const LOCAL_CODE_EXECUTION_DEFINITION: ToolRegistryDefinition = {
   name: 'execute_code',
   description: `Runs Python code locally and returns stdout/stderr output. Each execution is isolated and independent.
 - No network access available.
-- Generated files are automatically delivered; **DO NOT** provide download links.
+- To deliver files to the user, use workspace_send_file_to_user after saving them.
 - Supports Python only. Use print() for outputs; matplotlib: use plt.savefig() to save plots.
 - Use relative paths for files (e.g., open('out.txt', 'w'), plt.savefig('plot.png')). Working directory is the session workspace.`,
   schema: {
@@ -897,6 +897,72 @@ export const toolDefinitions: Record<string, ToolRegistryDefinition> = {
     schema: crmListActivitiesSchema,
     toolType: 'builtin',
   },
+  project_read: {
+    name: 'project_read',
+    description:
+      'Returns the project context document. Small curated context the agent maintains for this project. Available only when the conversation is assigned to a project.',
+    schema: { type: 'object', properties: {} },
+    toolType: 'builtin',
+  },
+  project_write: {
+    name: 'project_write',
+    description:
+      'Overwrites the project context document. Use to update the curated context (budget, state, key facts) after doing work. Required: content.',
+    schema: {
+      type: 'object',
+      properties: { content: { type: 'string', description: 'The new context document content' } },
+      required: ['content'],
+    },
+    toolType: 'builtin',
+  },
+  project_log: {
+    name: 'project_log',
+    description:
+      'Appends an entry to the project changelog. Append-only log for history. Never injected automatically. Required: entry.',
+    schema: {
+      type: 'object',
+      properties: { entry: { type: 'string', description: 'The log entry to append' } },
+      required: ['entry'],
+    },
+    toolType: 'builtin',
+  },
+  project_log_tail: {
+    name: 'project_log_tail',
+    description: 'Returns the last n entries from the project changelog. Optional: n (default 10, max 100).',
+    schema: {
+      type: 'object',
+      properties: { n: { type: 'number', description: 'Number of entries to return' } },
+    },
+    toolType: 'builtin',
+  },
+  project_log_search: {
+    name: 'project_log_search',
+    description: 'Search the project changelog by keyword. Required: query. Optional: limit.',
+    schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search query (keyword)' },
+        limit: { type: 'number', description: 'Max entries to return (default 50)' },
+      },
+      required: ['query'],
+    },
+    toolType: 'builtin',
+  },
+  project_log_range: {
+    name: 'project_log_range',
+    description:
+      'Returns changelog entries between two timestamps. Required: from, to (ISO date strings). Optional: limit.',
+    schema: {
+      type: 'object',
+      properties: {
+        from: { type: 'string', description: 'Start timestamp (ISO date)' },
+        to: { type: 'string', description: 'End timestamp (ISO date)' },
+        limit: { type: 'number', description: 'Max entries to return (default 100)' },
+      },
+      required: ['from', 'to'],
+    },
+    toolType: 'builtin',
+  },
   file_search: {
     name: 'file_search',
     description:
@@ -1134,6 +1200,26 @@ const globFilesDefinition: ToolRegistryDefinition = {
     required: ['pattern'],
   } as ExtendedJsonSchema,
   toolType: 'builtin',
+};
+
+const sendFileToUserDefinition: ToolRegistryDefinition = {
+  name: 'workspace_send_file_to_user',
+  description:
+    'Send one or more files from the workspace to the user. Files are displayed in the chat and saved for download. Use after execute_code creates files (e.g. plots, CSVs) that the user should see. Paths are relative to workspace root.',
+  schema: {
+    type: 'object',
+    properties: {
+      paths: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'File paths relative to workspace root (e.g. ["output.csv", "chart.png"])',
+        minItems: 1,
+      },
+    },
+    required: ['paths'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+  responseFormat: 'content_and_artifact',
 };
 
 /** Scheduling tools - used when agent has manage_scheduling capability */
@@ -1586,6 +1672,7 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
   workspace_list_files: listFilesDefinition,
   search_user_files: searchFilesDefinition,
   workspace_glob_files: globFilesDefinition,
+  workspace_send_file_to_user: sendFileToUserDefinition,
   list_schedules: listSchedulesDefinition,
   create_schedule: createScheduleDefinition,
   update_schedule: updateScheduleDefinition,
@@ -1612,6 +1699,72 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
   crm_soft_delete_organization: crmSoftDeleteOrganizationDefinition,
   crm_soft_delete_deal: crmSoftDeleteDealDefinition,
   crm_soft_delete_pipeline: crmSoftDeletePipelineDefinition,
+  project_read: {
+    name: 'project_read',
+    description:
+      'Returns the project context document. Small curated context the agent maintains for this project. Available only when the conversation is assigned to a project.',
+    schema: { type: 'object', properties: {} } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  project_write: {
+    name: 'project_write',
+    description:
+      'Overwrites the project context document. Use to update the curated context (budget, state, key facts) after doing work. Required: content.',
+    schema: {
+      type: 'object',
+      properties: { content: { type: 'string', description: 'The new context document content' } },
+      required: ['content'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  project_log: {
+    name: 'project_log',
+    description:
+      'Appends an entry to the project changelog. Append-only log for history. Never injected automatically. Required: entry.',
+    schema: {
+      type: 'object',
+      properties: { entry: { type: 'string', description: 'The log entry to append' } },
+      required: ['entry'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  project_log_tail: {
+    name: 'project_log_tail',
+    description: 'Returns the last n entries from the project changelog. Optional: n (default 10, max 100).',
+    schema: {
+      type: 'object',
+      properties: { n: { type: 'number', description: 'Number of entries to return' } },
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  project_log_search: {
+    name: 'project_log_search',
+    description: 'Search the project changelog by keyword. Required: query. Optional: limit.',
+    schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search query (keyword)' },
+        limit: { type: 'number', description: 'Max entries to return (default 50)' },
+      },
+      required: ['query'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  project_log_range: {
+    name: 'project_log_range',
+    description:
+      'Returns changelog entries between two timestamps. Required: from, to (ISO date strings). Optional: limit.',
+    schema: {
+      type: 'object',
+      properties: {
+        from: { type: 'string', description: 'Start timestamp (ISO date)' },
+        to: { type: 'string', description: 'End timestamp (ISO date)' },
+        limit: { type: 'number', description: 'Max entries to return (default 100)' },
+      },
+      required: ['from', 'to'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
   [CalculatorToolDefinition.name]: {
     name: CalculatorToolDefinition.name,
     description: CalculatorToolDefinition.description,
@@ -1663,6 +1816,7 @@ export function getWorkspaceCodeEditToolDefinitions() {
     listFilesDefinition,
     globFilesDefinition,
     searchFilesDefinition,
+    sendFileToUserDefinition,
   ];
 }
 
