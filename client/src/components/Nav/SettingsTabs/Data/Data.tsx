@@ -6,6 +6,7 @@ import { AgentApiKeys } from './AgentApiKeys';
 import { DeleteCache } from './DeleteCache';
 import { RevokeKeys } from './RevokeKeys';
 import { ClearChats } from './ClearChats';
+import { ClearCRMData } from './ClearCRMData';
 import SharedLinks from './SharedLinks';
 import { useHasAccess } from '~/hooks';
 
@@ -39,6 +40,9 @@ function Data() {
       </div>
       <div className="pb-3">
         <ClearChats />
+      </div>
+      <div className="pb-3">
+        <ClearCRMData />
       </div>
     </div>
   );

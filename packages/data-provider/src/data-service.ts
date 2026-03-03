@@ -517,6 +517,18 @@ export const getProject = (projectId: string): Promise<{ _id: string; name: stri
   return request.get(endpoints.crmProjectById(projectId));
 };
 
+export const clearCRMData = (): Promise<{
+  deleted: {
+    activities: number;
+    deals: number;
+    contacts: number;
+    organizations: number;
+    pipelines: number;
+  };
+}> => {
+  return request.delete(endpoints.crmClearMyData());
+};
+
 /* User Projects (conversation-scoped workspaces) */
 
 export const listUserProjects = (params?: {

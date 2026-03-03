@@ -137,6 +137,17 @@ export const useClearConversationsMutation = (): UseMutationResult<unknown> => {
   });
 };
 
+export const useClearCRMDataMutation = (): UseMutationResult<
+  { deleted: { activities: number; deals: number; contacts: number; organizations: number; pipelines: number } }
+> => {
+  const queryClient = useQueryClient();
+  return useMutation(() => dataService.clearCRMData(), {
+    onSuccess: () => {
+      queryClient.invalidateQueries([QueryKeys.crmProjects]);
+    },
+  });
+};
+
 export const useRevokeUserKeyMutation = (name: string): UseMutationResult<unknown> => {
   const queryClient = useQueryClient();
   return useMutation(() => dataService.revokeUserKey(name), {

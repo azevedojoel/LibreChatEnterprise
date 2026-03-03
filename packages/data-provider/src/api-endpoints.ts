@@ -393,6 +393,7 @@ export const verifyTwoFactorTemp = () => `${BASE_URL}/api/auth/2fa/verify-temp`;
 /* CRM */
 export const crmProjects = () => `${BASE_URL}/api/crm/projects`;
 export const crmProjectById = (projectId: string) => `${BASE_URL}/api/crm/projects/${projectId}`;
+export const crmClearMyData = () => `${BASE_URL}/api/crm/my-data`;
 
 /* Admin Users */
 export const adminUsers = (params?: { search?: string; limit?: number; page?: number }) => {
