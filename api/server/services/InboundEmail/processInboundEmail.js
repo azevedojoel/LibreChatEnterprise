@@ -7,6 +7,7 @@ const { logger } = require('@librechat/data-schemas');
 const { EModelEndpoint, Constants } = require('librechat-data-provider');
 const { GenerationJobManager } = require('@librechat/api');
 const { getUserByInboundToken, findUser } = require('~/models');
+const { getWorkspaceBySlug } = require('~/models/Workspace');
 const { formatEmailContent } = require('~/server/utils/formatEmailHighlights');
 const { sendInboundReply } = require('~/server/services/sendInboundReply');
 const { initializeClient } = require('~/server/services/Endpoints/agents');
@@ -18,7 +19,31 @@ const { processEmailAttachments } = require('./processEmailAttachments');
 const db = require('~/models');
 const { Conversation } = require('~/db/models');
 
-const MAILBOX_HASH_DELIMITER = '__';
+const {
+  parseRoutingToken,
+  buildReplyToAddress,
+  buildWorkspaceReplyTo,
+} = require('./processInboundEmailUtils');
+
+/**
+ * Build agent ID -> friendly name map from the agent client (primary + handoff configs).
+ * Used for displaying agent transfers in email replies.
+ * @param {Object} [client] - AgentClient from initializeClient result
+ * @returns {Record<string, string>}
+ */
+function buildAgentNamesFromClient(client) {
+  const names = {};
+  if (client?.options?.agent) {
+    const primary = client.options.agent;
+    names[primary.id] = primary.name || 'Assistant';
+  }
+  if (client?.agentConfigs) {
+    for (const [agentId, config] of client.agentConfigs) {
+      names[agentId] = config.name || config.id;
+    }
+  }
+  return names;
+}
 
 /** Extract raw email from "Name" <email> or plain email string */
 function extractEmailAddress(value) {
@@ -26,52 +51,6 @@ function extractEmailAddress(value) {
   const trimmed = value.trim();
   const angleMatch = trimmed.match(/<([^>]+)>/);
   return angleMatch ? angleMatch[1].trim() : trimmed;
-}
-
-/** Extract user token and optional conversationId from MailboxHash or To local part */
-function parseRoutingToken(mailboxHash, toAddress) {
-  let token = null;
-  let conversationId = null;
-  if (mailboxHash && typeof mailboxHash === 'string') {
-    const trimmed = mailboxHash.trim();
-    if (trimmed) {
-      const parts = trimmed.split(MAILBOX_HASH_DELIMITER);
-      if (parts.length >= 2) {
-        token = parts[0];
-        conversationId = parts[1];
-      } else {
-        token = trimmed;
-      }
-    }
-  }
-  if (!token && toAddress) {
-    const fullLocal = (toAddress.split('@')[0] || '').trim();
-    const afterPlus = fullLocal.includes('+') ? fullLocal.split('+').slice(1).join('+') : fullLocal;
-    if (afterPlus) {
-      const parts = afterPlus.split(MAILBOX_HASH_DELIMITER);
-      token = parts[0] || null;
-      conversationId = parts[1] || null;
-    }
-  }
-  return { token, conversationId };
-}
-
-function buildReplyToAddress(originalRecipient, userToken, conversationId) {
-  if (!originalRecipient || !userToken || !conversationId) {
-    return null;
-  }
-  try {
-    const atIdx = originalRecipient.indexOf('@');
-    if (atIdx === -1) {
-      return null;
-    }
-    const domain = originalRecipient.slice(atIdx);
-    const localPart = originalRecipient.slice(0, atIdx);
-    const hash = localPart.split('+')[0] || localPart;
-    return `${hash}+${userToken}${MAILBOX_HASH_DELIMITER}${conversationId}${domain}`;
-  } catch {
-    return null;
-  }
 }
 
 function stripHtml(html) {
@@ -116,30 +95,50 @@ async function processInboundEmail(payload) {
     return;
   }
 
-  const targetUser = await getUserByInboundToken(userToken, '_id role email');
-  if (!targetUser) {
-    logger.warn('[InboundEmail] User not found for token', { token: userToken });
-    return;
-  }
-
   const fromEmail = payload.From ?? payload.FromFull?.Email ?? '';
   if (!fromEmail || !fromEmail.trim()) {
     logger.warn('[InboundEmail] No From address in payload');
     return;
   }
-
   const senderEmail = fromEmail.trim().toLowerCase();
-  const targetEmail = (targetUser.email || '').trim().toLowerCase();
-  if (senderEmail !== targetEmail) {
-    logger.warn('[InboundEmail] Sender email does not match target user', {
-      from: senderEmail,
-      expected: targetEmail,
-    });
-    return;
+
+  let targetUser = null;
+  let isWorkspaceFlow = false;
+  let workspaceSlug = null;
+
+  // Try workspace lookup first (slug from To address, e.g. companyx@domain)
+  const workspace = await getWorkspaceBySlug(userToken, '_id slug');
+  if (workspace) {
+    const senderUserByEmail = await findUser(
+      { email: senderEmail },
+      '_id role email workspace_id',
+    );
+    if (senderUserByEmail && senderUserByEmail.workspace_id?.toString() === workspace._id.toString()) {
+      targetUser = senderUserByEmail;
+      isWorkspaceFlow = true;
+      workspaceSlug = workspace.slug;
+    }
+  }
+
+  // Fall back to personal inboundEmailToken
+  if (!targetUser) {
+    targetUser = await getUserByInboundToken(userToken, '_id role email');
+    if (!targetUser) {
+      logger.warn('[InboundEmail] User not found for token', { token: userToken });
+      return;
+    }
+    const targetEmail = (targetUser.email || '').trim().toLowerCase();
+    if (senderEmail !== targetEmail) {
+      logger.warn('[InboundEmail] Sender email does not match target user', {
+        from: senderEmail,
+        expected: targetEmail,
+      });
+      return;
+    }
   }
 
   const senderUserId = targetUser._id?.toString?.() ?? targetUser._id;
-  const senderUser = await findUser({ _id: senderUserId }, '_id role projectId');
+  const senderUser = await findUser({ _id: senderUserId }, '_id role projectId workspace_id');
   if (!senderUser) {
     logger.warn('[InboundEmail] Sender user not found');
     return;
@@ -212,12 +211,14 @@ async function processInboundEmail(payload) {
   }
 
   const replySubject = subject.startsWith('Re:') ? subject : `Re: ${subject}`;
-  const replyTo = buildReplyToAddress(originalRecipient, userToken, conversationId);
+  const replyTo = isWorkspaceFlow
+    ? buildWorkspaceReplyTo(originalRecipient, workspaceSlug, conversationId)
+    : buildReplyToAddress(originalRecipient, userToken, conversationId);
 
   if (!replyTo) {
     logger.warn('[InboundEmail] Could not build Reply-To address', {
       hasOriginalRecipient: !!originalRecipient,
-      hasUserToken: !!userToken,
+      isWorkspaceFlow,
       conversationId,
     });
   }
@@ -318,9 +319,11 @@ async function processInboundEmail(payload) {
     });
 
     const contentParts = response?.content ?? [];
+    const agentNames = buildAgentNamesFromClient(result.client);
     const { html: emailHtml, text: emailText } = formatEmailContent(contentParts, capturedOAuthUrls, {
       appName: process.env.APP_TITLE || 'Daily Thread',
       agentName: agent?.name,
+      agentNames,
       userMessage: messageText,
       fileNames: requestFiles.map((f) => f.filename),
     });

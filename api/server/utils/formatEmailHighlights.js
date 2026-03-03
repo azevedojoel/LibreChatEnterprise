@@ -1,10 +1,30 @@
-const { ContentTypes } = require('librechat-data-provider');
+const { ContentTypes, Constants } = require('librechat-data-provider');
 const { marked, Renderer } = require('marked');
 const sanitizeHtml = require('sanitize-html');
 const { getToolDisplayName } = require('./toolDisplayNames');
 
 const MAX_TOOL_OUTPUT_LEN = 200;
 const MAX_ARGS_LEN = 100;
+
+const LC_TRANSFER_PREFIX = Constants.LC_TRANSFER_TO_ || 'lc_transfer_to_';
+
+/** Humanize agent ID when not in agentNames map: "System-Productivity" -> "System Productivity" */
+function humanizeAgentId(agentId) {
+  if (!agentId || typeof agentId !== 'string') return 'Agent';
+  return agentId
+    .replace(/-/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim();
+}
+
+/** Get friendly display name for agent transfer tool (lc_transfer_to_*) */
+function getTransferDisplayName(toolName, agentNames = {}) {
+  if (!toolName || typeof toolName !== 'string' || !toolName.startsWith(LC_TRANSFER_PREFIX)) {
+    return null;
+  }
+  const agentId = toolName.replace(LC_TRANSFER_PREFIX, '');
+  return agentNames[agentId] ?? humanizeAgentId(agentId);
+}
 
 /* Matches client/src/style.css .dark theme exactly */
 const STYLES = {
@@ -156,10 +176,19 @@ function formatEmailHtml(contentParts, capturedOAuthUrls = [], options = {}) {
       }
     } else if ((part.type === 'tool_call' || part.type === ContentTypes.TOOL_CALL) && part.tool_call) {
       const name = part.tool_call.name ?? part.tool_call.function?.name ?? 'unknown';
-      const displayName = getToolDisplayName(name);
-      contentBlocks.push(
-        `<span style="display: inline-block; margin: 2px 4px 2px 0; padding: 4px 10px; background: ${STYLES.pillBg}; color: ${STYLES.textMuted}; border-radius: 6px; font-size: 13px;">${escapeHtml(displayName)}</span>`,
-      );
+      const agentNames = options.agentNames ?? {};
+      const transferDisplay = getTransferDisplayName(name, agentNames);
+      if (transferDisplay) {
+        contentBlocks.push(`
+<div style="margin: 12px 0; padding: 12px 16px; background: ${STYLES.pillBg}; border-left: 4px solid ${STYLES.blockquoteBorder}; border-radius: 6px; font-size: 14px; color: ${STYLES.text};">
+  <span style="color: ${STYLES.textMuted}; font-weight: 500;">Transferred to</span> <span style="font-weight: 600;">${escapeHtml(transferDisplay)}</span>
+</div>`);
+      } else {
+        const displayName = getToolDisplayName(name);
+        contentBlocks.push(
+          `<span style="display: inline-block; margin: 2px 4px 2px 0; padding: 4px 10px; background: ${STYLES.pillBg}; color: ${STYLES.textMuted}; border-radius: 6px; font-size: 13px;">${escapeHtml(displayName)}</span>`,
+        );
+      }
     }
   }
 
@@ -283,7 +312,13 @@ function formatEmailText(contentParts, capturedOAuthUrls = [], options = {}) {
       if (str.trim()) parts.push(`--- ${str.trim().slice(0, 300)}${str.length > 300 ? '...' : ''} ---`);
     } else if ((part.type === 'tool_call' || part.type === ContentTypes.TOOL_CALL) && part.tool_call) {
       const name = part.tool_call.name ?? part.tool_call.function?.name ?? 'unknown';
-      parts.push(`[${getToolDisplayName(name)}]`);
+      const agentNames = options.agentNames ?? {};
+      const transferDisplay = getTransferDisplayName(name, agentNames);
+      if (transferDisplay) {
+        parts.push(`--- Transferred to ${transferDisplay} ---`);
+      } else {
+        parts.push(`[${getToolDisplayName(name)}]`);
+      }
     }
   }
 
