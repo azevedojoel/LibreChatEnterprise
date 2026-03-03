@@ -18,10 +18,14 @@ const scheduledPromptSchema = new Schema<IScheduledPrompt>(
       type: String,
       required: true,
     },
+    prompt: {
+      type: String,
+      default: null,
+    },
     promptGroupId: {
       type: Schema.Types.ObjectId,
       ref: 'PromptGroup',
-      required: true,
+      required: false,
       index: true,
     },
     scheduleType: {
@@ -65,6 +69,11 @@ const scheduledPromptSchema = new Schema<IScheduledPrompt>(
     emailOnComplete: {
       type: Boolean,
       default: true,
+    },
+    userProjectId: {
+      type: Schema.Types.ObjectId,
+      ref: 'UserProject',
+      default: null,
     },
   },
   { timestamps: true, collection: 'scheduledprompts' },

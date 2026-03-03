@@ -7,7 +7,10 @@ export interface IScheduledPrompt extends Document {
   userId: Types.ObjectId;
   agentId: string;
   name: string;
-  promptGroupId: Types.ObjectId;
+  /** Free-text prompt. Required for new schedules. Legacy schedules may use promptGroupId. */
+  prompt?: string;
+  /** @deprecated Use prompt instead. Kept for backward compatibility during migration. */
+  promptGroupId?: Types.ObjectId;
   scheduleType: ScheduleType;
   cronExpression?: string;
   runAt?: Date;
@@ -18,6 +21,7 @@ export interface IScheduledPrompt extends Document {
   conversationId?: string;
   selectedTools?: string[] | null;
   emailOnComplete?: boolean;
+  userProjectId?: Types.ObjectId | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
