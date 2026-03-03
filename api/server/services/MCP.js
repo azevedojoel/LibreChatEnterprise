@@ -475,7 +475,7 @@ async function createMCPTool({
 }
 
 const HEADLESS_OAUTH_MESSAGE =
-  'This integration requires re-authentication in LibreChat. Please sign in at the LibreChat app and reconnect this service under Settings, then try your request again.';
+  'This integration requires re-authentication in Daily Thread. Please sign in at the Daily Thread app and reconnect this service under Settings, then try your request again.';
 
 function createToolInstance({
   req,
