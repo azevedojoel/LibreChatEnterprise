@@ -225,7 +225,7 @@ export default function BadgeRowProvider({
 
   const mcpServerManager = useMCPServerManager({
     conversationId,
-    assignedMcpServerNames: assignedMcpServerNames.size > 0 ? assignedMcpServerNames : undefined,
+    assignedMcpServerNames: shouldFetchAgent && agent !== undefined ? assignedMcpServerNames : undefined,
   });
 
   const value: BadgeRowContextType = {

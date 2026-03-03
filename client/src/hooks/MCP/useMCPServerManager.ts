@@ -78,7 +78,7 @@ export function useMCPServerManager({
         : Array.isArray(assignedMcpServerNames)
           ? new Set(assignedMcpServerNames)
           : null;
-    if (assignedSet && assignedSet.size > 0) {
+    if (assignedSet !== null && assignedSet !== undefined) {
       servers = servers.filter((s) => assignedSet.has(s.serverName));
     }
     return servers;
