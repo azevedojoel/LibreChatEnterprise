@@ -74,13 +74,24 @@ describe('processInboundEmailUtils', () => {
   });
 
   describe('buildWorkspaceReplyTo', () => {
-    it('builds workspace Reply-To as slug__convId@domain', () => {
+    it('builds workspace Reply-To as slug__convId@domain when no hash in originalRecipient', () => {
       const result = buildWorkspaceReplyTo(
         'companyx@inbound.example.com',
         'companyx',
         'conv-abc',
       );
       expect(result).toBe('companyx__conv-abc@inbound.example.com');
+    });
+
+    it('builds workspace Reply-To as hash+slug__convId@domain when hash present (Postmark forwarding)', () => {
+      const result = buildWorkspaceReplyTo(
+        '108a40bcf11b75b5020e7e5e6858e03d+heald@inbound.postmarkapp.com',
+        'heald',
+        '9bdd8776-cb57-4cec-84b7-e9c547fa1313',
+      );
+      expect(result).toBe(
+        '108a40bcf11b75b5020e7e5e6858e03d+heald__9bdd8776-cb57-4cec-84b7-e9c547fa1313@inbound.postmarkapp.com',
+      );
     });
 
     it('returns null when originalRecipient missing', () => {

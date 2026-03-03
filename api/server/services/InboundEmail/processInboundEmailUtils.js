@@ -49,7 +49,7 @@ function buildReplyToAddress(originalRecipient, userToken, conversationId) {
   }
 }
 
-/** Build Reply-To for workspace email: {slug}__{conversationId}@domain */
+/** Build Reply-To for workspace email: {hash}+{slug}__{conversationId}@domain (when hash present) or slug__convId@domain */
 function buildWorkspaceReplyTo(originalRecipient, slug, conversationId) {
   if (!originalRecipient || !slug || !conversationId) {
     return null;
@@ -60,7 +60,12 @@ function buildWorkspaceReplyTo(originalRecipient, slug, conversationId) {
       return null;
     }
     const domain = originalRecipient.slice(atIdx);
-    return `${slug}${MAILBOX_HASH_DELIMITER}${conversationId}${domain}`;
+    const localPart = originalRecipient.slice(0, atIdx);
+    const hash = localPart.split('+')[0] || localPart;
+    const hasPlus = localPart.includes('+');
+    return hasPlus
+      ? `${hash}+${slug}${MAILBOX_HASH_DELIMITER}${conversationId}${domain}`
+      : `${slug}${MAILBOX_HASH_DELIMITER}${conversationId}${domain}`;
   } catch {
     return null;
   }
