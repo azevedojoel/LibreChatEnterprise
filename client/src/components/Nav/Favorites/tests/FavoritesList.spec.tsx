@@ -53,8 +53,6 @@ const mockUseFavorites = jest.fn(() => ({
 
 jest.mock('~/hooks', () => ({
   useFavorites: () => mockUseFavorites(),
-  useLocalize: () => (key: string) => key,
-  useShowMarketplace: () => false,
   useNewConvo: () => ({ newConversation: jest.fn() }),
 }));
 
