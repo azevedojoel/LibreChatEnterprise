@@ -467,6 +467,9 @@
   "com_nav_chat_direction": "Chat direction",
   "com_nav_chat_direction_selected": "Chat direction: {{direction}}",
   "com_nav_clear_all_chats": "Clear all chats",
+  "com_nav_clear_crm_data": "Clear CRM data",
+  "com_nav_clear_crm_data_confirm": "Permanently delete all CRM data?",
+  "com_nav_clear_crm_data_warning": "This will permanently delete all contacts, deals, organizations, activities, and pipelines in your project. If other users share this project, their data will also be deleted. This cannot be undone.",
   "com_nav_clear_cache_confirm_message": "Are you sure you want to clear the cache?",
   "com_nav_clear_conversation": "Clear conversations",
   "com_nav_clear_conversation_confirm_message": "Are you sure you want to clear all conversations? This is irreversible.",
@@ -1750,5 +1753,9 @@
   "com_ui_zoom_in": "Zoom in",
   "com_ui_zoom_level": "Zoom level",
   "com_ui_zoom_out": "Zoom out",
+  "com_ui_calendar_start": "Start",
+  "com_ui_calendar_end": "End",
+  "com_ui_calendar_location": "Location",
+  "com_ui_calendar_open": "Open",
   "com_user_message": "You"
 }
