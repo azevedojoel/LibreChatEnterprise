@@ -1272,3 +1272,57 @@ export const sendAdminPasswordReset = (
   userId: string,
 ): Promise<{ message: string; link?: string }> =>
   request.post(endpoints.adminUserSendPasswordReset(userId));
+
+export const inviteAdminUser = (
+  data: { email: string },
+): Promise<{ message: string; link?: string }> =>
+  request.post(endpoints.adminUsersInvite(), data);
+
+/* Admin Workspaces */
+export const listAdminWorkspaces = (): Promise<q.TWorkspace[]> =>
+  request.get(endpoints.adminWorkspaces());
+
+export const getAdminWorkspace = (id: string): Promise<q.TWorkspace> =>
+  request.get(endpoints.adminWorkspace(id));
+
+export const createAdminWorkspace = (data: {
+  name: string;
+  slug: string;
+}): Promise<q.TWorkspace> => request.post(endpoints.adminWorkspaces(), data);
+
+export const updateAdminWorkspace = (
+  id: string,
+  data: { name?: string; slug?: string },
+): Promise<q.TWorkspace> => request.patch(endpoints.adminWorkspace(id), data);
+
+export const deleteAdminWorkspace = (id: string): Promise<{ message: string }> =>
+  request.delete(endpoints.adminWorkspace(id));
+
+export const listAdminWorkspaceMembers = (
+  id: string,
+): Promise<{ members: q.TWorkspaceMember[] }> =>
+  request.get(endpoints.adminWorkspaceMembers(id));
+
+export const listAdminWorkspaceInvites = (
+  id: string,
+  params?: { status?: string },
+): Promise<{ invites: q.TInvite[] }> => {
+  const query = params?.status ? `?status=${encodeURIComponent(params.status)}` : '';
+  return request.get(endpoints.adminWorkspaceInvites(id) + query);
+};
+
+export const inviteAdminWorkspaceMember = (
+  id: string,
+  data: { email: string },
+): Promise<{ message: string; user?: q.TWorkspaceMember; link?: string }> =>
+  request.post(endpoints.adminWorkspaceInvite(id), data);
+
+export const removeAdminWorkspaceMember = (
+  id: string,
+  userId: string,
+): Promise<{ message: string }> =>
+  request.delete(endpoints.adminWorkspaceRemoveMember(id, userId));
+
+export const getWorkspaceMe = (): Promise<{
+  workspace: { id: string; name: string; slug: string } | null;
+}> => request.get(endpoints.workspaceMe());

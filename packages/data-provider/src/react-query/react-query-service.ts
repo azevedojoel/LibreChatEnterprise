@@ -593,7 +593,12 @@ export const useGetScheduledAgentRunsQuery = (
           scheduleId: limitOrOpts.scheduleId,
         };
   return useQuery<q.ScheduledRun[]>(
-    [QueryKeys.scheduledAgentRuns, opts.limit, opts.promptGroupId ?? 'all', opts.scheduleId ?? 'all'],
+    [
+      QueryKeys.scheduledAgentRuns,
+      opts.limit,
+      opts.promptGroupId ?? 'all',
+      opts.scheduleId ?? 'all',
+    ],
     () =>
       dataService.listScheduledAgentRuns(
         opts.scheduleId
@@ -771,4 +776,138 @@ export const useSendAdminPasswordResetMutation = (): UseMutationResult<
   string
 > => {
   return useMutation(dataService.sendAdminPasswordReset);
+};
+
+export const useInviteAdminUserMutation = (): UseMutationResult<
+  { message: string; link?: string },
+  unknown,
+  { email: string }
+> => {
+  const queryClient = useQueryClient();
+  return useMutation(({ email }) => dataService.inviteAdminUser({ email }), {
+    onSuccess: () => {
+      queryClient.invalidateQueries([QueryKeys.adminUsers]);
+    },
+  });
+};
+
+/* Admin Workspaces */
+export const useGetAdminWorkspacesQuery = (
+  config?: UseQueryOptions<q.TWorkspace[]>,
+): QueryObserverResult<q.TWorkspace[]> => {
+  return useQuery<q.TWorkspace[]>(
+    [QueryKeys.adminWorkspaces],
+    () => dataService.listAdminWorkspaces(),
+    { refetchOnWindowFocus: false, ...config },
+  );
+};
+
+export const useGetAdminWorkspaceQuery = (
+  id: string,
+  config?: UseQueryOptions<q.TWorkspace>,
+): QueryObserverResult<q.TWorkspace> => {
+  return useQuery<q.TWorkspace>(
+    [QueryKeys.adminWorkspace, id],
+    () => dataService.getAdminWorkspace(id),
+    { enabled: !!id, refetchOnWindowFocus: false, ...config },
+  );
+};
+
+export const useGetAdminWorkspaceMembersQuery = (
+  id: string,
+  config?: UseQueryOptions<{ members: q.TWorkspaceMember[] }>,
+): QueryObserverResult<{ members: q.TWorkspaceMember[] }> => {
+  return useQuery<{ members: q.TWorkspaceMember[] }>(
+    [QueryKeys.adminWorkspaceMembers, id],
+    () => dataService.listAdminWorkspaceMembers(id),
+    { enabled: !!id, refetchOnWindowFocus: false, ...config },
+  );
+};
+
+export const useGetAdminWorkspaceInvitesQuery = (
+  id: string,
+  config?: UseQueryOptions<{ invites: q.TInvite[] }>,
+): QueryObserverResult<{ invites: q.TInvite[] }> => {
+  return useQuery<{ invites: q.TInvite[] }>(
+    ['adminWorkspaceInvites', id],
+    () => dataService.listAdminWorkspaceInvites(id),
+    { enabled: !!id, refetchOnWindowFocus: false, ...config },
+  );
+};
+
+export const useCreateAdminWorkspaceMutation = (): UseMutationResult<
+  q.TWorkspace,
+  unknown,
+  Parameters<typeof dataService.createAdminWorkspace>[0]
+> => {
+  const queryClient = useQueryClient();
+  return useMutation(dataService.createAdminWorkspace, {
+    onSuccess: () => {
+      queryClient.invalidateQueries([QueryKeys.adminWorkspaces]);
+    },
+  });
+};
+
+export const useUpdateAdminWorkspaceMutation = (): UseMutationResult<
+  q.TWorkspace,
+  unknown,
+  { id: string; data: Parameters<typeof dataService.updateAdminWorkspace>[1] }
+> => {
+  const queryClient = useQueryClient();
+  return useMutation(({ id, data }) => dataService.updateAdminWorkspace(id, data), {
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries([QueryKeys.adminWorkspaces]);
+      queryClient.invalidateQueries([QueryKeys.adminWorkspace, variables.id]);
+    },
+  });
+};
+
+export const useDeleteAdminWorkspaceMutation = (): UseMutationResult<
+  { message: string },
+  unknown,
+  string
+> => {
+  const queryClient = useQueryClient();
+  return useMutation(dataService.deleteAdminWorkspace, {
+    onSuccess: () => {
+      queryClient.invalidateQueries([QueryKeys.adminWorkspaces]);
+    },
+  });
+};
+
+export const useInviteAdminWorkspaceMemberMutation = (): UseMutationResult<
+  { message: string; user?: q.TWorkspaceMember; link?: string },
+  unknown,
+  { id: string; email: string }
+> => {
+  const queryClient = useQueryClient();
+  return useMutation(({ id, email }) => dataService.inviteAdminWorkspaceMember(id, { email }), {
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries([QueryKeys.adminWorkspaceMembers, variables.id]);
+      queryClient.invalidateQueries(['adminWorkspaceInvites', variables.id]);
+    },
+  });
+};
+
+export const useRemoveAdminWorkspaceMemberMutation = (): UseMutationResult<
+  { message: string },
+  unknown,
+  { id: string; userId: string }
+> => {
+  const queryClient = useQueryClient();
+  return useMutation(({ id, userId }) => dataService.removeAdminWorkspaceMember(id, userId), {
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries([QueryKeys.adminWorkspaceMembers, variables.id]);
+    },
+  });
+};
+
+export const useGetWorkspaceMeQuery = (
+  config?: UseQueryOptions<{ workspace: { id: string; name: string; slug: string } | null }>,
+): QueryObserverResult<{ workspace: { id: string; name: string; slug: string } | null }> => {
+  return useQuery<{ workspace: { id: string; name: string; slug: string } | null }>(
+    [QueryKeys.workspaceMe],
+    () => dataService.getWorkspaceMe(),
+    { refetchOnWindowFocus: false, ...config },
+  );
 };

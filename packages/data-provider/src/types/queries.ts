@@ -29,6 +29,36 @@ export type TAdminUsersListResponse = {
   limit: number;
 };
 
+/* Admin Workspaces */
+export type TWorkspace = {
+  _id: string;
+  id: string;
+  name: string;
+  slug: string;
+  createdBy: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type TWorkspaceMember = {
+  _id: string;
+  id: string;
+  email: string;
+  name?: string;
+  username?: string;
+  role?: string;
+};
+
+export type TInvite = {
+  _id: string;
+  id: string;
+  email: string;
+  workspaceId?: string;
+  status: 'pending' | 'accepted' | 'expired';
+  createdAt: string;
+  expiresAt: string;
+};
+
 export type Conversation = {
   id: string;
   createdAt: number;

@@ -8,6 +8,8 @@ export * from './Memories';
 export * from './ScheduledAgents';
 /* Admin Users */
 export * from './Users';
+/* Admin Workspaces */
+export * from './Workspaces';
 export * from './Messages';
 export * from './Misc';
 export * from './Tools';

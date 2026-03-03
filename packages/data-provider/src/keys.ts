@@ -75,6 +75,10 @@ export enum QueryKeys {
   /* Admin Users */
   adminUsers = 'adminUsers',
   adminUser = 'adminUser',
+  adminWorkspaces = 'adminWorkspaces',
+  adminWorkspace = 'adminWorkspace',
+  adminWorkspaceMembers = 'adminWorkspaceMembers',
+  workspaceMe = 'workspaceMe',
 }
 
 // Dynamic query keys that require parameters

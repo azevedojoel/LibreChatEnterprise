@@ -399,9 +399,20 @@ export const adminUsers = (params?: { search?: string; limit?: number; page?: nu
   const query = buildQuery(params || {});
   return `${BASE_URL}/api/admin/users${query}`;
 };
+export const adminUsersInvite = () => `${BASE_URL}/api/admin/users/invite`;
 export const adminUser = (userId: string) => `${BASE_URL}/api/admin/users/${userId}`;
 export const adminUserSendPasswordReset = (userId: string) =>
   `${adminUser(userId)}/send-password-reset`;
+
+export const adminWorkspaces = () => `${BASE_URL}/api/admin/workspaces`;
+export const adminWorkspace = (id: string) => `${BASE_URL}/api/admin/workspaces/${id}`;
+export const adminWorkspaceMembers = (id: string) => `${adminWorkspace(id)}/members`;
+export const adminWorkspaceInvites = (id: string) => `${adminWorkspace(id)}/invites`;
+export const adminWorkspaceInvite = (id: string) => `${adminWorkspace(id)}/invite`;
+export const adminWorkspaceRemoveMember = (id: string, userId: string) =>
+  `${adminWorkspace(id)}/members/${userId}`;
+
+export const workspaceMe = () => `${BASE_URL}/api/workspace/me`;
 
 /* Memories */
 export const memories = () => `${BASE_URL}/api/memories`;
