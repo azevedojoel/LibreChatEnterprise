@@ -38,7 +38,7 @@ jest.mock('~/db/models', () => ({
 }));
 
 const dbModels = require('~/db/models');
-const { listSchedulesForUser, listRunsForUser } = require('../schedulingService');
+const { listSchedulesForUser, listRunsForUser, runScheduleForUser } = require('../schedulingService');
 
 describe('schedulingService', () => {
   beforeEach(() => {
@@ -130,6 +130,18 @@ describe('schedulingService', () => {
 
       expect(mockScheduledRunFind).toHaveBeenCalledWith({ userId: 'user-1' });
       expect(mockScheduledPromptFind).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('runScheduleForUser', () => {
+    it('should return Invalid schedule ID when scheduleId is empty', async () => {
+      const result = await runScheduleForUser('user-1', '');
+      expect(result).toEqual({ success: false, error: 'Invalid schedule ID' });
+    });
+
+    it('should return Invalid schedule ID when scheduleId is not a valid ObjectId', async () => {
+      const result = await runScheduleForUser('user-1', 'not-valid-id');
+      expect(result).toEqual({ success: false, error: 'Invalid schedule ID' });
     });
   });
 });

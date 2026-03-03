@@ -105,7 +105,14 @@ async function createSchedule(req, res) {
     res.status(201).json(schedule);
   } catch (error) {
     logger.error('[ScheduledAgents] createSchedule error:', error);
-    res.status(500).json({ error: 'Failed to create schedule' });
+    const msg = error?.message || '';
+    const isValidation =
+      msg.includes('Schedule limit reached') ||
+      msg.startsWith('runAt is required') ||
+      msg.startsWith('runAt must be') ||
+      msg.startsWith('Cron schedule is too frequent') ||
+      msg === 'Prompt cannot be empty';
+    res.status(isValidation ? 400 : 500).json({ error: msg || 'Failed to create schedule' });
   }
 }
 
@@ -145,7 +152,14 @@ async function updateSchedule(req, res) {
     res.json(schedule);
   } catch (error) {
     logger.error('[ScheduledAgents] updateSchedule error:', error);
-    res.status(500).json({ error: 'Failed to update schedule' });
+    const msg = error?.message || '';
+    const isValidation =
+      msg.includes('Schedule limit reached') ||
+      msg.startsWith('runAt is required') ||
+      msg.startsWith('runAt must be') ||
+      msg.startsWith('Cron schedule is too frequent') ||
+      msg === 'Prompt cannot be empty';
+    res.status(isValidation ? 400 : 500).json({ error: msg || 'Failed to update schedule' });
   }
 }
 
@@ -176,6 +190,9 @@ async function runSchedule(req, res) {
   try {
     const result = await runScheduleForUser(req.user.id, req.params.id);
 
+    if (!result.success && result.error === 'Invalid schedule ID') {
+      return res.status(400).json({ error: 'Invalid schedule ID' });
+    }
     if (!result.success && result.error === 'Schedule not found') {
       return res.status(404).json({ error: 'Schedule not found' });
     }
@@ -188,7 +205,8 @@ async function runSchedule(req, res) {
         conversationId: result.conversationId,
       });
     } else {
-      res.status(500).json({ success: false, error: result.error });
+      const isThrottle = result.error?.includes('pending runs') || result.error?.includes('wait');
+      res.status(isThrottle ? 429 : 500).json({ success: false, error: result.error });
     }
   } catch (error) {
     logger.error(

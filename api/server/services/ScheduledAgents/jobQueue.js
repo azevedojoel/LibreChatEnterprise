@@ -10,6 +10,7 @@ const { Queue, Worker, Job, DelayedError } = require('bullmq');
 const { logger } = require('@librechat/data-schemas');
 const { cacheConfig, isEnabled } = require('@librechat/api');
 const { executeScheduledAgent } = require('./executeAgent');
+const { ScheduledRun } = require('~/db/models');
 
 const QUEUE_NAME = 'scheduled-agent-runs';
 const DEFAULT_CONCURRENCY = 3;
@@ -18,6 +19,8 @@ const MAX_CONCURRENCY = 20;
 const JOB_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 const RETRY_ATTEMPTS = 3;
 const AGENT_LOCK_DELAY_MS = 5000;
+/** Max times to delay when agent lock is busy before failing (~3 min at 5s intervals) */
+const MAX_LOCK_RETRIES = 36;
 
 function getConcurrency() {
   const raw = parseInt(process.env.SCHEDULED_AGENTS_QUEUE_CONCURRENCY, 10);
@@ -195,14 +198,34 @@ function startWorker() {
   worker = new Worker(
     QUEUE_NAME,
     async (job, token) => {
-      const { runId, scheduleId, userId, agentId, conversationId, selectedTools, userProjectId } =
-        job.data;
+      const {
+        runId,
+        scheduleId,
+        userId,
+        agentId,
+        conversationId,
+        selectedTools,
+        userProjectId,
+        lockRetryCount = 0,
+      } = job.data;
 
       logger.info(`[ScheduledAgents] Processing job: runId=${runId} scheduleId=${scheduleId}`);
 
       const lockAcquired = await tryAcquireAgentLock(agentId, runId);
       if (!lockAcquired) {
-        logger.debug(`[ScheduledAgents] Agent ${agentId} busy, delaying job runId=${runId}`);
+        const nextRetryCount = lockRetryCount + 1;
+        if (nextRetryCount >= MAX_LOCK_RETRIES) {
+          const errMsg = `Agent ${agentId} lock held for too long (${MAX_LOCK_RETRIES} retries); failing job runId=${runId}`;
+          logger.warn(`[ScheduledAgents] ${errMsg}`);
+          await ScheduledRun.findByIdAndUpdate(runId, {
+            $set: { status: 'failed', error: errMsg },
+          }).catch((err) => logger.error('[ScheduledAgents] Failed to update ScheduledRun on lock exhaustion:', err));
+          throw new Error(errMsg);
+        }
+        await job.updateData({ ...job.data, lockRetryCount: nextRetryCount });
+        logger.info(
+          `[ScheduledAgents] Agent ${agentId} busy, delaying job runId=${runId} (retry ${nextRetryCount}/${MAX_LOCK_RETRIES})`,
+        );
         await job.moveToDelayed(Date.now() + AGENT_LOCK_DELAY_MS, token);
         throw new DelayedError();
       }

@@ -11,6 +11,105 @@ const { getMessages } = require('~/models/Message');
 const ScheduledPrompt = dbModels.ScheduledPrompt ?? (mongoose.models && mongoose.models.ScheduledPrompt);
 const ScheduledRun = dbModels.ScheduledRun ?? (mongoose.models && mongoose.models.ScheduledRun);
 
+/** Max queued+running runs per schedule before skipping new triggers. Env: SCHEDULED_AGENTS_MAX_QUEUE_DEPTH */
+const DEFAULT_MAX_QUEUE_DEPTH = 5;
+/** Cooldown (ms) for run_schedule when schedule already has pending run. Env: SCHEDULED_AGENTS_RUN_COOLDOWN_MS */
+const DEFAULT_RUN_COOLDOWN_MS = 30 * 1000;
+/** Max schedules per user. Env: SCHEDULED_AGENTS_MAX_SCHEDULES_PER_USER */
+const DEFAULT_MAX_SCHEDULES_PER_USER = 50;
+/** Min cron interval (ms) when validation enabled. Env: SCHEDULED_AGENTS_MIN_CRON_INTERVAL_MS */
+const DEFAULT_MIN_CRON_INTERVAL_MS = 5 * 60 * 1000;
+
+function getMaxQueueDepth() {
+  const raw = parseInt(process.env.SCHEDULED_AGENTS_MAX_QUEUE_DEPTH, 10);
+  return Number.isNaN(raw) ? DEFAULT_MAX_QUEUE_DEPTH : Math.max(1, raw);
+}
+
+function getRunCooldownMs() {
+  const raw = parseInt(process.env.SCHEDULED_AGENTS_RUN_COOLDOWN_MS, 10);
+  return Number.isNaN(raw) ? DEFAULT_RUN_COOLDOWN_MS : Math.max(0, raw);
+}
+
+function getMaxSchedulesPerUser() {
+  const raw = parseInt(process.env.SCHEDULED_AGENTS_MAX_SCHEDULES_PER_USER, 10);
+  return Number.isNaN(raw) ? DEFAULT_MAX_SCHEDULES_PER_USER : Math.max(1, raw);
+}
+
+function getMinCronIntervalMs() {
+  const raw = parseInt(process.env.SCHEDULED_AGENTS_MIN_CRON_INTERVAL_MS, 10);
+  return Number.isNaN(raw) ? DEFAULT_MIN_CRON_INTERVAL_MS : Math.max(60 * 1000, raw);
+}
+
+function isCronFrequencyValidationEnabled() {
+  return process.env.SCHEDULED_AGENTS_VALIDATE_CRON_FREQUENCY === 'true';
+}
+
+/**
+ * Validate runAt for one-off schedules. Returns error message or null if valid.
+ * @param {string|Date} runAt
+ * @returns {string|null}
+ */
+function validateRunAt(runAt) {
+  if (runAt == null) return 'runAt is required for one-off schedules';
+  const d = new Date(runAt);
+  if (Number.isNaN(d.getTime())) return 'runAt must be a valid date (ISO string or date)';
+  if (d.getTime() <= Date.now()) return 'runAt must be in the future';
+  return null;
+}
+
+/**
+ * Validate cron frequency is not too aggressive. Returns error message or null if valid.
+ * @param {string} cronExpression
+ * @param {string} [timezone]
+ * @returns {Promise<string|null>}
+ */
+async function validateCronFrequency(cronExpression, timezone = 'UTC') {
+  if (!isCronFrequencyValidationEnabled() || !cronExpression) return null;
+  try {
+    const cronParser = require('cron-parser');
+    const interval = cronParser.parseExpression(cronExpression, {
+      currentDate: new Date(),
+      tz: timezone,
+    });
+    const next1 = interval.next().toDate();
+    const next2 = interval.next().toDate();
+    const minIntervalMs = next2.getTime() - next1.getTime();
+    if (minIntervalMs < getMinCronIntervalMs()) {
+      return `Cron schedule is too frequent (min ${Math.round(getMinCronIntervalMs() / 60000)} min between runs). Use a less frequent schedule.`;
+    }
+  } catch {
+    return null; // Let cron-parser fail elsewhere for invalid syntax
+  }
+  return null;
+}
+
+/**
+ * Count pending (queued or running) runs for a schedule.
+ * @param {string} scheduleId
+ * @returns {Promise<number>}
+ */
+async function countPendingRunsForSchedule(scheduleId) {
+  const count = await ScheduledRun.countDocuments({
+    scheduleId: new mongoose.Types.ObjectId(scheduleId),
+    status: { $in: ['queued', 'running'] },
+  });
+  return count;
+}
+
+/**
+ * Get the most recent pending run's runAt for a schedule.
+ * @param {string} scheduleId
+ * @returns {Promise<Date|null>}
+ */
+async function getMostRecentPendingRunAt(scheduleId) {
+  const run = await ScheduledRun.findOne(
+    { scheduleId: new mongoose.Types.ObjectId(scheduleId), status: { $in: ['queued', 'running'] } },
+    { runAt: 1 },
+    { sort: { runAt: -1 } },
+  ).lean();
+  return run?.runAt ? new Date(run.runAt) : null;
+}
+
 /**
  * Compute next run time for a schedule.
  * @param {Object} schedule - Schedule document (recurring or one-off)
@@ -84,6 +183,23 @@ async function createScheduleForUser(userId, data) {
   const { name, agentId, prompt, scheduleType, cronExpression, runAt, timezone, selectedTools, emailOnComplete, userProjectId } =
     data;
 
+  const existingCount = await ScheduledPrompt.countDocuments({ userId: new mongoose.Types.ObjectId(userId) });
+  if (existingCount >= getMaxSchedulesPerUser()) {
+    throw new Error(
+      `Schedule limit reached (max ${getMaxSchedulesPerUser()} per user). Delete existing schedules before creating new ones.`,
+    );
+  }
+
+  if (scheduleType === 'one-off') {
+    const runAtError = validateRunAt(runAt);
+    if (runAtError) throw new Error(runAtError);
+  }
+
+  if (scheduleType === 'recurring' && cronExpression) {
+    const cronError = await validateCronFrequency(cronExpression, timezone || 'UTC');
+    if (cronError) throw new Error(cronError);
+  }
+
   const schedule = await ScheduledPrompt.create({
     userId,
     agentId,
@@ -133,8 +249,24 @@ async function updateScheduleForUser(userId, scheduleId, updates) {
     schedule.prompt = trimmed;
   }
   if (scheduleType != null) schedule.scheduleType = scheduleType;
-  if (cronExpression != null) schedule.cronExpression = effectiveScheduleType === 'recurring' ? cronExpression : null;
-  if (runAt != null) schedule.runAt = effectiveScheduleType === 'one-off' ? new Date(runAt) : null;
+  if (cronExpression != null) {
+    if (effectiveScheduleType === 'recurring') {
+      const cronError = await validateCronFrequency(cronExpression, schedule.timezone || 'UTC');
+      if (cronError) throw new Error(cronError);
+      schedule.cronExpression = cronExpression;
+    } else {
+      schedule.cronExpression = null;
+    }
+  }
+  if (runAt != null) {
+    if (effectiveScheduleType === 'one-off') {
+      const runAtError = validateRunAt(runAt);
+      if (runAtError) throw new Error(runAtError);
+      schedule.runAt = new Date(runAt);
+    } else {
+      schedule.runAt = null;
+    }
+  }
   if (enabled != null) schedule.enabled = enabled;
   if (timezone != null) schedule.timezone = timezone;
   if (selectedTools !== undefined) schedule.selectedTools = selectedTools;
@@ -164,6 +296,15 @@ async function deleteScheduleForUser(userId, scheduleId) {
  * @returns {Promise<{ success: boolean; runId?: string; status?: string; conversationId?: string; error?: string }>}
  */
 async function runScheduleForUser(userId, scheduleId) {
+  const isValidId =
+    scheduleId &&
+    typeof scheduleId === 'string' &&
+    scheduleId.length === 24 &&
+    /^[a-fA-F0-9]{24}$/.test(scheduleId);
+  if (!isValidId) {
+    return { success: false, error: 'Invalid schedule ID' };
+  }
+
   const schedule = await ScheduledPrompt.findOne({
     _id: scheduleId,
     userId,
@@ -171,6 +312,25 @@ async function runScheduleForUser(userId, scheduleId) {
 
   if (!schedule) {
     return { success: false, error: 'Schedule not found' };
+  }
+
+  const pendingCount = await countPendingRunsForSchedule(scheduleId);
+  if (pendingCount >= getMaxQueueDepth()) {
+    return {
+      success: false,
+      error: `Schedule has too many pending runs (${pendingCount}). Wait for some to complete before triggering again.`,
+    };
+  }
+
+  const cooldownMs = getRunCooldownMs();
+  if (cooldownMs > 0 && pendingCount > 0) {
+    const mostRecent = await getMostRecentPendingRunAt(scheduleId);
+    if (mostRecent && Date.now() - mostRecent.getTime() < cooldownMs) {
+      return {
+        success: false,
+        error: `Please wait ${Math.ceil(cooldownMs / 1000)}s before triggering this schedule again (run already in progress).`,
+      };
+    }
   }
 
   const conversationId = v4();
