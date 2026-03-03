@@ -11,16 +11,16 @@ const US_TIMEZONES: { value: string; label: string }[] = [
 ];
 import type { ScheduledAgentSchedule } from 'librechat-data-provider';
 import type { Agent } from 'librechat-data-provider';
-import { useGetAllPromptGroups } from '~/data-provider';
+import { useUserProjectsQuery } from '~/data-provider';
 import { useLocalize } from '~/hooks';
-import { cn } from '~/utils';
 import ToolPicker from './ToolPicker';
 import SimpleRecurrencePicker from './SimpleRecurrencePicker';
 
 export type ScheduleFormValues = {
   name: string;
   agentId: string;
-  promptGroupId: string;
+  prompt: string;
+  projectId: string | null;
   scheduleType: 'recurring' | 'one-off';
   cronExpression: string;
   runAt: string;
@@ -35,8 +35,6 @@ type Props = {
   onClose: () => void;
   onSubmit: (data: ScheduleFormValues) => void;
   isSubmitting: boolean;
-  /** When set, prompt is fixed to this group - hide prompt selector and use this ID */
-  fixedPromptGroupId?: string;
 };
 
 export default function ScheduleForm({
@@ -45,12 +43,12 @@ export default function ScheduleForm({
   onClose,
   onSubmit,
   isSubmitting,
-  fixedPromptGroupId,
 }: Props) {
   const localize = useLocalize();
   const { showToast } = useToastContext();
   const isEdit = !!schedule;
-  const { data: promptGroups = [] } = useGetAllPromptGroups();
+  const { data: projectsData } = useUserProjectsQuery({ limit: 50 });
+  const projects = projectsData?.projects ?? [];
 
   const {
     register,
@@ -64,7 +62,8 @@ export default function ScheduleForm({
     defaultValues: {
       name: '',
       agentId: '',
-      promptGroupId: fixedPromptGroupId ?? '',
+      prompt: '',
+      projectId: null as string | null,
       scheduleType: 'recurring',
       cronExpression: '',
       runAt: '',
@@ -78,12 +77,6 @@ export default function ScheduleForm({
   const cronExpression = watch('cronExpression');
 
   useEffect(() => {
-    if (fixedPromptGroupId) {
-      setValue('promptGroupId', fixedPromptGroupId);
-    }
-  }, [fixedPromptGroupId, setValue]);
-
-  useEffect(() => {
     if (schedule) {
       const validTimezone: string =
         schedule.timezone && US_TIMEZONES.some((tz) => tz.value === schedule.timezone)
@@ -91,18 +84,18 @@ export default function ScheduleForm({
           : 'UTC';
       setValue('name', schedule.name);
       setValue('agentId', schedule.agentId);
-      setValue(
-        'promptGroupId',
-        typeof schedule.promptGroupId === 'object' && schedule.promptGroupId?._id
-          ? schedule.promptGroupId._id
-          : (typeof schedule.promptGroupId === 'string' ? schedule.promptGroupId : '') ?? '',
-      );
+      setValue('prompt', schedule.prompt ?? '');
       setValue('scheduleType', schedule.scheduleType);
       setValue('cronExpression', schedule.cronExpression ?? '');
       setValue('runAt', schedule.runAt ? new Date(schedule.runAt).toISOString().slice(0, 16) : '');
       setValue('timezone', schedule.timezone ? validTimezone : 'UTC');
       setValue('selectedTools', schedule.selectedTools ?? null);
       setValue('emailOnComplete', schedule.emailOnComplete !== false);
+      const projectId =
+        typeof schedule.userProjectId === 'string'
+          ? schedule.userProjectId
+          : (schedule.userProjectId as { _id?: string })?._id ?? null;
+      setValue('projectId', projectId || null);
     }
   }, [schedule, setValue]);
 
@@ -158,30 +151,41 @@ export default function ScheduleForm({
             <p className="mt-0.5 text-xs text-red-600">{localize('com_ui_required')}</p>
           )}
         </div>
-        {!fixedPromptGroupId && (
-          <div>
-            <Label htmlFor="schedule-prompt">
-              {localize('com_sidepanel_scheduled_agents_prompt')}
-            </Label>
-            <select
-              id="schedule-prompt"
-              {...register('promptGroupId', { required: !fixedPromptGroupId })}
-              className={cn(
-                'mt-1 flex h-9 w-full rounded-md border border-border-medium bg-transparent px-3 py-1 text-sm',
-              )}
-            >
-              <option value="">{localize('com_ui_select')}</option>
-              {promptGroups.map((g) => (
-                <option key={g._id} value={g._id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-            {errors.promptGroupId && (
-              <p className="mt-0.5 text-xs text-red-600">{localize('com_ui_required')}</p>
-            )}
-          </div>
-        )}
+        <div>
+          <Label htmlFor="schedule-project">{localize('com_ui_projects')}</Label>
+          <select
+            id="schedule-project"
+            {...register('projectId')}
+            className="mt-1 flex h-9 w-full rounded-md border border-border-medium bg-transparent px-3 py-1 text-sm"
+          >
+            <option value="">{localize('com_ui_no_project')}</option>
+            {projects.map((p: { _id: string; name: string }) => (
+              <option key={p._id} value={p._id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <Label htmlFor="schedule-prompt">
+            {localize('com_sidepanel_scheduled_agents_prompt')}
+          </Label>
+          <textarea
+            id="schedule-prompt"
+            {...register('prompt', {
+              required: true,
+              minLength: { value: 1, message: localize('com_ui_required') },
+            })}
+            placeholder={localize('com_sidepanel_scheduled_agents_prompt_placeholder')}
+            className="mt-1 min-h-[80px] w-full resize-y rounded-md border border-border-medium bg-transparent px-3 py-2 text-sm"
+            rows={3}
+          />
+          {errors.prompt && (
+            <p className="mt-0.5 text-xs text-red-600">
+              {errors.prompt.message ?? localize('com_ui_required')}
+            </p>
+          )}
+        </div>
         <div>
           <Label>{localize('com_sidepanel_scheduled_agents_schedule_type')}</Label>
           <div className="mt-1 flex gap-4">
@@ -237,7 +241,7 @@ export default function ScheduleForm({
               id="schedule-runat"
               type="datetime-local"
               {...register('runAt', { required: scheduleType === 'one-off' })}
-              className="mt-1"
+              className="mt-1 dark:[&::-webkit-calendar-picker-indicator]:invert"
             />
             {errors.runAt && (
               <p className="mt-0.5 text-xs text-red-600">{localize('com_ui_required')}</p>

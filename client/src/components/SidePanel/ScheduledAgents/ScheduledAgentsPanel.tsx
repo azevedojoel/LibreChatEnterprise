@@ -444,7 +444,7 @@ export default function ScheduledAgentsPanel() {
                 const payload = {
                   name: data.name,
                   agentId: data.agentId,
-                  promptGroupId: data.promptGroupId,
+                  prompt: data.prompt.trim(),
                   scheduleType: data.scheduleType,
                   ...(data.scheduleType === 'recurring'
                     ? { cronExpression: data.cronExpression }
@@ -452,6 +452,7 @@ export default function ScheduledAgentsPanel() {
                   timezone: data.timezone || 'UTC',
                   ...(data.selectedTools !== undefined && { selectedTools: data.selectedTools }),
                   emailOnComplete: data.emailOnComplete,
+                  userProjectId: data.projectId || null,
                 };
                 const opts = { onSuccess: handleFormSuccess, onError: handleFormError };
                 if (editingSchedule) {

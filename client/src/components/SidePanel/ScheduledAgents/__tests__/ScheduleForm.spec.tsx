@@ -26,8 +26,8 @@ jest.mock('~/hooks', () => ({
 }));
 
 jest.mock('~/data-provider', () => ({
-  useGetAllPromptGroups: jest.fn().mockReturnValue({
-    data: [{ _id: 'pg-1', name: 'Hello', command: '' }],
+  useUserProjectsQuery: jest.fn().mockReturnValue({
+    data: { projects: [{ _id: 'proj-1', name: 'Project One' }] },
   }),
 }));
 
@@ -44,12 +44,12 @@ describe('ScheduleForm', () => {
     jest.clearAllMocks();
   });
 
-  it('pre-populates form with schedule.selectedTools when editing', () => {
+  it('pre-populates form with schedule.prompt and selectedTools when editing', () => {
     const schedule = {
       _id: 'sched-1',
       name: 'My Schedule',
       agentId: 'agent-1',
-      promptGroupId: 'pg-1',
+      prompt: 'Summarize my inbox',
       scheduleType: 'recurring' as const,
       cronExpression: '0 0 * * *',
       runAt: null,
@@ -68,16 +68,16 @@ describe('ScheduleForm', () => {
     );
 
     expect(screen.getByDisplayValue('My Schedule')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Hello')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Summarize my inbox')).toBeInTheDocument();
     expect(screen.getByTestId('tool-picker')).toBeInTheDocument();
   });
 
-  it('includes selectedTools in payload when submitting', async () => {
+  it('includes selectedTools and prompt in payload when submitting', async () => {
     const schedule = {
       _id: 'sched-1',
       name: 'My Schedule',
       agentId: 'agent-1',
-      promptGroupId: 'pg-1',
+      prompt: 'Summarize my inbox',
       scheduleType: 'recurring' as const,
       cronExpression: '0 0 * * *',
       runAt: null,
@@ -107,6 +107,7 @@ describe('ScheduleForm', () => {
     const submittedData = onSubmit.mock.calls[0][0] as ScheduleFormValues;
     expect(submittedData).toHaveProperty('selectedTools');
     expect(submittedData.selectedTools).toBeNull();
+    expect(submittedData.prompt).toBe('Summarize my inbox');
   });
 
   it('renders ToolPicker when agentId is set', () => {
@@ -129,7 +130,7 @@ describe('ScheduleForm', () => {
     expect(screen.getByTestId('tool-picker')).toBeInTheDocument();
   });
 
-  it('when fixedPromptGroupId is set and schedule is null: hides prompt select and includes promptGroupId in submit', async () => {
+  it('requires prompt and includes it in submit when creating', async () => {
     render(
       <ScheduleForm
         agents={mockAgents}
@@ -137,17 +138,15 @@ describe('ScheduleForm', () => {
         onClose={onClose}
         onSubmit={onSubmit}
         isSubmitting={false}
-        fixedPromptGroupId="pg-1"
       />,
     );
-
-    expect(screen.queryByLabelText('com_sidepanel_scheduled_agents_prompt')).not.toBeInTheDocument();
-    expect(screen.queryByRole('combobox', { name: 'com_sidepanel_scheduled_agents_prompt' })).not.toBeInTheDocument();
-    expect(document.getElementById('schedule-prompt')).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/com_ui_agent/i), { target: { value: 'agent-1' } });
     fireEvent.change(screen.getByLabelText(/com_ui_name/i), {
       target: { value: 'Test Schedule' },
+    });
+    fireEvent.change(screen.getByLabelText(/com_sidepanel_scheduled_agents_prompt/i), {
+      target: { value: 'Run daily summary' },
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'com_ui_create' }));
@@ -156,6 +155,6 @@ describe('ScheduleForm', () => {
       expect(onSubmit).toHaveBeenCalled();
     });
     const submittedData = onSubmit.mock.calls[0][0] as ScheduleFormValues;
-    expect(submittedData.promptGroupId).toBe('pg-1');
+    expect(submittedData.prompt).toBe('Run daily summary');
   });
 });
