@@ -1319,7 +1319,7 @@ export const createAdminWorkspace = (data: {
 
 export const updateAdminWorkspace = (
   id: string,
-  data: { name?: string; slug?: string },
+  data: { name?: string; slug?: string; maxMembers?: number; adminIds?: string[] },
 ): Promise<q.TWorkspace> => request.patch(endpoints.adminWorkspace(id), data);
 
 export const deleteAdminWorkspace = (id: string): Promise<{ message: string }> =>
@@ -1353,3 +1353,6 @@ export const removeAdminWorkspaceMember = (
 export const getWorkspaceMe = (): Promise<{
   workspace: { id: string; name: string; slug: string } | null;
 }> => request.get(endpoints.workspaceMe());
+
+export const getWorkspaceMeMembers = (): Promise<{ members: q.TWorkspaceMember[] }> =>
+  request.get(endpoints.workspaceMeMembers());

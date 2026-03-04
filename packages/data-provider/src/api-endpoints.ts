@@ -416,6 +416,7 @@ export const adminWorkspaceRemoveMember = (id: string, userId: string) =>
   `${adminWorkspace(id)}/members/${userId}`;
 
 export const workspaceMe = () => `${BASE_URL}/api/workspace/me`;
+export const workspaceMeMembers = () => `${BASE_URL}/api/workspace/me/members`;
 
 /* Memories */
 export const memories = () => `${BASE_URL}/api/memories`;

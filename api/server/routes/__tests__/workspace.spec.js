@@ -1,6 +1,7 @@
 /**
  * Workspace route tests.
  * GET /api/workspace/me - Returns current user's workspace when they have workspace_id.
+ * GET /api/workspace/me/members - Returns workspace members for current user's workspace.
  */
 const express = require('express');
 const request = require('supertest');
@@ -8,6 +9,7 @@ const mongoose = require('mongoose');
 
 const mockFindUser = jest.fn();
 const mockGetWorkspaceById = jest.fn();
+const mockUserFind = jest.fn();
 
 jest.mock('~/server/middleware', () => ({
   requireJwtAuth: (req, res, next) => next(),
@@ -19,6 +21,12 @@ jest.mock('~/models', () => ({
 
 jest.mock('~/models/Workspace', () => ({
   getWorkspaceById: (...args) => mockGetWorkspaceById(...args),
+}));
+
+jest.mock('~/db/models', () => ({
+  User: {
+    find: (...args) => mockUserFind(...args),
+  },
 }));
 
 describe('Workspace Routes', () => {
@@ -107,6 +115,55 @@ describe('Workspace Routes', () => {
         .expect(500);
 
       expect(response.body).toEqual({ message: 'Failed to get workspace' });
+    });
+  });
+
+  describe('GET /api/workspace/me/members', () => {
+    it('returns members when user has workspace_id', async () => {
+      mockFindUser.mockResolvedValue({
+        _id: validUserId,
+        workspace_id: validWorkspaceId,
+      });
+      mockGetWorkspaceById.mockResolvedValue({
+        _id: validWorkspaceId,
+        name: 'Acme Corp',
+        slug: 'acme',
+      });
+      mockUserFind.mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([
+          {
+            _id: new mongoose.Types.ObjectId(),
+            email: 'alice@acme.com',
+            name: 'Alice',
+            username: 'alice',
+            role: 'USER',
+          },
+        ]),
+      });
+
+      const response = await request(app)
+        .get('/api/workspace/me/members')
+        .expect(200);
+
+      expect(response.body.members).toHaveLength(1);
+      expect(response.body.members[0]).toMatchObject({
+        email: 'alice@acme.com',
+        name: 'Alice',
+        username: 'alice',
+        role: 'USER',
+      });
+    });
+
+    it('returns empty members when user has no workspace_id', async () => {
+      mockFindUser.mockResolvedValue({ _id: validUserId, workspace_id: null });
+
+      const response = await request(app)
+        .get('/api/workspace/me/members')
+        .expect(200);
+
+      expect(response.body).toEqual({ members: [] });
+      expect(mockUserFind).not.toHaveBeenCalled();
     });
   });
 });
