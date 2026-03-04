@@ -35,14 +35,16 @@ const getWorkspaceById = async function (workspaceId, fieldsToSelect = null) {
 
 /**
  * List all workspaces.
- * @returns {Promise<Array<{_id: string, name: string, slug: string}>>}
+ * @returns {Promise<Array<{_id: string, name: string, slug: string, maxMembers?: number}>>}
  */
 const listWorkspaces = async function () {
-  const workspaces = await Workspace.find().select('name slug').lean();
+  const workspaces = await Workspace.find().select('name slug maxMembers').lean();
   return workspaces.map((w) => ({
     _id: w._id.toString(),
+    id: w._id?.toString(),
     name: w.name,
     slug: w.slug,
+    maxMembers: w.maxMembers ?? 3,
   }));
 };
 
@@ -68,6 +70,8 @@ const createWorkspace = async function (data) {
     name: name.trim(),
     slug: normalizedSlug,
     createdBy,
+    adminIds: [createdBy],
+    maxMembers: 3,
   });
   return workspace.toObject ? workspace.toObject() : workspace;
 };
@@ -75,12 +79,12 @@ const createWorkspace = async function (data) {
 /**
  * Update workspace.
  * @param {string} workspaceId - Workspace ID
- * @param {Object} updates - { name?, slug? }
+ * @param {Object} updates - { name?, slug?, maxMembers?, adminIds? }
  * @returns {Promise<Object|null>}
  */
 const updateWorkspace = async function (workspaceId, updates) {
   if (!workspaceId) return null;
-  const { name, slug } = updates;
+  const { name, slug, maxMembers, adminIds } = updates;
   const set = {};
   if (name !== undefined) set.name = name.trim();
   if (slug !== undefined) {
@@ -96,9 +100,49 @@ const updateWorkspace = async function (workspaceId, updates) {
       set.slug = normalizedSlug;
     }
   }
+  if (maxMembers !== undefined && typeof maxMembers === 'number' && maxMembers >= 1) {
+    set.maxMembers = maxMembers;
+  }
+  if (adminIds !== undefined && Array.isArray(adminIds)) {
+    const mongoose = require('mongoose');
+    set.adminIds = adminIds
+      .filter((id) => id != null && mongoose.Types.ObjectId.isValid(id))
+      .map((id) => new mongoose.Types.ObjectId(id));
+  }
   if (Object.keys(set).length === 0) return getWorkspaceById(workspaceId);
   const workspace = await Workspace.findByIdAndUpdate(workspaceId, { $set: set }, { new: true }).lean();
   return workspace;
+};
+
+/**
+ * Check if a user is a workspace admin.
+ * Backward compat: if adminIds is empty, createdBy is the sole admin.
+ * @param {Object} workspace - Workspace document (lean)
+ * @param {string} userId - User ID to check
+ * @returns {boolean}
+ */
+const isWorkspaceAdmin = function (workspace, userId) {
+  if (!workspace || !userId) return false;
+  const idStr = userId.toString();
+  const adminIds = workspace.adminIds || [];
+  if (adminIds.length > 0) {
+    return adminIds.some((aid) => (aid && aid.toString()) === idStr);
+  }
+  return workspace.createdBy && workspace.createdBy.toString() === idStr;
+};
+
+/**
+ * Get the workspace admin member ID for notify flow (createdBy or first adminIds).
+ * @param {Object} workspace - Workspace document (lean)
+ * @returns {string|null}
+ */
+const getWorkspaceAdminId = function (workspace) {
+  if (!workspace) return null;
+  const adminIds = workspace.adminIds || [];
+  if (adminIds.length > 0 && adminIds[0]) {
+    return adminIds[0].toString();
+  }
+  return workspace.createdBy ? workspace.createdBy.toString() : null;
 };
 
 /**
@@ -114,6 +158,52 @@ const deleteWorkspace = async function (workspaceId) {
   await Workspace.findByIdAndDelete(workspaceId);
 };
 
+/**
+ * Set a routing rule (create or update). Trigger = topic, recipient = memberId.
+ * @param {string} workspaceId - Workspace ID
+ * @param {string} trigger - Topic/trigger (e.g. "commercial auto", "new leads")
+ * @param {string} recipient - User ID (memberId) who handles this
+ * @param {string} [instructions] - Optional instructions for the human
+ * @returns {Promise<Object|null>}
+ */
+const setRoutingRule = async function (workspaceId, trigger, recipient, instructions) {
+  if (!workspaceId || !trigger || !recipient) return null;
+  const mongoose = require('mongoose');
+  if (!mongoose.Types.ObjectId.isValid(recipient)) return null;
+  const topic = String(trigger).trim();
+  const memberId = new mongoose.Types.ObjectId(recipient);
+  const workspace = await Workspace.findById(workspaceId);
+  if (!workspace) return null;
+  const rules = workspace.routingRules || [];
+  const existingIndex = rules.findIndex((r) => r.topic === topic);
+  const newRule = { topic, memberId, ...(instructions != null && { instructions: String(instructions).trim() }) };
+  if (existingIndex >= 0) {
+    rules[existingIndex] = newRule;
+  } else {
+    rules.push(newRule);
+  }
+  workspace.routingRules = rules;
+  await workspace.save();
+  return workspace.toObject ? workspace.toObject() : workspace;
+};
+
+/**
+ * Delete a routing rule by trigger.
+ * @param {string} workspaceId - Workspace ID
+ * @param {string} trigger - Topic/trigger to remove
+ * @returns {Promise<Object|null>}
+ */
+const deleteRoutingRule = async function (workspaceId, trigger) {
+  if (!workspaceId || !trigger) return null;
+  const topic = String(trigger).trim();
+  const workspace = await Workspace.findById(workspaceId);
+  if (!workspace) return null;
+  const rules = (workspace.routingRules || []).filter((r) => r.topic !== topic);
+  workspace.routingRules = rules;
+  await workspace.save();
+  return workspace.toObject ? workspace.toObject() : workspace;
+};
+
 module.exports = {
   getWorkspaceBySlug,
   getWorkspaceById,
@@ -121,4 +211,8 @@ module.exports = {
   createWorkspace,
   updateWorkspace,
   deleteWorkspace,
+  setRoutingRule,
+  deleteRoutingRule,
+  isWorkspaceAdmin,
+  getWorkspaceAdminId,
 };

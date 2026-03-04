@@ -36,6 +36,8 @@ export type TWorkspace = {
   name: string;
   slug: string;
   createdBy: string;
+  maxMembers?: number;
+  adminIds?: string[];
   createdAt?: string;
   updatedAt?: string;
 };

@@ -1,9 +1,18 @@
 import { Schema, Document, Types } from 'mongoose';
 
+export interface IWorkspaceRoutingRule {
+  topic: string;
+  memberId: Types.ObjectId;
+  instructions?: string;
+}
+
 export interface IMongoWorkspace extends Document {
   name: string;
   slug: string;
   createdBy: Types.ObjectId;
+  routingRules?: IWorkspaceRoutingRule[];
+  maxMembers?: number;
+  adminIds?: Types.ObjectId[];
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -29,6 +38,24 @@ const workspaceSchema = new Schema<IMongoWorkspace>(
       ref: 'User',
       required: true,
       index: true,
+    },
+    routingRules: {
+      type: [
+        {
+          topic: { type: String, required: true, trim: true },
+          memberId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+          instructions: { type: String, trim: true },
+        },
+      ],
+      default: [],
+    },
+    maxMembers: {
+      type: Number,
+      default: 3,
+    },
+    adminIds: {
+      type: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+      default: [],
     },
   },
   {
