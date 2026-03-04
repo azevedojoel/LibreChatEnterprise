@@ -51,7 +51,12 @@ export function useToolApproval(toolCallId?: string, output?: string) {
     pending.conversationId === conversationId &&
     pending.runId === messageId;
 
-  const resolvedKey = getResolvedKey(conversationId, messageId, toolCallId);
+  // Use runId when available to match tool_approved SSE event key (conversationId:runId:toolCallId)
+  const resolvedKey = getResolvedKey(
+    conversationId,
+    pending?.runId ?? messageId,
+    toolCallId,
+  );
   const resolvedStatus = resolvedKey ? resolvedToolApprovals[resolvedKey] : undefined;
   const outputDenial = getDenialFromOutput(output);
 
@@ -81,7 +86,11 @@ export function useToolApproval(toolCallId?: string, output?: string) {
         approved: true,
       });
       if (result.success) {
-        const key = getResolvedKey(conversationId, messageId, toolCallId);
+        const key = getResolvedKey(
+          conversationId,
+          pending?.runId ?? messageId,
+          toolCallId,
+        );
         if (key) {
           setResolvedToolApprovals((prev) => ({ ...prev, [key]: 'approved' }));
         }
@@ -119,7 +128,11 @@ export function useToolApproval(toolCallId?: string, output?: string) {
         approved: false,
       });
       if (result.success) {
-        const key = getResolvedKey(conversationId, messageId, toolCallId);
+        const key = getResolvedKey(
+          conversationId,
+          pending?.runId ?? messageId,
+          toolCallId,
+        );
         if (key) {
           setResolvedToolApprovals((prev) => ({ ...prev, [key]: 'denied' }));
         }
@@ -150,5 +163,7 @@ export function useToolApproval(toolCallId?: string, output?: string) {
     handleApprove,
     handleDeny,
     approvalSubmitting,
+    waitingForApprover: pending?.waitingForApprover ?? false,
+    approverName: pending?.approverName ?? null,
   };
 }

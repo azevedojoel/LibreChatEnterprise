@@ -172,7 +172,7 @@ export default function ToolApprovalPage() {
               ? (localize('com_ui_tool_approved_message') || 'The tool has been approved and will continue executing.')
               : (localize('com_ui_tool_denied_message') || 'The tool has been denied.')}
           </p>
-          {pending && (
+          {pending && pending.canViewConversation !== false && (
             <Button
               variant="outline"
               className="mt-2"

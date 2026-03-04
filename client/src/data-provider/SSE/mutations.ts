@@ -59,6 +59,8 @@ export interface PendingToolConfirmationResponse {
   contextLabel?: string;
   conversationTitle?: string;
   recentMessages?: Array<{ role: 'user' | 'assistant'; text: string }>;
+  /** When false, approver does not have access to the conversation (e.g. human_await_response target member) */
+  canViewConversation?: boolean;
 }
 
 /**

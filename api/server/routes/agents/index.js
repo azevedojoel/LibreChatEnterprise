@@ -307,6 +307,7 @@ router.get('/chat/tool-confirmation/pending', async (req, res) => {
     toolName: link.toolName,
     argsSummary: link.argsSummary || '',
     conversationId: link.conversationId,
+    canViewConversation: true,
   };
 
   try {
@@ -322,6 +323,7 @@ router.get('/chat/tool-confirmation/pending', async (req, res) => {
       .lean();
 
     if (convo) {
+      payload.canViewConversation = true;
       payload.conversationTitle = convo.title || null;
 
       if (convo.scheduledRunId) {
@@ -365,6 +367,8 @@ router.get('/chat/tool-confirmation/pending', async (req, res) => {
           text: text || '(no text)',
         };
       });
+    } else {
+      payload.canViewConversation = false;
     }
   } catch (err) {
     logger.warn('[ToolConfirmation] Failed to enrich pending response:', err);
@@ -515,6 +519,21 @@ router.post('/chat/tool-confirmation', async (req, res) => {
     } catch (auditErr) {
       logger.warn('[ToolConfirmation] Failed to persist inline approval audit:', auditErr);
     }
+  }
+
+  // Notify client that approval was processed - agent run will resume, stream will continue
+  try {
+    await GenerationJobManager.emitChunk(resolvedConversationId, {
+      event: 'tool_approved',
+      data: {
+        toolCallId: resolvedToolCallId,
+        approved,
+        conversationId: resolvedConversationId,
+        runId,
+      },
+    });
+  } catch (emitErr) {
+    logger.warn('[ToolConfirmation] Failed to emit tool_approved:', emitErr);
   }
 
   return res.json({ success: true });

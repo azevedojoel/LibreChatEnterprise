@@ -225,7 +225,15 @@ export default function useEventHandlers({
   );
 
   const onToolConfirmationRequired = useCallback(
-    (data: { toolCallId: string; toolName: string; args?: string; conversationId: string; runId: string }) => {
+    (data: {
+      toolCallId: string;
+      toolName: string;
+      args?: string;
+      conversationId: string;
+      runId: string;
+      waitingForApprover?: boolean;
+      approverName?: string;
+    }) => {
       setPendingToolConfirmation((prev) => ({
         ...prev,
         [data.toolCallId]: {
@@ -234,6 +242,8 @@ export default function useEventHandlers({
           toolCallId: data.toolCallId,
           toolName: data.toolName,
           argsSummary: data.args,
+          waitingForApprover: data.waitingForApprover,
+          approverName: data.approverName,
         },
       }));
     },

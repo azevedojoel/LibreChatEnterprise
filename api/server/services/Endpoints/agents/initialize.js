@@ -33,7 +33,13 @@ const { processAddedConvo } = require('./addedConvo');
 const { getAgent } = require('~/models/Agent');
 const { logViolation } = require('~/cache');
 const db = require('~/models');
-const { ToolApprovalLink } = require('~/db/models');
+const { ToolApprovalLink, User } = require('~/db/models');
+const { Tools } = require('librechat-data-provider');
+const {
+  formatToolApprovalEmail,
+  buildToolApprovalSubject,
+} = require('~/server/utils/formatEmailHighlights');
+const { sendInboundReply } = require('~/server/services/sendInboundReply');
 
 /**
  * Creates a tool loader function for the agent.
@@ -168,69 +174,160 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
     requestToolConfirmation: async (toolCall, metadata) => {
       const conversationId = metadata?.thread_id;
       const runId = metadata?.run_id;
-      const userId = metadata?.user_id;
-      if (!conversationId || !runId || !userId) {
+      const conversationOwnerId = metadata?.user_id;
+      if (!conversationId || !runId || !conversationOwnerId) {
         logger.warn('[ToolConfirmation] Missing metadata for confirmation', {
           hasThreadId: !!conversationId,
           hasRunId: !!runId,
-          hasUserId: !!userId,
+          hasUserId: !!conversationOwnerId,
         });
         return { approved: false };
       }
-      const argsStr =
-        typeof toolCall.args === 'string'
-          ? toolCall.args
-          : JSON.stringify(toolCall.args ?? {});
+
+      const argsRaw = toolCall.args ?? {};
+      const args =
+        typeof argsRaw === 'string' ? (() => { try { return JSON.parse(argsRaw); } catch { return {}; } })() : argsRaw;
+      const argsStr = typeof argsRaw === 'string' ? argsRaw : JSON.stringify(argsRaw ?? {});
       const argsSummary = argsStr.length > 200 ? argsStr.slice(0, 200) + '...' : argsStr;
+
+      let approverUserId = conversationOwnerId;
+      let approverName = null;
+      let isTargetMemberApproval = false;
+      let targetUser = null;
+
+      if (toolCall.name === Tools.human_await_response && args?.memberId) {
+        const memberIdStr = String(args.memberId).trim();
+        if (memberIdStr) {
+          try {
+            const ownerUser = await User.findById(conversationOwnerId).select('workspace_id').lean();
+            const workspaceId = ownerUser?.workspace_id?.toString();
+            if (!workspaceId) {
+              logger.warn('[ToolConfirmation] human_await_response: conversation owner has no workspace');
+              return { approved: false };
+            }
+            targetUser = await User.findById(memberIdStr).select('_id email name workspace_id').lean();
+            if (!targetUser) {
+              logger.warn('[ToolConfirmation] human_await_response: target member not found', { memberId: memberIdStr });
+              return { approved: false };
+            }
+            if (targetUser.workspace_id?.toString() !== workspaceId) {
+              logger.warn('[ToolConfirmation] human_await_response: target member not in same workspace');
+              return { approved: false };
+            }
+            approverUserId = targetUser._id.toString();
+            approverName = targetUser.name || targetUser.email || 'the human';
+            isTargetMemberApproval = true;
+          } catch (err) {
+            logger.error('[ToolConfirmation] human_await_response: failed to resolve approver', err);
+            return { approved: false };
+          }
+        }
+      }
 
       logger.debug('[ToolConfirmation] Registering', {
         conversationId,
         runId,
         toolCallId: toolCall.id,
         toolName: toolCall.name,
+        approverUserId,
+        isTargetMemberApproval,
       });
 
       const { promise } = await ToolConfirmationStore.register({
         conversationId,
         runId,
         toolCallId: toolCall.id,
-        userId,
+        userId: approverUserId,
         toolName: toolCall.name,
         argsSummary,
       });
 
-      emitToolConfirmationEvent({
-        event: 'tool_confirmation_required',
-        data: {
-          toolCallId: toolCall.id,
-          toolName: toolCall.name,
-          args: argsSummary,
-          conversationId,
-          runId,
-        },
-      });
+      const baseUrl = process.env.DOMAIN_CLIENT || process.env.DOMAIN_SERVER || 'http://localhost:3080';
 
-      if (req._headlessSendApprovalEmail) {
-        const baseUrl = process.env.DOMAIN_CLIENT || process.env.DOMAIN_SERVER || 'http://localhost:3080';
+      if (isTargetMemberApproval) {
+        // targetUser already fetched above when resolving approverUserId
+        if (!targetUser?.email) {
+          logger.warn('[ToolConfirmation] human_await_response: target member has no email');
+          return promise;
+        }
         const token = nanoid(32);
-        const expiresAt = new Date(Date.now() + 3600 * 1000); // 1 hour TTL
+        const expiresAt = new Date(Date.now() + 3600 * 1000);
         await ToolApprovalLink.create({
           token,
           conversationId,
           runId,
           toolCallId: toolCall.id,
-          userId,
+          userId: approverUserId,
           toolName: toolCall.name,
           argsSummary,
           status: 'pending',
           expiresAt,
         });
         const approvalUrl = `${baseUrl}/approve/tool?id=${token}`;
-        await req._headlessSendApprovalEmail({
-          toolName: toolCall.name,
-          argsSummary,
-          approvalUrl,
+        const appName = process.env.APP_TITLE || 'Daily Thread';
+        const { html, text } = formatToolApprovalEmail(
+          { toolName: toolCall.name, argsSummary, approvalUrl },
+          { appName },
+        );
+        const subject = buildToolApprovalSubject({ toolName: toolCall.name, argsSummary }, { appName });
+        const emailResult = await sendInboundReply({
+          to: targetUser.email,
+          subject,
+          body: text,
+          html,
         });
+        if (!emailResult.success) {
+          logger.warn('[ToolConfirmation] human_await_response: failed to send approval email', {
+            error: emailResult.error,
+            to: targetUser.email,
+          });
+        }
+        emitToolConfirmationEvent({
+          event: 'tool_confirmation_required',
+          data: {
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            args: argsSummary,
+            conversationId,
+            runId,
+            approverUserId,
+            approverName,
+            waitingForApprover: true,
+          },
+        });
+      } else {
+        emitToolConfirmationEvent({
+          event: 'tool_confirmation_required',
+          data: {
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            args: argsSummary,
+            conversationId,
+            runId,
+          },
+        });
+
+        if (req._headlessSendApprovalEmail) {
+          const token = nanoid(32);
+          const expiresAt = new Date(Date.now() + 3600 * 1000);
+          await ToolApprovalLink.create({
+            token,
+            conversationId,
+            runId,
+            toolCallId: toolCall.id,
+            userId: approverUserId,
+            toolName: toolCall.name,
+            argsSummary,
+            status: 'pending',
+            expiresAt,
+          });
+          const approvalUrl = `${baseUrl}/approve/tool?id=${token}`;
+          await req._headlessSendApprovalEmail({
+            toolName: toolCall.name,
+            argsSummary,
+            approvalUrl,
+          });
+        }
       }
 
       return promise;

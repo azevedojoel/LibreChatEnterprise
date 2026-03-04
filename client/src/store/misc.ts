@@ -87,6 +87,9 @@ export interface PendingToolConfirmation {
   toolCallId: string;
   toolName: string;
   argsSummary?: string;
+  /** When true, approval is routed to another user (e.g. human_await_response memberId); conversation owner cannot approve */
+  waitingForApprover?: boolean;
+  approverName?: string;
 }
 
 /** Map of toolCallId -> PendingToolConfirmation (supports parallel tool confirmations) */

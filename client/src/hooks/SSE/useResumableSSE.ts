@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { v4 } from 'uuid';
 import { SSE } from 'sse.js';
-import { useSetRecoilState } from 'recoil';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   request,
@@ -21,6 +20,7 @@ import type { ActiveJobsResponse } from '~/data-provider';
 import { useAuthContext } from '~/hooks/AuthContext';
 import useEventHandlers from './useEventHandlers';
 import store from '~/store';
+import { useSetRecoilState } from 'recoil';
 
 const clearDraft = (conversationId?: string | null) => {
   if (conversationId) {
@@ -99,6 +99,9 @@ export default function useResumableSSE(
   const reconnectAttemptRef = useRef(0);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const submissionRef = useRef<TSubmission | null>(null);
+
+  const setPendingToolConfirmation = useSetRecoilState(store.pendingToolConfirmationAtom);
+  const setResolvedToolApprovals = useSetRecoilState(store.resolvedToolApprovalsAtom);
 
   const {
     setMessages,
@@ -183,6 +186,7 @@ export default function useResumableSSE(
               finalHandler(data, currentSubmission as EventSubmission);
             } catch (error) {
               console.error('[ResumableSSE] Error in finalHandler:', error);
+            } finally {
               setIsSubmitting(false);
               setShowStopButton(false);
             }
@@ -249,6 +253,30 @@ export default function useResumableSSE(
               conversationId: string;
               runId: string;
             });
+            return;
+          }
+
+          if (data.event === 'tool_approved' && data.data) {
+            const { toolCallId, approved, conversationId, runId } = data.data as {
+              toolCallId: string;
+              approved: boolean;
+              conversationId?: string;
+              runId?: string;
+            };
+            if (toolCallId) {
+              setPendingToolConfirmation((prev) => {
+                const next = { ...prev };
+                delete next[toolCallId];
+                return next;
+              });
+              if (conversationId && runId) {
+                const key = `${conversationId}:${runId}:${toolCallId}`;
+                setResolvedToolApprovals((prev) => ({
+                  ...prev,
+                  [key]: approved ? 'approved' : 'denied',
+                }));
+              }
+            }
             return;
           }
 
