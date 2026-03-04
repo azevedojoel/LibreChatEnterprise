@@ -228,7 +228,7 @@ webSearch:
 
 # Memory configuration
 memory:
-  disabled: false
+  disabled: true
   validKeys: ['preferences', 'work_info', 'personal_info', 'skills', 'interests', 'context']
   tokenLimit: 10000
   charLimit: 10000
@@ -351,7 +351,7 @@ endpoints:
           Your role:
           - Be a true AI assistant: helpful, attentive, and proactive. Understand what users need and deliver it clearly.
           - You have access to the user's data through this system: their files (via file_search), the web (via web_search), and any context they share in the chat. Use these to give accurate, grounded answers.
-          - When users need CRM tasks (contacts, deals, pipelines, organizations, activities), transfer to Morgan. When users need Google Workspace or Microsoft 365 (email, docs, calendar, files), transfer to Casey. When users need to create or manage scheduled agent runs, transfer to the Schedule Manager. When users need deep research, multi-source investigation, or a synthesized report across web, files, CRM, email, or documents, transfer to the Research Agent. When users need to build Python scripts or automations, transfer to Coder.
+          - When users need CRM tasks (contacts, deals, pipelines, organizations, activities), transfer to Morgan. When users need Google Workspace or Microsoft 365 (email, docs, calendar, files), transfer to Casey. When users need to create or manage scheduled agent runs, transfer to the Schedule Manager. When users need deep research, multi-source investigation, or a synthesized report across web, files, CRM, email, or documents, transfer to the Research Agent. When users need to build Python scripts or automations, transfer to Coder. When a real person in the workspace needs to act or decide, transfer to Human.
           - When users add and connect Google Workspace or Microsoft 365 tools, you can help with email, documents, scheduling, and files. Until then, use file_search and web_search for their needs.
           - When users email this system, their messages reach you. Reply in a natural, conversational way—as if you're their dedicated assistant.
           - Respect privacy and boundaries. You see only what the user shares in the current conversation and any files they attach or reference. Don't assume access to other users' data.
@@ -495,6 +495,27 @@ endpoints:
           - reset_workspace
           - update_todo
           - create_plan
+      - id: system-human
+        name: Human
+        provider: openAI
+        # Verify model exists for your provider (e.g. gpt-4o-mini, gpt-5-mini-2025-08-07)
+        model: gpt-5-mini-2025-08-07
+        instructions: |
+          You are the Human agent—the bridge between AI and real people in the workspace.
+          When Ellis or another agent transfers to you, a real person needs to act or decide.
+          Use human_list_workspace_members to see who's in the workspace and their roles.
+          Use human_routing_rules_list to read routing rules, human_routing_rules_set to create/update,
+          human_routing_rules_delete to remove. You manage routing config yourself—no different from
+          Morgan managing CRM or Scheduler managing schedules.
+          Use human_await_response when you need a human to approve or deny before continuing. It sends
+          them an approval email—do NOT call human_notify_human first. Use human_notify_human only when
+          you need to inform someone without blocking (e.g. FYI, no approval needed).
+          Use human_invite_to_workspace to invite a user by email. Only workspace admins can invite.
+          If you get an error that you are not an admin, use human_notify_human to ask the workspace
+          admin (use adminMemberId from the error) to invite them.
+          Use human_remove_from_workspace to remove a member. Only admins can remove; you cannot remove yourself.
+        tools:
+          - human_in_the_loop
     primaryAgentHandoffs:
       - to: system-crm
         description: Transfer to Morgan for CRM tasks (contacts, deals, pipelines, organizations, activities)
@@ -519,4 +540,9 @@ endpoints:
           inputs/outputs, constraints, and any context the user provided. Coder will create
           requirements.md from this content and then create the plan. Set reset: true only if
           the user explicitly wants to start fresh.
+      - to: system-human
+        description: Transfer to Human when a real person in the workspace needs to act or decide
+        prompt: |
+          Summarize what the human needs to do or decide. Include context, urgency, and any
+          relevant details from the conversation.
     defaultAgentForInboundEmail: system-general  # System agent that handles inbound email
