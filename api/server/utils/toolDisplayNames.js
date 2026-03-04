@@ -13,6 +13,8 @@ const TOOL_DISPLAY_NAMES = {
   workspace_delete_file: 'Delete File',
   workspace_list_files: 'List Files',
   workspace_send_file_to_user: 'Send File to User',
+  workspace_pull_file: 'Pull File to Workspace',
+  create_pdf: 'Create PDF',
   [Constants.TOOL_SEARCH]: 'Discovery',
   // Google Workspace MCP tools (underscore notation)
   tasks_listTaskLists: 'Fetch Task Lists',
@@ -30,7 +32,7 @@ const TOOL_DISPLAY_NAMES = {
   drive_search: 'Searched Google Drive',
   drive_createFolder: 'Created folder',
   drive_findFolder: 'Found folder',
-  drive_downloadFile: 'Downloaded file',
+  drive_downloadFile: 'Downloaded to My Files',
   gmail_search: 'Searched Gmail',
   gmail_get: 'Retrieved email',
   gmail_send: 'Sent email',

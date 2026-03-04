@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
-import { ArrowUpLeft } from 'lucide-react';
+import { ArrowUpLeft, Upload } from 'lucide-react';
 import {
   Table,
   Button,
@@ -10,6 +10,7 @@ import {
   FilterInput,
   TableHeader,
   useToastContext,
+  Spinner,
 } from '@librechat/client';
 import {
   flexRender,
@@ -34,7 +35,7 @@ import {
 } from 'librechat-data-provider';
 import { MyFilesModal } from '~/components/Chat/Input/Files/MyFilesModal';
 import { useFileMapContext, useChatContext } from '~/Providers';
-import { useLocalize, useUpdateFiles } from '~/hooks';
+import { useLocalize, useUpdateFiles, useMyFilesUpload } from '~/hooks';
 import { useGetFileConfig } from '~/data-provider';
 
 interface DataTableProps<TData, TValue> {
@@ -87,6 +88,12 @@ export default function DataTable<TData, TValue>({ columns, data }: DataTablePro
   const fileMap = useFileMapContext();
   const { showToast } = useToastContext();
   const { setFiles, conversation } = useChatContext();
+  const {
+    fileInputRef,
+    isUploading,
+    handleFileChange,
+    triggerFileInput,
+  } = useMyFilesUpload();
   const { data: fileConfig = null } = useGetFileConfig({
     select: (data) => mergeFileConfig(data),
   });
@@ -290,16 +297,39 @@ export default function DataTable<TData, TValue>({ columns, data }: DataTablePro
       </div>
 
       <div className="flex items-center justify-between">
-        <Button
-          ref={manageFilesRef}
-          variant="outline"
-          size="sm"
-          onClick={() => setShowFilesModal(true)}
-          aria-label={localize('com_sidepanel_manage_files')}
-        >
-          <ArrowUpLeft className="h-4 w-4" aria-hidden="true" />
-          <span className="ml-2">{localize('com_sidepanel_manage_files')}</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            ref={manageFilesRef}
+            variant="outline"
+            size="sm"
+            onClick={() => setShowFilesModal(true)}
+            aria-label={localize('com_sidepanel_manage_files')}
+          >
+            <ArrowUpLeft className="h-4 w-4" aria-hidden="true" />
+            <span className="ml-2">{localize('com_sidepanel_manage_files')}</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={triggerFileInput}
+            disabled={isUploading || !fileConfig}
+            aria-label={localize('com_ui_upload')}
+          >
+            {isUploading ? (
+              <Spinner className="h-4 w-4" />
+            ) : (
+              <Upload className="h-4 w-4" aria-hidden="true" />
+            )}
+            <span className="ml-2">{localize('com_ui_upload')}</span>
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={handleFileChange}
+            aria-hidden
+          />
+        </div>
 
         <div className="flex items-center gap-2" role="navigation" aria-label="Pagination">
           <Button

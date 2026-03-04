@@ -41,10 +41,19 @@ const {
 } = require('../');
 const { primeFiles: primeCodeFiles } = require('~/server/services/Files/Code/process');
 const { createLocalCodeExecutionTool } = require('~/server/services/LocalCodeExecution');
-const { createWorkspaceCodeEditTools } = require('~/server/services/WorkspaceCodeEdit');
+const {
+  createWorkspaceCodeEditTools,
+  createPullFileToWorkspaceTool,
+} = require('~/server/services/WorkspaceCodeEdit');
+const { createCreatePdfTool } = require('~/server/services/CreatePdf/tool');
 const { createSchedulingTools } = require('~/server/services/ScheduledAgents/schedulingTools');
-const { buildSchedulerTargetContext, buildSchedulerPromptContext } = require('~/server/services/ScheduledAgents/schedulerContext');
-const { SCHEDULER_DEFAULT_INSTRUCTIONS } = require('~/server/services/ScheduledAgents/schedulerInstructions');
+const {
+  buildSchedulerTargetContext,
+  buildSchedulerPromptContext,
+} = require('~/server/services/ScheduledAgents/schedulerContext');
+const {
+  SCHEDULER_DEFAULT_INSTRUCTIONS,
+} = require('~/server/services/ScheduledAgents/schedulerInstructions');
 const { getAgents } = require('~/models/Agent');
 const { createFileSearchTool, primeFiles: primeSearchFiles } = require('./fileSearch');
 const { getUserPluginAuthValue } = require('~/server/services/PluginService');
@@ -331,8 +340,7 @@ const loadTools = async ({
           throwError: false,
         });
         const codeApiKey = authValues[EnvVar.CODE_API_KEY] ?? '';
-        const useLocalExecution =
-          !disableLocal && (!codeApiKey || codeApiKey === 'local');
+        const useLocalExecution = !disableLocal && (!codeApiKey || codeApiKey === 'local');
         if (disableLocal && (!codeApiKey || codeApiKey === 'local')) {
           throw new Error(
             'Local code execution is disabled. Configure a remote code execution API key (E2B/Replit) or set DISABLE_LOCAL_CODE_EXECUTION=false.',
@@ -372,10 +380,10 @@ const loadTools = async ({
       tool === Tools.workspace_list_files ||
       tool === Tools.search_user_files ||
       tool === Tools.workspace_glob_files ||
-      tool === Tools.workspace_send_file_to_user
+      tool === Tools.workspace_send_file_to_user ||
+      tool === Tools.workspace_pull_file
     ) {
-      const conversationId =
-        options.req?.body?.conversationId ?? options.conversationId;
+      const conversationId = options.req?.body?.conversationId ?? options.conversationId;
       const agentId = agent?.id;
       const userId = user;
       if (!conversationId && !(agentId && userId)) {
@@ -397,10 +405,7 @@ const loadTools = async ({
       let workspaceInjected = false;
       const ensureWorkspaceInjected = async () => {
         if (workspaceInjected) return;
-        const { files } = await primeCodeFiles(
-          { ...options, agentId: agent?.id },
-          '',
-        );
+        const { files } = await primeCodeFiles({ ...options, agentId: agent?.id }, '');
         await injectAgentFiles(workspaceRoot, files, options.req);
         workspaceInjected = true;
       };
@@ -415,6 +420,12 @@ const loadTools = async ({
         searchFilesTool,
         sendFileToUserTool,
       ] = createWorkspaceCodeEditTools({ workspaceRoot });
+      const pullFileToWorkspaceTool = createPullFileToWorkspaceTool({
+        workspaceRoot,
+        req: options.req,
+        agentId,
+        userId,
+      });
       const toolMap = {
         [Tools.workspace_read_file]: readFileTool,
         [Tools.workspace_edit_file]: editFileTool,
@@ -424,11 +435,20 @@ const loadTools = async ({
         [Tools.search_user_files]: searchFilesTool,
         [Tools.workspace_glob_files]: globFilesTool,
         [Tools.workspace_send_file_to_user]: sendFileToUserTool,
+        [Tools.workspace_pull_file]: pullFileToWorkspaceTool,
       };
       requestedTools[tool] = async () => {
         await ensureWorkspaceInjected();
         return toolMap[tool];
       };
+      continue;
+    } else if (tool === Tools.create_pdf) {
+      const req = options.req;
+      if (!req) {
+        logger.warn('[handleTools] create_pdf requires req, skipping');
+        continue;
+      }
+      requestedTools[tool] = async () => createCreatePdfTool({ req });
       continue;
     } else if (
       tool === Tools.list_schedules ||

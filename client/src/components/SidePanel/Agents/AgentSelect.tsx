@@ -69,6 +69,7 @@ export default function AgentSelect({
         [AgentCapabilities.web_search]: false,
         [AgentCapabilities.file_search]: false,
         [AgentCapabilities.execute_code]: false,
+        [AgentCapabilities.create_pdf]: false,
         [AgentCapabilities.manage_scheduling]: false,
         [AgentCapabilities.end_after_tools]: false,
         [AgentCapabilities.hide_sequential_outputs]: false,
@@ -108,6 +109,10 @@ export default function AgentSelect({
           if (!agentTools.includes(AgentCapabilities.manage_scheduling)) {
             agentTools.push(AgentCapabilities.manage_scheduling);
           }
+          return;
+        }
+        if (tool === Tools.create_pdf) {
+          capabilities[AgentCapabilities.create_pdf] = true;
           return;
         }
 

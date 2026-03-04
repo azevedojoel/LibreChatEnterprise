@@ -124,10 +124,13 @@ export function formatToolContent(
 
   type ContentHandler = undefined | ((item: t.ToolContentPart) => void);
 
+  const fileArtifacts: Array<{ name: string; buffer: Buffer }> = [];
+
   const contentHandlers: {
     text: (item: Extract<t.ToolContentPart, { type: 'text' }>) => void;
     image: (item: t.ToolContentPart) => void;
     resource: (item: Extract<t.ToolContentPart, { type: 'resource' }>) => void;
+    file: (item: { type: 'file'; name: string; mimeType?: string; data: string }) => void;
   } = {
     text: (item) => {
       const segment = formatter ? formatter(item.text, ctx) : item.text;
@@ -173,6 +176,37 @@ export function formatToolContent(
         resourceText.push(`Resource Text: ${item.resource.text}`);
       }
 
+      if ('blob' in item.resource && typeof item.resource.blob === 'string') {
+        try {
+          const buffer = Buffer.from(item.resource.blob, 'base64');
+          const name =
+            'name' in item.resource && typeof item.resource.name === 'string'
+              ? item.resource.name
+              : item.resource.uri.startsWith('drive-file:')
+                ? item.resource.uri.slice('drive-file:'.length)
+                : `file.${(item.resource.mimeType || '').split('/')[1] || 'bin'}`;
+          fileArtifacts.push({ name, buffer });
+        } catch {
+          /* skip invalid base64 */
+        }
+      } else if (item.resource.uri.startsWith('data:')) {
+        const match = item.resource.uri.match(/^data:([^;]+);base64,(.+)$/);
+        if (match) {
+          try {
+            const buffer = Buffer.from(match[2], 'base64');
+            const mime = match[1];
+            const ext = mime.split('/')[1] || 'bin';
+            const name =
+              'name' in item.resource && typeof item.resource.name === 'string'
+                ? item.resource.name
+                : `file.${ext}`;
+            fileArtifacts.push({ name, buffer });
+          } catch {
+            /* skip invalid base64 */
+          }
+        }
+      }
+
       if (item.resource.uri.length) {
         resourceText.push(`Resource URI: ${item.resource.uri}`);
       }
@@ -182,6 +216,18 @@ export function formatToolContent(
 
       if (resourceText.length) {
         currentTextBlock += (currentTextBlock ? '\n\n' : '') + resourceText.join('\n');
+      }
+    },
+
+    file: (item) => {
+      if (item.type !== 'file' || !item.name || !item.data) {
+        return;
+      }
+      try {
+        const buffer = Buffer.from(item.data, 'base64');
+        fileArtifacts.push({ name: item.name, buffer });
+      } catch {
+        /* skip invalid base64 */
       }
     },
   };
@@ -229,6 +275,15 @@ UI Resource Markers Available:
     artifacts = {
       ...artifacts,
       [Tools.ui_resources]: { data: uiResources },
+    };
+  }
+
+  if (fileArtifacts.length > 0) {
+    const sessionId = ctx?.run_id ?? ctx?.session_id;
+    artifacts = {
+      ...artifacts,
+      files: fileArtifacts,
+      ...(sessionId ? { session_id: String(sessionId) } : {}),
     };
   }
 

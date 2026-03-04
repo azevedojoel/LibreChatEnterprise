@@ -26,6 +26,7 @@ import FileContext from './FileContext';
 import SearchForm from './Search/Form';
 import FileSearch from './FileSearch';
 import SchedulingCheckbox from './SchedulingCheckbox';
+import CreatePdfCheckbox from './CreatePdfCheckbox';
 import SchedulerTargetAgents from './SchedulerTargetAgents';
 import Artifacts from './Artifacts';
 import AgentTool from './AgentTool';
@@ -87,6 +88,7 @@ export default function AgentConfig() {
     artifactsEnabled,
     webSearchEnabled,
     fileSearchEnabled,
+    createPdfEnabled,
     manageSchedulingEnabled,
   } = useAgentCapabilities(agentsConfig?.capabilities);
 
@@ -292,6 +294,7 @@ export default function AgentConfig() {
           artifactsEnabled ||
           contextEnabled ||
           webSearchEnabled ||
+          createPdfEnabled ||
           manageSchedulingEnabled) && (
           <div className="mb-4 flex w-full flex-col items-start gap-3">
             <label className="text-token-text-primary block font-medium">
@@ -307,6 +310,8 @@ export default function AgentConfig() {
             {artifactsEnabled && <Artifacts />}
             {/* File Search */}
             {fileSearchEnabled && <FileSearch agent_id={agent_id} files={knowledge_files} />}
+            {/* Create PDF */}
+            {createPdfEnabled && <CreatePdfCheckbox />}
             {/* Manage Scheduling */}
             {manageSchedulingEnabled && (
               <>

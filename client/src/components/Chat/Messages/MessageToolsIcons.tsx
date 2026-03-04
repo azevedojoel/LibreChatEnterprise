@@ -9,6 +9,7 @@ import {
   FileEdit,
   FilePlus,
   FileX,
+  FileDown,
   FolderOpen,
   ListPlus,
   List,
@@ -47,6 +48,8 @@ const BUILT_IN_ICONS: Record<string, React.ComponentType<{ className?: string; s
   [Tools.workspace_list_files]: FolderOpen,
   [Tools.workspace_glob_files]: Search,
   [Tools.workspace_send_file_to_user]: FilePlus,
+  [Tools.workspace_pull_file]: FileDown,
+  [Tools.create_pdf]: FileText,
   [Tools.search_user_files]: Search,
 };
 
@@ -84,6 +87,8 @@ function getToolDisplayName(
     [Tools.workspace_list_files]: 'List Files',
     [Tools.workspace_glob_files]: 'Globbed',
     [Tools.workspace_send_file_to_user]: 'Send File to User',
+    [Tools.workspace_pull_file]: 'Pull File to Workspace',
+    [Tools.create_pdf]: 'Create PDF',
     [Tools.search_user_files]: 'Grepped',
   };
   return labels[toolId] ?? toolId;

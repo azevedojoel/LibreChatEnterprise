@@ -442,6 +442,8 @@ const nativeTools = new Set([
   Tools.search_user_files,
   Tools.workspace_glob_files,
   Tools.workspace_send_file_to_user,
+  Tools.workspace_pull_file,
+  Tools.create_pdf,
   Tools.list_schedules,
   Tools.list_user_projects,
   Tools.create_schedule,
@@ -533,6 +535,7 @@ async function loadToolDefinitionsWrapper({
       Tools.search_user_files,
       Tools.workspace_glob_files,
       Tools.workspace_send_file_to_user,
+      Tools.workspace_pull_file,
     ];
     toolsToFilter = [...new Set([...toolsToFilter, ...workspaceTools])];
   }
@@ -668,7 +671,8 @@ async function loadToolDefinitionsWrapper({
       tool === Tools.workspace_list_files ||
       tool === Tools.search_user_files ||
       tool === Tools.workspace_glob_files ||
-      tool === Tools.workspace_send_file_to_user
+      tool === Tools.workspace_send_file_to_user ||
+      tool === Tools.workspace_pull_file
     ) {
       if (isPersistentAgent) {
         if (ephemeralAgent?.execute_code === false) return false;
@@ -691,6 +695,16 @@ async function loadToolDefinitionsWrapper({
     ) {
       if (appConfig?.interfaceConfig?.scheduledAgents === false) return false;
       return checkCapability(AgentCapabilities.manage_scheduling);
+    }
+    if (tool === Tools.create_pdf) {
+      if (isPersistentAgent) {
+        if (ephemeralAgent?.create_pdf === false) return false;
+        return checkCapability(AgentCapabilities.create_pdf);
+      }
+      if (ephemeralAgent != null && 'create_pdf' in ephemeralAgent) {
+        return ephemeralAgent.create_pdf === true;
+      }
+      return checkCapability(AgentCapabilities.create_pdf);
     }
     if (!areToolsEnabled && !tool.includes(actionDelimiter)) {
       return false;
@@ -942,7 +956,8 @@ async function loadToolDefinitionsWrapper({
       filteredTools.includes(Tools.workspace_list_files) ||
       filteredTools.includes(Tools.search_user_files) ||
       filteredTools.includes(Tools.workspace_glob_files) ||
-      filteredTools.includes(Tools.workspace_send_file_to_user));
+      filteredTools.includes(Tools.workspace_send_file_to_user) ||
+      filteredTools.includes(Tools.workspace_pull_file));
 
   if (hasWebSearch) {
     toolContextMap[Tools.web_search] = buildWebSearchContext();
@@ -956,6 +971,12 @@ async function loadToolDefinitionsWrapper({
     toolContextMap[Tools.execute_code] = '- Code execution runs locally. Supports Python only.';
   }
 
+  const hasCreatePdf = filteredTools.includes(Tools.create_pdf);
+  if (hasCreatePdf) {
+    toolContextMap[Tools.create_pdf] =
+      '- Converts HTML/CSS to PDF. Saves to user files and displays in chat.';
+  }
+
   if (hasWorkspaceCodeEdit) {
     toolContextMap[Tools.workspace_read_file] =
       toolContextMap[Tools.workspace_edit_file] =
@@ -965,7 +986,8 @@ async function loadToolDefinitionsWrapper({
       toolContextMap[Tools.search_user_files] =
       toolContextMap[Tools.workspace_glob_files] =
       toolContextMap[Tools.workspace_send_file_to_user] =
-        '- Workspace tools: operate on the conversation-scoped workspace (shared with execute_code). Files from email attachments or file_search are NOT in the workspace—use file_search for those.';
+      toolContextMap[Tools.workspace_pull_file] =
+        '- Workspace tools: operate on the conversation-scoped workspace (shared with execute_code). Files from email attachments or file_search are NOT in the workspace—use file_search for those. Use workspace_pull_file to copy a file from My Files (e.g. from file_search results) into the workspace.';
   }
 
   if (hasFileSearch) {
@@ -1150,6 +1172,7 @@ async function loadAgentTools({
       Tools.search_user_files,
       Tools.workspace_glob_files,
       Tools.workspace_send_file_to_user,
+      Tools.workspace_pull_file,
     ];
     toolsToFilter = [...new Set([...toolsToFilter, ...workspaceTools])];
   }
@@ -1288,7 +1311,8 @@ async function loadAgentTools({
       tool === Tools.workspace_list_files ||
       tool === Tools.search_user_files ||
       tool === Tools.workspace_glob_files ||
-      tool === Tools.workspace_send_file_to_user
+      tool === Tools.workspace_send_file_to_user ||
+      tool === Tools.workspace_pull_file
     ) {
       if (isPersistentAgent) {
         if (ephemeralAgent?.execute_code === false) return false;
@@ -1310,6 +1334,15 @@ async function loadAgentTools({
     ) {
       if (appConfig?.interfaceConfig?.scheduledAgents === false) return false;
       return checkCapability(AgentCapabilities.manage_scheduling);
+    } else if (tool === Tools.create_pdf) {
+      if (isPersistentAgent) {
+        if (ephemeralAgent?.create_pdf === false) return false;
+        return checkCapability(AgentCapabilities.create_pdf);
+      }
+      if (ephemeralAgent != null && 'create_pdf' in ephemeralAgent) {
+        return ephemeralAgent.create_pdf === true;
+      }
+      return checkCapability(AgentCapabilities.create_pdf);
     } else if (!areToolsEnabled && !tool.includes(actionDelimiter)) {
       return false;
     }
@@ -1384,7 +1417,8 @@ async function loadAgentTools({
         tool.name === Tools.workspace_list_files ||
         tool.name === Tools.search_user_files ||
         tool.name === Tools.workspace_glob_files ||
-        tool.name === Tools.workspace_send_file_to_user)
+        tool.name === Tools.workspace_send_file_to_user ||
+        tool.name === Tools.workspace_pull_file)
     ) {
       agentTools.push(tool);
       continue;
@@ -1674,6 +1708,35 @@ async function loadToolsForExecution({
   const appConfig = req.config;
   const allLoadedTools = [];
   const configurable = { userMCPAuthMap };
+
+  const hasWorkspaceTools = toolNames.some(
+    (n) =>
+      n === Tools.workspace_read_file ||
+      n === Tools.workspace_edit_file ||
+      n === Tools.workspace_create_file ||
+      n === Tools.workspace_delete_file ||
+      n === Tools.workspace_list_files ||
+      n === Tools.search_user_files ||
+      n === Tools.workspace_glob_files ||
+      n === Tools.workspace_send_file_to_user ||
+      n === Tools.workspace_pull_file,
+  );
+  const hasDriveDownloadFile = toolNames.some(
+    (n) => typeof n === 'string' && n.includes('drive_downloadFile'),
+  );
+  if ((hasWorkspaceTools || hasDriveDownloadFile) && req?.user?.id && (req?.body?.conversationId || agent?.id)) {
+    const pathMod = require('path');
+    const {
+      getSessionBaseDir,
+      getWorkspaceSessionId,
+    } = require('~/server/services/LocalCodeExecution');
+    const sessionId = getWorkspaceSessionId({
+      agentId: agent?.id,
+      userId: req.user.id,
+      conversationId: req.body?.conversationId,
+    });
+    configurable.workspaceRoot = pathMod.join(getSessionBaseDir(), sessionId);
+  }
 
   const isToolSearchVariant = (n) =>
     isToolSearchTool(n) || (typeof n === 'string' && n.startsWith('tool_search_mcp_'));

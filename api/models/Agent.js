@@ -122,6 +122,9 @@ const loadEphemeralAgent = async ({ req, spec, endpoint, model_parameters: _m })
   if (ephemeralAgent?.web_search === true || modelSpec?.webSearch === true) {
     tools.push(Tools.web_search);
   }
+  if (ephemeralAgent?.create_pdf === true || modelSpec?.createPdf === true) {
+    tools.push(Tools.create_pdf);
+  }
 
   const addedServers = new Set();
   if (mcpServers.size > 0) {

@@ -4,7 +4,13 @@
  */
 const fs = require('fs').promises;
 const path = require('path');
+const { createWriteStream } = require('fs');
+const { pipeline } = require('stream').promises;
 const { glob } = require('glob');
+const { getFiles } = require('~/models');
+const { filterFilesByAgentAccess } = require('~/server/services/Files/permissions');
+const { getStrategyFunctions } = require('~/server/services/Files/strategies');
+const { FileSources } = require('librechat-data-provider');
 
 /**
  * Normalizes paths that use /mnt/data convention (from execute_code) to relative paths.
@@ -421,6 +427,60 @@ async function sendFilesToUser({ workspaceRoot, paths }) {
   return { files };
 }
 
+/**
+ * Copy a file from the user's My Files into the workspace.
+ * Uses same copy logic as injectAgentFiles. Skips if file already exists in workspace.
+ * @param {object} params
+ * @param {string} params.workspaceRoot - Absolute workspace path
+ * @param {string} params.file_id - File ID from file_search or My Files
+ * @param {import('express').Request} params.req - Request for storage streaming
+ * @param {string} params.userId - User ID for access check
+ * @param {string} [params.agentId] - Agent ID for access check
+ * @param {string} [params.role] - User role for access check
+ * @returns {Promise<{ filename: string } | { error: string }>}
+ */
+async function pullFileToWorkspace({ workspaceRoot, file_id, req, userId, agentId, role }) {
+  if (!file_id || typeof file_id !== 'string') {
+    return { error: 'file_id is required' };
+  }
+  if (!req) {
+    return { error: 'Request context required for file access' };
+  }
+  if (!userId || !agentId) {
+    return { error: 'User and agent context required for file access' };
+  }
+  const allFiles = (await getFiles({ file_id }, null, { text: 0 })) ?? [];
+  const dbFiles = await filterFilesByAgentAccess({
+    files: allFiles,
+    userId,
+    role: role ?? req.user?.role,
+    agentId,
+  });
+  const file = dbFiles[0];
+  if (!file || !file.filename || !file.filepath) {
+    return { error: 'File not found or access denied.' };
+  }
+  await fs.mkdir(workspaceRoot, { recursive: true });
+  const dest = path.join(workspaceRoot, path.basename(file.filename));
+  const stat = await fs.stat(dest).catch(() => null);
+  if (stat?.isFile()) {
+    return { filename: path.basename(file.filename) };
+  }
+  try {
+    const source = file.source ?? FileSources.local;
+    const { getDownloadStream } = getStrategyFunctions(source);
+    if (!getDownloadStream) {
+      return { error: 'File storage does not support streaming' };
+    }
+    const readStream = await getDownloadStream(req, file.filepath);
+    const writeStream = createWriteStream(dest);
+    await pipeline(readStream, writeStream);
+    return { filename: path.basename(file.filename) };
+  } catch (err) {
+    return { error: `Failed to copy file: ${err.message}` };
+  }
+}
+
 module.exports = {
   readFile,
   editFile,
@@ -430,4 +490,5 @@ module.exports = {
   globFiles,
   searchFiles,
   sendFilesToUser,
+  pullFileToWorkspace,
 };

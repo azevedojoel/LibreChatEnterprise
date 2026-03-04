@@ -10,6 +10,8 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   [Tools.workspace_delete_file]: 'Delete File',
   [Tools.workspace_list_files]: 'List Files',
   [Tools.workspace_send_file_to_user]: 'Send File to User',
+  [Tools.workspace_pull_file]: 'Pull File to Workspace',
+  [Tools.create_pdf]: 'Create PDF',
   [Tools.execute_code]: 'Code Interpreter',
   [Constants.TOOL_SEARCH]: 'Discovery',
   // Google Workspace MCP tools (underscore notation)
@@ -58,7 +60,7 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   sheets_getMetadata: 'Retrieved Sheets metadata',
   // Google Drive (additional)
   drive_findFolder: 'Found folder',
-  drive_downloadFile: 'Downloaded file',
+  drive_downloadFile: 'Downloaded to My Files',
   // Google Auth
   auth_clear: 'Cleared authentication',
   auth_refreshToken: 'Refreshed token',

@@ -7,6 +7,7 @@ import type { SandpackPreviewRef, CodeEditorRef } from '@codesandbox/sandpack-re
 import { useShareContext, useMutationState } from '~/Providers';
 import useArtifacts from '~/hooks/Artifacts/useArtifacts';
 import DownloadArtifact from './DownloadArtifact';
+import SaveArtifactAsPdf from './SaveArtifactAsPdf';
 import ArtifactVersion from './ArtifactVersion';
 import ArtifactTabs from './ArtifactTabs';
 import { CopyCodeButton } from './Code';
@@ -281,6 +282,7 @@ export default function Artifacts() {
                 />
               )}
               <CopyCodeButton content={currentArtifact.content ?? ''} />
+              <SaveArtifactAsPdf artifact={currentArtifact} />
               <DownloadArtifact artifact={currentArtifact} />
               <Button
                 size="icon"

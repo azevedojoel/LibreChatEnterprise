@@ -579,6 +579,17 @@ function createToolInstance({
         derivedSignal.addEventListener('abort', abortHandler, { once: true });
       }
 
+      let effectiveToolArguments = toolArguments;
+      if (
+        toolName === 'drive_downloadFile' &&
+        effectiveToolArguments?.destination === 'workspace'
+      ) {
+        const workspaceRoot = config?.configurable?.workspaceRoot;
+        if (workspaceRoot) {
+          effectiveToolArguments = { ...effectiveToolArguments, workspace_path: workspaceRoot };
+        }
+      }
+
       let customUserVars =
         config?.configurable?.userMCPAuthMap?.[`${Constants.mcp_prefix}${serverName}`] ?? {};
       /** CRM always needs PROJECT_ID and LIBRECHAT_MCP_ACCESS_TOKEN - inject when calling */
@@ -617,7 +628,8 @@ function createToolInstance({
         serverName,
         toolName,
         provider,
-        toolArguments,
+        toolArguments: effectiveToolArguments,
+        runId: config.metadata?.run_id,
         options: {
           signal: derivedSignal,
         },
@@ -636,11 +648,12 @@ function createToolInstance({
       });
 
       if (isAssistantsEndpoint(provider) && Array.isArray(result)) {
-        return result[0];
+        return [result[0], result[1]];
       }
       // When formatToolContent returns [formattedContent, artifacts] for content-array providers
       // (google, anthropic, openai, azureopenai), extract the text so tool_call.output gets the
       // plain string. This lets DriveSearch, GmailSearch, GmailGet parse the compact JSON correctly.
+      // Always return [content, artifact] tuple for responseFormat: 'content_and_artifact'.
       if (Array.isArray(result[0]) && result[0][0]?.type === ContentTypes.TEXT) {
         const text = result[0]
           .map((block) => (block.type === ContentTypes.TEXT ? block.text : ''))
@@ -649,11 +662,10 @@ function createToolInstance({
         const artifacts = result[1];
         const hasArtifacts =
           artifacts &&
-          (artifacts.content?.length > 0 || artifacts[Tools.ui_resources]);
-        if (!hasArtifacts) {
-          return text;
-        }
-        return [text, artifacts];
+          (artifacts.content?.length > 0 ||
+            artifacts[Tools.ui_resources] ||
+            (artifacts.files?.length ?? 0) > 0);
+        return [text, hasArtifacts ? artifacts : undefined];
       }
       return result;
     } catch (error) {
@@ -704,13 +716,14 @@ function createToolInstance({
     }
   };
 
-  // MCP tools (gmail, drive, etc.) return plain text/JSON, not artifacts. Use 'content' so
-  // the framework accepts a string return instead of requiring a two-tuple.
+  // MCP tools can return [text, artifacts] when formatToolContent extracts file artifacts
+  // (e.g. drive_downloadFile with destination=my_files). Use 'content_and_artifact' so the
+  // artifact (file buffers) is NOT sent to the LLM context—only the short text message is.
   const toolInstance = tool(_call, {
     schema,
     name: normalizedToolKey,
     description: description || '',
-    responseFormat: 'content',
+    responseFormat: 'content_and_artifact',
   });
   toolInstance.mcp = true;
   toolInstance.mcpRawServerName = serverName;

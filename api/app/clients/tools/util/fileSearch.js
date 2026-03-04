@@ -152,7 +152,7 @@ const createFileSearchTool = async ({ userId, files, entity_id, fileCitations = 
       const formattedResults = validResults
         .flatMap((result, fileIndex) =>
           result.data.map(([docInfo, distance]) => ({
-            filename: docInfo.metadata.source.split('/').pop(),
+            filename: files[fileIndex]?.filename ?? docInfo.metadata.source?.split('/').pop() ?? 'Unknown',
             content: docInfo.page_content,
             distance,
             file_id: files[fileIndex]?.file_id,
@@ -169,24 +169,52 @@ const createFileSearchTool = async ({ userId, files, entity_id, fileCitations = 
         ];
       }
 
+      // Deduplicate by file_id so we count unique files, not chunks (RAG returns multiple chunks per file)
+      // Filter out content snippets misidentified as filenames (e.g. "Listed but not BBB accredited")
+      const hasFileExtension = (name) => /\.(pdf|docx?|xlsx?|txt|md|csv|pptx?|jpg|jpeg|png|gif|webp)$/i.test(name ?? '');
+
+      const sourcesByFile = new Map();
+      for (const result of formattedResults) {
+        if (!hasFileExtension(result.filename)) continue;
+
+        const fileId = result.file_id;
+        const relevance = 1.0 - result.distance;
+        const page = result.page ?? null;
+        const pageRelevance = page ? { [page]: relevance } : {};
+
+        const existing = sourcesByFile.get(fileId);
+        if (!existing) {
+          sourcesByFile.set(fileId, {
+            type: 'file',
+            fileId,
+            content: result.content,
+            fileName: result.filename,
+            relevance,
+            pages: page ? [page] : [],
+            pageRelevance,
+          });
+        } else {
+          if (relevance > existing.relevance) {
+            existing.content = result.content;
+          }
+          existing.relevance = Math.max(existing.relevance, relevance);
+          if (page && !existing.pages.includes(page)) {
+            existing.pages.push(page);
+            existing.pages.sort((a, b) => a - b);
+          }
+          Object.assign(existing.pageRelevance, pageRelevance);
+        }
+      }
+      const sources = Array.from(sourcesByFile.values());
+
       const formattedString = formattedResults
         .map(
           (result, index) =>
-            `File: ${result.filename}${
+            `File: ${result.filename}\nfile_id: ${result.file_id ?? 'unknown'}${
               fileCitations ? `\nAnchor: \\ue202turn0file${index} (${result.filename})` : ''
             }\nRelevance: ${(1.0 - result.distance).toFixed(4)}\nContent: ${result.content}\n`,
         )
         .join('\n---\n');
-
-      const sources = formattedResults.map((result) => ({
-        type: 'file',
-        fileId: result.file_id,
-        content: result.content,
-        fileName: result.filename,
-        relevance: 1.0 - result.distance,
-        pages: result.page ? [result.page] : [],
-        pageRelevance: result.page ? { [result.page]: 1.0 - result.distance } : {},
-      }));
 
       return [formattedString, { [Tools.file_search]: { sources, fileCitations } }];
     },

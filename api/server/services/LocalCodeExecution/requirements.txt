@@ -9,4 +9,37 @@ openpyxl>=3.1
 statsmodels>=0.14
 matplotlib>=3.7
 
-# Additions per user request (latest versions as of mid-2024)
+# Document Processing
+PyPDF2>=3.0
+pypdf>=4.0
+pdfplumber>=0.10
+python-docx>=1.0
+xlrd>=2.0
+python-pptx>=0.6
+
+# Data & Structured Files
+pyyaml>=6.0
+toml>=0.10
+lxml>=5.0
+
+# Image Processing
+Pillow>=10.0
+opencv-python>=4.8
+pytesseract>=0.3
+
+# Text & Encoding
+chardet>=5.0
+python-magic>=0.4
+markdown>=3.5
+beautifulsoup4>=4.12
+
+# Compression & Archives
+py7zr>=0.20
+
+# Visualization
+seaborn>=0.13
+plotly>=5.18
+
+# Audio/Video Metadata
+mutagen>=1.47
+ffmpeg-python>=0.2

@@ -445,6 +445,9 @@ export default function AgentPanel() {
       if (data.web_search === true) {
         tools.push(Tools.web_search);
       }
+      if (data.create_pdf === true) {
+        tools.push(Tools.create_pdf);
+      }
       if (data.execute_code === true) {
         const workspaceTools = [
           Tools.workspace_read_file,

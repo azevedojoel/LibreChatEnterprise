@@ -53,6 +53,7 @@ async function processDueSchedules() {
         try {
           const interval = cronParser.parseExpression(s.cronExpression, {
             currentDate: twoMinutesAgo,
+            tz: s.timezone || 'UTC',
           });
           const next = interval.next().toDate();
           if (next <= now && next >= oneMinuteAgo) {

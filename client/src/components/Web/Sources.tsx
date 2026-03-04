@@ -170,7 +170,7 @@ type AgentFileSource = {
   pageRelevance?: Record<number, number>;
   messageId: string;
   toolCallId: string;
-  metadata?: any;
+  metadata?: { storageType?: string; [key: string]: unknown };
 };
 
 interface FileItemProps {
@@ -281,57 +281,13 @@ const FileItem = React.memo(function FileItem({
     status: isLoading ? localize('com_sources_downloading_status') : '',
   });
   const error = null;
-  if (expanded) {
-    return (
-      <button
-        onClick={isLocalFile ? undefined : handleDownload}
-        disabled={isLoading}
-        className={`flex w-full flex-col rounded-lg bg-surface-primary-contrast px-3 py-2 text-sm transition-all duration-300 disabled:opacity-50 ${
-          isLocalFile ? 'cursor-default' : 'hover:bg-surface-tertiary'
-        }`}
-        aria-label={
-          isLocalFile ? localize('com_sources_download_local_unavailable') : downloadAriaLabel
-        }
-      >
-        <div className="flex items-center gap-2">
-          <span className="text-base">{fileIcon}</span>
-          <span className="truncate text-xs font-medium text-text-secondary">
-            {localize('com_sources_agent_file')}
-          </span>
-          {!isLocalFile && <Download className="ml-auto h-3 w-3" aria-hidden="true" />}
-        </div>
-        <div className="mt-1 min-w-0">
-          <span className="line-clamp-2 break-all text-left text-sm font-medium text-text-primary md:line-clamp-3">
-            {file.filename}
-          </span>
-          {file.pages && file.pages.length > 0 && (
-            <span className="mt-1 line-clamp-1 text-left text-xs text-text-secondary">
-              {localize('com_sources_pages')}:{' '}
-              {sortPagesByRelevance(file.pages, file.pageRelevance).join(', ')}
-            </span>
-          )}
-          {file.bytes && (
-            <span className="mt-1 line-clamp-1 text-xs text-text-secondary">
-              {(file.bytes / 1024).toFixed(1)} KB
-            </span>
-          )}
-        </div>
-        {error && <div className="mt-1 text-xs text-red-500">{getErrorMessage(error)}</div>}
-      </button>
-    );
-  }
 
-  return (
-    <button
-      onClick={isLocalFile ? undefined : handleDownload}
-      disabled={isLoading}
-      className={`flex h-full w-full flex-col rounded-lg bg-surface-primary-contrast px-3 py-2 text-sm transition-all duration-300 disabled:opacity-50 ${
-        isLocalFile ? 'cursor-default' : 'hover:bg-surface-tertiary'
-      }`}
-      aria-label={
-        isLocalFile ? localize('com_sources_download_local_unavailable') : downloadAriaLabel
-      }
-    >
+  const baseClassName = `flex w-full flex-col rounded-lg bg-surface-primary-contrast px-3 py-2 text-sm transition-all duration-300 ${
+    expanded ? '' : 'h-full'
+  } ${isLocalFile ? 'cursor-default' : 'hover:bg-surface-tertiary'} disabled:opacity-50`;
+
+  const innerContent = (
+    <>
       <div className="flex items-center gap-2">
         <span className="text-base">{fileIcon}</span>
         <span className="truncate text-xs font-medium text-text-secondary">
@@ -349,8 +305,26 @@ const FileItem = React.memo(function FileItem({
             {sortPagesByRelevance(file.pages, file.pageRelevance).join(', ')}
           </span>
         )}
+        {file.bytes && (
+          <span className="mt-1 line-clamp-1 text-xs text-text-secondary">
+            {(file.bytes / 1024).toFixed(1)} KB
+          </span>
+        )}
       </div>
       {error && <div className="mt-1 text-xs text-red-500">{getErrorMessage(error)}</div>}
+    </>
+  );
+
+  return (
+    <button
+      onClick={isLocalFile ? undefined : handleDownload}
+      disabled={isLoading}
+      className={baseClassName}
+      aria-label={
+        isLocalFile ? localize('com_sources_download_local_unavailable') : downloadAriaLabel
+      }
+    >
+      {innerContent}
     </button>
   );
 });
@@ -700,16 +674,7 @@ function SourcesComponent({ messageId, conversationId }: SourcesProps = {}) {
     }
 
     return availableTabs;
-  }, [
-    organicSources,
-    topStories,
-    images,
-    hasAnswerBox,
-    agentFiles,
-    messageId,
-    conversationId,
-    localize,
-  ]);
+  }, [organicSources, topStories, images, hasAnswerBox, agentFiles, messageId, conversationId, localize]);
 
   if (!tabs.length) return null;
 

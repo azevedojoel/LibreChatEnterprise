@@ -530,7 +530,10 @@ function createToolEndCallback({
     const isCodeTool =
       output.name === Tools.execute_code || output.name === Constants.PROGRAMMATIC_TOOL_CALLING;
     const isSendFileTool = output.name === Tools.workspace_send_file_to_user;
-    if (!isCodeTool && !isSendFileTool) {
+    const isCreatePdfTool = output.name === Tools.create_pdf;
+    const isDriveDownloadFileTool =
+      typeof output.name === 'string' && output.name.includes('drive_downloadFile');
+    if (!isCodeTool && !isSendFileTool && !isCreatePdfTool && !isDriveDownloadFileTool) {
       return;
     }
 
@@ -550,7 +553,7 @@ function createToolEndCallback({
             req,
             buffer,
             name,
-            session_id: output.artifact.session_id,
+            session_id: output.artifact.session_id ?? metadata.run_id,
             messageId: metadata.run_id,
             toolCallId: output.tool_call_id,
             conversationId: metadata.thread_id,
@@ -738,7 +741,10 @@ function createResponsesToolEndCallback({ req, res, tracker, artifactPromises })
     const isCodeTool =
       output.name === Tools.execute_code || output.name === Constants.PROGRAMMATIC_TOOL_CALLING;
     const isSendFileTool = output.name === Tools.workspace_send_file_to_user;
-    if (!isCodeTool && !isSendFileTool) {
+    const isCreatePdfTool = output.name === Tools.create_pdf;
+    const isDriveDownloadFileTool =
+      typeof output.name === 'string' && output.name.includes('drive_downloadFile');
+    if (!isCodeTool && !isSendFileTool && !isCreatePdfTool && !isDriveDownloadFileTool) {
       return;
     }
 
@@ -758,7 +764,7 @@ function createResponsesToolEndCallback({ req, res, tracker, artifactPromises })
             req,
             buffer,
             name,
-            session_id: output.artifact.session_id,
+            session_id: output.artifact.session_id ?? metadata.run_id,
             messageId: metadata.run_id,
             toolCallId: output.tool_call_id,
             conversationId: metadata.thread_id,

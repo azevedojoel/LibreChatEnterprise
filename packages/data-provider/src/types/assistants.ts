@@ -32,6 +32,8 @@ export enum Tools {
   search_user_files = 'search_user_files',
   workspace_glob_files = 'workspace_glob_files',
   workspace_send_file_to_user = 'workspace_send_file_to_user',
+  workspace_pull_file = 'workspace_pull_file',
+  create_pdf = 'create_pdf',
   list_schedules = 'list_schedules',
   create_schedule = 'create_schedule',
   update_schedule = 'update_schedule',

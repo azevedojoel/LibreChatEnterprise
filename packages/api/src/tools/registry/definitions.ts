@@ -1271,6 +1271,45 @@ const sendFileToUserDefinition: ToolRegistryDefinition = {
   responseFormat: 'content_and_artifact',
 };
 
+const pullFileToWorkspaceDefinition: ToolRegistryDefinition = {
+  name: 'workspace_pull_file',
+  description:
+    "Copy a file from the user's My Files into the workspace. Use file_id from file_search results. After pulling, use workspace_read_file or execute_code to work with the file.",
+  schema: {
+    type: 'object',
+    properties: {
+      file_id: {
+        type: 'string',
+        description: 'File ID from file_search results or user My Files',
+      },
+    },
+    required: ['file_id'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const createPdfDefinition: ToolRegistryDefinition = {
+  name: 'create_pdf',
+  description:
+    'Convert HTML/CSS content to a PDF document. Use when the user or task requires a PDF. Provide valid HTML (optionally with inline CSS). The PDF is saved to the user\'s files and displayed in chat.',
+  schema: {
+    type: 'object',
+    properties: {
+      html: {
+        type: 'string',
+        description: 'HTML content to convert to PDF. Can include inline CSS in <style> tags.',
+      },
+      filename: {
+        type: 'string',
+        description: 'Optional filename for the PDF (e.g. "report.pdf"). Defaults to "document.pdf".',
+      },
+    },
+    required: ['html'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+  responseFormat: 'content_and_artifact',
+};
+
 /** Scheduling tools - used when agent has manage_scheduling capability */
 const listSchedulesDefinition: ToolRegistryDefinition = {
   name: 'list_schedules',
@@ -1664,6 +1703,8 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
   search_user_files: searchFilesDefinition,
   workspace_glob_files: globFilesDefinition,
   workspace_send_file_to_user: sendFileToUserDefinition,
+  workspace_pull_file: pullFileToWorkspaceDefinition,
+  create_pdf: createPdfDefinition,
   list_schedules: listSchedulesDefinition,
   list_user_projects: listUserProjectsDefinition,
   create_schedule: createScheduleDefinition,

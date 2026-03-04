@@ -12,6 +12,7 @@ const {
   globFiles,
   searchFiles,
   sendFilesToUser,
+  pullFileToWorkspace,
 } = require('./executor');
 
 /**
@@ -367,4 +368,47 @@ function createWorkspaceCodeEditTools({ workspaceRoot }) {
   ];
 }
 
-module.exports = { createWorkspaceCodeEditTools };
+/**
+ * Creates the workspace_pull_file tool. Requires req, workspaceRoot, agentId, userId.
+ * @param {object} params
+ * @param {string} params.workspaceRoot - Absolute path to workspace
+ * @param {import('express').Request} params.req - Request for file streaming
+ * @param {string} params.agentId - Agent ID for access check
+ * @param {string} params.userId - User ID for access check
+ * @returns {import('@langchain/core/tools').DynamicStructuredTool}
+ */
+function createPullFileToWorkspaceTool({ workspaceRoot, req, agentId, userId }) {
+  return tool(
+    async (rawInput) => {
+      const result = await pullFileToWorkspace({
+        workspaceRoot,
+        file_id: rawInput.file_id,
+        req,
+        userId,
+        agentId,
+        role: req?.user?.role,
+      });
+      if (result.error) {
+        return `Error: ${result.error}`;
+      }
+      return `Pulled ${result.filename} into workspace. Use workspace_read_file or execute_code to work with it.`;
+    },
+    {
+      name: 'workspace_pull_file',
+      description:
+        "Copy a file from the user's My Files into the workspace. Use file_id from file_search results. After pulling, use workspace_read_file or execute_code to work with the file.",
+      schema: {
+        type: 'object',
+        properties: {
+          file_id: {
+            type: 'string',
+            description: 'File ID from file_search results or user My Files',
+          },
+        },
+        required: ['file_id'],
+      },
+    },
+  );
+}
+
+module.exports = { createWorkspaceCodeEditTools, createPullFileToWorkspaceTool };

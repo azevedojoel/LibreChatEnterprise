@@ -324,6 +324,7 @@ endpoints:
       - deferred_tools
       - execute_code
       - file_search
+      - create_pdf
       - web_search
       - artifacts
       - actions
@@ -345,14 +346,14 @@ endpoints:
           Your role:
           - Be a true AI assistant: helpful, attentive, and proactive. Understand what users need and deliver it clearly.
           - You have access to the user's data through this system: their files (via file_search), the web (via web_search), and any context they share in the chat. Use these to give accurate, grounded answers.
-          - When users need CRM tasks (contacts, deals, pipelines, organizations, activities), transfer to Morgan. When users need Google Workspace or Microsoft 365 (email, docs, calendar, files), transfer to Casey. When users need to create or manage scheduled agent runs, transfer to the Schedule Manager.
+          - When users need CRM tasks (contacts, deals, pipelines, organizations, activities), transfer to Morgan. When users need Google Workspace or Microsoft 365 (email, docs, calendar, files), transfer to Casey. When users need to create or manage scheduled agent runs, transfer to the Schedule Manager. When users need deep research, multi-source investigation, or a synthesized report across web, files, CRM, email, or documents, transfer to the Research Agent.
           - When users add and connect Google Workspace or Microsoft 365 tools, you can help with email, documents, scheduling, and files. Until then, use file_search and web_search for their needs.
           - When users email this system, their messages reach you. Reply in a natural, conversational way—as if you're their dedicated assistant.
           - Respect privacy and boundaries. You see only what the user shares in the current conversation and any files they attach or reference. Don't assume access to other users' data.
           - Be concise when appropriate, but thorough when the task demands it. Adapt your tone to the user's needs.
 
           You are part of Daily Thread—a platform that connects people with AI assistance. Your job is to make that connection feel seamless and valuable.
-        tools: [file_search, web_search]
+        tools: [file_search, web_search, create_pdf]
       - id: system-crm
         name: Morgan
         provider: openAI
@@ -428,6 +429,44 @@ endpoints:
           - system-general
           - system-crm
           - system-productivity
+      - id: system-researcher
+        name: Research
+        provider: openAI
+        model: gpt-5-mini-2025-08-07
+        instructions: |
+          You are the Research Agent for Daily Thread. Your job is to gather information from ALL available sources and produce a clear, synthesized report.
+
+          ## Mandatory source usage
+          You MUST query every source that is available. Do not skip any:
+          - file_search: ALWAYS run. Search the user's uploaded files (documents, PDFs, spreadsheets, notes). Use full query and key terms.
+          - web_search: ALWAYS run. Search the web. Use full phrase and key terms.
+          - Google Drive (drive_search, drive_list_files): If Google is connected, search Drive for docs, sheets, PDFs. Use full query and key terms.
+          - Gmail (gmail_search): If Google is connected, search email. Try full query and key terms.
+          - OneDrive / SharePoint (drive_search, list_files): If Microsoft is connected, search OneDrive and SharePoint for documents. Use full query and key terms.
+          - Outlook (list_mail, search_mail): If Microsoft is connected, search email. Try full query and key terms.
+          - Google Docs, Sheets, Slides: Use Google tools to find and read relevant documents when Drive search returns matches.
+          - CRM (crm_list_contacts, crm_list_organizations, crm_list_deals): If CRM is configured, search with query and key terms.
+
+          ## Workflow
+          1. Run file_search first—user-uploaded files often contain the most relevant context.
+          2. Run web_search.
+          3. Run Google Drive search and Gmail if Google is connected.
+          4. Run OneDrive/SharePoint and Outlook search if Microsoft is connected.
+          5. Run CRM list tools if configured.
+          6. Run multiple queries per source when helpful (full phrase, then key terms like "cenegenics", "bradley eye").
+          7. Synthesize all findings into a clear, structured report.
+
+          ## Constraints
+          - Be thorough. Do not skip file_search or any other source. Token usage is acceptable for comprehensive research.
+          - If a source is unavailable (e.g. CRM not configured, MCP not connected), note it and proceed with the rest.
+        tools:
+          - file_search
+          - web_search
+          - crm_list_contacts
+          - crm_list_organizations
+          - crm_list_deals
+          - sys__all__sys_mcp_Google
+          - sys__all__sys_mcp_Microsoft
     primaryAgentHandoffs:
       - to: system-crm
         description: Transfer to Morgan for CRM tasks (contacts, deals, pipelines, organizations, activities)
@@ -441,6 +480,10 @@ endpoints:
         description: Transfer to Schedule Manager for creating or managing scheduled agent runs
         prompt: |
           Summarize what the user wants to schedule: which agent (Ellis, Morgan, or Casey) to run, what the task is, and any timing or frequency they specified.
+      - to: system-researcher
+        description: Transfer to Research Agent for deep research, multi-source investigation, or gathering information across web, files, CRM, email, and documents
+        prompt: |
+          Summarize the research topic: what the user wants to learn or investigate. Include key terms, entities, and any constraints (e.g. time range, sources to prioritize).
     defaultAgentForInboundEmail: system-general  # System agent that handles inbound email
 
   # Anthropic with Vertex AI (uncomment if using)

@@ -592,11 +592,16 @@ const processAgentFileUpload = async ({ req, res, metadata }) => {
   }
 
   // Dual storage pattern for RAG files: Storage + Vector DB
+  // Embed when: (1) file_search tool resource, or (2) message attachment (makes My Files searchable)
+  const shouldEmbedForSearch =
+    tool_resource === EToolResources.file_search ||
+    (messageAttachment && !isImage && process.env.RAG_API_URL);
+
   let storageResult, embeddingResult;
   const isImageFile = file.mimetype.startsWith('image');
   const source = getFileStrategy(appConfig, { isImage: isImageFile });
 
-  if (tool_resource === EToolResources.file_search) {
+  if (shouldEmbedForSearch) {
     // FIRST: Upload to Storage for permanent backup (S3/local/etc.)
     const { handleFileUpload } = getStrategyFunctions(source);
     const sanitizedUploadFn = createSanitizedUploadWrapper(handleFileUpload);
@@ -608,15 +613,23 @@ const processAgentFileUpload = async ({ req, res, metadata }) => {
       entity_id,
     });
 
-    // SECOND: Upload to Vector DB
+    // SECOND: Upload to Vector DB (for file_search / My Files semantic search)
     const { uploadVectors } = require('./VectorDB/crud');
 
-    embeddingResult = await uploadVectors({
-      req,
-      file,
-      file_id,
-      entity_id,
-    });
+    try {
+      embeddingResult = await uploadVectors({
+        req,
+        file,
+        file_id,
+        entity_id,
+      });
+    } catch (embedErr) {
+      logger.warn(
+        `[processAgentFileUpload] Embedding failed for ${messageAttachment ? 'attachment' : 'file_search'} "${file.originalname}":`,
+        embedErr,
+      );
+      embeddingResult = { embedded: false };
+    }
 
     // Vector status will be stored at root level, no need for metadata
     fileInfoMetadata = {};
@@ -639,9 +652,9 @@ const processAgentFileUpload = async ({ req, res, metadata }) => {
   let { bytes, filename, filepath: _filepath, height, width } = storageResult;
   // For RAG files, use embedding result; for others, use storage result
   let embedded = storageResult.embedded;
-  if (tool_resource === EToolResources.file_search) {
-    embedded = embeddingResult?.embedded;
-    filename = embeddingResult?.filename || filename;
+  if (shouldEmbedForSearch && embeddingResult) {
+    embedded = embeddingResult.embedded;
+    filename = embeddingResult.filename || filename;
   }
 
   let filepath = _filepath;

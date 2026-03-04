@@ -272,6 +272,7 @@ Please follow these instructions when using tools from the respective MCP server
     toolName,
     provider,
     toolArguments,
+    runId,
     options,
     tokenMethods,
     requestBody,
@@ -286,6 +287,7 @@ Please follow these instructions when using tools from the respective MCP server
     toolName: string;
     provider: t.Provider;
     toolArguments?: Record<string, unknown>;
+    runId?: string;
     options?: RequestOptions;
     requestBody?: RequestBody;
     tokenMethods?: TokenMethods;
@@ -389,6 +391,7 @@ Please follow these instructions when using tools from the respective MCP server
       return formatToolContent(result as t.MCPToolCallResponse, provider, formatter, {
         serverName,
         toolName,
+        run_id: runId,
       });
     } catch (error) {
       // Log with context and re-throw or handle as needed

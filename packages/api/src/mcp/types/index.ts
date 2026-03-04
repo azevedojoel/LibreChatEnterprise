@@ -132,7 +132,7 @@ export type Artifacts =
         fileCitations?: boolean;
       };
       [Tools.web_search]?: SearchResultData;
-      files?: Array<{ id: string; name: string }>;
+      files?: Array<{ id?: string; name: string; buffer?: Buffer }>;
       session_id?: string;
       file_ids?: string[];
     }

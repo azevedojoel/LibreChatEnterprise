@@ -16,12 +16,15 @@ import CodeAnalyze from './CodeAnalyze';
 import Container from './Container';
 import WebSearch from './WebSearch';
 import DriveSearch from './DriveSearch';
+import AgentFileSearch from './AgentFileSearch';
 import GmailSearch from './GmailSearch';
 import GmailGet from './GmailGet';
 import GmailSend from './GmailSend';
 import GmailSendDraft from './GmailSendDraft';
 import DocsCreate from './DocsCreate';
 import DriveCreateFolder from './DriveCreateFolder';
+import DriveDownloadFile from './DriveDownloadFile';
+import CreatePdf from './CreatePdf';
 import DiscoverySearch from './DiscoverySearch';
 import GoogleTasksList from './GoogleTasksList';
 import GoogleTaskLists from './GoogleTaskLists';
@@ -73,7 +76,15 @@ type PartProps = {
 };
 
 const Part = memo(
-  ({ part, isSubmitting, attachments, isLast, showCursor, isCreatedByUser, showAuthButton = true }: PartProps) => {
+  ({
+    part,
+    isSubmitting,
+    attachments,
+    isLast,
+    showCursor,
+    isCreatedByUser,
+    showAuthButton = true,
+  }: PartProps) => {
     if (!part) {
       return null;
     }
@@ -201,6 +212,18 @@ const Part = memo(
             output={toolCall.output ?? ''}
           />
         );
+      } else if (isToolCall && toolCall.name === Tools.file_search) {
+        return (
+          <AgentFileSearch
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            attachments={attachments}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
       } else if (
         isToolCall &&
         (toolCall.name === 'drive_search' ||
@@ -297,6 +320,17 @@ const Part = memo(
             toolName={toolCall.name}
           />
         );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'drive_downloadFile')) {
+        return (
+          <DriveDownloadFile
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+          />
+        );
       } else if (
         isToolCall &&
         (toolCall.name === Constants.TOOL_SEARCH ||
@@ -330,7 +364,8 @@ const Part = memo(
       } else if (
         isToolCall &&
         (toolCall.name === 'tasks_listTaskLists' ||
-          (typeof toolCall.name === 'string' && toolCall.name.startsWith('tasks_listTaskLists_mcp_')))
+          (typeof toolCall.name === 'string' &&
+            toolCall.name.startsWith('tasks_listTaskLists_mcp_')))
       ) {
         return (
           <GoogleTaskLists
@@ -360,7 +395,8 @@ const Part = memo(
       } else if (
         isToolCall &&
         (toolCall.name === 'list-todo-task-lists' ||
-          (typeof toolCall.name === 'string' && toolCall.name.startsWith('list-todo-task-lists_mcp_')))
+          (typeof toolCall.name === 'string' &&
+            toolCall.name.startsWith('list-todo-task-lists_mcp_')))
       ) {
         return (
           <MicrosoftTodoTaskLists
@@ -390,7 +426,8 @@ const Part = memo(
       } else if (
         isToolCall &&
         (toolCall.name === 'tasks_createTaskList' ||
-          (typeof toolCall.name === 'string' && toolCall.name.startsWith('tasks_createTaskList_mcp_')))
+          (typeof toolCall.name === 'string' &&
+            toolCall.name.startsWith('tasks_createTaskList_mcp_')))
       ) {
         return (
           <GoogleTaskListCreate
@@ -420,7 +457,8 @@ const Part = memo(
       } else if (
         isToolCall &&
         (toolCall.name === 'tasks_updateTaskList' ||
-          (typeof toolCall.name === 'string' && toolCall.name.startsWith('tasks_updateTaskList_mcp_')))
+          (typeof toolCall.name === 'string' &&
+            toolCall.name.startsWith('tasks_updateTaskList_mcp_')))
       ) {
         return (
           <GoogleTaskListUpdate
@@ -480,7 +518,8 @@ const Part = memo(
       } else if (
         isToolCall &&
         (toolCall.name === 'tasks_deleteTaskList' ||
-          (typeof toolCall.name === 'string' && toolCall.name.startsWith('tasks_deleteTaskList_mcp_')))
+          (typeof toolCall.name === 'string' &&
+            toolCall.name.startsWith('tasks_deleteTaskList_mcp_')))
       ) {
         return (
           <GoogleTaskListDelete
@@ -933,6 +972,18 @@ const Part = memo(
             toolName={toolCall.name}
           />
         );
+      } else if (isToolCall && toolCall.name === Tools.create_pdf) {
+        return (
+          <CreatePdf
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            attachments={attachments}
+          />
+        );
       } else if (isToolCall) {
         return (
           <ToolCall
@@ -1001,6 +1052,32 @@ const Part = memo(
               isSubmitting={isSubmitting}
               isLast={isLast}
               toolCallId={toolCall.id}
+            />
+          );
+        }
+        if (funcName === Tools.file_search) {
+          return (
+            <AgentFileSearch
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              attachments={attachments}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
+            />
+          );
+        }
+        if (funcName === Tools.create_pdf) {
+          return (
+            <CreatePdf
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
+              attachments={attachments}
             />
           );
         }
@@ -1094,6 +1171,21 @@ const Part = memo(
               isLast={isLast}
               toolCallId={toolCall.id}
               toolName={funcName}
+            />
+          );
+        }
+        if (
+          funcName === 'drive_downloadFile' ||
+          (typeof funcName === 'string' && funcName.startsWith('drive_downloadFile_mcp_'))
+        ) {
+          return (
+            <DriveDownloadFile
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
             />
           );
         }

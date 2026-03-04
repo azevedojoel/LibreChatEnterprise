@@ -139,6 +139,9 @@ const loadAddedAgent = async ({ req, conversation, primaryAgent }) => {
   if (ephemeralAgent?.web_search === true || modelSpec?.webSearch === true) {
     tools.push(Tools.web_search);
   }
+  if (ephemeralAgent?.create_pdf === true || modelSpec?.createPdf === true) {
+    tools.push(Tools.create_pdf);
+  }
 
   const addedServers = new Set();
   if (mcpServers.size > 0) {

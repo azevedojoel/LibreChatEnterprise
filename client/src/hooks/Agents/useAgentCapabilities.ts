@@ -10,6 +10,7 @@ interface AgentCapabilitiesResult {
   fileSearchEnabled: boolean;
   webSearchEnabled: boolean;
   codeEnabled: boolean;
+  createPdfEnabled: boolean;
   deferredToolsEnabled: boolean;
   programmaticToolsEnabled: boolean;
   manageSchedulingEnabled: boolean;
@@ -59,6 +60,11 @@ export default function useAgentCapabilities(
     [capabilities],
   );
 
+  const createPdfEnabled = useMemo(
+    () => capabilities?.includes(AgentCapabilities.create_pdf) ?? false,
+    [capabilities],
+  );
+
   const deferredToolsEnabled = useMemo(
     () => capabilities?.includes(AgentCapabilities.deferred_tools) ?? false,
     [capabilities],
@@ -82,6 +88,7 @@ export default function useAgentCapabilities(
   return {
     ocrEnabled,
     codeEnabled,
+    createPdfEnabled,
     toolsEnabled,
     actionsEnabled,
     contextEnabled,

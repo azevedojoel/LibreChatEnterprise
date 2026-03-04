@@ -187,6 +187,7 @@ export enum AgentCapabilities {
   tools = 'tools',
   chain = 'chain',
   ocr = 'ocr',
+  create_pdf = 'create_pdf',
   manage_scheduling = 'manage_scheduling',
   inbound_email = 'inbound_email',
 }
@@ -271,6 +272,7 @@ export const defaultAgentCapabilities = [
   AgentCapabilities.file_search,
   AgentCapabilities.web_search,
   AgentCapabilities.artifacts,
+  AgentCapabilities.create_pdf,
   AgentCapabilities.actions,
   AgentCapabilities.context,
   AgentCapabilities.tools,

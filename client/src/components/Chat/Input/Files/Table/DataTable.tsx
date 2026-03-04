@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Upload } from 'lucide-react';
 import { useSetRecoilState } from 'recoil';
 import {
   flexRender,
@@ -14,7 +15,7 @@ import type {
   VisibilityState,
   ColumnFiltersState,
 } from '@tanstack/react-table';
-import { FileContext } from 'librechat-data-provider';
+import { FileContext, mergeFileConfig } from 'librechat-data-provider';
 import {
   Table,
   Button,
@@ -30,8 +31,9 @@ import {
 } from '@librechat/client';
 import type { TFile } from 'librechat-data-provider';
 import { ColumnVisibilityDropdown } from './ColumnVisibilityDropdown';
-import { useDeleteFilesFromTable } from '~/hooks/Files';
+import { useDeleteFilesFromTable, useMyFilesUpload } from '~/hooks/Files';
 import { useLocalize, TranslationKeys } from '~/hooks';
+import { useGetFileConfig } from '~/data-provider';
 import { cn } from '~/utils';
 import store from '~/store';
 
@@ -60,6 +62,15 @@ export default function DataTable<TData, TValue>({ columns, data }: DataTablePro
   const [isDeleting, setIsDeleting] = useState(false);
   const setFiles = useSetRecoilState(store.filesByIndex(0));
   const { deleteFiles } = useDeleteFilesFromTable(() => setIsDeleting(false));
+  const {
+    fileInputRef,
+    isUploading,
+    handleFileChange,
+    triggerFileInput,
+  } = useMyFilesUpload();
+  const { data: fileConfig = null } = useGetFileConfig({
+    select: (data) => mergeFileConfig(data),
+  });
 
   const [rowSelection, setRowSelection] = useState({});
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -114,6 +125,27 @@ export default function DataTable<TData, TValue>({ columns, data }: DataTablePro
           )}
           {!isSmallScreen && <span className="ml-2">{localize('com_ui_delete')}</span>}
         </Button>
+        <Button
+          variant="outline"
+          onClick={triggerFileInput}
+          disabled={isUploading || !fileConfig}
+          className={cn('min-w-[40px] transition-all duration-200', isSmallScreen && 'px-2 py-1')}
+          aria-label={localize('com_ui_upload')}
+        >
+          {isUploading ? (
+            <Spinner className="size-3.5 sm:size-4" />
+          ) : (
+            <Upload className="size-3.5 sm:size-4" aria-hidden="true" />
+          )}
+          {!isSmallScreen && <span className="ml-2">{localize('com_ui_upload')}</span>}
+        </Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          onChange={handleFileChange}
+          aria-hidden
+        />
         <FilterInput
           inputId="files-filter"
           label={localize('com_files_filter')}

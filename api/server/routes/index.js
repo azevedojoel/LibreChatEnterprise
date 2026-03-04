@@ -1,4 +1,5 @@
 const accessPermissions = require('./accessPermissions');
+const artifacts = require('./artifacts');
 const assistants = require('./assistants');
 const categories = require('./categories');
 const adminAuth = require('./admin/auth');
@@ -35,6 +36,7 @@ const userProjects = require('./userProjects');
 
 module.exports = {
   mcp,
+  artifacts,
   auth,
   adminAuth,
   adminUsers,
