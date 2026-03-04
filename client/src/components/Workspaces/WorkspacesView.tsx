@@ -11,8 +11,11 @@ import {
   useToastContext,
 } from '@librechat/client';
 import { Building2, Mail, Pencil, Plus, Trash2, UserMinus } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { QueryKeys } from 'librechat-data-provider';
 import {
   useGetAdminWorkspacesQuery,
+  useGetAdminWorkspaceQuery,
   useGetAdminWorkspaceMembersQuery,
   useGetAdminWorkspaceInvitesQuery,
   useCreateAdminWorkspaceMutation,
@@ -40,6 +43,7 @@ function WorkspacesView() {
   const [deleteWorkspace, setDeleteWorkspace] = useState<TWorkspace | null>(null);
   const [selectedWorkspace, setSelectedWorkspace] = useState<TWorkspace | null>(null);
   const [inviteEmail, setInviteEmail] = useState('');
+  const [addAdminMemberId, setAddAdminMemberId] = useState<string>('');
 
   const inboundDomain =
     agentsConfig?.inboundEmailDisplayDomain ?? agentsConfig?.inboundEmailAddress ?? 'dailythread.ai';
@@ -49,6 +53,9 @@ function WorkspacesView() {
   });
 
   const workspaceId = selectedWorkspace?.id ?? selectedWorkspace?._id ?? '';
+  const { data: workspaceData } = useGetAdminWorkspaceQuery(workspaceId, {
+    enabled: !!workspaceId,
+  });
   const { data: membersData, isLoading: membersLoading } = useGetAdminWorkspaceMembersQuery(
     workspaceId,
     { enabled: !!selectedWorkspace },
@@ -60,6 +67,7 @@ function WorkspacesView() {
   const members = membersData?.members ?? [];
   const invites = invitesData?.invites ?? [];
 
+  const queryClient = useQueryClient();
   const createMutation = useCreateAdminWorkspaceMutation();
   const updateMutation = useUpdateAdminWorkspaceMutation();
   const deleteMutation = useDeleteAdminWorkspaceMutation();
@@ -141,9 +149,16 @@ function WorkspacesView() {
     );
   };
 
-  const handleUpdate = (id: string, name: string, slug: string) => {
+  const handleUpdate = (id: string, name: string, slug: string, maxMembers?: number) => {
     updateMutation.mutate(
-      { id, data: { name: name.trim(), slug: slug.trim().toLowerCase() } },
+      {
+        id,
+        data: {
+          name: name.trim(),
+          slug: slug.trim().toLowerCase(),
+          ...(maxMembers != null && { maxMembers }),
+        },
+      },
       mutationCallbacks.update,
     );
   };
@@ -156,6 +171,71 @@ function WorkspacesView() {
         email: inviteEmail.trim(),
       },
       mutationCallbacks.invite,
+    );
+  };
+
+  const workspace = workspaceData ?? selectedWorkspace;
+  const effectiveAdminIds =
+    (workspace?.adminIds?.length ?? 0) > 0
+      ? (workspace?.adminIds ?? []).map(String)
+      : workspace?.createdBy
+        ? [String(workspace.createdBy)]
+        : [];
+  const adminMembers = members.filter((m) =>
+    effectiveAdminIds.some((aid) => (aid && String(aid)) === (m.id ?? m._id)),
+  );
+  const nonAdminMembers = members.filter(
+    (m) => !effectiveAdminIds.some((aid) => (aid && String(aid)) === (m.id ?? m._id)),
+  );
+  const canRemoveAdmin = effectiveAdminIds.length > 1;
+
+  const handleAddAdmin = () => {
+    if (!workspace || !addAdminMemberId) return;
+    const wid = workspace.id ?? workspace._id;
+    const newAdminIds =
+      effectiveAdminIds.length > 0
+        ? [...effectiveAdminIds, addAdminMemberId]
+        : workspace.createdBy
+          ? [String(workspace.createdBy), addAdminMemberId]
+          : [addAdminMemberId];
+    updateMutation.mutate(
+      {
+        id: wid,
+        data: { adminIds: newAdminIds },
+      },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries([QueryKeys.adminWorkspace, wid]);
+          showToast({ message: localize('com_ui_workspace_updated'), status: 'success' });
+          setAddAdminMemberId('');
+        },
+        onError: (error: Error) => {
+          const msg = (error as any)?.response?.data?.message ?? error.message;
+          showToast({ message: msg, status: 'error' });
+        },
+      },
+    );
+  };
+
+  const handleRemoveAdmin = (memberId: string) => {
+    if (!workspace || !canRemoveAdmin) return;
+    const wid = workspace.id ?? workspace._id;
+    const newAdminIds = effectiveAdminIds.filter((id) => id !== memberId);
+    updateMutation.mutate(
+      {
+        id: wid,
+        data: { adminIds: newAdminIds },
+      },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries([QueryKeys.adminWorkspace, wid]);
+          showToast({ message: localize('com_ui_workspace_updated'), status: 'success' });
+        },
+        onError: (error: Error) => {
+          const msg = (error as any)?.response?.data?.message ?? error.message;
+          showToast({ message: msg, status: 'error' });
+        },
+      },
     );
   };
 
@@ -223,7 +303,7 @@ function WorkspacesView() {
                     size="sm"
                     title={localize('com_ui_edit_workspace')}
                     className="border-border-medium text-text-primary hover:bg-surface-hover"
-                    onClick={() => setEditWorkspace(selectedWorkspace)}
+                    onClick={() => setEditWorkspace(workspace ?? selectedWorkspace)}
                   >
                     <Pencil className="size-4" />
                   </Button>
@@ -293,15 +373,77 @@ function WorkspacesView() {
                 )}
               </div>
 
+              <div className="mb-4">
+                <h3 className="mb-2 font-medium text-text-primary">
+                  {localize('com_ui_workspace_admins')}
+                </h3>
+                {membersLoading ? (
+                  <Spinner className="size-6" />
+                ) : adminMembers.length === 0 ? (
+                  <p className="text-sm text-text-secondary">{localize('com_ui_no_admins')}</p>
+                ) : (
+                  <ul className="mb-3 divide-y divide-border-medium">
+                    {adminMembers.map((m) => (
+                      <li
+                        key={m.id ?? m._id}
+                        className="flex items-center justify-between rounded-lg py-2 px-2 transition-colors hover:bg-surface-hover"
+                      >
+                        <div>
+                          <span className="font-medium text-text-primary">{m.email}</span>
+                          {m.name && (
+                            <span className="ml-2 text-sm text-text-secondary">({m.name})</span>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title={localize('com_ui_remove_admin')}
+                          disabled={!canRemoveAdmin}
+                          className="text-red-600 hover:bg-red-500/10 hover:text-red-700 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-500/20 dark:hover:text-red-300"
+                          onClick={() => handleRemoveAdmin(m.id ?? m._id)}
+                        >
+                          <UserMinus className="size-4" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {nonAdminMembers.length > 0 && (
+                  <div className="flex gap-2">
+                    <select
+                      value={addAdminMemberId}
+                      onChange={(e) => setAddAdminMemberId(e.target.value)}
+                      className="flex-1 rounded-lg border border-border-medium bg-surface-secondary px-3 py-2 text-sm text-text-primary"
+                    >
+                      <option value="">
+                        {localize('com_ui_select_member_to_add_admin')}
+                      </option>
+                      {nonAdminMembers.map((m) => (
+                        <option key={m.id ?? m._id} value={m.id ?? m._id}>
+                          {m.email}
+                          {m.name ? ` (${m.name})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <Button
+                      onClick={handleAddAdmin}
+                      disabled={!addAdminMemberId || updateMutation.isLoading}
+                    >
+                      {localize('com_ui_add_admin')}
+                    </Button>
+                  </div>
+                )}
+              </div>
+
               <div>
                 <h3 className="mb-2 font-medium text-text-primary">{localize('com_ui_members')}</h3>
                 {membersLoading ? (
                   <Spinner className="size-6" />
-                ) : members.length === 0 ? (
+                ) : nonAdminMembers.length === 0 ? (
                   <p className="text-sm text-text-secondary">{localize('com_ui_no_members')}</p>
                 ) : (
                   <ul className="divide-y divide-border-medium">
-                    {members.map((m) => (
+                    {nonAdminMembers.map((m) => (
                       <li
                         key={m.id ?? m._id}
                         className="flex items-center justify-between rounded-lg py-2 px-2 transition-colors hover:bg-surface-hover"
@@ -449,22 +591,26 @@ function EditWorkspaceDialog({
   workspace: TWorkspace;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (id: string, name: string, slug: string) => void;
+  onSubmit: (id: string, name: string, slug: string, maxMembers?: number) => void;
   isLoading: boolean;
 }) {
   const localize = useLocalize();
   const [name, setName] = useState(workspace.name);
   const [slug, setSlug] = useState(workspace.slug);
+  const [maxMembers, setMaxMembers] = useState(
+    workspace.maxMembers ?? 3,
+  );
 
   React.useEffect(() => {
     setName(workspace.name);
     setSlug(workspace.slug);
+    setMaxMembers(workspace.maxMembers ?? 3);
   }, [workspace]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim() && slug.trim()) {
-      onSubmit(workspace.id ?? workspace._id, name, slug);
+      onSubmit(workspace.id ?? workspace._id, name, slug, maxMembers);
     }
   };
 
@@ -495,6 +641,21 @@ function EditWorkspaceDialog({
                 required
                 className="mt-1 w-full border-border-medium bg-surface-secondary text-text-primary placeholder:text-text-secondary"
               />
+            </div>
+            <div>
+              <Label className="text-text-primary">
+                {localize('com_ui_max_members')}
+              </Label>
+              <Input
+                type="number"
+                min={1}
+                value={maxMembers}
+                onChange={(e) => setMaxMembers(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                className="mt-1 w-full border-border-medium bg-surface-secondary text-text-primary"
+              />
+              <p className="mt-1 text-xs text-text-secondary">
+                {localize('com_ui_max_members_hint')}
+              </p>
             </div>
           </form>
         }
