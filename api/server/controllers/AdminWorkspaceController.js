@@ -1,6 +1,4 @@
-const mongoose = require('mongoose');
 const { logger } = require('@librechat/data-schemas');
-const { checkEmailConfig } = require('@librechat/api');
 const {
   listWorkspaces,
   createWorkspace,
@@ -8,10 +6,11 @@ const {
   deleteWorkspace,
   getWorkspaceById,
 } = require('~/models/Workspace');
-const { findUser } = require('~/models');
-const { createInvite } = require('~/models/inviteUser');
 const { listInvitesByWorkspace, markExpiredInvites } = require('~/models/Invite');
-const { sendEmail } = require('~/server/utils');
+const {
+  inviteUserToWorkspace,
+  INVITE_ERROR_CODES,
+} = require('~/server/services/WorkspaceInvite/inviteUser');
 
 /**
  * List all workspaces (admin only)
@@ -51,6 +50,8 @@ const create = async (req, res) => {
       name: workspace.name,
       slug: workspace.slug,
       createdBy: workspace.createdBy,
+      maxMembers: workspace.maxMembers ?? 3,
+      adminIds: workspace.adminIds ?? [],
       createdAt: workspace.createdAt,
       updatedAt: workspace.updatedAt,
     });
@@ -85,6 +86,8 @@ const getById = async (req, res) => {
       name: workspace.name,
       slug: workspace.slug,
       createdBy: workspace.createdBy,
+      maxMembers: workspace.maxMembers ?? 3,
+      adminIds: workspace.adminIds ?? [],
       createdAt: workspace.createdAt,
       updatedAt: workspace.updatedAt,
     });
@@ -96,14 +99,14 @@ const getById = async (req, res) => {
 
 /**
  * Update workspace (admin only)
- * Body: { name?, slug? }
+ * Body: { name?, slug?, maxMembers?, adminIds? }
  */
 const update = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, slug } = req.body;
+    const { name, slug, maxMembers, adminIds } = req.body;
 
-    const workspace = await updateWorkspace(id, { name, slug });
+    const workspace = await updateWorkspace(id, { name, slug, maxMembers, adminIds });
 
     if (!workspace) {
       return res.status(404).json({ message: 'Workspace not found' });
@@ -115,6 +118,8 @@ const update = async (req, res) => {
       name: workspace.name,
       slug: workspace.slug,
       createdBy: workspace.createdBy,
+      maxMembers: workspace.maxMembers ?? 3,
+      adminIds: workspace.adminIds ?? [],
       createdAt: workspace.createdAt,
       updatedAt: workspace.updatedAt,
     });
@@ -205,63 +210,32 @@ const invite = async (req, res) => {
       return res.status(404).json({ message: 'Workspace not found' });
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
-    const User = require('~/db/models').User;
-    const user = await findUser({ email: normalizedEmail }, '_id email workspace_id');
-
-    if (user) {
-      if (user.workspace_id && user.workspace_id.toString() !== id) {
-        return res.status(409).json({
-          message: 'User is already in another workspace. Remove them first to transfer.',
-        });
-      }
-
-      if (user.workspace_id && user.workspace_id.toString() === id) {
-        return res.status(200).json({ message: 'User is already in this workspace' });
-      }
-
-      const workspaceObjId = mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id;
-      await User.updateOne({ _id: user._id }, { $set: { workspace_id: workspaceObjId } });
-
-      return res.status(200).json({
-        message: 'User added to workspace',
-        user: { id: user._id?.toString(), email: user.email },
-      });
-    }
-
-    const token = await createInvite(normalizedEmail, {
+    const result = await inviteUserToWorkspace({
       workspaceId: id,
+      email,
       invitedBy: req.user?.id,
     });
 
-    if (token && typeof token === 'object' && token.message) {
-      return res.status(500).json({ message: token.message });
+    if (!result.success) {
+      if (result.errorCode === INVITE_ERROR_CODES.MEMBER_LIMIT) {
+        return res.status(400).json({ message: result.error });
+      }
+      if (result.errorCode === INVITE_ERROR_CODES.ALREADY_IN_ANOTHER_WORKSPACE) {
+        return res.status(409).json({ message: result.error });
+      }
+      return res.status(500).json({ message: result.error || 'Failed to invite user' });
     }
 
-    const domainClient = process.env.DOMAIN_CLIENT || 'http://localhost:3080';
-    const inviteLink = `${domainClient}/register?token=${token}`;
-    const appName = process.env.APP_TITLE || 'LibreChat';
-
-    if (checkEmailConfig()) {
-      await sendEmail({
-        email: normalizedEmail,
-        subject: `Invite to join ${workspace.name} on ${appName}!`,
-        payload: {
-          appName,
-          inviteLink,
-          workspaceName: workspace.name,
-          year: new Date().getFullYear(),
-        },
-        template: 'inviteUser.handlebars',
+    if (result.link) {
+      return res.status(200).json({
+        message: result.message,
+        link: result.link,
       });
-      logger.info(`[AdminWorkspaceController.invite] Invitation sent. [Email: ${normalizedEmail}] [Workspace: ${id}]`);
-      return res.status(200).json({ message: 'Invitation sent successfully' });
     }
-
-    return res.status(200).json({
-      message: 'Invitation created. Email is not configured. Share this link with the user.',
-      link: inviteLink,
-    });
+    if (result.user) {
+      return res.status(200).json({ message: result.message, user: result.user });
+    }
+    return res.status(200).json({ message: result.message });
   } catch (error) {
     logger.error('[AdminWorkspaceController.invite]', error);
     return res.status(500).json({ message: 'Failed to invite user' });
