@@ -57,6 +57,7 @@ type AllContentTypes =
   | ContentTypes.TOOL_CALL
   | ContentTypes.IMAGE_FILE
   | ContentTypes.IMAGE_URL
+  | ContentTypes.AGENT_RETURN
   | ContentTypes.ERROR;
 
 export default function useStepHandler({
@@ -73,6 +74,14 @@ export default function useStepHandler({
   const stepMap = useRef(new Map<string, Agents.RunStep>());
   /** Buffer for deltas that arrive before their corresponding run step */
   const pendingDeltaBuffer = useRef(new Map<string, TStepEvent[]>());
+  /** Buffer for tool output deltas (e.g. generate_code) that arrive before the tool call is in messageMap */
+  const pendingToolOutputDeltas = useRef(new Map<string, string[]>());
+  /** Queue agent_return parts when response is not yet in messageMap; applied when response becomes available */
+  const pendingAgentReturns = useRef(
+    new Map<string, Array<{ agentId: string; sourceAgentId: string }>>(),
+  );
+  /** Count for throttling generate_code_stream logs (log every 10th) */
+  const toolOutputDeltaCountRef = useRef(0);
 
   /**
    * Calculate content index for a run step.
@@ -161,6 +170,15 @@ export default function useStepHandler({
       };
 
       updatedContent[index] = update;
+    } else if (
+      contentType.startsWith(ContentTypes.AGENT_RETURN) &&
+      'agent_return' in contentPart &&
+      contentPart.agent_return
+    ) {
+      updatedContent[index] = {
+        type: ContentTypes.AGENT_RETURN,
+        agent_return: contentPart.agent_return,
+      };
     } else if (
       contentType.startsWith(ContentTypes.THINK) &&
       ContentTypes.THINK in contentPart &&
@@ -256,6 +274,34 @@ export default function useStepHandler({
     return metadata;
   };
 
+  /** Apply queued agent_return parts when response was missing at event time */
+  const applyPendingAgentReturns = (
+    responseMessageId: string,
+    response: TMessage,
+  ): TMessage => {
+    const pending = pendingAgentReturns.current.get(responseMessageId);
+    if (!pending || pending.length === 0) {
+      return response;
+    }
+    let updated = response;
+    for (const { agentId, sourceAgentId } of pending) {
+      const newIndex = (updated.content ?? []).length;
+      const agentReturnPart: TMessageContentParts = {
+        type: ContentTypes.AGENT_RETURN,
+        agent_return: { agentId, sourceAgentId },
+      };
+      updated = updateContent(
+        updated,
+        newIndex,
+        agentReturnPart as Agents.MessageContentComplex,
+        false,
+        { agentId, groupId: 1 },
+      );
+    }
+    pendingAgentReturns.current.delete(responseMessageId);
+    return updated;
+  };
+
   const stepHandler = useCallback(
     ({ event, data }: TStepEvent, submission: EventSubmission) => {
       const messages = getMessages() || [];
@@ -289,6 +335,10 @@ export default function useStepHandler({
         stepMap.current.set(runStep.id, runStep);
 
         let response = messageMap.current.get(responseMessageId);
+        if (response) {
+          response = applyPendingAgentReturns(responseMessageId, response);
+          messageMap.current.set(responseMessageId, response);
+        }
 
         if (!response) {
           // Find the actual response message - check if last message is a response, otherwise use initialResponse
@@ -312,6 +362,7 @@ export default function useStepHandler({
             content: mergedContent,
           };
 
+          response = applyPendingAgentReturns(responseMessageId, response);
           messageMap.current.set(responseMessageId, response);
 
           // Get fresh messages to handle multi-tab scenarios where messages may have loaded
@@ -368,6 +419,34 @@ export default function useStepHandler({
             );
           });
 
+          // Apply any buffered tool output deltas (e.g. generate_code) that arrived before this run step
+          for (const toolCall of stepCalls) {
+            const toolCallId = toolCall.id ?? '';
+            const bufferedDeltas = pendingToolOutputDeltas.current.get(toolCallId);
+            if (bufferedDeltas && bufferedDeltas.length > 0) {
+              pendingToolOutputDeltas.current.delete(toolCallId);
+              const accumulatedOutput = bufferedDeltas.join('');
+              const content = updatedResponse.content ?? [];
+              const foundIdx = content.findIndex((part) => {
+                if (part?.type !== ContentTypes.TOOL_CALL) return false;
+                const tc = (part as Agents.ToolCallContent).tool_call;
+                return tc?.id === toolCallId;
+              });
+              if (foundIdx >= 0) {
+                const part = content[foundIdx] as Agents.ToolCallContent;
+                const tc = part.tool_call;
+                if (tc) {
+                  const updatedContent = [...content];
+                  updatedContent[foundIdx] = {
+                    ...part,
+                    tool_call: { ...tc, output: accumulatedOutput },
+                  };
+                  updatedResponse = { ...updatedResponse, content: updatedContent };
+                }
+              }
+            }
+          }
+
           messageMap.current.set(responseMessageId, updatedResponse);
           const updatedMessages = messages.map((msg) =>
             msg.messageId === responseMessageId ? updatedResponse : msg,
@@ -417,6 +496,49 @@ export default function useStepHandler({
           );
           setMessages(updatedMessages);
         }
+      } else if (event === 'agent_return') {
+        const agentReturnData = data as { agent_id?: string; source_agent_id?: string };
+        const agentId = agentReturnData?.agent_id;
+        const sourceAgentId = agentReturnData?.source_agent_id;
+        if (!agentId || !sourceAgentId) {
+          return;
+        }
+        let responseMessageId = submission?.initialResponse?.messageId ?? '';
+        if (!responseMessageId) {
+          console.warn('No message id found in agent return event');
+          return;
+        }
+        let response = messageMap.current.get(responseMessageId);
+        if (!response) {
+          const queue = pendingAgentReturns.current.get(responseMessageId) ?? [];
+          queue.push({ agentId, sourceAgentId });
+          pendingAgentReturns.current.set(responseMessageId, queue);
+          return;
+        }
+        response = applyPendingAgentReturns(responseMessageId, response);
+        const currentContent = response.content ?? [];
+        const newIndex = currentContent.length;
+        const agentReturnPart: TMessageContentParts = {
+          type: ContentTypes.AGENT_RETURN,
+          agent_return: { agentId, sourceAgentId },
+        };
+        const agentReturnMeta: ContentMetadata | undefined = {
+          agentId,
+          groupId: 1,
+        };
+        const updatedResponse = updateContent(
+          response,
+          newIndex,
+          agentReturnPart as Agents.MessageContentComplex,
+          false,
+          agentReturnMeta,
+        );
+        messageMap.current.set(responseMessageId, updatedResponse);
+        const currentMessages = getMessages() || [];
+        const updatedMessages = currentMessages.map((msg) =>
+          msg.messageId === responseMessageId ? updatedResponse : msg,
+        );
+        setMessages(updatedMessages);
       } else if (event === 'on_message_delta') {
         const messageDelta = data as Agents.MessageDeltaEvent;
         const runStep = stepMap.current.get(messageDelta.id);
@@ -433,7 +555,11 @@ export default function useStepHandler({
           return;
         }
 
-        const response = messageMap.current.get(responseMessageId);
+        let response = messageMap.current.get(responseMessageId);
+        if (response) {
+          response = applyPendingAgentReturns(responseMessageId, response);
+          messageMap.current.set(responseMessageId, response);
+        }
         if (response && messageDelta.delta.content) {
           const contentPart = Array.isArray(messageDelta.delta.content)
             ? messageDelta.delta.content[0]
@@ -479,7 +605,11 @@ export default function useStepHandler({
           return;
         }
 
-        const response = messageMap.current.get(responseMessageId);
+        let response = messageMap.current.get(responseMessageId);
+        if (response) {
+          response = applyPendingAgentReturns(responseMessageId, response);
+          messageMap.current.set(responseMessageId, response);
+        }
         if (response && reasoningDelta.delta.content != null) {
           const contentPart = Array.isArray(reasoningDelta.delta.content)
             ? reasoningDelta.delta.content[0]
@@ -676,6 +806,85 @@ export default function useStepHandler({
             msg.messageId === responseMessageId ? updatedResponse : msg,
           );
           setMessages(updatedMessages);
+        }
+      } else if (event === 'on_tool_output_delta') {
+        const deltaData = data as { tool_call_id?: string; step_id?: string; delta?: string };
+        const { tool_call_id: toolCallId, delta } = deltaData;
+        if (!toolCallId || typeof delta !== 'string') {
+          return;
+        }
+        toolOutputDeltaCountRef.current += 1;
+        const n = toolOutputDeltaCountRef.current;
+        if (n === 1) {
+          console.log(
+            `[generate_code_stream] CLIENT first on_tool_output_delta received toolCallId=${toolCallId} deltaLen=${delta.length}`,
+          );
+        } else if (n % 10 === 0) {
+          console.log(
+            `[generate_code_stream] CLIENT received delta toolCallId=${toolCallId} deltaLen=${delta.length} (count=${n})`,
+          );
+        }
+        for (const [responseMessageId, response] of messageMap.current) {
+          const content = response.content ?? [];
+          const foundIdx = content.findIndex((part) => {
+            if (part?.type !== ContentTypes.TOOL_CALL) return false;
+            const tc = (part as Agents.ToolCallContent).tool_call;
+            if (!tc || tc.id !== toolCallId) return false;
+            const hasFinalOutput =
+              tc.output != null &&
+              tc.output !== '' &&
+              (() => {
+                try {
+                  const parsed = JSON.parse(tc.output);
+                  return parsed && typeof parsed === 'object' && 'diff' in parsed;
+                } catch {
+                  return false;
+                }
+              })();
+            return !hasFinalOutput;
+          });
+          if (foundIdx >= 0) {
+            const part = content[foundIdx] as Agents.ToolCallContent;
+            const tc = part.tool_call;
+            if (tc) {
+              const prevOutput = tc.output ?? '';
+              const newOutput = prevOutput + delta;
+              if (n === 1 || n % 10 === 0) {
+                console.log(
+                  `[generate_code_stream] CLIENT applied delta to message newOutputLen=${newOutput.length}`,
+                );
+              }
+              const updatedContent = [...content];
+              updatedContent[foundIdx] = {
+                ...part,
+                tool_call: { ...tc, output: newOutput },
+              };
+              const updatedResponse = { ...response, content: updatedContent };
+              messageMap.current.set(responseMessageId, updatedResponse);
+              const currentMessages = getMessages() ?? [];
+              const updatedMessages = currentMessages.map((msg) =>
+                msg.messageId === responseMessageId ? updatedResponse : msg,
+              );
+              setMessages(updatedMessages);
+            }
+            return;
+          }
+        }
+        // Buffer delta for replay when tool call appears (race: deltas can arrive before on_run_step)
+        const buffer = pendingToolOutputDeltas.current.get(toolCallId) ?? [];
+        buffer.push(delta);
+        pendingToolOutputDeltas.current.set(toolCallId, buffer);
+        if (buffer.length === 1) {
+          const mapKeys = [...messageMap.current.keys()];
+          const toolCallIdsInMap = [...messageMap.current.values()].flatMap((msg) =>
+            (msg.content ?? [])
+              .filter((p) => p?.type === ContentTypes.TOOL_CALL)
+              .map((p) => (p as Agents.ToolCallContent).tool_call?.id)
+              .filter(Boolean),
+          );
+          console.log(
+            `[generate_code_stream] CLIENT buffering delta (toolCallId=${toolCallId}, mapSize=${messageMap.current.size}, mapKeys=${mapKeys.join(',') || '(none)'}, existingToolCallIds=${toolCallIdsInMap.join(',') || '(none)'})`,
+          );
         }
       } else if (event === 'on_run_step_completed') {
         const { result } = data as unknown as { result: Agents.ToolEndEvent };

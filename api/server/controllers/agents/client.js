@@ -1134,6 +1134,9 @@ You have these tools to manage the project:
             parentMessageId: this.parentMessageId,
           },
           user: createSafeUser(this.options.req.user),
+          ...(typeof this.options.emitToolOutputDelta === 'function' && {
+            emitToolOutputDelta: this.options.emitToolOutputDelta,
+          }),
         },
         recursionLimit: agentsEConfig?.recursionLimit ?? 50,
         signal: abortController.signal,
@@ -1248,9 +1251,11 @@ You have these tools to manage the project:
           // 1. At or after the finalContentStart index
           // 2. Of type tool_call
           // 3. Have tool_call_ids property
+          // 4. Of type agent_return (preserves "Returned from X" in multi-agent flows)
           return (
             index >= this.contentParts.length - 1 ||
             part.type === ContentTypes.TOOL_CALL ||
+            part.type === ContentTypes.AGENT_RETURN ||
             part.tool_call_ids
           );
         });

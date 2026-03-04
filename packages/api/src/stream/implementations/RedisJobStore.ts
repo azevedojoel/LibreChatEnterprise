@@ -496,7 +496,9 @@ export class RedisJobStore implements IJobStore {
       'on_reasoning_delta',
       'on_run_step_delta',
       'on_run_step_completed',
+      'on_tool_output_delta',
       'on_agent_update',
+      'agent_return',
     ]);
 
     for (const chunk of chunks) {

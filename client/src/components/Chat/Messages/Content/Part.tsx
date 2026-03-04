@@ -12,6 +12,7 @@ import { OpenAIImageGen, EmptyText, Reasoning, ExecuteCode, AgentUpdate, Text } 
 import { ErrorMessage } from './MessageContent';
 import RetrievalCall from './RetrievalCall';
 import AgentHandoff from './AgentHandoff';
+import AgentReturn from './AgentReturn';
 import CodeAnalyze from './CodeAnalyze';
 import Container from './Container';
 import WebSearch from './WebSearch';
@@ -112,6 +113,15 @@ const Part = memo(
             </Container>
           )}
         </>
+      );
+    } else if (part.type === 'agent_return') {
+      const agentReturn = (part as { agent_return?: { agentId?: string; sourceAgentId?: string } })
+        .agent_return;
+      if (!agentReturn?.agentId || !agentReturn?.sourceAgentId) {
+        return null;
+      }
+      return (
+        <AgentReturn agentId={agentReturn.agentId} sourceAgentId={agentReturn.sourceAgentId} />
       );
     } else if (part.type === ContentTypes.TEXT) {
       const text = typeof part.text === 'string' ? part.text : part.text?.value;

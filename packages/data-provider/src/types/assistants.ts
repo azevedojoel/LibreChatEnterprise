@@ -67,7 +67,55 @@ export enum Tools {
   project_log_tail = 'project_log_tail',
   project_log_search = 'project_log_search',
   project_log_range = 'project_log_range',
+  generate_code = 'generate_code',
+  lint = 'lint',
+  run_program = 'run_program',
+  workspace_status = 'workspace_status',
+  workspace_init = 'workspace_init',
+  reset_workspace = 'reset_workspace',
+  update_todo = 'update_todo',
+  create_plan = 'create_plan',
+  install_dependencies = 'install_dependencies',
 }
+
+/**
+ * Tools injected when execute_code (Run Code) capability is enabled.
+ * Single source of truth for AgentPanel, AgentSelect, and ToolService.
+ */
+export const EXECUTE_CODE_TOOLS: Tools[] = [
+  Tools.workspace_read_file,
+  Tools.workspace_edit_file,
+  Tools.workspace_create_file,
+  Tools.workspace_delete_file,
+  Tools.workspace_list_files,
+  Tools.search_user_files,
+  Tools.workspace_glob_files,
+  Tools.workspace_send_file_to_user,
+  Tools.workspace_pull_file,
+  Tools.generate_code,
+  Tools.install_dependencies,
+  Tools.lint,
+  Tools.run_program,
+  Tools.workspace_status,
+  Tools.workspace_init,
+  Tools.reset_workspace,
+  Tools.update_todo,
+  Tools.create_plan,
+];
+
+/**
+ * Tools injected when manage_scheduling capability is enabled.
+ */
+export const SCHEDULING_TOOLS: Tools[] = [
+  Tools.list_schedules,
+  Tools.list_user_projects,
+  Tools.create_schedule,
+  Tools.update_schedule,
+  Tools.delete_schedule,
+  Tools.run_schedule,
+  Tools.list_runs,
+  Tools.get_run,
+];
 
 export enum EToolResources {
   code_interpreter = 'code_interpreter',
@@ -598,6 +646,7 @@ export type TMessageContentParts =
     } & ContentMetadata)
   | ({ type: ContentTypes.IMAGE_FILE; image_file: ImageFile & PartMetadata } & ContentMetadata)
   | (Agents.AgentUpdate & ContentMetadata)
+  | (Agents.AgentReturn & ContentMetadata)
   | (Agents.MessageContentImageUrl & ContentMetadata)
   | (Agents.MessageContentVideoUrl & ContentMetadata)
   | (Agents.MessageContentInputAudio & ContentMetadata);

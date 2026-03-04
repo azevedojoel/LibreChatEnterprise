@@ -78,6 +78,7 @@ Defined in [`packages/data-provider/src/types/agents.ts`](packages/data-provider
 - The agent **decides when** to hand off; routing is dynamic
 - Supports passing instructions via `prompt` and `promptKey`
 - **Transitive handoffs** (A→B→C) are supported via BFS discovery during initialization
+- **Return control**: When `return_control: true` is passed to the transfer tool, the receiving agent completes its task and control automatically transfers back to the caller with the output. Use `return_to` to specify which agent receives control (defaults to the caller). Enables multi-step workflows (e.g., Ellis → Casey → Ellis → Coder).
 - **UI**: [`client/src/components/SidePanel/Agents/Advanced/AgentHandoffs.tsx`](client/src/components/SidePanel/Agents/Advanced/AgentHandoffs.tsx)
 
 ### Direct Edges (`edgeType: 'direct'`)

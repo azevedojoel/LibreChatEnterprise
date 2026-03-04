@@ -28,6 +28,14 @@ export namespace Agents {
     };
   };
 
+  export type AgentReturn = {
+    type: ContentTypes.AGENT_RETURN;
+    agent_return: {
+      agentId: string;
+      sourceAgentId: string;
+    };
+  };
+
   export type MessageContentImageUrl = {
     type: ContentTypes.IMAGE_URL;
     image_url: string | { url: string; detail?: ImageDetail };
@@ -49,6 +57,7 @@ export namespace Agents {
   export type MessageContentComplex =
     | ReasoningContentText
     | AgentUpdate
+    | AgentReturn
     | MessageContentText
     | MessageContentImageUrl
     | MessageContentVideoUrl

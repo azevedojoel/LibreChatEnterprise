@@ -457,7 +457,7 @@ describe('getDefaultHandlers - ON_HANDOFF', () => {
   it('should update handoffState and emit agent_handoff when ON_HANDOFF fires with streamId', async () => {
     const handoffState = { currentAgentId: null };
     const streamId = 'stream-xyz';
-    const handlers = getDefaultHandlers({
+    const { handlers } = getDefaultHandlers({
       res,
       aggregateContent: jest.fn(),
       toolEndCallback: jest.fn(),
@@ -484,7 +484,7 @@ describe('getDefaultHandlers - ON_HANDOFF', () => {
 
   it('should update handoffState but NOT emit when streamId is null', async () => {
     const handoffState = { currentAgentId: null };
-    const handlers = getDefaultHandlers({
+    const { handlers } = getDefaultHandlers({
       res,
       aggregateContent: jest.fn(),
       toolEndCallback: jest.fn(),

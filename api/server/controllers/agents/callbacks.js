@@ -329,19 +329,46 @@ function getDefaultHandlers({
         (data?.toolName && typeof data.toolName === 'string'
           ? data.toolName.replace(Constants.LC_TRANSFER_TO_, '')
           : null);
+      const sourceAgentId = data?.sourceAgentId ?? null;
       if (handoffState && targetAgentId) {
         handoffState.currentAgentId = targetAgentId;
-        if (streamId) {
+        await emitEvent(res, streamId, {
+          event: 'agent_handoff',
+          data: { agent_id: targetAgentId },
+        });
+        if (sourceAgentId) {
+          aggregateContent({
+            event: 'agent_return',
+            data: { agent_id: targetAgentId, source_agent_id: sourceAgentId },
+          });
           await emitEvent(res, streamId, {
-            event: 'agent_handoff',
-            data: { agent_id: targetAgentId },
+            event: 'agent_return',
+            data: { agent_id: targetAgentId, source_agent_id: sourceAgentId },
           });
         }
       }
     },
   };
 
-  return handlers;
+  /** Emit tool output delta for streaming tool results (e.g. generate_code). Injected into config.configurable. */
+  const emitToolOutputDelta = (toolCallId, stepId, delta) => {
+    console.log(
+      `[generate_code_stream] emitToolOutputDelta toolCallId=${toolCallId ?? '?'} deltaLen=${typeof delta === 'string' ? delta.length : 0} streamId=${streamId ?? 'null'}`,
+    );
+    const eventData = {
+      event: GraphEvents.ON_TOOL_OUTPUT_DELTA ?? 'on_tool_output_delta',
+      data: { tool_call_id: toolCallId, step_id: stepId, delta },
+    };
+    if (streamId) {
+      GenerationJobManager.emitChunk(streamId, eventData).catch((err) =>
+        logger.warn('[emitToolOutputDelta] Failed to emit chunk', err),
+      );
+    } else {
+      sendEvent(res, eventData);
+    }
+  };
+
+  return { handlers, emitToolOutputDelta };
 }
 
 /**
