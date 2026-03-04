@@ -125,6 +125,15 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   [Tools.reset_workspace]: 'Reset Workspace',
   [Tools.update_todo]: 'Update Todo',
   [Tools.create_plan]: 'Create Plan',
+  // Human tools
+  [Tools.human_list_workspace_members]: 'List Workspace Members',
+  [Tools.human_routing_rules_list]: 'List Routing Rules',
+  [Tools.human_routing_rules_set]: 'Set Routing Rule',
+  [Tools.human_routing_rules_delete]: 'Delete Routing Rule',
+  [Tools.human_notify_human]: 'Notify Team Member',
+  [Tools.human_await_response]: 'Request Approval',
+  [Tools.human_invite_to_workspace]: 'Invite to Workspace',
+  [Tools.human_remove_from_workspace]: 'Remove from Workspace',
 };
 
 /**

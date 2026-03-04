@@ -156,6 +156,15 @@ const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
   [Tools.run_schedule]: 'Run Schedule Now',
   [Tools.list_runs]: 'List Run History',
   [Tools.get_run]: 'Get Run Details',
+  // Human tools
+  [Tools.human_list_workspace_members]: 'List Workspace Members',
+  [Tools.human_routing_rules_list]: 'List Routing Rules',
+  [Tools.human_routing_rules_set]: 'Set Routing Rule',
+  [Tools.human_routing_rules_delete]: 'Delete Routing Rule',
+  [Tools.human_notify_human]: 'Notify Team Member',
+  [Tools.human_await_response]: 'Request Approval',
+  [Tools.human_invite_to_workspace]: 'Invite to Workspace',
+  [Tools.human_remove_from_workspace]: 'Remove from Workspace',
 };
 
 /** Icons for project tools */
@@ -252,6 +261,17 @@ const CRM_TOOL_ICONS: Partial<Record<string, React.ComponentType<{ className?: s
   crm_list_activities: List,
 };
 
+/** Icons for Human tools */
+const HUMAN_TOOL_ICONS: Partial<Record<string, React.ComponentType<{ className?: string }>>> = {
+  [Tools.human_await_response]: UserCheck,
+  [Tools.human_notify_human]: Mail,
+  [Tools.human_invite_to_workspace]: UserPlus,
+  [Tools.human_list_workspace_members]: Users,
+  [Tools.human_routing_rules_list]: List,
+  [Tools.human_routing_rules_set]: ListPlus,
+  [Tools.human_routing_rules_delete]: Trash2,
+};
+
 import type { TAttachment } from 'librechat-data-provider';
 import {
   Plug,
@@ -277,6 +297,11 @@ import {
   Info,
   RotateCcw,
   ClipboardList,
+  UserCheck,
+  UserPlus,
+  UserMinus,
+  Mail,
+  Users,
 } from 'lucide-react';
 import { useLocalize, useProgress, useMCPConnectionStatus, useToolApproval } from '~/hooks';
 import { useMessageContext } from '~/Providers';
@@ -317,7 +342,7 @@ export default function ToolCall({
   const setPendingMCPOAuth = useSetRecoilState(store.pendingMCPOAuthAtom);
   const expandedToolCalls = useRecoilValue(store.expandedToolCallsAtom);
   const setExpandedToolCalls = useSetRecoilState(store.expandedToolCallsAtom);
-  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting } =
+  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting, waitingForApprover, approverName } =
     useToolApproval(toolCallId, output ?? '');
   const { data: startupConfig } = useGetStartupConfig();
 
@@ -420,6 +445,9 @@ export default function ToolCall({
     }
     if (function_name && CODER_TOOL_ICONS[function_name]) {
       return CODER_TOOL_ICONS[function_name] as React.ComponentType<{ className?: string }>;
+    }
+    if (function_name && HUMAN_TOOL_ICONS[function_name]) {
+      return HUMAN_TOOL_ICONS[function_name] as React.ComponentType<{ className?: string }>;
     }
     return Plug;
   }, [function_name, lintData?.hasErrors]);
@@ -836,6 +864,8 @@ export default function ToolCall({
               resolved={
                 approvalStatus === 'approved' ? 'approved' : approvalStatus === 'denied' ? 'denied' : undefined
               }
+              waitingForApprover={waitingForApprover}
+              approverName={approverName}
             />
           </div>
         ) : useToolResultLayout ? (

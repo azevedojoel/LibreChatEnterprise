@@ -9,7 +9,7 @@ import { UIResourceRenderer } from '@mcp-ui/client';
 import UIResourceCarousel from './UIResourceCarousel';
 import { RunScheduleNowWidget } from './RunScheduleNowWidget';
 import MarkdownLite from './MarkdownLite';
-import { cn } from '~/utils';
+import { cn, humanizeToolName } from '~/utils';
 import type { TAttachment, UIResource } from 'librechat-data-provider';
 
 const PROMPT_TRUNCATE_LENGTH = 200;
@@ -94,6 +94,17 @@ const DIFF_TOOLS = new Set<string>([
   Tools.run_program,
   Tools.workspace_create_file,
   Tools.workspace_edit_file,
+]);
+
+const HUMAN_TOOLS = new Set<string>([
+  Tools.human_list_workspace_members,
+  Tools.human_routing_rules_list,
+  Tools.human_routing_rules_set,
+  Tools.human_routing_rules_delete,
+  Tools.human_notify_human,
+  Tools.human_await_response,
+  Tools.human_invite_to_workspace,
+  Tools.human_remove_from_workspace,
 ]);
 
 function formatSchedulerTime(iso: string) {
@@ -878,6 +889,97 @@ export default function ToolCallInfo({
     return null;
   }, [function_name, input]);
 
+  const humanToolData = useMemo(() => {
+    if (!function_name || !HUMAN_TOOLS.has(function_name)) return null;
+    const argLabels: Record<string, string> = {
+      memberId: 'Recipient',
+      message: 'Message',
+      context: 'Context',
+      trigger: 'Topic',
+      recipient: 'Recipient',
+      instructions: 'Instructions',
+      email: 'Email',
+    };
+    let inputFields: Array<{ label: string; value: string }> = [];
+    if (input?.trim()) {
+      try {
+        const parsed = JSON.parse(input) as Record<string, unknown>;
+        for (const [key, val] of Object.entries(parsed)) {
+          if (key.startsWith('_') || val == null) continue;
+          const label = argLabels[key] ?? humanizeToolName(key);
+          const value =
+            typeof val === 'object' ? JSON.stringify(val) : String(val);
+          if (value.trim()) {
+            inputFields.push({ label, value });
+          }
+        }
+      } catch {
+        // fall through
+      }
+    }
+    let outputSummary: string | null = null;
+    if (output?.trim()) {
+      const outputLower = output.toLowerCase();
+      const isDeniedOutput =
+        outputLower.includes('user denied') || outputLower.includes('denied execution');
+      try {
+        const parsed = JSON.parse(output) as Record<string, unknown>;
+        if (parsed?.error && typeof parsed.error === 'string') {
+          outputSummary = parsed.error;
+        } else if (function_name === Tools.human_await_response) {
+          if (isDeniedOutput) {
+            outputSummary = 'Denied';
+          } else if (parsed?.approved === true) {
+            outputSummary = 'Approved';
+          } else {
+            outputSummary = (parsed?.message as string) ?? 'Approved';
+          }
+        } else if (function_name === Tools.human_notify_human) {
+          outputSummary =
+            (parsed?.message as string) ??
+            (parsed?.emailSent ? 'Notification sent' : 'Notification queued');
+        } else if (function_name === Tools.human_invite_to_workspace) {
+          outputSummary =
+            parsed?.error ??
+            (parsed?.message as string) ??
+            (parsed?.success ? 'Invitation sent' : '');
+        } else if (function_name === Tools.human_remove_from_workspace) {
+          outputSummary =
+            parsed?.error ??
+            (parsed?.message as string) ??
+            (parsed?.success ? 'Member removed' : '');
+        } else if (function_name === Tools.human_list_workspace_members) {
+          const members = parsed?.members as Array<unknown> | undefined;
+          const invites = parsed?.invites as Array<unknown> | undefined;
+          const memberCount = Array.isArray(members) ? members.length : 0;
+          const inviteCount = Array.isArray(invites) ? invites.length : 0;
+          const parts: string[] = [];
+          if (memberCount > 0) parts.push(`${memberCount} member${memberCount === 1 ? '' : 's'}`);
+          if (inviteCount > 0) parts.push(`${inviteCount} invite${inviteCount === 1 ? '' : 's'}`);
+          outputSummary = parts.length > 0 ? `Listed ${parts.join(', ')}` : 'No members or invites';
+        } else if (
+          function_name === Tools.human_routing_rules_set ||
+          function_name === Tools.human_routing_rules_delete
+        ) {
+          outputSummary = (parsed?.message as string) ?? (parsed?.success ? 'Success' : '');
+        } else if (function_name === Tools.human_routing_rules_list) {
+          const rules = parsed?.rules as Array<unknown> | undefined;
+          const count = Array.isArray(rules) ? rules.length : 0;
+          outputSummary = count > 0 ? `Found ${count} rule${count === 1 ? '' : 's'}` : 'No rules';
+        } else {
+          outputSummary = (parsed?.message as string) ?? null;
+        }
+      } catch {
+        if (function_name === Tools.human_await_response && isDeniedOutput) {
+          outputSummary = 'Denied';
+        } else {
+          outputSummary = output;
+        }
+      }
+    }
+    return { inputFields, outputSummary };
+  }, [function_name, input, output]);
+
   const handleOpenInArtifact = React.useCallback(() => {
     if (readFileData) {
       openInArtifact({
@@ -1504,6 +1606,54 @@ export default function ToolCallInfo({
           {schedulerContent && (
             <div className={hasSchedulerInputPreview || showSchedulerInput ? 'mt-2' : ''}>
               {schedulerContent}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Human tools: compact card with human-readable input/output
+  if (humanToolData) {
+    const { inputFields, outputSummary } = humanToolData;
+    const hasInput = inputFields.length > 0;
+    const hasOutput = outputSummary != null && outputSummary.trim() !== '';
+    const isApproved =
+      function_name === Tools.human_await_response &&
+      outputSummary?.toLowerCase().includes('approved');
+    const isDenied =
+      function_name === Tools.human_await_response &&
+      (outputSummary?.toLowerCase().includes('denied') ?? false);
+
+    return (
+      <div className="w-full p-2">
+        <div style={{ opacity: 1 }} className="space-y-2">
+          {hasInput && (
+            <div className="space-y-1.5">
+              {inputFields.map(({ label, value }) => (
+                <div key={label} className="rounded-lg border border-border-light bg-surface-tertiary p-2 text-sm">
+                  <div className="mb-0.5 text-xs font-medium text-text-secondary">{label}</div>
+                  <div className="whitespace-pre-wrap break-words text-text-primary">
+                    {value.length > 500 ? `${value.slice(0, 500)}…` : value}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {hasOutput && (
+            <div
+              className={cn(
+                'flex items-center gap-2 rounded-lg border px-2 py-2 text-sm',
+                isApproved &&
+                  'border-green-500/30 bg-green-500/5 text-green-600 dark:text-green-400',
+                isDenied && 'border-red-500/30 bg-red-500/5 text-red-600 dark:text-red-400',
+                !isApproved &&
+                  !isDenied &&
+                  'border-border-light bg-surface-tertiary text-text-primary',
+              )}
+            >
+              {isApproved && <CheckCircle className="size-4 shrink-0" aria-hidden />}
+              <span>{outputSummary}</span>
             </div>
           )}
         </div>

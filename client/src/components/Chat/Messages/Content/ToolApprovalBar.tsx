@@ -13,6 +13,9 @@ type ToolApprovalBarProps = {
   toolName?: string;
   /** When set, shows Approved/Denied status instead of Approve/Deny buttons */
   resolved?: 'approved' | 'denied';
+  /** When true, approval is routed to another user; hide Approve/Deny, show waiting message */
+  waitingForApprover?: boolean;
+  approverName?: string | null;
 };
 
 export default function ToolApprovalBar({
@@ -23,9 +26,14 @@ export default function ToolApprovalBar({
   isSubmitting,
   toolName,
   resolved,
+  waitingForApprover,
+  approverName,
 }: ToolApprovalBarProps) {
   const localize = useLocalize();
   const label = toolName ? getToolDisplayName(toolName) : (localize('com_ui_tool_approval_required') || 'Tool approval required');
+  const waitingLabel = approverName
+    ? `Waiting for ${approverName} to approve. They will receive an email.`
+    : 'Waiting for approval. The approver will receive an email.';
 
   return (
     <div className="flex min-h-7 flex-wrap items-center gap-x-3 gap-y-2 py-0.5">
@@ -41,9 +49,11 @@ export default function ToolApprovalBar({
           ? (localize('com_ui_tool_approved') || 'Approved')
           : resolved === 'denied'
             ? (localize('com_ui_tool_denied') || 'Denied')
-            : label}
+            : waitingForApprover
+              ? waitingLabel
+              : label}
       </span>
-      {!resolved && (
+      {!resolved && !waitingForApprover && (
         <div className="flex gap-2">
           <Button
             variant="default"

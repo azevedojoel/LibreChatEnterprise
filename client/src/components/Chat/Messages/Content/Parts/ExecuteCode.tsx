@@ -62,7 +62,7 @@ export default function ExecuteCode({
   toolCallId?: string;
 }) {
   const localize = useLocalize();
-  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting } =
+  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting, waitingForApprover, approverName } =
     useToolApproval(toolCallId, output);
 
   const hasOutput = output.length > 0;
@@ -195,6 +195,8 @@ export default function ExecuteCode({
             isSubmitting={approvalSubmitting}
             toolName="execute_code"
             resolved={approvalStatus === 'approved' ? 'approved' : approvalStatus === 'denied' ? 'denied' : undefined}
+            waitingForApprover={waitingForApprover}
+            approverName={approverName}
           />
         </div>
         <div
