@@ -946,6 +946,102 @@ export const toolDefinitions: Record<string, ToolRegistryDefinition> = {
     schema: crmListActivitiesSchema,
     toolType: 'builtin',
   },
+  human_list_workspace_members: {
+    name: 'human_list_workspace_members',
+    description:
+      'List all members in the current user\'s workspace. Returns id, email, name, username, role for each member.',
+    schema: { type: 'object', properties: {}, required: [] },
+    toolType: 'builtin',
+  },
+  human_routing_rules_list: {
+    name: 'human_routing_rules_list',
+    description:
+      'List routing rules for the workspace: who handles what (e.g. commercial auto → Chris).',
+    schema: { type: 'object', properties: {}, required: [] },
+    toolType: 'builtin',
+  },
+  human_routing_rules_set: {
+    name: 'human_routing_rules_set',
+    description:
+      'Create or update a routing rule. Required: trigger, recipient. Optional: instructions.',
+    schema: {
+      type: 'object',
+      properties: {
+        trigger: { type: 'string', description: 'Topic/trigger (e.g. "commercial auto")' },
+        recipient: { type: 'string', description: 'User ID of the workspace member who handles this' },
+        instructions: { type: 'string', description: 'Optional instructions for the human' },
+      },
+      required: ['trigger', 'recipient'],
+    },
+    toolType: 'builtin',
+  },
+  human_routing_rules_delete: {
+    name: 'human_routing_rules_delete',
+    description: 'Remove a routing rule by trigger.',
+    schema: {
+      type: 'object',
+      properties: {
+        trigger: { type: 'string', description: 'Topic/trigger to remove' },
+      },
+      required: ['trigger'],
+    },
+    toolType: 'builtin',
+  },
+  human_notify_human: {
+    name: 'human_notify_human',
+    description:
+      'Send a notification to a workspace member (FYI, no approval needed). Required: memberId, message. Optional: context. Use this only when you do NOT need to wait for approval—if you need approval, use human_await_response instead (it sends the notification).',
+    schema: {
+      type: 'object',
+      properties: {
+        memberId: { type: 'string', description: 'User ID of the workspace member to notify' },
+        message: { type: 'string', description: 'The notification message' },
+        context: { type: 'string', description: 'Additional context for the human' },
+      },
+      required: ['memberId', 'message'],
+    },
+    toolType: 'builtin',
+  },
+  human_await_response: {
+    name: 'human_await_response',
+    description:
+      'Block until a human approves. Sends them an approval email—do NOT call human_notify_human first. Use memberId to route to a specific workspace member; omit for conversation owner to approve inline. Optional: message (context shown in approval request).',
+    schema: {
+      type: 'object',
+      properties: {
+        memberId: { type: 'string', description: 'User ID of the member who should respond' },
+        message: { type: 'string', description: 'Instruction or context for the human' },
+      },
+      required: [],
+    },
+    toolType: 'builtin',
+  },
+  human_invite_to_workspace: {
+    name: 'human_invite_to_workspace',
+    description:
+      'Invite a user to the workspace by email. Only workspace admins can invite. If you get an error that you are not an admin, use human_notify_human to ask the workspace admin (adminMemberId) to invite them. Required: email.',
+    schema: {
+      type: 'object',
+      properties: {
+        email: { type: 'string', description: 'Email address of the user to invite' },
+      },
+      required: ['email'],
+    },
+    toolType: 'builtin',
+  },
+  human_remove_from_workspace: {
+    name: 'human_remove_from_workspace',
+    description:
+      'Remove a member from the workspace. Only workspace admins can remove. Cannot remove yourself. Required: memberId (user ID from human_list_workspace_members).',
+    schema: {
+      type: 'object',
+      properties: {
+        memberId: { type: 'string', description: 'User ID of the workspace member to remove' },
+      },
+      required: ['memberId'],
+    },
+    toolType: 'builtin',
+  },
   project_read: {
     name: 'project_read',
     description:

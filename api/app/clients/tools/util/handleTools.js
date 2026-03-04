@@ -78,6 +78,7 @@ const { findUser } = require('~/models');
 const { getConvo } = require('~/models/Conversation');
 const { createCRMTools } = require('../structured/CRMTools');
 const { createProjectTools } = require('../structured/ProjectTools');
+const { createHumanTools } = require('~/server/services/HumanAgent');
 
 /**
  * Validates the availability and authentication of tools for a user based on environment variables or user-specific plugin authentication values.
@@ -212,6 +213,9 @@ const loadTools = async ({
   const PROJECT_TOOL_NAMES = new Set(
     Object.values(Tools).filter((t) => typeof t === 'string' && t.startsWith('project_')),
   );
+  const HUMAN_TOOL_NAMES = new Set(
+    Object.values(Tools).filter((t) => typeof t === 'string' && t.startsWith('human_')),
+  );
   const hasCRMTools = tools.some((t) => CRM_TOOL_NAMES.has(t));
   const hasProjectTools = tools.some((t) => PROJECT_TOOL_NAMES.has(t));
   let userProjectId = null;
@@ -221,6 +225,15 @@ const loadTools = async ({
       userProjectId = userDoc?.projectId?.toString?.() ?? userDoc?.projectId ?? null;
     } catch (err) {
       logger.debug('[handleTools] Could not resolve projectId for CRM tools:', err);
+    }
+  }
+  let userWorkspaceId = null;
+  if (HUMAN_TOOL_NAMES.size > 0 && tools.some((t) => HUMAN_TOOL_NAMES.has(t))) {
+    try {
+      const userDoc = await findUser({ _id: user }, 'workspace_id');
+      userWorkspaceId = userDoc?.workspace_id?.toString?.() ?? userDoc?.workspace_id ?? null;
+    } catch (err) {
+      logger.debug('[handleTools] Could not resolve workspace_id for Human tools:', err);
     }
   }
   let conversationUserProjectId = null;
@@ -622,6 +635,20 @@ const loadTools = async ({
       requestedTools[tool] = async () => {
         const crmTools = createCRMTools({ userId: user, projectId: userProjectId });
         return crmTools[tool];
+      };
+      continue;
+    } else if (HUMAN_TOOL_NAMES.has(tool)) {
+      if (!userWorkspaceId) {
+        continue;
+      }
+      requestedTools[tool] = async () => {
+        const humanTools = createHumanTools({
+          userId: user,
+          workspaceId: userWorkspaceId,
+          conversationId: options.req?.body?.conversationId ?? options.conversationId,
+          agentId: agent?.id,
+        });
+        return humanTools[tool];
       };
       continue;
     } else if (PROJECT_TOOL_NAMES.has(tool)) {

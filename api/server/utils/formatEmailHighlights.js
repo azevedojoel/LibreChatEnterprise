@@ -567,8 +567,8 @@ function formatToolApprovalEmail({ toolName, argsSummary, approvalUrl }, options
   const text = `Your agent requested approval for a destructive action.
 
 Tool: ${displayName}
-${argsText ? `Arguments:\n${argsText}\n\n` : ''}To approve or deny, sign in and visit:
-${approvalUrl || ''}
+${argsText ? `Arguments:\n${argsText}\n\n` : ''}Click this link to approve or deny (sign in first if needed):
+${approvalUrl || '(link not available)'}
 
 This link expires in 1 hour.`;
 

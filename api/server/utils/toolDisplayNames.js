@@ -85,6 +85,15 @@ const TOOL_DISPLAY_NAMES = {
   reset_workspace: 'Reset Workspace',
   update_todo: 'Update Todo',
   create_plan: 'Create Plan',
+  // Human tools
+  human_list_workspace_members: 'List Workspace Members',
+  human_routing_rules_list: 'List Routing Rules',
+  human_routing_rules_set: 'Set Routing Rule',
+  human_routing_rules_delete: 'Delete Routing Rule',
+  human_notify_human: 'Notify Team Member',
+  human_await_response: 'Request Approval',
+  human_invite_to_workspace: 'Invite to Workspace',
+  human_remove_from_workspace: 'Remove from Workspace',
 };
 
 /**

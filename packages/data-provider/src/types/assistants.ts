@@ -76,6 +76,14 @@ export enum Tools {
   update_todo = 'update_todo',
   create_plan = 'create_plan',
   install_dependencies = 'install_dependencies',
+  human_list_workspace_members = 'human_list_workspace_members',
+  human_routing_rules_list = 'human_routing_rules_list',
+  human_routing_rules_set = 'human_routing_rules_set',
+  human_routing_rules_delete = 'human_routing_rules_delete',
+  human_notify_human = 'human_notify_human',
+  human_await_response = 'human_await_response',
+  human_invite_to_workspace = 'human_invite_to_workspace',
+  human_remove_from_workspace = 'human_remove_from_workspace',
 }
 
 /**

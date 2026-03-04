@@ -85,6 +85,8 @@ const DESTRUCTIVE_TOOLS = new Set([
   'reply-to-chat-message',
   'send-channel-message',
   'reply-to-group-thread',
+  // Human agent - blocks until target member approves
+  Tools.human_await_response,
 ]);
 
 /**

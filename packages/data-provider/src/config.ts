@@ -189,6 +189,7 @@ export enum AgentCapabilities {
   ocr = 'ocr',
   create_pdf = 'create_pdf',
   manage_scheduling = 'manage_scheduling',
+  human_in_the_loop = 'human_in_the_loop',
   inbound_email = 'inbound_email',
 }
 

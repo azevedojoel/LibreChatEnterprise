@@ -467,6 +467,14 @@ const nativeTools = new Set([
   Tools.reset_workspace,
   Tools.update_todo,
   Tools.create_plan,
+  Tools.human_list_workspace_members,
+  Tools.human_routing_rules_list,
+  Tools.human_routing_rules_set,
+  Tools.human_routing_rules_delete,
+  Tools.human_notify_human,
+  Tools.human_await_response,
+  Tools.human_invite_to_workspace,
+  Tools.human_remove_from_workspace,
 ]);
 
 const { isDestructiveTool } = require('./destructiveTools');
@@ -573,10 +581,28 @@ async function loadToolDefinitionsWrapper({
     toolsToFilter = [...new Set([...toolsToFilter, ...schedulingTools])];
   }
 
+  /** Inject human tools when human_in_the_loop capability is enabled */
+  if (toolsToFilter.includes(AgentCapabilities.human_in_the_loop)) {
+    const humanTools = [
+      Tools.human_list_workspace_members,
+      Tools.human_routing_rules_list,
+      Tools.human_routing_rules_set,
+      Tools.human_routing_rules_delete,
+      Tools.human_notify_human,
+      Tools.human_await_response,
+      Tools.human_invite_to_workspace,
+      Tools.human_remove_from_workspace,
+    ];
+    toolsToFilter = [...new Set([...toolsToFilter, ...humanTools])];
+  }
+
   /** Filter CRM native tools when user has no projectId - CRM requires user.projectId */
   const hasCRMTools = toolsToFilter.some(
     (t) => typeof t === 'string' && t.startsWith('crm_'),
   );
+  const hasHumanTools =
+    toolsToFilter.includes(AgentCapabilities.human_in_the_loop) ||
+    toolsToFilter.some((t) => typeof t === 'string' && t.startsWith('human_'));
   const hasProjectTools = toolsToFilter.some(
     (t) => typeof t === 'string' && t.startsWith('project_'),
   );
@@ -590,6 +616,17 @@ async function loadToolDefinitionsWrapper({
     userProjectId = userDoc?.projectId;
     if (hasCRMTools && !userProjectId) {
       toolsToFilter = toolsToFilter.filter((t) => typeof t !== 'string' || !t.startsWith('crm_'));
+    }
+  }
+  if (hasHumanTools) {
+    const userDoc = await findUser({ _id: req.user.id }, 'workspace_id');
+    const userWorkspaceId = userDoc?.workspace_id?.toString?.() ?? userDoc?.workspace_id ?? null;
+    if (!userWorkspaceId) {
+      toolsToFilter = toolsToFilter.filter(
+        (t) =>
+          typeof t !== 'string' ||
+          (t !== AgentCapabilities.human_in_the_loop && !t.startsWith('human_')),
+      );
     }
   }
 
@@ -670,6 +707,9 @@ async function loadToolDefinitionsWrapper({
     if (tool === AgentCapabilities.manage_scheduling) {
       if (appConfig?.interfaceConfig?.scheduledAgents === false) return false;
       return checkCapability(AgentCapabilities.manage_scheduling);
+    }
+    if (tool === AgentCapabilities.human_in_the_loop) {
+      return false;
     }
     if (tool === Tools.web_search) {
       if (isPersistentAgent) {
@@ -1248,10 +1288,27 @@ async function loadAgentTools({
     toolsToFilter = [...new Set([...toolsToFilter, ...schedulingTools])];
   }
 
+  if (toolsToFilter.includes(AgentCapabilities.human_in_the_loop)) {
+    const humanTools = [
+      Tools.human_list_workspace_members,
+      Tools.human_routing_rules_list,
+      Tools.human_routing_rules_set,
+      Tools.human_routing_rules_delete,
+      Tools.human_notify_human,
+      Tools.human_await_response,
+      Tools.human_invite_to_workspace,
+      Tools.human_remove_from_workspace,
+    ];
+    toolsToFilter = [...new Set([...toolsToFilter, ...humanTools])];
+  }
+
   /** Filter CRM native tools when user has no projectId - CRM requires user.projectId */
   const hasCRMToolsLoadAgent = toolsToFilter.some(
     (t) => typeof t === 'string' && t.startsWith('crm_'),
   );
+  const hasHumanToolsLoadAgent =
+    toolsToFilter.includes(AgentCapabilities.human_in_the_loop) ||
+    toolsToFilter.some((t) => typeof t === 'string' && t.startsWith('human_'));
   const hasProjectToolsLoadAgent = toolsToFilter.some(
     (t) => typeof t === 'string' && t.startsWith('project_'),
   );
@@ -1265,6 +1322,17 @@ async function loadAgentTools({
     userProjectIdLoadAgent = userDoc?.projectId;
     if (hasCRMToolsLoadAgent && !userProjectIdLoadAgent) {
       toolsToFilter = toolsToFilter.filter((t) => typeof t !== 'string' || !t.startsWith('crm_'));
+    }
+  }
+  if (hasHumanToolsLoadAgent) {
+    const userDoc = await findUser({ _id: req.user.id }, 'workspace_id');
+    const userWorkspaceIdLoadAgent = userDoc?.workspace_id?.toString?.() ?? userDoc?.workspace_id ?? null;
+    if (!userWorkspaceIdLoadAgent) {
+      toolsToFilter = toolsToFilter.filter(
+        (t) =>
+          typeof t !== 'string' ||
+          (t !== AgentCapabilities.human_in_the_loop && !t.startsWith('human_')),
+      );
     }
   }
 
@@ -1345,6 +1413,8 @@ async function loadAgentTools({
     } else if (tool === AgentCapabilities.manage_scheduling) {
       if (appConfig?.interfaceConfig?.scheduledAgents === false) return false;
       return checkCapability(AgentCapabilities.manage_scheduling);
+    } else if (tool === AgentCapabilities.human_in_the_loop) {
+      return false;
     } else if (tool === Tools.web_search) {
       if (isPersistentAgent) {
         if (ephemeralAgent?.web_search === false) {
