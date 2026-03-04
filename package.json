@@ -34,6 +34,7 @@
     "delete-user": "node config/delete-user.js",
     "reset-meili-sync": "node config/reset-meili-sync.js",
     "init-pgvector-rag": "node scripts/init-pgvector-rag.js",
+    "setup:coder": "node scripts/setup-coder-env.js",
     "check-convo": "node scripts/check-convo.js",
     "update-banner": "node config/update-banner.js",
     "delete-banner": "node config/delete-banner.js",

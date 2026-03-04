@@ -115,6 +115,16 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   [Tools.run_schedule]: 'Run Schedule Now',
   [Tools.list_runs]: 'List Run History',
   [Tools.get_run]: 'Get Run Details',
+  // Coder tools
+  [Tools.generate_code]: 'Generate Code',
+  [Tools.install_dependencies]: 'Install Dependencies',
+  [Tools.lint]: 'Lint',
+  [Tools.run_program]: 'Run Program',
+  [Tools.workspace_status]: 'Workspace Status',
+  [Tools.workspace_init]: 'Workspace Init',
+  [Tools.reset_workspace]: 'Reset Workspace',
+  [Tools.update_todo]: 'Update Todo',
+  [Tools.create_plan]: 'Create Plan',
 };
 
 /**

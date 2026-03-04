@@ -15,6 +15,9 @@ import {
   List,
   Search,
   CalendarRange,
+  CheckCircle,
+  Play,
+  Package,
 } from 'lucide-react';
 import { VectorIcon } from '@librechat/client';
 import { EModelEndpoint, Tools, AgentCapabilities } from 'librechat-data-provider';
@@ -51,6 +54,15 @@ const BUILT_IN_ICONS: Record<string, React.ComponentType<{ className?: string; s
   [Tools.workspace_pull_file]: FileDown,
   [Tools.create_pdf]: FileText,
   [Tools.search_user_files]: Search,
+  [Tools.generate_code]: TerminalSquareIcon,
+  [Tools.install_dependencies]: Package,
+  [Tools.lint]: CheckCircle,
+  [Tools.run_program]: Play,
+  [Tools.workspace_status]: FileText,
+  [Tools.workspace_init]: FolderOpen,
+  [Tools.reset_workspace]: Wrench,
+  [Tools.update_todo]: ListPlus,
+  [Tools.create_plan]: FileText,
 };
 
 function getToolIcon(toolId: string): React.ComponentType<{ className?: string; size?: number }> {
@@ -90,6 +102,15 @@ function getToolDisplayName(
     [Tools.workspace_pull_file]: 'Pull File to Workspace',
     [Tools.create_pdf]: 'Create PDF',
     [Tools.search_user_files]: 'Grepped',
+    [Tools.generate_code]: 'Generate Code',
+    [Tools.install_dependencies]: 'Install Dependencies',
+    [Tools.lint]: 'Lint',
+    [Tools.run_program]: 'Run Program',
+    [Tools.workspace_status]: 'Workspace Status',
+    [Tools.workspace_init]: 'Workspace Init',
+    [Tools.reset_workspace]: 'Reset Workspace',
+    [Tools.update_todo]: 'Update Todo',
+    [Tools.create_plan]: 'Create Plan',
   };
   return labels[toolId] ?? toolId;
 }

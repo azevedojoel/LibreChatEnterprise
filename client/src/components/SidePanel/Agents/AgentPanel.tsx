@@ -6,6 +6,7 @@ import { useGetModelsQuery } from 'librechat-data-provider/react-query';
 import {
   Tools,
   EToolResources,
+  EXECUTE_CODE_TOOLS,
   SystemRoles,
   ResourceType,
   EModelEndpoint,
@@ -449,17 +450,9 @@ export default function AgentPanel() {
         tools.push(Tools.create_pdf);
       }
       if (data.execute_code === true) {
-        const workspaceTools = [
-          Tools.workspace_read_file,
-          Tools.workspace_edit_file,
-          Tools.workspace_create_file,
-          Tools.workspace_delete_file,
-          Tools.workspace_list_files,
-          Tools.search_user_files,
-          Tools.workspace_glob_files,
-          Tools.workspace_send_file_to_user,
-        ].filter((t): t is string => t != null && t !== '');
-        tools.push(...workspaceTools);
+        tools.push(
+          ...EXECUTE_CODE_TOOLS.filter((t): t is string => t != null && t !== ''),
+        );
       }
       if (data.manage_scheduling === true) {
         tools.push(AgentCapabilities.manage_scheduling);

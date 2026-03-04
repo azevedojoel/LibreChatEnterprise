@@ -1610,6 +1610,7 @@
   "com_ui_view_conversation": "View conversation",
   "com_ui_tool_approval_submit_error": "Failed to submit approval. Please try again.",
   "com_ui_transferred_to": "Transferred to",
+  "com_ui_returned_from": "Returned from",
   "com_ui_travel": "Travel",
   "com_ui_trust_app": "I trust this application",
   "com_ui_try_adjusting_search": "Try adjusting your search terms",

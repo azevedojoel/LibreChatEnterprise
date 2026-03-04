@@ -75,6 +75,16 @@ const TOOL_DISPLAY_NAMES = {
   project_log_tail: 'Recent Changelog Entries',
   project_log_search: 'Search Changelog',
   project_log_range: 'Changelog by Date Range',
+  // Coder tools
+  generate_code: 'Generate Code',
+  install_dependencies: 'Install Dependencies',
+  lint: 'Lint',
+  run_program: 'Run Program',
+  workspace_status: 'Workspace Status',
+  workspace_init: 'Workspace Init',
+  reset_workspace: 'Reset Workspace',
+  update_todo: 'Update Todo',
+  create_plan: 'Create Plan',
 };
 
 /**

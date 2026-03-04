@@ -21,6 +21,15 @@ const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
   [Tools.workspace_send_file_to_user]: 'Send File to User',
   [Tools.workspace_pull_file]: 'Pull File to Workspace',
   [Tools.create_pdf]: 'Create PDF',
+  [Tools.generate_code]: 'Generate Code',
+  [Tools.install_dependencies]: 'Install Dependencies',
+  [Tools.lint]: 'Lint',
+  [Tools.run_program]: 'Run Program',
+  [Tools.workspace_status]: 'Workspace Status',
+  [Tools.workspace_init]: 'Workspace Init',
+  [Tools.reset_workspace]: 'Reset Workspace',
+  [Tools.update_todo]: 'Update Todo',
+  [Tools.create_plan]: 'Create Plan',
   [Tools.file_search]: 'Searched My Files',
   [Constants.TOOL_SEARCH]: 'Discovery',
   // CRM tools
@@ -173,6 +182,18 @@ const WORKSPACE_TOOL_ICONS: Partial<Record<string, React.ComponentType<{ classNa
   [Tools.file_search]: FileSearch,
 };
 
+/** Icons for Coder tools */
+const CODER_TOOL_ICONS: Partial<Record<string, React.ComponentType<{ className?: string }>>> = {
+  [Tools.generate_code]: Code2,
+  [Tools.lint]: CheckCircle,
+  [Tools.run_program]: Play,
+  [Tools.workspace_status]: Info,
+  [Tools.workspace_init]: FolderOpen,
+  [Tools.reset_workspace]: RotateCcw,
+  [Tools.update_todo]: ListPlus,
+  [Tools.create_plan]: ClipboardList,
+};
+
 /** Icons for scheduler tools */
 const SCHEDULER_TOOL_ICONS: Partial<Record<string, React.ComponentType<{ className?: string }>>> = {
   [Tools.list_schedules]: Calendar,
@@ -250,6 +271,12 @@ import {
   Trash2,
   Play,
   FileSearch,
+  Code2,
+  CheckCircle,
+  AlertCircle,
+  Info,
+  RotateCcw,
+  ClipboardList,
 } from 'lucide-react';
 import { useLocalize, useProgress, useMCPConnectionStatus, useToolApproval } from '~/hooks';
 import { useMessageContext } from '~/Providers';
@@ -358,7 +385,24 @@ export default function ToolCall({
 
   const humanizedDisplayName = useMemo(() => getToolDisplayName(name), [name]);
 
+  const lintData = useMemo(() => {
+    if (function_name !== Tools.lint || !output?.trim().startsWith('{')) {
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(output) as { hasErrors?: boolean; errors?: unknown[] };
+      const hasErrors = parsed.hasErrors === true;
+      const count = Array.isArray(parsed.errors) ? parsed.errors.length : 0;
+      return { hasErrors, count };
+    } catch {
+      return null;
+    }
+  }, [function_name, output]);
+
   const ToolIcon = useMemo(() => {
+    if (function_name === Tools.lint && lintData?.hasErrors) {
+      return AlertCircle;
+    }
     if (function_name && PROJECT_TOOL_ICONS[function_name]) {
       return PROJECT_TOOL_ICONS[function_name] as React.ComponentType<{ className?: string }>;
     }
@@ -374,8 +418,11 @@ export default function ToolCall({
     if (function_name && CRM_TOOL_ICONS[function_name]) {
       return CRM_TOOL_ICONS[function_name] as React.ComponentType<{ className?: string }>;
     }
+    if (function_name && CODER_TOOL_ICONS[function_name]) {
+      return CODER_TOOL_ICONS[function_name] as React.ComponentType<{ className?: string }>;
+    }
     return Plug;
-  }, [function_name]);
+  }, [function_name, lintData?.hasErrors]);
 
   const inlinePattern = useMemo(() => {
     if (function_name !== Tools.search_user_files && function_name !== Tools.workspace_glob_files) {
@@ -419,6 +466,19 @@ export default function ToolCall({
     [args, output, isToolSearch],
   );
   const hasOutput = output != null && output !== '';
+
+  // Auto-expand generate_code when streaming so user sees the stream output
+  useEffect(() => {
+    if (
+      expandedKey &&
+      function_name === Tools.generate_code &&
+      isSubmitting &&
+      !hasOutput &&
+      hasInfo
+    ) {
+      setExpandedToolCalls((prev) => (prev.has(expandedKey) ? prev : new Set(prev).add(expandedKey)));
+    }
+  }, [expandedKey, function_name, isSubmitting, hasOutput, hasInfo, setExpandedToolCalls]);
 
   const resolvedServerName = useMemo(() => {
     if (mcpServerName) return mcpServerName;
@@ -553,7 +613,99 @@ export default function ToolCall({
     [displayName, inlinePattern],
   );
 
+  const DIFF_TOOLS = useMemo(
+    () =>
+      new Set([
+        Tools.generate_code,
+        Tools.run_program,
+        Tools.workspace_edit_file,
+        Tools.workspace_create_file,
+      ]),
+    [],
+  );
+
   const { resultsCount, summaryText } = useMemo(() => {
+    if (function_name === Tools.create_plan) {
+      if (output?.trim().startsWith('{')) {
+        try {
+          const parsed = JSON.parse(output) as { items?: unknown[]; error?: string };
+          if (parsed.error) {
+            return { resultsCount: undefined, summaryText: 'Plan' };
+          }
+          const count = Array.isArray(parsed.items) ? parsed.items.length : undefined;
+          return {
+            resultsCount: count,
+            summaryText: count != null ? `Plan — ${count} item${count !== 1 ? 's' : ''}` : 'Plan',
+          };
+        } catch {
+          // fall through
+        }
+      }
+      return { resultsCount: undefined, summaryText: 'Plan' };
+    }
+    if (function_name === Tools.lint && lintData) {
+      const text = lintData.hasErrors
+        ? `Lint (${lintData.count} error${lintData.count !== 1 ? 's' : ''})`
+        : 'Lint (passed)';
+      return { resultsCount: undefined, summaryText: text };
+    }
+    if (function_name === Tools.workspace_pull_file && output) {
+      let filename = '';
+      if (output.startsWith('Error:')) {
+        return { resultsCount: undefined, summaryText: 'Pull File' };
+      }
+      try {
+        const parsed = JSON.parse(output) as { filename?: string };
+        filename = parsed.filename ?? '';
+      } catch {
+        const match = output.match(/Pulled (.+?) into workspace/);
+        filename = match?.[1] ?? '';
+      }
+      return {
+        resultsCount: undefined,
+        summaryText: filename ? `${filename}` : 'Pull File to Workspace',
+      };
+    }
+    if (function_name === Tools.workspace_read_file && (args || output)) {
+      let filename = '';
+      let lineRange = '';
+      try {
+        const inputParsed = JSON.parse(args || '{}') as {
+          path?: string;
+          start_line?: number;
+          end_line?: number;
+        };
+        const pathVal = inputParsed.path;
+        if (typeof pathVal === 'string') {
+          filename = pathVal.split(/[/\\]/).pop() ?? pathVal;
+        }
+        if (typeof inputParsed.start_line === 'number' && typeof inputParsed.end_line === 'number') {
+          lineRange = ` · ${inputParsed.start_line}–${inputParsed.end_line}`;
+        } else if (typeof inputParsed.start_line === 'number') {
+          lineRange = ` · ${inputParsed.start_line}`;
+        }
+      } catch {
+        // ignore
+      }
+      return {
+        resultsCount: undefined,
+        summaryText: filename ? `Read File · ${filename}${lineRange}` : 'Read File',
+      };
+    }
+    if (DIFF_TOOLS.has(function_name) && output?.trim().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(output) as { file?: string; summary?: string; error?: string };
+        if (parsed.error) {
+          return { resultsCount: undefined, summaryText: parsed.file ? `${parsed.file}` : displayName };
+        }
+        const file = parsed.file ?? '';
+        const summary = parsed.summary ?? '';
+        const text = file && summary ? `${file} · ${summary}` : file || summary || displayName;
+        return { resultsCount: undefined, summaryText: text };
+      } catch {
+        // fall through
+      }
+    }
     const base = labelWithPattern || humanizedDisplayName || localize('com_assistants_running_action');
     if (!output || typeof output !== 'string') {
       return { resultsCount: undefined, summaryText: base };
@@ -578,7 +730,17 @@ export default function ToolCall({
     }
     const text = count != null ? `${base} — ${count} result${count !== 1 ? 's' : ''}` : base;
     return { resultsCount: count, summaryText: text };
-  }, [output, labelWithPattern, humanizedDisplayName, localize]);
+  }, [
+    function_name,
+    output,
+    args,
+    displayName,
+    DIFF_TOOLS,
+    labelWithPattern,
+    humanizedDisplayName,
+    localize,
+    lintData,
+  ]);
 
   const isTasksTool = function_name?.startsWith('tasks_') || function_name?.startsWith('tasks.');
 
@@ -690,7 +852,7 @@ export default function ToolCall({
             isExpanded={showInfo}
             onToggle={toggleShowInfo}
             isLoading={isSubmitting && !hasOutput}
-            error={cancelled}
+            error={cancelled || (function_name === Tools.lint && !!lintData?.hasErrors)}
             hasExpandableContent={hasInfo}
             minExpandHeight={120}
           >

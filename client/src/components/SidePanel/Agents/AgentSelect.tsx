@@ -99,12 +99,22 @@ export default function AgentSelect({
           tool === Tools.workspace_list_files ||
           tool === Tools.search_user_files ||
           tool === Tools.workspace_glob_files ||
-          tool === Tools.workspace_send_file_to_user
+          tool === Tools.workspace_send_file_to_user ||
+          tool === Tools.workspace_pull_file ||
+          tool === Tools.generate_code ||
+          tool === Tools.install_dependencies ||
+          tool === Tools.lint ||
+          tool === Tools.run_program ||
+          tool === Tools.workspace_status ||
+          tool === Tools.workspace_init ||
+          tool === Tools.reset_workspace ||
+          tool === Tools.update_todo ||
+          tool === Tools.create_plan
         ) {
           capabilities[AgentCapabilities.execute_code] = true;
           return;
         }
-        if (schedulingToolSet.has(tool)) {
+        if (schedulingToolSet.has(tool as Tools)) {
           capabilities[AgentCapabilities.manage_scheduling] = true;
           if (!agentTools.includes(AgentCapabilities.manage_scheduling)) {
             agentTools.push(AgentCapabilities.manage_scheduling);
