@@ -46,6 +46,19 @@ const {
   createPullFileToWorkspaceTool,
 } = require('~/server/services/WorkspaceCodeEdit');
 const { createCreatePdfTool } = require('~/server/services/CreatePdf/tool');
+const { createGenerateCodeTool } = require('~/server/services/GenerateCode');
+const {
+  createWorkspaceStatusTool,
+  createWorkspaceInitTool,
+  createResetWorkspaceTool,
+} = require('~/server/services/WorkspaceStatus');
+const {
+  createCreatePlanTool,
+  createUpdateTodoTool,
+} = require('~/server/services/CoderPlan');
+const { createInstallDependenciesTool } = require('~/server/services/InstallDependencies');
+const { createLintTool } = require('~/server/services/Lint');
+const { createRunProgramTool } = require('~/server/services/RunProgram');
 const { createSchedulingTools } = require('~/server/services/ScheduledAgents/schedulingTools');
 const {
   buildSchedulerTargetContext,
@@ -441,6 +454,59 @@ const loadTools = async ({
         await ensureWorkspaceInjected();
         return toolMap[tool];
       };
+      continue;
+    } else if (
+      tool === Tools.generate_code ||
+      tool === Tools.install_dependencies ||
+      tool === Tools.lint ||
+      tool === Tools.run_program ||
+      tool === Tools.workspace_status ||
+      tool === Tools.workspace_init ||
+      tool === Tools.reset_workspace ||
+      tool === Tools.update_todo ||
+      tool === Tools.create_plan
+    ) {
+      const conversationId = options.req?.body?.conversationId ?? options.conversationId;
+      const agentId = agent?.id;
+      const userId = user;
+      if (!conversationId && !(agentId && userId)) {
+        continue;
+      }
+      const codeGen = options.req?.config?.config?.codeGeneration ?? options.req?.config?.codeGeneration;
+      if (tool === Tools.generate_code && !codeGen) {
+        continue;
+      }
+      const pathMod = require('path');
+      const {
+        getSessionBaseDir,
+        getWorkspaceSessionId,
+      } = require('~/server/services/LocalCodeExecution');
+      const sessionId = getWorkspaceSessionId({
+        agentId,
+        userId,
+        conversationId,
+      });
+      const workspaceRoot = pathMod.join(getSessionBaseDir(), sessionId);
+
+      const coderToolMap = {
+        ...(codeGen && {
+          [Tools.generate_code]: () =>
+            createGenerateCodeTool({
+              workspaceRoot,
+              provider: codeGen.provider,
+              model: codeGen.model,
+            }),
+        }),
+        [Tools.install_dependencies]: () => createInstallDependenciesTool({ workspaceRoot }),
+        [Tools.lint]: () => createLintTool({ workspaceRoot }),
+        [Tools.run_program]: () => createRunProgramTool({ workspaceRoot }),
+        [Tools.workspace_status]: () => createWorkspaceStatusTool({ workspaceRoot }),
+        [Tools.workspace_init]: () => createWorkspaceInitTool({ workspaceRoot }),
+        [Tools.reset_workspace]: () => createResetWorkspaceTool({ workspaceRoot }),
+        [Tools.update_todo]: () => createUpdateTodoTool({ workspaceRoot }),
+        [Tools.create_plan]: () => createCreatePlanTool({ workspaceRoot }),
+      };
+      requestedTools[tool] = async () => coderToolMap[tool]();
       continue;
     } else if (tool === Tools.create_pdf) {
       const req = options.req;

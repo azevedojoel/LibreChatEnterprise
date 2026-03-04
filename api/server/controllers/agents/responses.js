@@ -17,6 +17,7 @@ const {
   recordCollectedUsage,
   getTransactionsConfig,
   createToolExecuteHandler,
+  sendEvent,
   // Responses API
   writeDone,
   buildResponse,
@@ -493,12 +494,19 @@ const createResponse = async (req, res) => {
       }
 
       // Process the stream
+      const emitToolOutputDelta = (toolCallId, stepId, delta) => {
+        sendEvent(res, {
+          event: 'on_tool_output_delta',
+          data: { tool_call_id: toolCallId, step_id: stepId, delta },
+        });
+      };
       const config = {
         runName: 'AgentRun',
         configurable: {
           thread_id: conversationId,
           user_id: userId,
           user: createSafeUser(req.user),
+          emitToolOutputDelta,
           ...(userMCPAuthMap != null && { userMCPAuthMap }),
         },
         signal: abortController.signal,
@@ -644,12 +652,19 @@ const createResponse = async (req, res) => {
         throw new Error('Failed to create agent run');
       }
 
+      const emitToolOutputDeltaAgg = (toolCallId, stepId, delta) => {
+        sendEvent(res, {
+          event: 'on_tool_output_delta',
+          data: { tool_call_id: toolCallId, step_id: stepId, delta },
+        });
+      };
       const config = {
         runName: 'AgentRun',
         configurable: {
           thread_id: conversationId,
           user_id: userId,
           user: createSafeUser(req.user),
+          emitToolOutputDelta: emitToolOutputDeltaAgg,
           ...(userMCPAuthMap != null && { userMCPAuthMap }),
         },
         signal: abortController.signal,

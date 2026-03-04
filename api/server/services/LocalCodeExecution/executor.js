@@ -213,9 +213,21 @@ function runWithTimeout(cmd, args, opts) {
   });
 }
 
+/**
+ * Returns path to ruff in the code-exec venv when available.
+ * Used by the lint tool. Call ensureCodeExecVenv first to create venv if needed.
+ */
+async function getRuffPath() {
+  const pythonPath = await ensureCodeExecVenv();
+  if (!pythonPath) return null;
+  const binDir = path.dirname(pythonPath);
+  return path.join(binDir, process.platform === 'win32' ? 'ruff.exe' : 'ruff');
+}
+
 module.exports = {
   runCodeLocally,
   imageExtRegex,
   getSessionBaseDir,
   injectAgentFiles,
+  getRuffPath,
 };

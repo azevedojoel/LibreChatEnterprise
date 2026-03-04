@@ -1,4 +1,5 @@
 # Standard Python libs preinstalled for local code execution.
+ruff>=0.8
 numpy>=1.24
 pandas>=2.0
 scipy>=1.11

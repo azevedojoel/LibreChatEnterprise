@@ -1103,7 +1103,7 @@ const readFileDefinition: ToolRegistryDefinition = {
 const editFileDefinition: ToolRegistryDefinition = {
   name: 'workspace_edit_file',
   description:
-    'Edit a file in the workspace. Replace exact old_string with new_string. old_string must match exactly once. Fails if old_string appears 0 or 2+ times; use search_user_files first to verify. Whitespace must match exactly.',
+    'Edit a file in the workspace. Replace exact old_string with new_string. Use for fixing lint errors: read file, apply edits per lint output. old_string must match exactly once. Fails if old_string appears 0 or 2+ times; use search_user_files first to verify. Whitespace must match exactly.',
   schema: {
     type: 'object',
     properties: {
@@ -1796,6 +1796,102 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
       },
       required: ['from', 'to'],
     } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  generate_code: {
+    name: 'generate_code',
+    description:
+      'Generate Python code via configured LLM. For new code only. Do NOT use for fixing lint errors—use workspace_edit_file. Provide file_path (relative to workspace) and request (what to build). Writes the file and returns a diff. Never write code inline—use this tool for new code generation.',
+    schema: {
+      type: 'object',
+      properties: {
+        file_path: { type: 'string', description: 'File path relative to workspace root' },
+        request: { type: 'string', description: 'What to generate (requirements, behavior, constraints)' },
+      },
+      required: ['file_path', 'request'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  lint: {
+    name: 'lint',
+    description:
+      'Run linter (ESLint for JS/TS, Ruff for Python) on a file or directory. Updates lint_status.json. run_program blocks if lint has errors.',
+    schema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'File or directory path relative to workspace' },
+      },
+      required: ['path'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  run_program: {
+    name: 'run_program',
+    description:
+      'Execute a Python script (e.g. main.py). Optional args for CLI arguments. Blocks if lint_status.json has errors. On success: git add + commit with output summary. On failure: no commit.',
+    schema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Entry file path (e.g. main.py)' },
+        args: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional arguments to pass to the script',
+        },
+      },
+      required: ['path'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  workspace_status: {
+    name: 'workspace_status',
+    description: 'Git status, todo list, last commit. Call first on every invocation.',
+    schema: { type: 'object', properties: {}, required: [] } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  workspace_init: {
+    name: 'workspace_init',
+    description: 'Init workspace. Clones template if configured, else git init + .gitignore. Call when workspace_status says empty.',
+    schema: { type: 'object', properties: {}, required: [] } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  reset_workspace: {
+    name: 'reset_workspace',
+    description: 'Wipe workspace and re-init. Only when handoff says reset: true.',
+    schema: { type: 'object', properties: {}, required: [] } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  update_todo: {
+    name: 'update_todo',
+    description: 'Mark a todo item complete or pending. Updates todo.json.',
+    schema: {
+      type: 'object',
+      properties: {
+        item: { type: 'string', description: 'Todo item text' },
+        status: { type: 'string', enum: ['pending', 'complete'], description: 'Item status' },
+      },
+      required: ['item', 'status'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  create_plan: {
+    name: 'create_plan',
+    description:
+      'Write plan.md and todo.json from plan content. Call after reading requirements from Ellis handoff.',
+    schema: {
+      type: 'object',
+      properties: {
+        plan_content: { type: 'string', description: 'Full plan content (markdown)' },
+      },
+      required: ['plan_content'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  install_dependencies: {
+    name: 'install_dependencies',
+    description:
+      'pip install -r requirements.txt into workspace .venv. Call after adding/updating requirements.txt, before run_program.',
+    schema: { type: 'object', properties: {}, required: [] } as ExtendedJsonSchema,
     toolType: 'builtin',
   },
   [CalculatorToolDefinition.name]: {

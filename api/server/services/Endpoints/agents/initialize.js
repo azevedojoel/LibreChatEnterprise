@@ -267,7 +267,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
     },
   };
 
-  const eventHandlers = getDefaultHandlers({
+  const { handlers: eventHandlers, emitToolOutputDelta } = getDefaultHandlers({
     res,
     toolExecuteOptions,
     aggregateContent,
@@ -528,6 +528,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
     contentParts,
     agentConfigs,
     eventHandlers,
+    emitToolOutputDelta,
     collectedUsage,
     aggregateContent,
     artifactPromises,

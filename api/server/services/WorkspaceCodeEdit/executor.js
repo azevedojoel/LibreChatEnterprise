@@ -4,6 +4,7 @@
  */
 const fs = require('fs').promises;
 const path = require('path');
+const { computeUnifiedDiff, truncateDiff } = require('./diffUtils');
 const { createWriteStream } = require('fs');
 const { pipeline } = require('stream').promises;
 const { glob } = require('glob');
@@ -149,7 +150,10 @@ async function editFile({ workspaceRoot, relativePath, old_string, new_string })
     const escapedNew = escapeReplacementString(new_string ?? '');
     const newContent = content.replace(normalizedOld, escapedNew);
     await fs.writeFile(absPath, newContent, 'utf8');
-    return { success: true };
+    const fullDiff = computeUnifiedDiff(relativePath, content, newContent);
+    const { diff, truncated, totalLines } = truncateDiff(fullDiff);
+    const summary = `Edited ${relativePath}`;
+    return { success: true, diff, file: relativePath, summary, truncated, totalLines };
   } catch (err) {
     if (err.code === 'ENOENT') {
       return { error: `File "${relativePath}" not found` };
@@ -167,14 +171,30 @@ function escapeRegex(str) {
  * @param {string} params.workspaceRoot
  * @param {string} params.relativePath
  * @param {string} params.content
- * @returns {Promise<{ success: true } | { error: string }>}
+ * @returns {Promise<{ success: true, diff, file, summary, truncated, totalLines? } | { error: string }>}
  */
 async function createFile({ workspaceRoot, relativePath, content }) {
   try {
     const absPath = resolvePath(workspaceRoot, relativePath);
+    let oldContent = null;
+    try {
+      oldContent = await fs.readFile(absPath, 'utf8');
+    } catch {
+      // File does not exist
+    }
     await fs.mkdir(path.dirname(absPath), { recursive: true });
     await fs.writeFile(absPath, content, 'utf8');
-    return { success: true };
+    const isNewFile = oldContent == null;
+    const summary = isNewFile ? `Created ${relativePath}` : `Created ${relativePath} (overwrite)`;
+    if (isNewFile) {
+      const fullDiff = computeUnifiedDiff(relativePath, null, content);
+      const { diff, truncated, totalLines } = truncateDiff(fullDiff);
+      const lineCount = content.split(/\r?\n/).length;
+      return { success: true, diff, file: relativePath, summary: `${summary} (${lineCount} lines)`, truncated, totalLines };
+    }
+    const fullDiff = computeUnifiedDiff(relativePath, oldContent, content);
+    const { diff, truncated, totalLines } = truncateDiff(fullDiff);
+    return { success: true, diff, file: relativePath, summary, truncated, totalLines };
   } catch (err) {
     return { error: err.message };
   }

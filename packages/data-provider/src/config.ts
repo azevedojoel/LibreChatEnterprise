@@ -1041,6 +1041,12 @@ export const configSchema = z.object({
   rateLimits: rateLimitSchema.optional(),
   fileConfig: fileConfigSchema.optional(),
   modelSpecs: specsConfigSchema.optional(),
+  codeGeneration: z
+    .object({
+      provider: z.enum(['openrouter', 'openai', 'anthropic', 'deepseek']),
+      model: z.string(),
+    })
+    .optional(),
   endpoints: z
     .object({
       all: baseEndpointSchema.optional(),

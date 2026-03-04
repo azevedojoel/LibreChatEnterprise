@@ -458,6 +458,15 @@ const nativeTools = new Set([
   Tools.project_log_tail,
   Tools.project_log_search,
   Tools.project_log_range,
+  Tools.generate_code,
+  Tools.install_dependencies,
+  Tools.lint,
+  Tools.run_program,
+  Tools.workspace_status,
+  Tools.workspace_init,
+  Tools.reset_workspace,
+  Tools.update_todo,
+  Tools.create_plan,
 ]);
 
 const { isDestructiveTool } = require('./destructiveTools');
@@ -536,6 +545,15 @@ async function loadToolDefinitionsWrapper({
       Tools.workspace_glob_files,
       Tools.workspace_send_file_to_user,
       Tools.workspace_pull_file,
+      Tools.generate_code,
+      Tools.install_dependencies,
+      Tools.lint,
+      Tools.run_program,
+      Tools.workspace_status,
+      Tools.workspace_init,
+      Tools.reset_workspace,
+      Tools.update_todo,
+      Tools.create_plan,
     ];
     toolsToFilter = [...new Set([...toolsToFilter, ...workspaceTools])];
   }
@@ -705,6 +723,27 @@ async function loadToolDefinitionsWrapper({
         return ephemeralAgent.create_pdf === true;
       }
       return checkCapability(AgentCapabilities.create_pdf);
+    }
+    const coderTools = [
+      Tools.generate_code,
+      Tools.install_dependencies,
+      Tools.lint,
+      Tools.run_program,
+      Tools.workspace_status,
+      Tools.workspace_init,
+      Tools.reset_workspace,
+      Tools.update_todo,
+      Tools.create_plan,
+    ];
+    if (coderTools.includes(tool)) {
+      if (isPersistentAgent) {
+        if (ephemeralAgent?.execute_code === false) return false;
+        return checkCapability(AgentCapabilities.execute_code);
+      }
+      if (ephemeralAgent != null && 'execute_code' in ephemeralAgent) {
+        return ephemeralAgent.execute_code === true;
+      }
+      return checkCapability(AgentCapabilities.execute_code);
     }
     if (!areToolsEnabled && !tool.includes(actionDelimiter)) {
       return false;
@@ -1074,6 +1113,15 @@ async function loadToolDefinitionsWrapper({
     toolContextMap[Tools.create_schedule] = parts.filter(Boolean).join('\n\n');
   }
 
+  const hasCoderWorkflowTools =
+    filteredTools.includes(Tools.run_program) ||
+    filteredTools.includes(Tools.generate_code);
+
+  if (hasCoderWorkflowTools) {
+    const { CODER_DEFAULT_INSTRUCTIONS } = require('~/server/services/CoderPrompt/coderInstructions');
+    toolContextMap._coderInstructions = CODER_DEFAULT_INSTRUCTIONS;
+  }
+
   return {
     toolRegistry,
     userMCPAuthMap,
@@ -1173,6 +1221,15 @@ async function loadAgentTools({
       Tools.workspace_glob_files,
       Tools.workspace_send_file_to_user,
       Tools.workspace_pull_file,
+      Tools.generate_code,
+      Tools.install_dependencies,
+      Tools.lint,
+      Tools.run_program,
+      Tools.workspace_status,
+      Tools.workspace_init,
+      Tools.reset_workspace,
+      Tools.update_todo,
+      Tools.create_plan,
     ];
     toolsToFilter = [...new Set([...toolsToFilter, ...workspaceTools])];
   }
@@ -1721,10 +1778,22 @@ async function loadToolsForExecution({
       n === Tools.workspace_send_file_to_user ||
       n === Tools.workspace_pull_file,
   );
+  const hasCoderTools = toolNames.some(
+    (n) =>
+      n === Tools.generate_code ||
+      n === Tools.install_dependencies ||
+      n === Tools.lint ||
+      n === Tools.run_program ||
+      n === Tools.workspace_status ||
+      n === Tools.workspace_init ||
+      n === Tools.reset_workspace ||
+      n === Tools.update_todo ||
+      n === Tools.create_plan,
+  );
   const hasDriveDownloadFile = toolNames.some(
     (n) => typeof n === 'string' && n.includes('drive_downloadFile'),
   );
-  if ((hasWorkspaceTools || hasDriveDownloadFile) && req?.user?.id && (req?.body?.conversationId || agent?.id)) {
+  if ((hasWorkspaceTools || hasCoderTools || hasDriveDownloadFile) && req?.user?.id && (req?.body?.conversationId || agent?.id)) {
     const pathMod = require('path');
     const {
       getSessionBaseDir,

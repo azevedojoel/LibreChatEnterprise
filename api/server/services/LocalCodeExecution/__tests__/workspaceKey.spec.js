@@ -4,21 +4,13 @@
 const { getWorkspaceSessionId } = require('../workspaceKey');
 
 describe('getWorkspaceSessionId', () => {
-  it('returns agent_user key when both agentId and userId are provided', () => {
-    const result = getWorkspaceSessionId({
-      agentId: 'agent-123',
-      userId: 'user-456',
-    });
-    expect(result).toBe('agent_agent-123_user_user-456');
-  });
-
-  it('returns agent_user key when agentId, userId, and conversationId are provided (agent+user takes precedence)', () => {
+  it('returns conv key when conversationId is provided (always conversation-scoped)', () => {
     const result = getWorkspaceSessionId({
       agentId: 'agent-123',
       userId: 'user-456',
       conversationId: 'conv-789',
     });
-    expect(result).toBe('agent_agent-123_user_user-456');
+    expect(result).toBe('conv_conv-789');
   });
 
   it('returns conv key when only conversationId is provided', () => {
@@ -44,12 +36,29 @@ describe('getWorkspaceSessionId', () => {
     expect(result).toBe('conv_conv-abc');
   });
 
-  it('returns local timestamp when no params provided', () => {
+  it('returns ephemeral key when conversationId is "new"', () => {
+    const result = getWorkspaceSessionId({
+      agentId: 'agent-123',
+      userId: 'user-456',
+      conversationId: 'new',
+    });
+    expect(result).toMatch(/^local_[a-z0-9]+$/);
+  });
+
+  it('returns ephemeral key when only agentId and userId are provided (no conversation)', () => {
+    const result = getWorkspaceSessionId({
+      agentId: 'agent-123',
+      userId: 'user-456',
+    });
+    expect(result).toMatch(/^local_[a-z0-9]+$/);
+  });
+
+  it('returns ephemeral key when no params provided', () => {
     const result = getWorkspaceSessionId({});
     expect(result).toMatch(/^local_[a-z0-9]+$/);
   });
 
-  it('returns local timestamp when all params are empty/falsy', () => {
+  it('returns ephemeral key when all params are empty/falsy', () => {
     const result = getWorkspaceSessionId({
       agentId: '',
       userId: null,

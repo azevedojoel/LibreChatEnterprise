@@ -72,14 +72,19 @@ function createWorkspaceCodeEditTools({ workspaceRoot }) {
         new_string: rawInput.new_string ?? '',
       });
       if (result.error) {
-        return `Error: ${result.error}`;
+        return JSON.stringify({ error: result.error });
       }
-      return `Edited ${rawInput.path} successfully.`;
+      return JSON.stringify({
+        diff: result.diff,
+        file: result.file,
+        summary: result.summary,
+        ...(result.truncated && { truncated: result.truncated, totalLines: result.totalLines }),
+      });
     },
     {
       name: 'workspace_edit_file',
       description:
-        'Edit a file in the workspace. Replace exact old_string with new_string. old_string must match exactly once. Fails if old_string appears 0 or 2+ times; use search_user_files first to verify. Whitespace must match exactly.',
+        'Edit a file in the workspace. Replace exact old_string with new_string. Use for fixing lint errors: read the file with workspace_read_file, identify the issue from lint output, then apply old_string/new_string edits. old_string must match exactly once. Fails if old_string appears 0 or 2+ times; use search_user_files first to verify. Whitespace must match exactly.',
       schema: {
         type: 'object',
         properties: {
@@ -109,9 +114,14 @@ function createWorkspaceCodeEditTools({ workspaceRoot }) {
         content: rawInput.content ?? '',
       });
       if (result.error) {
-        return `Error: ${result.error}`;
+        return JSON.stringify({ error: result.error });
       }
-      return `Created ${rawInput.path} successfully.`;
+      return JSON.stringify({
+        diff: result.diff,
+        file: result.file,
+        summary: result.summary,
+        ...(result.truncated && { truncated: result.truncated, totalLines: result.totalLines }),
+      });
     },
     {
       name: 'workspace_create_file',
@@ -391,7 +401,10 @@ function createPullFileToWorkspaceTool({ workspaceRoot, req, agentId, userId }) 
       if (result.error) {
         return `Error: ${result.error}`;
       }
-      return `Pulled ${result.filename} into workspace. Use workspace_read_file or execute_code to work with it.`;
+      return JSON.stringify({
+        filename: result.filename,
+        message: `Pulled ${result.filename} into workspace. Use workspace_read_file or execute_code to work with it.`,
+      });
     },
     {
       name: 'workspace_pull_file',
