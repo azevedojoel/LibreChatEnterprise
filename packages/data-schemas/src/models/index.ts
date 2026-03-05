@@ -40,6 +40,7 @@ import { createToolApprovalLinkModel } from './toolApprovalLink';
 import { createToolApprovalRecordModel } from './toolApprovalRecord';
 import { createUserProjectModel } from './userProject';
 import { createProjectLogModel } from './projectLog';
+import { createProjectContextSectionModel } from './projectContextSection';
 
 /**
  * Creates all database models for all collections
@@ -88,5 +89,6 @@ export function createModels(mongoose: typeof import('mongoose')) {
     ToolApprovalRecord: createToolApprovalRecordModel(mongoose),
     UserProject: createUserProjectModel(mongoose),
     ProjectLog: createProjectLogModel(mongoose),
+    ProjectContextSection: createProjectContextSectionModel(mongoose),
   };
 }
