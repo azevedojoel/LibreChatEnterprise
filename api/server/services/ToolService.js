@@ -461,6 +461,10 @@ const nativeTools = new Set([
   Tools.project_log_tail,
   Tools.project_log_search,
   Tools.project_log_range,
+  Tools.project_create,
+  Tools.project_list,
+  Tools.project_archive,
+  Tools.project_update_metadata,
   Tools.generate_code,
   Tools.install_dependencies,
   Tools.lint,
@@ -653,24 +657,43 @@ async function loadToolDefinitionsWrapper({
     logger.debug('[ToolService] Could not resolve userProjectId for project tools:', err);
   }
 
+  const PROJECT_CONTEXT_TOOLS = [
+    Tools.project_section_update,
+    Tools.project_section_delete,
+    Tools.project_section_patch,
+    Tools.project_log,
+    Tools.project_log_tail,
+    Tools.project_log_search,
+    Tools.project_log_range,
+  ];
+  const PROJECT_MANAGEMENT_TOOLS = [
+    Tools.project_create,
+    Tools.project_list,
+    Tools.project_archive,
+    Tools.project_update_metadata,
+  ];
   if (hasProjectTools && !conversationUserProjectId) {
     toolsToFilter = toolsToFilter.filter(
-      (t) => typeof t !== 'string' || !t.startsWith('project_'),
+      (t) =>
+        typeof t !== 'string' ||
+        !t.startsWith('project_') ||
+        PROJECT_MANAGEMENT_TOOLS.includes(t),
     );
   }
 
-  /** Inject project tools when conversation has userProjectId */
-  if (conversationUserProjectId && !toolsToFilter.some((t) => typeof t === 'string' && t.startsWith('project_'))) {
-    const projectTools = [
-      Tools.project_section_update,
-      Tools.project_section_delete,
-      Tools.project_section_patch,
-      Tools.project_log,
-      Tools.project_log_tail,
-      Tools.project_log_search,
-      Tools.project_log_range,
-    ];
-    toolsToFilter = [...new Set([...toolsToFilter, ...projectTools])];
+  /** Inject project context tools when conversation has userProjectId */
+  if (
+    conversationUserProjectId &&
+    !toolsToFilter.some((t) => typeof t === 'string' && PROJECT_CONTEXT_TOOLS.includes(t))
+  ) {
+    toolsToFilter = [...new Set([...toolsToFilter, ...PROJECT_CONTEXT_TOOLS])];
+  }
+  /** Inject project management tools when agent has any project tool (they don't require conversation project) */
+  if (
+    hasProjectTools &&
+    !toolsToFilter.some((t) => typeof t === 'string' && PROJECT_MANAGEMENT_TOOLS.includes(t))
+  ) {
+    toolsToFilter = [...new Set([...toolsToFilter, ...PROJECT_MANAGEMENT_TOOLS])];
   }
 
   /** Filter by ephemeralAgent (chat badge overrides) - only for primary agent; handoff targets get full tools */
@@ -1378,24 +1401,43 @@ async function loadAgentTools({
     logger.debug('[ToolService] Could not resolve userProjectId for project tools:', err);
   }
 
+  const PROJECT_CONTEXT_TOOLS_LOAD = [
+    Tools.project_section_update,
+    Tools.project_section_delete,
+    Tools.project_section_patch,
+    Tools.project_log,
+    Tools.project_log_tail,
+    Tools.project_log_search,
+    Tools.project_log_range,
+  ];
+  const PROJECT_MANAGEMENT_TOOLS_LOAD = [
+    Tools.project_create,
+    Tools.project_list,
+    Tools.project_archive,
+    Tools.project_update_metadata,
+  ];
   if (hasProjectToolsLoadAgent && !conversationUserProjectIdLoadAgent) {
     toolsToFilter = toolsToFilter.filter(
-      (t) => typeof t !== 'string' || !t.startsWith('project_'),
+      (t) =>
+        typeof t !== 'string' ||
+        !t.startsWith('project_') ||
+        PROJECT_MANAGEMENT_TOOLS_LOAD.includes(t),
     );
   }
 
-  /** Inject project tools when conversation has userProjectId */
-  if (conversationUserProjectIdLoadAgent && !toolsToFilter.some((t) => typeof t === 'string' && t.startsWith('project_'))) {
-    const projectTools = [
-      Tools.project_section_update,
-      Tools.project_section_delete,
-      Tools.project_section_patch,
-      Tools.project_log,
-      Tools.project_log_tail,
-      Tools.project_log_search,
-      Tools.project_log_range,
-    ];
-    toolsToFilter = [...new Set([...toolsToFilter, ...projectTools])];
+  /** Inject project context tools when conversation has userProjectId */
+  if (
+    conversationUserProjectIdLoadAgent &&
+    !toolsToFilter.some((t) => typeof t === 'string' && PROJECT_CONTEXT_TOOLS_LOAD.includes(t))
+  ) {
+    toolsToFilter = [...new Set([...toolsToFilter, ...PROJECT_CONTEXT_TOOLS_LOAD])];
+  }
+  /** Inject project management tools when agent has any project tool */
+  if (
+    hasProjectToolsLoadAgent &&
+    !toolsToFilter.some((t) => typeof t === 'string' && PROJECT_MANAGEMENT_TOOLS_LOAD.includes(t))
+  ) {
+    toolsToFilter = [...new Set([...toolsToFilter, ...PROJECT_MANAGEMENT_TOOLS_LOAD])];
   }
 
   /** Filter by ephemeralAgent (chat badge overrides) - only for primary agent; handoff targets get full tools */

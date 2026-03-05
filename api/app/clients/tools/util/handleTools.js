@@ -79,8 +79,15 @@ const { getRoleByName } = require('~/models/Role');
 const { findUser } = require('~/models');
 const { getConvo } = require('~/models/Conversation');
 const { createCRMTools } = require('../structured/CRMTools');
-const { createProjectTools } = require('../structured/ProjectTools');
+const { createProjectTools, createProjectManagementTools } = require('../structured/ProjectTools');
 const { createHumanTools } = require('~/server/services/HumanAgent');
+
+const PROJECT_MANAGEMENT_TOOL_NAMES = new Set([
+  Tools.project_create,
+  Tools.project_list,
+  Tools.project_archive,
+  Tools.project_update_metadata,
+]);
 
 /**
  * Validates the availability and authentication of tools for a user based on environment variables or user-specific plugin authentication values.
@@ -666,16 +673,24 @@ const loadTools = async ({
       };
       continue;
     } else if (PROJECT_TOOL_NAMES.has(tool)) {
-      if (!conversationUserProjectId) {
-        continue;
+      if (PROJECT_MANAGEMENT_TOOL_NAMES.has(tool)) {
+        requestedTools[tool] = async () => {
+          const mgmtTools = createProjectManagementTools({
+            userId: user,
+            conversationId: options.req?.body?.conversationId ?? options.conversationId,
+            req: options.req,
+          });
+          return mgmtTools[tool];
+        };
+      } else if (conversationUserProjectId) {
+        requestedTools[tool] = async () => {
+          const projectTools = createProjectTools({
+            userId: user,
+            projectId: conversationUserProjectId,
+          });
+          return projectTools[tool];
+        };
       }
-      requestedTools[tool] = async () => {
-        const projectTools = createProjectTools({
-          userId: user,
-          projectId: conversationUserProjectId,
-        });
-        return projectTools[tool];
-      };
       continue;
     } else if (tool && mcpToolPattern.test(tool)) {
       const toolParts = tool.split(Constants.mcp_delimiter);

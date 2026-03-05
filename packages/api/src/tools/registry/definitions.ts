@@ -1146,6 +1146,85 @@ export const toolDefinitions: Record<string, ToolRegistryDefinition> = {
     },
     toolType: 'builtin',
   },
+  project_create: {
+    name: 'project_create',
+    description:
+      'Create a new project. Required: name. Optional: description, tags[], sharedWithWorkspace (workspace admin only), templateProjectId (copy sections from template). If sharedWithWorkspace and you are not a workspace admin, use human_notify_human to ask the admin (adminMemberId) to create a shared project.',
+    schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Project name' },
+        description: { type: 'string', description: 'Project description' },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Tags for the project',
+        },
+        sharedWithWorkspace: {
+          type: 'boolean',
+          description: 'If true, create a workspace-shared project (workspace admin only)',
+        },
+        templateProjectId: {
+          type: 'string',
+          description: 'Copy context sections from this project',
+        },
+      },
+      required: ['name'],
+    },
+    toolType: 'builtin',
+  },
+  project_list: {
+    name: 'project_list',
+    description:
+      'List projects the user can access (own and workspace-shared). Optional: limit (default 25), cursor, status (active|archived|all). Returns projectId, name, description, tags, owner, shared, lastUpdated.',
+    schema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Max projects to return (default 25)' },
+        cursor: { type: 'string', description: 'Pagination cursor from previous response' },
+        status: {
+          type: 'string',
+          enum: ['active', 'archived', 'all'],
+          description: 'Filter by status (default active)',
+        },
+      },
+    },
+    toolType: 'builtin',
+  },
+  project_archive: {
+    name: 'project_archive',
+    description:
+      'Archive a project (soft delete). Only owner or workspace admin can archive. Required: projectId.',
+    schema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'Project ID to archive' },
+      },
+      required: ['projectId'],
+    },
+    toolType: 'builtin',
+  },
+  project_update_metadata: {
+    name: 'project_update_metadata',
+    description:
+      'Update project metadata. Required: projectId. Optional: name, description, tags[], ownerId (workspace admin only, shared projects).',
+    schema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'Project ID to update' },
+        name: { type: 'string', description: 'New project name' },
+        description: { type: 'string', description: 'New project description' },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'New tags (replaces existing)',
+        },
+        ownerId: { type: 'string', description: 'New owner user ID' },
+      },
+      required: ['projectId'],
+    },
+    toolType: 'builtin',
+  },
   file_search: {
     name: 'file_search',
     description:
@@ -2023,6 +2102,85 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
         limit: { type: 'number', description: 'Max entries to return (default 100)' },
       },
       required: ['from', 'to'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  project_create: {
+    name: 'project_create',
+    description:
+      'Create a new project. Required: name. Optional: description, tags[], sharedWithWorkspace (workspace admin only), templateProjectId (copy sections from template). If sharedWithWorkspace and you are not a workspace admin, use human_notify_human to ask the admin (adminMemberId) to create a shared project.',
+    schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Project name' },
+        description: { type: 'string', description: 'Project description' },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Tags for the project',
+        },
+        sharedWithWorkspace: {
+          type: 'boolean',
+          description: 'If true, create a workspace-shared project (workspace admin only)',
+        },
+        templateProjectId: {
+          type: 'string',
+          description: 'Copy context sections from this project',
+        },
+      },
+      required: ['name'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  project_list: {
+    name: 'project_list',
+    description:
+      'List projects the user can access (own and workspace-shared). Optional: limit (default 25), cursor, status (active|archived|all). Returns projectId, name, description, tags, owner, shared, lastUpdated.',
+    schema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Max projects to return (default 25)' },
+        cursor: { type: 'string', description: 'Pagination cursor from previous response' },
+        status: {
+          type: 'string',
+          enum: ['active', 'archived', 'all'],
+          description: 'Filter by status (default active)',
+        },
+      },
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  project_archive: {
+    name: 'project_archive',
+    description:
+      'Archive a project (soft delete). Only owner or workspace admin can archive. Required: projectId.',
+    schema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'Project ID to archive' },
+      },
+      required: ['projectId'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  project_update_metadata: {
+    name: 'project_update_metadata',
+    description:
+      'Update project metadata. Required: projectId. Optional: name, description, tags[], ownerId (workspace admin only, shared projects).',
+    schema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'Project ID to update' },
+        name: { type: 'string', description: 'New project name' },
+        description: { type: 'string', description: 'New project description' },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'New tags (replaces existing)',
+        },
+        ownerId: { type: 'string', description: 'New owner user ID' },
+      },
+      required: ['projectId'],
     } as ExtendedJsonSchema,
     toolType: 'builtin',
   },

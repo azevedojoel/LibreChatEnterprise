@@ -78,6 +78,10 @@ const TOOL_DISPLAY_NAMES = {
   project_log_tail: 'Recent Changelog Entries',
   project_log_search: 'Search Changelog',
   project_log_range: 'Changelog by Date Range',
+  project_create: 'Create Project',
+  project_list: 'List Projects',
+  project_archive: 'Archive Project',
+  project_update_metadata: 'Update Project Metadata',
   // Coder tools
   generate_code: 'Generate Code',
   install_dependencies: 'Install Dependencies',

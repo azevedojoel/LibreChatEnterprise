@@ -1,6 +1,7 @@
 /**
- * Project tools - context sections and changelog for user-scoped projects.
- * Tools receive userId and projectId from the conversation's userProjectId.
+ * Project tools - context sections, changelog, and management for user-scoped projects.
+ * Context tools receive userId and projectId from the conversation's userProjectId.
+ * Management tools receive userId, conversationId, and req (no project required).
  */
 const { Tool } = require('@langchain/core/tools');
 const { appendLog, tail, search, range } = require('~/server/services/UserProject/projectLogService');
@@ -9,6 +10,13 @@ const {
   patchSections,
   deleteSection,
 } = require('~/server/services/UserProject/projectContextSectionService');
+const {
+  createUserProject,
+  listUserProjects,
+  archiveUserProject,
+  updateUserProject,
+} = require('~/models/UserProject');
+const { saveConvo } = require('~/models/Conversation');
 
 const toJson = (obj) => (typeof obj === 'string' ? obj : JSON.stringify(obj ?? null));
 
@@ -236,4 +244,179 @@ function createProjectTools({ userId, projectId }) {
   return tools;
 }
 
-module.exports = { createProjectTools };
+/**
+ * Project management tools - create, list, archive, update metadata.
+ * Do NOT require conversationUserProjectId. Receive userId, conversationId, req.
+ * @param {{ userId: string, conversationId?: string, req?: Object }} options
+ * @returns {Record<string, Tool>}
+ */
+function createProjectManagementTools({ userId, conversationId, req } = {}) {
+  const uid = userId ?? 'agent';
+
+  const tools = {};
+
+  tools.project_create = new (class extends Tool {
+    name = 'project_create';
+    description =
+      'Create a new project. Required: name. Optional: description, tags[], sharedWithWorkspace (workspace admin only), templateProjectId. If sharedWithWorkspace and not admin, use human_notify_human.';
+    schema = {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Project name' },
+        description: { type: 'string', description: 'Project description' },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Tags for the project',
+        },
+        sharedWithWorkspace: {
+          type: 'boolean',
+          description: 'If true, create workspace-shared project (admin only)',
+        },
+        templateProjectId: { type: 'string', description: 'Copy sections from this project' },
+      },
+      required: ['name'],
+    };
+    static get jsonSchema() {
+      return this.prototype.schema;
+    }
+    async _call(args) {
+      const { name, description, tags, sharedWithWorkspace, templateProjectId } = args || {};
+      if (!name || !String(name).trim()) return toJson({ error: 'name is required' });
+      try {
+        const result = await createUserProject(uid, {
+          name: String(name).trim(),
+          description,
+          tags,
+          sharedWithWorkspace: !!sharedWithWorkspace,
+          templateProjectId,
+        });
+        if (result.error) {
+          return toJson({ error: result.error, adminMemberId: result.adminMemberId });
+        }
+        const project = result.project;
+        if (conversationId && req && project?._id) {
+          try {
+            await saveConvo(req, { conversationId, userProjectId: project._id }, {
+              context: 'project_create tool - assign new project to conversation',
+            });
+          } catch (e) {
+            // Ignore - project was created, just couldn't assign to conversation
+          }
+        }
+        return toJson({
+          success: true,
+          projectId: project._id,
+          name: project.name,
+          shared: project.shared,
+          ...project,
+        });
+      } catch (e) {
+        return toJson({ error: e?.message || 'Failed to create project' });
+      }
+    }
+  })();
+
+  tools.project_list = new (class extends Tool {
+    name = 'project_list';
+    description =
+      'List projects the user can access. Optional: limit, cursor, status (active|archived|all).';
+    schema = {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Max projects (default 25)' },
+        cursor: { type: 'string', description: 'Pagination cursor' },
+        status: {
+          type: 'string',
+          enum: ['active', 'archived', 'all'],
+          description: 'Filter by status (default active)',
+        },
+      },
+    };
+    static get jsonSchema() {
+      return this.prototype.schema;
+    }
+    async _call(args) {
+      const { limit = 25, cursor, status = 'active' } = args || {};
+      try {
+        const result = await listUserProjects(uid, { limit, cursor, status });
+        return toJson(result);
+      } catch (e) {
+        return toJson({ error: e?.message || 'Failed to list projects' });
+      }
+    }
+  })();
+
+  tools.project_archive = new (class extends Tool {
+    name = 'project_archive';
+    description = 'Archive a project (soft delete). Required: projectId. Owner or workspace admin only.';
+    schema = {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'Project ID to archive' },
+      },
+      required: ['projectId'],
+    };
+    static get jsonSchema() {
+      return this.prototype.schema;
+    }
+    async _call(args) {
+      const { projectId } = args || {};
+      if (!projectId) return toJson({ error: 'projectId is required' });
+      try {
+        const archived = await archiveUserProject(uid, projectId);
+        if (!archived) {
+          return toJson({ error: 'Project not found or access denied' });
+        }
+        return toJson({ success: true, archived: true });
+      } catch (e) {
+        return toJson({ error: e?.message || 'Failed to archive project' });
+      }
+    }
+  })();
+
+  tools.project_update_metadata = new (class extends Tool {
+    name = 'project_update_metadata';
+    description = 'Update project metadata. Required: projectId. Optional: name, description, tags[], ownerId (workspace admin only, shared projects).';
+    schema = {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'Project ID to update' },
+        name: { type: 'string', description: 'New name' },
+        description: { type: 'string', description: 'New description' },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'New tags (replaces existing)',
+        },
+        ownerId: { type: 'string', description: 'New owner user ID' },
+      },
+      required: ['projectId'],
+    };
+    static get jsonSchema() {
+      return this.prototype.schema;
+    }
+    async _call(args) {
+      const { projectId, name, description, tags, ownerId } = args || {};
+      if (!projectId) return toJson({ error: 'projectId is required' });
+      try {
+        const project = await updateUserProject(uid, projectId, {
+          name,
+          description,
+          tags,
+          ownerId,
+        });
+        if (!project) {
+          return toJson({ error: 'Project not found or access denied' });
+        }
+        return toJson({ success: true, project });
+      } catch (e) {
+        return toJson({ error: e?.message || 'Failed to update project' });
+      }
+    }
+  })();
+
+  return tools;
+}
+
+module.exports = { createProjectTools, createProjectManagementTools };

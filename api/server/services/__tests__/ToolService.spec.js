@@ -308,6 +308,10 @@ describe('ToolService - isDestructiveTool', () => {
     expect(isDestructiveTool(Tools.run_schedule)).toBe(true);
   });
 
+  it('returns true for project_create', () => {
+    expect(isDestructiveTool(Tools.project_create)).toBe(true);
+  });
+
   it('returns true for Gmail and Calendar tools', () => {
     expect(isDestructiveTool('gmail_send')).toBe(true);
     expect(isDestructiveTool('calendar_createEvent')).toBe(true);
