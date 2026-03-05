@@ -12,7 +12,7 @@ const fileSearchJsonSchema = {
     query: {
       type: 'string',
       description:
-        "A natural language query to search for relevant information in the files. Be specific and use keywords related to the information you're looking for. The query will be used for semantic similarity matching against the file contents.",
+        "A natural language query or filename. For semantic search: use keywords related to the information you're looking for. For filename search: use the exact or partial filename (e.g. 'contacts_2024.json', 'export.csv') to find files by name.",
     },
   },
   required: ['query'],
@@ -87,6 +87,44 @@ const primeFiles = async (options) => {
   return { files, toolContext };
 };
 
+/** Query looks like a filename (e.g. "contacts.json" or "report_2024.csv") */
+const looksLikeFilename = (q) =>
+  typeof q === 'string' &&
+  q.trim().length > 0 &&
+  /\.(json|csv|txt|md|xlsx?|docx?|pdf)$/i.test(q.trim());
+
+/**
+ * Fetch files by filename match (includes execute_code/run_tool_and_save files not in RAG).
+ * @param {string} userId
+ * @param {string} query - Filename or partial match
+ * @param {Object} [options] - { req, agentId } for access filtering
+ */
+const fetchFilesByFilename = async (userId, query, options = {}) => {
+  const { req, agentId } = options;
+  const trimmed = query.trim();
+  const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const filter = {
+    user: userId,
+    filename: { $regex: `^${escaped}`, $options: 'i' },
+  };
+  let matches = (await getFiles(filter, null, { text: 0 })) ?? [];
+  if (agentId && req?.user) {
+    matches = await filterFilesByAgentAccess({
+      files: matches,
+      userId: req.user.id,
+      role: req.user.role,
+      agentId,
+    });
+  }
+  return matches.slice(0, 10).map((f) => ({
+    file_id: f.file_id,
+    filename: f.filename,
+    content: `[File: ${f.filename}]`,
+    distance: 0,
+    page: null,
+  }));
+};
+
 /**
  *
  * @param {Object} options
@@ -94,17 +132,54 @@ const primeFiles = async (options) => {
  * @param {Array<{ file_id: string; filename: string }>} options.files
  * @param {string} [options.entity_id]
  * @param {boolean} [options.fileCitations=false] - Whether to include citation instructions
+ * @param {Object} [options.req] - Request for filename lookup and access control
+ * @param {string} [options.agentId] - Agent ID for file access control
  * @returns
  */
-const createFileSearchTool = async ({ userId, files, entity_id, fileCitations = false }) => {
+const createFileSearchTool = async ({
+  userId,
+  files,
+  entity_id,
+  fileCitations = false,
+  req,
+  agentId,
+}) => {
   return tool(
     async ({ query }) => {
-      if (files.length === 0) {
+      // Filename lookup: run_tool_and_save JSON/CSV files are not embedded; search by name
+      let filenameResults = [];
+      if (looksLikeFilename(query)) {
+        filenameResults = await fetchFilesByFilename(userId, query, { req, agentId });
+      }
+
+      if (files.length === 0 && filenameResults.length === 0) {
         return [
           'No files to search. The user has no embedded files in My Files. Instruct them to upload documents to My Files to enable search.',
           undefined,
         ];
       }
+
+      if (files.length === 0) {
+        const formattedString = filenameResults
+          .map(
+            (r, i) =>
+              `File: ${r.filename}\nfile_id: ${r.file_id}${
+                fileCitations ? `\nAnchor: \\ue202turn0file${i} (${r.filename})` : ''
+              }\nRelevance: 1.0000\nContent: ${r.content}\n`,
+          )
+          .join('---\n');
+        const sources = filenameResults.map((r) => ({
+          type: 'file',
+          fileId: r.file_id,
+          content: r.content,
+          fileName: r.filename,
+          relevance: 1.0,
+          pages: [],
+          pageRelevance: {},
+        }));
+        return [formattedString, { [Tools.file_search]: { sources, fileCitations } }];
+      }
+
       const jwtToken = generateShortLivedToken(userId);
       if (!jwtToken) {
         return ['There was an error authenticating the file search request.', undefined];
@@ -145,22 +220,37 @@ const createFileSearchTool = async ({ userId, files, entity_id, fileCitations = 
       const results = await Promise.all(queryPromises);
       const validResults = results.filter((result) => result !== null);
 
-      if (validResults.length === 0) {
-        return ['No results found or errors occurred while searching the files.', undefined];
+      let formattedResults = [];
+      if (validResults.length > 0) {
+        formattedResults = validResults
+          .flatMap((result, fileIndex) =>
+            result.data.map(([docInfo, distance]) => ({
+              filename: files[fileIndex]?.filename ?? docInfo.metadata.source?.split('/').pop() ?? 'Unknown',
+              content: docInfo.page_content,
+              distance,
+              file_id: files[fileIndex]?.file_id,
+              page: docInfo.metadata.page || null,
+            })),
+          )
+          .sort((a, b) => a.distance - b.distance)
+          .slice(0, 10);
       }
 
-      const formattedResults = validResults
-        .flatMap((result, fileIndex) =>
-          result.data.map(([docInfo, distance]) => ({
-            filename: files[fileIndex]?.filename ?? docInfo.metadata.source?.split('/').pop() ?? 'Unknown',
-            content: docInfo.page_content,
-            distance,
-            file_id: files[fileIndex]?.file_id,
-            page: docInfo.metadata.page || null,
-          })),
-        )
-        .sort((a, b) => a.distance - b.distance)
-        .slice(0, 10);
+      // Prepend filename matches (e.g. run_tool_and_save JSON/CSV) so they rank first
+      const seenIds = new Set(formattedResults.map((r) => r.file_id));
+      for (const r of filenameResults) {
+        if (!seenIds.has(r.file_id)) {
+          seenIds.add(r.file_id);
+          formattedResults.unshift({
+            filename: r.filename,
+            content: r.content,
+            distance: 0,
+            file_id: r.file_id,
+            page: null,
+          });
+        }
+      }
+      formattedResults = formattedResults.slice(0, 10);
 
       if (formattedResults.length === 0) {
         return [
@@ -221,7 +311,7 @@ const createFileSearchTool = async ({ userId, files, entity_id, fileCitations = 
     {
       name: Tools.file_search,
       responseFormat: 'content_and_artifact',
-      description: `Performs semantic search across the user's My Files using natural language queries. Searches all embedded documents the user has uploaded. Use this when the user asks to search their files, find information in their documents, or locate content across their file library.${
+      description: `Performs semantic search across the user's My Files using natural language queries. Also supports filename search: when the query looks like a filename (e.g. "contacts_2024.json" or "export.csv"), returns matching files by name—including JSON/CSV exports from run_tool_and_save. Use this when the user asks to search their files, find information in their documents, or locate a file by name.${
         fileCitations
           ? `
 

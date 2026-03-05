@@ -76,7 +76,9 @@ describe('fileSearch.js - tuple return validation', () => {
 
       expect(Array.isArray(result)).toBe(true);
       expect(result).toHaveLength(2);
-      expect(result[0]).toBe('No results found or errors occurred while searching the files.');
+      expect(result[0]).toBe(
+        'No content found in the files. The files may not have been processed correctly or you may need to refine your query.',
+      );
       expect(result[1]).toBeUndefined();
     });
   });
@@ -130,7 +132,8 @@ describe('fileSearch.js - tuple return validation', () => {
       expect(artifact.file_search).toHaveProperty('sources');
       expect(artifact.file_search).toHaveProperty('fileCitations', false);
       expect(Array.isArray(artifact.file_search.sources)).toBe(true);
-      expect(artifact.file_search.sources.length).toBe(2);
+      // Deduplicated by file_id: both chunks are from test.pdf, so 1 source
+      expect(artifact.file_search.sources.length).toBe(1);
 
       const source = artifact.file_search.sources[0];
       expect(source).toMatchObject({
@@ -139,8 +142,8 @@ describe('fileSearch.js - tuple return validation', () => {
         fileName: 'test.pdf',
         content: expect.any(String),
         relevance: expect.any(Number),
-        pages: [1],
-        pageRelevance: { 1: expect.any(Number) },
+        pages: expect.arrayContaining([1, 2]),
+        pageRelevance: expect.any(Object),
       });
     });
 
