@@ -589,6 +589,26 @@ Project description and key facts.
 [ ] Task 1
 [ ] Task 2
 )`;
+
+            let sharedSection = '';
+            if (project.shared && project.workspace_id) {
+              const { User } = require('~/db/models');
+              const members = await User.find({ workspace_id: project.workspace_id })
+                .select('name email')
+                .lean();
+              const membersList =
+                members
+                  ?.map((m) => `${m.name || 'Unknown'} (${m.email || 'no email'})`)
+                  .join(', ') || '(none)';
+              sharedSection = `
+## Shared project
+
+This project is shared with your workspace. All workspace members can view and update the context.
+
+**Workspace members:** ${membersList}
+`;
+            }
+
             const projectPrompt = `# Project
 
 You are working in a project. Projects are user-scoped workspaces that organize work and persist context across conversations. This conversation is assigned to the project "${projectName}".
@@ -600,16 +620,23 @@ You are working in a project. Projects are user-scoped workspaces that organize 
 The context below is always in your prompt. Update it with project_section_patch (batch upsert/delete), project_section_update (single section), or project_section_delete (remove one). Format: # Title (id=sectionId) + content.
 
 ${projectContext}
-
+${sharedSection}
 ## Project tools
 
+**Context (current project):**
 - project_section_patch: Batch update in one call. sections: [{ sectionId, title, content }], deleteIds: [sectionId]. Use to build or replace full context.
 - project_section_update: Create or replace a single section. Required: sectionId, title, content
 - project_section_delete: Remove a section. Required: sectionId
 - project_log: Append an entry to the project changelog. Required: entry
 - project_log_tail: Get the last n changelog entries. Optional: n (default 10, max 100)
 - project_log_search: Search the changelog by keyword. Required: query
-- project_log_range: Get changelog entries between two timestamps. Required: from, to (ISO date strings)`;
+- project_log_range: Get changelog entries between two timestamps. Required: from, to (ISO date strings)
+
+**Management (work even without a project):**
+- project_create: Create a project. Required: name. Optional: description, tags[], sharedWithWorkspace (workspace admin only), templateProjectId. If sharedWithWorkspace and you are not admin, use human_notify_human.
+- project_list: List projects. Optional: limit, cursor, status (active|archived|all)
+- project_archive: Archive a project. Required: projectId
+- project_update_metadata: Update name, description, tags. Required: projectId. ownerId: workspace admin only (shared projects).`;
             sharedRunContextParts.unshift(projectPrompt);
           }
         }
