@@ -28,11 +28,16 @@ describe('useStepHandler', () => {
   const mockGetMessages = jest.fn();
   const mockAnnouncePolite = jest.fn();
   const mockLastAnnouncementTimeRef = { current: 0 };
+  const mockQueryClient = {
+    invalidateQueries: jest.fn(),
+  } as unknown as ReturnType<typeof import('@tanstack/react-query').useQueryClient>;
+
   const createHookParams = () => ({
     setMessages: mockSetMessages,
     getMessages: mockGetMessages,
     announcePolite: mockAnnouncePolite,
     lastAnnouncementTimeRef: mockLastAnnouncementTimeRef,
+    queryClient: mockQueryClient,
   });
 
   const createUserMessage = (overrides: Partial<TMessage> = {}): TMessage => ({

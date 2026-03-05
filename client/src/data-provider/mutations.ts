@@ -143,17 +143,26 @@ export const useArchiveConvoMutation = (
 };
 
 export const useCreateUserProjectMutation = (
-  options?: t.MutationOptions<t.TUserProject, { name: string }>,
-): UseMutationResult<t.TUserProject, unknown, { name: string }, unknown> => {
+  options?: t.MutationOptions<t.TUserProject, { name: string; sharedWithWorkspace?: boolean }>,
+): UseMutationResult<
+  t.TUserProject,
+  unknown,
+  { name: string; sharedWithWorkspace?: boolean },
+  unknown
+> => {
   const queryClient = useQueryClient();
   const { onSuccess, ..._options } = options || {};
-  return useMutation((payload: { name: string }) => dataService.createUserProject(payload), {
-    onSuccess: (data, _vars, context) => {
-      queryClient.invalidateQueries([QueryKeys.userProjects]);
-      onSuccess?.(data, _vars, context);
+  return useMutation(
+    (payload: { name: string; sharedWithWorkspace?: boolean }) =>
+      dataService.createUserProject(payload),
+    {
+      onSuccess: (data, _vars, context) => {
+        queryClient.invalidateQueries([QueryKeys.userProjects]);
+        onSuccess?.(data, _vars, context);
+      },
+      ..._options,
     },
-    ..._options,
-  });
+  );
 };
 
 export const useUpdateUserProjectMutation = (

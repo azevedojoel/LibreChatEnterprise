@@ -6,7 +6,10 @@ import {
   ContentTypes,
   ToolCallTypes,
   getNonEmptyValue,
+  QueryKeys,
+  Tools,
 } from 'librechat-data-provider';
+import type { QueryClient } from '@tanstack/react-query';
 import type {
   Agents,
   TMessage,
@@ -19,6 +22,8 @@ import type { SetterOrUpdater } from 'recoil';
 import type { AnnounceOptions } from '~/common';
 import { MESSAGE_UPDATE_INTERVAL } from '~/common';
 
+const PROJECT_MUTATING_TOOLS = new Set([Tools.project_create, Tools.project_update_metadata]);
+
 type TUseStepHandler = {
   announcePolite: (options: AnnounceOptions) => void;
   setMessages: (messages: TMessage[]) => void;
@@ -26,6 +31,7 @@ type TUseStepHandler = {
   /** @deprecated - isSubmitting should be derived from submission state */
   setIsSubmitting?: SetterOrUpdater<boolean>;
   lastAnnouncementTimeRef: React.MutableRefObject<number>;
+  queryClient: QueryClient;
   /** Called when MCP OAuth auth is merged - used to show overlay immediately */
   onAuthMerged?: (authUrl: string, toolName: string) => void;
   /** Called when a tool completes - clears overlay if it was the auth tool (pass tool name to verify) */
@@ -65,6 +71,7 @@ export default function useStepHandler({
   getMessages,
   announcePolite,
   lastAnnouncementTimeRef,
+  queryClient,
   onAuthMerged,
   onAuthCleared,
 }: TUseStepHandler) {
@@ -453,6 +460,14 @@ export default function useStepHandler({
           );
 
           setMessages(updatedMessages);
+
+          // Invalidate userProjects when AI calls project_create or project_update_metadata
+          const hasProjectMutatingTool = stepCalls.some((tc) =>
+            PROJECT_MUTATING_TOOLS.has(tc.name ?? ''),
+          );
+          if (hasProjectMutatingTool) {
+            queryClient.invalidateQueries([QueryKeys.userProjects]);
+          }
         }
 
         const bufferedDeltas = pendingDeltaBuffer.current.get(runStep.id);

@@ -6,13 +6,15 @@ import {
   Label,
   Input,
   Spinner,
+  Checkbox,
 } from '@librechat/client';
 import { useLocalize } from '~/hooks';
+import { useGetWorkspaceMeQuery } from '~/data-provider';
 
 interface CreateProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (name: string) => void;
+  onCreate: (name: string, sharedWithWorkspace?: boolean) => void;
   isLoading: boolean;
 }
 
@@ -24,17 +26,24 @@ export default function CreateProjectModal({
 }: CreateProjectModalProps) {
   const localize = useLocalize();
   const [name, setName] = useState('');
+  const [sharedWithWorkspace, setSharedWithWorkspace] = useState(false);
+
+  const { data: workspaceMeData } = useGetWorkspaceMeQuery({ enabled: isOpen });
+  const showShareCheckbox =
+    !!workspaceMeData?.workspace?.id && !!workspaceMeData?.isAdmin;
 
   const handleSubmit = useCallback(() => {
     const trimmed = name.trim();
     if (trimmed && !isLoading) {
-      onCreate(trimmed);
+      onCreate(trimmed, showShareCheckbox ? sharedWithWorkspace : undefined);
       setName('');
+      setSharedWithWorkspace(false);
     }
-  }, [name, onCreate, isLoading]);
+  }, [name, sharedWithWorkspace, showShareCheckbox, onCreate, isLoading]);
 
   const handleClose = useCallback(() => {
     setName('');
+    setSharedWithWorkspace(false);
     onClose();
   }, [onClose]);
 
@@ -60,6 +69,23 @@ export default function CreateProjectModal({
                 autoFocus
               />
             </div>
+            {showShareCheckbox && (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="project-share-workspace"
+                  checked={sharedWithWorkspace}
+                  onCheckedChange={(checked) => setSharedWithWorkspace(checked === true)}
+                  className="relative float-left inline-flex h-4 w-4 cursor-pointer"
+                  aria-label={localize('com_ui_project_share_with_workspace')}
+                />
+                <Label
+                  htmlFor="project-share-workspace"
+                  className="text-sm text-text-primary cursor-pointer"
+                >
+                  {localize('com_ui_project_share_with_workspace')}
+                </Label>
+              </div>
+            )}
           </div>
         }
         buttons={

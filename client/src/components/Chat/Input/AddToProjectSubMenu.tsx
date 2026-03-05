@@ -1,6 +1,6 @@
 import React from 'react';
 import * as Ariakit from '@ariakit/react';
-import { ChevronRight, FolderIcon, Check } from 'lucide-react';
+import { ChevronRight, FolderIcon, Check, Share2 } from 'lucide-react';
 import { Constants } from 'librechat-data-provider';
 import type { TUserProject } from 'librechat-data-provider';
 import { useUserProjectsQuery, useUpdateConversationMutation } from '~/data-provider';
@@ -140,9 +140,12 @@ const AddToProjectSubMenu = React.forwardRef<HTMLDivElement, React.HTMLAttribute
                     ) : (
                       <FolderIcon className="h-4 w-4 shrink-0 text-text-secondary" />
                     )}
-                    <span className={currentProjectId === project._id ? 'ml-2' : 'ml-6'}>
+                    <span className={cn('flex-1 truncate', currentProjectId === project._id ? 'ml-2' : 'ml-6')}>
                       {project.name}
                     </span>
+                    {project.shared && (
+                      <Share2 className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
+                    )}
                   </button>
                 ))
               )}

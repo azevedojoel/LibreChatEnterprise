@@ -150,6 +150,10 @@ const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
   project_log_tail: 'Recent Changelog Entries',
   project_log_search: 'Search Changelog',
   project_log_range: 'Changelog by Date Range',
+  [Tools.project_create]: 'Create Project',
+  [Tools.project_list]: 'List Projects',
+  [Tools.project_archive]: 'Archive Project',
+  [Tools.project_update_metadata]: 'Update Project Metadata',
   // Scheduler tools
   [Tools.list_schedules]: 'List Schedules',
   [Tools.list_user_projects]: 'List Projects',
@@ -179,6 +183,10 @@ const PROJECT_TOOL_ICONS: Partial<Record<string, React.ComponentType<{ className
   project_log_tail: List,
   project_log_search: Search,
   project_log_range: CalendarRange,
+  [Tools.project_create]: FolderPlus,
+  [Tools.project_list]: List,
+  [Tools.project_archive]: Archive,
+  [Tools.project_update_metadata]: FileEdit,
 };
 
 /** Icons for workspace file edit tools */
@@ -286,6 +294,8 @@ import {
   FileX,
   FileDown,
   FolderOpen,
+  FolderPlus,
+  Archive,
   ListPlus,
   List,
   Search,

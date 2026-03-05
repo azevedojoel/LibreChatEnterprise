@@ -109,6 +109,10 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   project_log_tail: 'Recent Changelog Entries',
   project_log_search: 'Search Changelog',
   project_log_range: 'Changelog by Date Range',
+  project_create: 'Create Project',
+  project_list: 'List Projects',
+  project_archive: 'Archive Project',
+  project_update_metadata: 'Update Project Metadata',
   // Scheduler tools
   [Tools.list_schedules]: 'List Schedules',
   [Tools.list_user_projects]: 'List Projects',

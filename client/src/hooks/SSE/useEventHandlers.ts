@@ -281,6 +281,7 @@ export default function useEventHandlers({
     getMessages,
     announcePolite,
     lastAnnouncementTimeRef,
+    queryClient,
     onAuthMerged,
     onAuthCleared,
   });
