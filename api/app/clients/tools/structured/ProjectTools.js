@@ -1,10 +1,14 @@
 /**
- * Project tools - context doc and changelog for user-scoped projects.
+ * Project tools - context sections and changelog for user-scoped projects.
  * Tools receive userId and projectId from the conversation's userProjectId.
  */
 const { Tool } = require('@langchain/core/tools');
-const { getUserProject, updateUserProject } = require('~/models/UserProject');
 const { appendLog, tail, search, range } = require('~/server/services/UserProject/projectLogService');
+const {
+  upsertSection,
+  patchSections,
+  deleteSection,
+} = require('~/server/services/UserProject/projectContextSectionService');
 
 const toJson = (obj) => (typeof obj === 'string' ? obj : JSON.stringify(obj ?? null));
 
@@ -28,46 +32,101 @@ function createProjectTools({ userId, projectId }) {
 
   const tools = {};
 
-  tools.project_read = new (class extends Tool {
-    name = 'project_read';
-    description = 'Returns the project context document. Small curated context the agent maintains for this project.';
-    schema = { type: 'object', properties: {} };
-    static get jsonSchema() {
-      return { type: 'object', properties: {} };
-    }
-    async _call() {
-      try {
-        const project = await getUserProject(uid, pid);
-        if (!project) return toJson({ error: 'Project not found' });
-        return toJson({ context: project.context ?? '' });
-      } catch (e) {
-        return toJson({ error: sanitizeError(e?.message) || 'Failed to read project context' });
-      }
-    }
-  })();
-
-  tools.project_write = new (class extends Tool {
-    name = 'project_write';
+  tools.project_section_update = new (class extends Tool {
+    name = 'project_section_update';
     description =
-      'Overwrites the project context document. Use to update the curated context (budget, state, key facts) after doing work.';
+      'Create or replace a project context section. Use to add or update sections (e.g. overview, tasks). Format: # Title (id=sectionId) + content.';
     schema = {
       type: 'object',
       properties: {
-        content: { type: 'string', description: 'The new context document content' },
+        sectionId: { type: 'string', description: 'Section ID (slug, e.g. overview, tasks)' },
+        title: { type: 'string', description: 'Section title for display' },
+        content: { type: 'string', description: 'Section content (markdown). Optional, defaults to empty string.' },
       },
-      required: ['content'],
+      required: ['sectionId', 'title'],
     };
     static get jsonSchema() {
       return this.prototype.schema;
     }
     async _call(args) {
-      const { content } = args || {};
+      const { sectionId, title, content } = args || {};
+      if (!sectionId || !title) return toJson({ error: 'sectionId and title are required' });
       try {
-        const project = await updateUserProject(uid, pid, { context: content ?? '' });
-        if (!project) return toJson({ error: 'Project not found' });
+        await upsertSection(pid, uid, { sectionId, title, content: content ?? '' });
         return toJson({ success: true });
       } catch (e) {
-        return toJson({ error: sanitizeError(e?.message) || 'Failed to write project context' });
+        return toJson({ error: sanitizeError(e?.message) || 'Failed to update section' });
+      }
+    }
+  })();
+
+  tools.project_section_patch = new (class extends Tool {
+    name = 'project_section_patch';
+    description =
+      'Batch update project context sections in one call. Upsert multiple sections and optionally delete others. Use to build or replace the full context in one shot.';
+    schema = {
+      type: 'object',
+      properties: {
+        sections: {
+          type: 'array',
+          description: 'Sections to create or update. Each: { sectionId, title, content }',
+          items: {
+            type: 'object',
+            properties: {
+              sectionId: { type: 'string', description: 'Section ID (slug, e.g. overview, tasks)' },
+              title: { type: 'string', description: 'Section title' },
+              content: { type: 'string', description: 'Section content (markdown)' },
+            },
+            required: ['sectionId', 'title', 'content'],
+          },
+        },
+        deleteIds: {
+          type: 'array',
+          description: 'Section IDs to remove',
+          items: { type: 'string' },
+        },
+      },
+    };
+    static get jsonSchema() {
+      return this.prototype.schema;
+    }
+    async _call(args) {
+      const { sections = [], deleteIds = [] } = args || {};
+      const sec = Array.isArray(sections) ? sections : [];
+      const del = Array.isArray(deleteIds) ? deleteIds : [];
+      if (sec.length === 0 && del.length === 0) {
+        return toJson({ error: 'Provide at least one of sections or deleteIds' });
+      }
+      try {
+        const result = await patchSections(pid, uid, { sections: sec, deleteIds: del });
+        return toJson({ success: true, ...result });
+      } catch (e) {
+        return toJson({ error: sanitizeError(e?.message) || 'Failed to patch sections' });
+      }
+    }
+  })();
+
+  tools.project_section_delete = new (class extends Tool {
+    name = 'project_section_delete';
+    description = 'Remove a project context section by sectionId.';
+    schema = {
+      type: 'object',
+      properties: {
+        sectionId: { type: 'string', description: 'Section ID to remove (e.g. overview, tasks)' },
+      },
+      required: ['sectionId'],
+    };
+    static get jsonSchema() {
+      return this.prototype.schema;
+    }
+    async _call(args) {
+      const { sectionId } = args || {};
+      if (!sectionId) return toJson({ error: 'sectionId is required' });
+      try {
+        const deleted = await deleteSection(pid, uid, sectionId);
+        return toJson({ success: true, deleted });
+      } catch (e) {
+        return toJson({ error: sanitizeError(e?.message) || 'Failed to delete section' });
       }
     }
   })();

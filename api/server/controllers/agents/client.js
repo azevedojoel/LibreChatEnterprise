@@ -49,6 +49,7 @@ const { encodeAndFormat } = require('~/server/services/Files/images/encode');
 const { createContextHandlers } = require('~/app/clients/prompts');
 const { getConvoFiles, getConvo } = require('~/models/Conversation');
 const { getUserProject } = require('~/models/UserProject');
+const { getFormattedContext } = require('~/server/services/UserProject/projectContextSectionService');
 const BaseClient = require('~/app/clients/BaseClient');
 const { getRoleByName } = require('~/models/Role');
 const { loadAgent } = require('~/models/Agent');
@@ -578,7 +579,16 @@ You are running in a headless scheduled agent run. No user is present in the cha
           if (project) {
             const projectName = project.name?.trim() || 'Untitled';
             const projectContext =
-              project.context?.trim() || '(No context set yet. Use project_write to add context.)';
+              (await getFormattedContext(userProjectId, userId)) ||
+              `(No context yet. Use project_section_patch or project_section_update to add sections. Example:
+
+# Overview (id=overview)
+Project description and key facts.
+
+# Tasks (id=tasks)
+[ ] Task 1
+[ ] Task 2
+)`;
             const projectPrompt = `# Project
 
 You are working in a project. Projects are user-scoped workspaces that organize work and persist context across conversations. This conversation is assigned to the project "${projectName}".
@@ -587,13 +597,15 @@ You are working in a project. Projects are user-scoped workspaces that organize 
 
 ## Project context
 
+The context below is always in your prompt. Update it with project_section_patch (batch upsert/delete), project_section_update (single section), or project_section_delete (remove one). Format: # Title (id=sectionId) + content.
+
 ${projectContext}
 
 ## Project tools
 
-You have these tools to manage the project:
-- project_read: Read the curated context document
-- project_write: Update the context document (budget, state, key facts). Required: content
+- project_section_patch: Batch update in one call. sections: [{ sectionId, title, content }], deleteIds: [sectionId]. Use to build or replace full context.
+- project_section_update: Create or replace a single section. Required: sectionId, title, content
+- project_section_delete: Remove a section. Required: sectionId
 - project_log: Append an entry to the project changelog. Required: entry
 - project_log_tail: Get the last n changelog entries. Optional: n (default 10, max 100)
 - project_log_search: Search the changelog by keyword. Required: query

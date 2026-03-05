@@ -454,8 +454,9 @@ const nativeTools = new Set([
   Tools.run_schedule,
   Tools.list_runs,
   Tools.get_run,
-  Tools.project_read,
-  Tools.project_write,
+  Tools.project_section_update,
+  Tools.project_section_delete,
+  Tools.project_section_patch,
   Tools.project_log,
   Tools.project_log_tail,
   Tools.project_log_search,
@@ -661,8 +662,9 @@ async function loadToolDefinitionsWrapper({
   /** Inject project tools when conversation has userProjectId */
   if (conversationUserProjectId && !toolsToFilter.some((t) => typeof t === 'string' && t.startsWith('project_'))) {
     const projectTools = [
-      Tools.project_read,
-      Tools.project_write,
+      Tools.project_section_update,
+      Tools.project_section_delete,
+      Tools.project_section_patch,
       Tools.project_log,
       Tools.project_log_tail,
       Tools.project_log_search,
@@ -1385,8 +1387,9 @@ async function loadAgentTools({
   /** Inject project tools when conversation has userProjectId */
   if (conversationUserProjectIdLoadAgent && !toolsToFilter.some((t) => typeof t === 'string' && t.startsWith('project_'))) {
     const projectTools = [
-      Tools.project_read,
-      Tools.project_write,
+      Tools.project_section_update,
+      Tools.project_section_delete,
+      Tools.project_section_patch,
       Tools.project_log,
       Tools.project_log_tail,
       Tools.project_log_search,

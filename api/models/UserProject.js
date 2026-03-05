@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { UserProject, ProjectLog } = require('~/db/models');
+const { UserProject, ProjectLog, ProjectContextSection } = require('~/db/models');
 
 /**
  * List user projects with pagination.
@@ -104,6 +104,7 @@ const deleteUserProject = async (userId, projectId) => {
   }
   const objId = new mongoose.Types.ObjectId(projectId);
   await ProjectLog.deleteMany({ projectId: objId });
+  await ProjectContextSection.deleteMany({ projectId: objId });
   await UserProject.deleteOne({ _id: projectId, user: userId });
   return true;
 };
