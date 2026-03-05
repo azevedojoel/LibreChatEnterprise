@@ -841,19 +841,6 @@ export const editArtifact = async ({
   return request.post(endpoints.messagesArtifacts(messageId), params);
 };
 
-export type SaveArtifactAsPdfResponse = {
-  file_id: string;
-  filepath: string;
-  filename: string;
-};
-
-export const saveArtifactAsPdf = async (
-  html: string,
-  filename?: string,
-): Promise<SaveArtifactAsPdfResponse> => {
-  return request.post(endpoints.artifactsPdf(), { html, filename });
-};
-
 export const branchMessage = async (
   payload: m.TBranchMessageRequest,
 ): Promise<m.TBranchMessageResponse> => {
