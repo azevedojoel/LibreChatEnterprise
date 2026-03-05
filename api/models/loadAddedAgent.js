@@ -142,7 +142,6 @@ const loadAddedAgent = async ({ req, conversation, primaryAgent }) => {
   if (ephemeralAgent?.create_pdf === true || modelSpec?.createPdf === true) {
     tools.push(Tools.create_pdf);
   }
-
   const addedServers = new Set();
   if (mcpServers.size > 0) {
     for (const mcpServer of mcpServers) {

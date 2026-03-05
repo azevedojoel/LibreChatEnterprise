@@ -174,7 +174,8 @@
       "data/",
       "client/",
       "admin/",
-      "packages/"
+      "packages/",
+      "uploads/"
     ]
   }
 }

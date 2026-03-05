@@ -790,7 +790,26 @@ class BaseClient {
     }
 
     if (this.artifactPromises) {
-      responseMessage.attachments = (await Promise.all(this.artifactPromises)).filter((a) => a);
+      const ARTIFACT_TIMEOUT_MS = parseInt(process.env.ARTIFACT_TIMEOUT_MS, 10) || 15000;
+      try {
+        responseMessage.attachments = (
+          await Promise.race([
+            Promise.all(this.artifactPromises),
+            new Promise((_, reject) =>
+              setTimeout(
+                () => reject(new Error('Artifact processing timeout')),
+                ARTIFACT_TIMEOUT_MS,
+              ),
+            ),
+          ])
+        ).filter((a) => a);
+      } catch (err) {
+        logger.warn(
+          '[BaseClient] Artifact processing timeout or error, proceeding without attachments',
+          err?.message ?? err,
+        );
+        responseMessage.attachments = [];
+      }
     }
 
     if (this.options.attachments) {

@@ -125,7 +125,6 @@ export default function AgentSelect({
           capabilities[AgentCapabilities.create_pdf] = true;
           return;
         }
-
         agentTools.push(tool);
       });
 

@@ -140,8 +140,17 @@ router.get('/chat/stream/:streamId', async (req, res) => {
  * @returns { activeJobIds: string[] }
  */
 router.get('/chat/active', async (req, res) => {
-  const activeJobIds = await GenerationJobManager.getActiveJobIdsForUser(req.user.id);
-  res.json({ activeJobIds });
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const activeJobIds = await GenerationJobManager.getActiveJobIdsForUser(userId);
+    res.json({ activeJobIds });
+  } catch (error) {
+    logger.error('Error in chat/active:', error);
+    res.status(500).json({ error: 'Failed to get active jobs', activeJobIds: [] });
+  }
 });
 
 /**

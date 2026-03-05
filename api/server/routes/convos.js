@@ -74,30 +74,40 @@ router.get('/:conversationId', async (req, res) => {
 });
 
 router.get('/gen_title/:conversationId', async (req, res) => {
-  const { conversationId } = req.params;
-  const titleCache = getLogStores(CacheKeys.GEN_TITLE);
-  const key = `${req.user.id}-${conversationId}`;
-  let title = await titleCache.get(key);
+  try {
+    const { conversationId } = req.params;
+    const titleCache = getLogStores(CacheKeys.GEN_TITLE);
+    if (!titleCache) {
+      return res.status(404).json({
+        message: "Title not found or method not implemented for the conversation's endpoint",
+      });
+    }
+    const key = `${req.user.id}-${conversationId}`;
+    let title = await titleCache.get(key);
 
-  if (!title) {
-    // Exponential backoff: 500ms, 1s, 2s, 4s, 8s (total ~15.5s max wait)
-    const delays = [500, 1000, 2000, 4000, 8000];
-    for (const delay of delays) {
-      await sleep(delay);
-      title = await titleCache.get(key);
-      if (title) {
-        break;
+    if (!title) {
+      // Exponential backoff: 500ms, 1s, 2s, 4s, 8s (total ~15.5s max wait)
+      const delays = [500, 1000, 2000, 4000, 8000];
+      for (const delay of delays) {
+        await sleep(delay);
+        title = await titleCache.get(key);
+        if (title) {
+          break;
+        }
       }
     }
-  }
 
-  if (title) {
-    await titleCache.delete(key);
-    res.status(200).json({ title });
-  } else {
-    res.status(404).json({
-      message: "Title not found or method not implemented for the conversation's endpoint",
-    });
+    if (title) {
+      await titleCache.delete(key);
+      res.status(200).json({ title });
+    } else {
+      res.status(404).json({
+        message: "Title not found or method not implemented for the conversation's endpoint",
+      });
+    }
+  } catch (error) {
+    logger.error('Error in gen_title:', error);
+    res.status(500).json({ error: 'Failed to generate title' });
   }
 });
 
