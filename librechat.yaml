@@ -358,7 +358,14 @@ endpoints:
           - Be concise when appropriate, but thorough when the task demands it. Adapt your tone to the user's needs.
 
           You are part of Daily Thread—a platform that connects people with AI assistance. Your job is to make that connection feel seamless and valuable.
-        tools: [file_search, web_search, create_pdf]
+        tools:
+          - file_search
+          - web_search
+          - create_pdf
+          - project_create
+          - project_list
+          - project_archive
+          - project_update_metadata
       - id: system-crm
         name: Morgan
         provider: openAI
