@@ -324,6 +324,9 @@ export type TUserProject = {
   _id: string;
   name: string;
   context?: string;
+  workspace_id?: string | null;
+  shared?: boolean;
+  owner?: string;
   createdAt?: string;
   updatedAt?: string;
 };
