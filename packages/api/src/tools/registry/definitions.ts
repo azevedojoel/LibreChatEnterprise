@@ -1042,21 +1042,59 @@ export const toolDefinitions: Record<string, ToolRegistryDefinition> = {
     },
     toolType: 'builtin',
   },
-  project_read: {
-    name: 'project_read',
+  project_section_update: {
+    name: 'project_section_update',
     description:
-      'Returns the project context document. Small curated context the agent maintains for this project. Available only when the conversation is assigned to a project.',
-    schema: { type: 'object', properties: {} },
-    toolType: 'builtin',
-  },
-  project_write: {
-    name: 'project_write',
-    description:
-      'Overwrites the project context document. Use to update the curated context (budget, state, key facts) after doing work. Required: content.',
+      'Create or replace a project context section. Use to add or update sections (e.g. overview, tasks). Format: # Title (id=sectionId) + content. Required: sectionId, title. Optional: content (defaults to empty).',
     schema: {
       type: 'object',
-      properties: { content: { type: 'string', description: 'The new context document content' } },
-      required: ['content'],
+      properties: {
+        sectionId: { type: 'string', description: 'Section ID (slug, e.g. overview, tasks)' },
+        title: { type: 'string', description: 'Section title for display' },
+        content: { type: 'string', description: 'Section content (markdown). Optional, defaults to empty string.' },
+      },
+      required: ['sectionId', 'title'],
+    },
+    toolType: 'builtin',
+  },
+  project_section_delete: {
+    name: 'project_section_delete',
+    description: 'Remove a project context section by sectionId. Required: sectionId.',
+    schema: {
+      type: 'object',
+      properties: {
+        sectionId: { type: 'string', description: 'Section ID to remove (e.g. overview, tasks)' },
+      },
+      required: ['sectionId'],
+    },
+    toolType: 'builtin',
+  },
+  project_section_patch: {
+    name: 'project_section_patch',
+    description:
+      'Batch update project context sections in one call. Upsert multiple sections and optionally delete others. Use to build or replace the full context in one shot. At least one of sections or deleteIds is required.',
+    schema: {
+      type: 'object',
+      properties: {
+        sections: {
+          type: 'array',
+          description: 'Sections to create or update. Each: { sectionId, title, content }',
+          items: {
+            type: 'object',
+            properties: {
+              sectionId: { type: 'string', description: 'Section ID (slug, e.g. overview, tasks)' },
+              title: { type: 'string', description: 'Section title' },
+              content: { type: 'string', description: 'Section content (markdown)' },
+            },
+            required: ['sectionId', 'title', 'content'],
+          },
+        },
+        deleteIds: {
+          type: 'array',
+          description: 'Section IDs to remove',
+          items: { type: 'string' },
+        },
+      },
     },
     toolType: 'builtin',
   },
@@ -1884,21 +1922,59 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
   crm_soft_delete_organization: crmSoftDeleteOrganizationDefinition,
   crm_soft_delete_deal: crmSoftDeleteDealDefinition,
   crm_soft_delete_pipeline: crmSoftDeletePipelineDefinition,
-  project_read: {
-    name: 'project_read',
+  project_section_update: {
+    name: 'project_section_update',
     description:
-      'Returns the project context document. Small curated context the agent maintains for this project. Available only when the conversation is assigned to a project.',
-    schema: { type: 'object', properties: {} } as ExtendedJsonSchema,
-    toolType: 'builtin',
-  },
-  project_write: {
-    name: 'project_write',
-    description:
-      'Overwrites the project context document. Use to update the curated context (budget, state, key facts) after doing work. Required: content.',
+      'Create or replace a project context section. Use to add or update sections (e.g. overview, tasks). Format: # Title (id=sectionId) + content. Required: sectionId, title. Optional: content (defaults to empty).',
     schema: {
       type: 'object',
-      properties: { content: { type: 'string', description: 'The new context document content' } },
-      required: ['content'],
+      properties: {
+        sectionId: { type: 'string', description: 'Section ID (slug, e.g. overview, tasks)' },
+        title: { type: 'string', description: 'Section title for display' },
+        content: { type: 'string', description: 'Section content (markdown). Optional, defaults to empty string.' },
+      },
+      required: ['sectionId', 'title'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  project_section_delete: {
+    name: 'project_section_delete',
+    description: 'Remove a project context section by sectionId. Required: sectionId.',
+    schema: {
+      type: 'object',
+      properties: {
+        sectionId: { type: 'string', description: 'Section ID to remove (e.g. overview, tasks)' },
+      },
+      required: ['sectionId'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  project_section_patch: {
+    name: 'project_section_patch',
+    description:
+      'Batch update project context sections in one call. Upsert multiple sections and optionally delete others. Use to build or replace the full context in one shot. At least one of sections or deleteIds is required.',
+    schema: {
+      type: 'object',
+      properties: {
+        sections: {
+          type: 'array',
+          description: 'Sections to create or update. Each: { sectionId, title, content }',
+          items: {
+            type: 'object',
+            properties: {
+              sectionId: { type: 'string', description: 'Section ID (slug, e.g. overview, tasks)' },
+              title: { type: 'string', description: 'Section title' },
+              content: { type: 'string', description: 'Section content (markdown)' },
+            },
+            required: ['sectionId', 'title', 'content'],
+          },
+        },
+        deleteIds: {
+          type: 'array',
+          description: 'Section IDs to remove',
+          items: { type: 'string' },
+        },
+      },
     } as ExtendedJsonSchema,
     toolType: 'builtin',
   },
