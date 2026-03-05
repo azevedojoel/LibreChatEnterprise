@@ -74,11 +74,18 @@ async function saveLocalBuffer({ userId, buffer, fileName, basePath = 'images' }
     const directoryPath =
       basePath === 'images' ? path.join(publicPath, basePath, userId) : path.join(uploads, userId);
 
-    if (!fs.existsSync(directoryPath)) {
-      fs.mkdirSync(directoryPath, { recursive: true });
+    const outputPath = path.join(directoryPath, fileName);
+    const resolvedOutput = path.resolve(outputPath);
+    const resolvedDir = path.resolve(directoryPath);
+    if (!resolvedOutput.startsWith(resolvedDir + path.sep) && resolvedOutput !== resolvedDir) {
+      throw new Error('Invalid fileName: path traversal is not allowed');
+    }
+    const outputDir = path.dirname(outputPath);
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
     }
 
-    fs.writeFileSync(path.join(directoryPath, fileName), buffer);
+    fs.writeFileSync(outputPath, buffer);
 
     const filePath = path.posix.join('/', basePath, userId, fileName);
 

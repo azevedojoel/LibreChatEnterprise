@@ -407,6 +407,7 @@ const SEND_FILE_MAX_BYTES =
 
 /**
  * Read files from workspace and return buffers for artifact delivery.
+ * Validates all paths exist before reading; returns a comprehensive error listing any missing files.
  * @param {object} params
  * @param {string} params.workspaceRoot - Absolute workspace path
  * @param {string[]} params.paths - File paths relative to workspace root
@@ -416,33 +417,55 @@ async function sendFilesToUser({ workspaceRoot, paths }) {
   if (!Array.isArray(paths) || paths.length === 0) {
     return { error: 'paths must be a non-empty array' };
   }
-  const files = [];
+  const validPaths = [];
+  const missingPaths = [];
+  const otherErrors = [];
+
   for (const relativePath of paths) {
     if (typeof relativePath !== 'string' || !relativePath.trim()) {
       return { error: 'Each path must be a non-empty string' };
     }
+    const trimmed = relativePath.trim();
     try {
-      const absPath = resolvePath(workspaceRoot, relativePath.trim());
+      const absPath = resolvePath(workspaceRoot, trimmed);
       const stat = await fs.stat(absPath);
       if (!stat.isFile()) {
-        return { error: `"${relativePath}" is not a file` };
+        otherErrors.push(`"${trimmed}" is not a file (it may be a directory)`);
+        continue;
       }
       if (stat.size > SEND_FILE_MAX_BYTES) {
         return {
-          error: `"${relativePath}" exceeds maximum size (${Math.round(SEND_FILE_MAX_BYTES / 1024 / 1024)}MB)`,
+          error: `"${trimmed}" exceeds maximum size (${Math.round(SEND_FILE_MAX_BYTES / 1024 / 1024)}MB)`,
         };
       }
-      const buffer = await fs.readFile(absPath);
-      files.push({ name: relativePath.trim(), buffer });
+      validPaths.push(trimmed);
     } catch (err) {
       if (err.code === 'ENOENT') {
-        return { error: `"${relativePath}" not found` };
-      }
-      if (err.message?.includes('escapes workspace')) {
+        missingPaths.push(trimmed);
+      } else if (err.message?.includes('escapes workspace')) {
         return { error: err.message };
+      } else {
+        otherErrors.push(`"${trimmed}": ${err.message}`);
       }
-      return { error: `"${relativePath}": ${err.message}` };
     }
+  }
+
+  if (missingPaths.length > 0) {
+    const fileWord = missingPaths.length === 1 ? 'File' : 'Files';
+    const list = missingPaths.map((p) => `"${p}"`).join(', ');
+    return {
+      error: `${fileWord} not found: ${list}. Please verify the paths are correct and the files were created.`,
+    };
+  }
+  if (otherErrors.length > 0) {
+    return { error: otherErrors.join('; ') };
+  }
+
+  const files = [];
+  for (const trimmed of validPaths) {
+    const absPath = resolvePath(workspaceRoot, trimmed);
+    const buffer = await fs.readFile(absPath);
+    files.push({ name: trimmed, buffer });
   }
   return { files };
 }
@@ -459,9 +482,48 @@ async function sendFilesToUser({ workspaceRoot, paths }) {
  * @param {string} [params.role] - User role for access check
  * @returns {Promise<{ filename: string } | { error: string }>}
  */
-async function pullFileToWorkspace({ workspaceRoot, file_id, req, userId, agentId, role }) {
-  if (!file_id || typeof file_id !== 'string') {
-    return { error: 'file_id is required' };
+/**
+ * List user's My Files by optional filename filter. No embeddings—direct DB lookup.
+ * @param {string} userId
+ * @param {string} [filenameFilter] - Optional: partial match (case-insensitive). Omit for recent files.
+ * @param {string} [agentId]
+ * @param {string} [role]
+ * @returns {Promise<Array<{ file_id: string; filename: string }>>}
+ */
+async function listMyFiles({ userId, filenameFilter, agentId, role }) {
+  if (!userId) return [];
+  const filter = { user: userId };
+  if (filenameFilter && filenameFilter.trim()) {
+    const escaped = filenameFilter.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    filter.filename = { $regex: escaped, $options: 'i' };
+  }
+  let files = (await getFiles(filter, null, { text: 0, filepath: 0 })) ?? [];
+  if (agentId && files.length > 0) {
+    const req = { user: { id: userId, role } };
+    files = await filterFilesByAgentAccess({
+      files,
+      userId,
+      role: role ?? 'USER',
+      agentId,
+    });
+  }
+  return files.slice(0, 50).map((f) => ({ file_id: f.file_id, filename: f.filename }));
+}
+
+async function pullFileToWorkspace({ workspaceRoot, file_id, filename, req, userId, agentId, role }) {
+  let resolvedFileId = file_id;
+  if (!resolvedFileId && filename && typeof filename === 'string' && filename.trim()) {
+    const matches = await listMyFiles({
+      userId,
+      filenameFilter: filename.trim(),
+      agentId,
+      role: role ?? req?.user?.role,
+    });
+    const exact = matches.find((m) => m.filename === filename.trim());
+    resolvedFileId = exact?.file_id ?? matches[0]?.file_id;
+  }
+  if (!resolvedFileId || typeof resolvedFileId !== 'string') {
+    return { error: 'file_id or filename is required' };
   }
   if (!req) {
     return { error: 'Request context required for file access' };
@@ -469,7 +531,7 @@ async function pullFileToWorkspace({ workspaceRoot, file_id, req, userId, agentI
   if (!userId || !agentId) {
     return { error: 'User and agent context required for file access' };
   }
-  const allFiles = (await getFiles({ file_id }, null, { text: 0 })) ?? [];
+  const allFiles = (await getFiles({ file_id: resolvedFileId }, null, { text: 0 })) ?? [];
   const dbFiles = await filterFilesByAgentAccess({
     files: allFiles,
     userId,
@@ -511,4 +573,5 @@ module.exports = {
   searchFiles,
   sendFilesToUser,
   pullFileToWorkspace,
+  listMyFiles,
 };
