@@ -102,8 +102,9 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   'update-calendar-event': 'Updated event',
   'update-specific-calendar-event': 'Updated event',
   // Project tools
-  project_read: 'Project Context',
-  project_write: 'Update Project Context',
+  project_section_update: 'Update Project Section',
+  project_section_delete: 'Delete Project Section',
+  project_section_patch: 'Batch Update Project Sections',
   project_log: 'Append to Changelog',
   project_log_tail: 'Recent Changelog Entries',
   project_log_search: 'Search Changelog',

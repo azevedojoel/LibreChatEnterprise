@@ -568,24 +568,6 @@ export default function ToolCallInfo({
     return null;
   }, [function_name, output, input]);
 
-  const projectReadData = useMemo(() => {
-    if (function_name !== 'project_read' || !output) {
-      return null;
-    }
-    try {
-      const parsed = JSON.parse(output) as { context?: string; error?: string };
-      if (typeof parsed.error === 'string' && parsed.error.length > 0) {
-        return { error: parsed.error };
-      }
-      if (typeof parsed.context === 'string') {
-        return { context: parsed.context };
-      }
-    } catch {
-      // output is not valid JSON
-    }
-    return null;
-  }, [function_name, output]);
-
   const [planViewExpanded, setPlanViewExpanded] = useState(false);
 
   const planData = useMemo(() => {
@@ -986,13 +968,8 @@ export default function ToolCallInfo({
         content: readFileData.content,
         filename: readFileData.filename,
       });
-    } else if (projectReadData && 'context' in projectReadData) {
-      openInArtifact({
-        content: projectReadData.context ?? '',
-        filename: 'project-context.txt',
-      });
     }
-  }, [readFileData, projectReadData, openInArtifact]);
+  }, [readFileData, openInArtifact]);
 
   const isCompactFileList =
     (searchFilesData && searchFilesData.length > 0) || (globFilesData && globFilesData.length > 0);
@@ -1325,41 +1302,6 @@ export default function ToolCallInfo({
         <div className="rounded-lg bg-red-500/10 p-2 text-sm text-red-600 dark:bg-red-950/20 dark:text-red-400">
           {readFileData.error}
         </div>
-      </div>
-    );
-  }
-
-  // project_read: user-facing, just show context or empty (no technical labels)
-  if (projectReadData) {
-    let projectReadContent: React.ReactNode;
-    if ('error' in projectReadData) {
-      projectReadContent = (
-        <div className="rounded-lg bg-red-500/10 p-2 text-sm text-red-600 dark:bg-red-950/20 dark:text-red-400">
-          {projectReadData.error}
-        </div>
-      );
-    } else if (projectReadData.context) {
-      projectReadContent = (
-        <>
-          <div className="whitespace-pre-wrap break-words text-sm text-text-primary">
-            {projectReadData.context}
-          </div>
-          <div className="mt-2">
-            <Button variant="outline" size="sm" onClick={handleOpenInArtifact} className="gap-1.5">
-              <ExternalLink className="h-4 w-4" aria-hidden="true" />
-              {localize('com_ui_open_in_artifact')}
-            </Button>
-          </div>
-        </>
-      );
-    } else {
-      projectReadContent = (
-        <div className="text-sm text-text-secondary">{localize('com_ui_no_project_context')}</div>
-      );
-    }
-    return (
-      <div className="w-full p-2">
-        <div style={{ opacity: 1 }}>{projectReadContent}</div>
       </div>
     );
   }

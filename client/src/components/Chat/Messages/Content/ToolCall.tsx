@@ -143,8 +143,9 @@ const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
   'update-todo-task': 'Updating To Do task',
   'delete-todo-task': 'Deleting To Do task',
   // Project tools
-  project_read: 'Project Context',
-  project_write: 'Update Project Context',
+  project_section_update: 'Update Project Section',
+  project_section_delete: 'Delete Project Section',
+  project_section_patch: 'Batch Update Project Sections',
   project_log: 'Append to Changelog',
   project_log_tail: 'Recent Changelog Entries',
   project_log_search: 'Search Changelog',
@@ -171,8 +172,9 @@ const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
 
 /** Icons for project tools */
 const PROJECT_TOOL_ICONS: Partial<Record<string, React.ComponentType<{ className?: string }>>> = {
-  project_read: FileText,
-  project_write: FileEdit,
+  [Tools.project_section_update]: FileEdit,
+  [Tools.project_section_delete]: Trash2,
+  [Tools.project_section_patch]: FileEdit,
   project_log: ListPlus,
   project_log_tail: List,
   project_log_search: Search,

@@ -71,8 +71,9 @@ const TOOL_DISPLAY_NAMES = {
   people_getMe: 'Retrieved my profile',
   people_getUserRelations: 'Retrieved user relations',
   // Project tools
-  project_read: 'Project Context',
-  project_write: 'Update Project Context',
+  project_section_update: 'Update Project Section',
+  project_section_delete: 'Delete Project Section',
+  project_section_patch: 'Batch Update Project Sections',
   project_log: 'Append to Changelog',
   project_log_tail: 'Recent Changelog Entries',
   project_log_search: 'Search Changelog',

@@ -18,6 +18,7 @@ import {
   CheckCircle,
   Play,
   Package,
+  Trash2,
 } from 'lucide-react';
 import { VectorIcon } from '@librechat/client';
 import { EModelEndpoint, Tools, AgentCapabilities } from 'librechat-data-provider';
@@ -37,8 +38,9 @@ const BUILT_IN_ICONS: Record<string, React.ComponentType<{ className?: string; s
   [Tools.execute_code]: TerminalSquareIcon,
   [AgentCapabilities.artifacts]: Box,
   // Project tools
-  project_read: FileText,
-  project_write: FileEdit,
+  [Tools.project_section_update]: FileEdit,
+  [Tools.project_section_delete]: Trash2,
+  [Tools.project_section_patch]: FileEdit,
   project_log: ListPlus,
   project_log_tail: List,
   project_log_search: Search,
@@ -87,8 +89,9 @@ function getToolDisplayName(
     [Tools.execute_code]: 'Code Interpreter',
     [AgentCapabilities.artifacts]: 'Artifacts',
     // Project tools
-    project_read: 'Project Context',
-    project_write: 'Update Project Context',
+    [Tools.project_section_update]: 'Update Project Section',
+    [Tools.project_section_delete]: 'Delete Project Section',
+    [Tools.project_section_patch]: 'Batch Update Project Sections',
     project_log: 'Append to Changelog',
     project_log_tail: 'Recent Changelog Entries',
     project_log_search: 'Search Changelog',
