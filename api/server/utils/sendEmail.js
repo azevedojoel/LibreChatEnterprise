@@ -100,7 +100,7 @@ const sendEmail = async ({ email, subject, payload, template, throwError = true 
     const fromName = process.env.EMAIL_FROM_NAME || process.env.APP_TITLE;
     const fromEmail = process.env.EMAIL_FROM;
     const fromAddress = `"${fromName}" <${fromEmail}>`;
-    const toAddress = `"${payload.name}" <${email}>`;
+    const toAddress = payload?.name ? `"${payload.name}" <${email}>` : email;
 
     // Check if Mailgun is configured
     if (process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN) {
