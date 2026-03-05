@@ -1370,16 +1370,36 @@ const sendFileToUserDefinition: ToolRegistryDefinition = {
 const pullFileToWorkspaceDefinition: ToolRegistryDefinition = {
   name: 'workspace_pull_file',
   description:
-    "Copy a file from the user's My Files into the workspace. Use file_id from file_search results. After pulling, use workspace_read_file or execute_code to work with the file.",
+    "Copy a file from the user's My Files into the workspace. Provide file_id OR filename (e.g. 'contacts_2024.json'). No embeddings—direct lookup by name. Use list_my_files to discover files. After pulling, use workspace_read_file or execute_code.",
   schema: {
     type: 'object',
+    description: 'At least one of file_id or filename is required.',
     properties: {
       file_id: {
         type: 'string',
-        description: 'File ID from file_search results or user My Files',
+        description: 'File ID (optional if filename provided)',
+      },
+      filename: {
+        type: 'string',
+        description: 'Exact or partial filename (e.g. "contacts_2024.json")',
       },
     },
-    required: ['file_id'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const listMyFilesDefinition: ToolRegistryDefinition = {
+  name: 'list_my_files',
+  description:
+    "List files in the user's My Files. Optional filename_filter for partial match (e.g. 'contacts' for contacts_*.json). Returns file_id + filename. Use workspace_pull_file to copy into workspace. No embeddings.",
+  schema: {
+    type: 'object',
+    properties: {
+      filename_filter: {
+        type: 'string',
+        description: 'Optional: partial filename match. Omit to list recent files.',
+      },
+    },
   } as ExtendedJsonSchema,
   toolType: 'builtin',
 };
@@ -1401,6 +1421,40 @@ const createPdfDefinition: ToolRegistryDefinition = {
       },
     },
     required: ['html'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+  responseFormat: 'content_and_artifact',
+};
+
+const runToolAndSaveDefinition: ToolRegistryDefinition = {
+  name: 'run_tool_and_save',
+  description:
+    'Run any available tool with given arguments and save the output to a file. Use when the user wants to export data (e.g. CRM contacts, Gmail search results) to a file without the raw data passing through the model. Output format can be JSON or CSV. Filename gets a timestamp suffix automatically.',
+  schema: {
+    type: 'object',
+    properties: {
+      toolName: {
+        type: 'string',
+        description:
+          'Exact tool name (e.g. "crm_list_contacts" or "gmail_search_mcp_Google-Workspace"). Use tool_search to find available tools.',
+      },
+      args: {
+        type: 'object',
+        description:
+          'Arguments to pass to the tool. Use {} when the tool needs no arguments (e.g. crm_list_contacts).',
+      },
+      format: {
+        type: 'string',
+        enum: ['json', 'csv'],
+        description: 'Output format: "json" (default) or "csv". CSV works best for array-of-objects data.',
+      },
+      filename: {
+        type: 'string',
+        description:
+          'Optional base filename (e.g. "contacts"). Extension and timestamp are added automatically.',
+      },
+    },
+    required: ['toolName'],
   } as ExtendedJsonSchema,
   toolType: 'builtin',
   responseFormat: 'content_and_artifact',
@@ -1800,7 +1854,9 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
   workspace_glob_files: globFilesDefinition,
   workspace_send_file_to_user: sendFileToUserDefinition,
   workspace_pull_file: pullFileToWorkspaceDefinition,
+  list_my_files: listMyFilesDefinition,
   create_pdf: createPdfDefinition,
+  run_tool_and_save: runToolAndSaveDefinition,
   list_schedules: listSchedulesDefinition,
   list_user_projects: listUserProjectsDefinition,
   create_schedule: createScheduleDefinition,

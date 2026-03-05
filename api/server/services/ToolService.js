@@ -443,7 +443,9 @@ const nativeTools = new Set([
   Tools.workspace_glob_files,
   Tools.workspace_send_file_to_user,
   Tools.workspace_pull_file,
+  Tools.list_my_files,
   Tools.create_pdf,
+  Tools.run_tool_and_save,
   Tools.list_schedules,
   Tools.list_user_projects,
   Tools.create_schedule,
@@ -542,6 +544,10 @@ async function loadToolDefinitionsWrapper({
   let toolsToFilter = [
     ...new Set((agent.tools ?? []).filter((t) => t != null && typeof t === 'string')),
   ];
+
+  /** Inject run_tool_and_save on every agent run - allows exporting any tool output to JSON/CSV file */
+  toolsToFilter = [...new Set([...toolsToFilter, Tools.run_tool_and_save])];
+
   if (toolsToFilter.includes(Tools.execute_code)) {
     const workspaceTools = [
       Tools.workspace_read_file,
@@ -553,6 +559,7 @@ async function loadToolDefinitionsWrapper({
       Tools.workspace_glob_files,
       Tools.workspace_send_file_to_user,
       Tools.workspace_pull_file,
+      Tools.list_my_files,
       Tools.generate_code,
       Tools.install_dependencies,
       Tools.lint,
@@ -730,7 +737,8 @@ async function loadToolDefinitionsWrapper({
       tool === Tools.search_user_files ||
       tool === Tools.workspace_glob_files ||
       tool === Tools.workspace_send_file_to_user ||
-      tool === Tools.workspace_pull_file
+      tool === Tools.workspace_pull_file ||
+      tool === Tools.list_my_files
     ) {
       if (isPersistentAgent) {
         if (ephemeralAgent?.execute_code === false) return false;
@@ -763,6 +771,9 @@ async function loadToolDefinitionsWrapper({
         return ephemeralAgent.create_pdf === true;
       }
       return checkCapability(AgentCapabilities.create_pdf);
+    }
+    if (tool === Tools.run_tool_and_save) {
+      return true; /* Always allow - auto-injected on every agent run */
     }
     const coderTools = [
       Tools.generate_code,
@@ -1036,7 +1047,8 @@ async function loadToolDefinitionsWrapper({
       filteredTools.includes(Tools.search_user_files) ||
       filteredTools.includes(Tools.workspace_glob_files) ||
       filteredTools.includes(Tools.workspace_send_file_to_user) ||
-      filteredTools.includes(Tools.workspace_pull_file));
+      filteredTools.includes(Tools.workspace_pull_file) ||
+      filteredTools.includes(Tools.list_my_files));
 
   if (hasWebSearch) {
     toolContextMap[Tools.web_search] = buildWebSearchContext();
@@ -1056,6 +1068,12 @@ async function loadToolDefinitionsWrapper({
       '- Converts HTML/CSS to PDF. Saves to user files and displays in chat.';
   }
 
+  const hasRunToolAndSave = filteredTools.includes(Tools.run_tool_and_save);
+  if (hasRunToolAndSave) {
+    toolContextMap[Tools.run_tool_and_save] =
+      '- Runs any tool with given args and saves output to JSON or CSV file. Filename gets timestamp. Use to export CRM, Gmail, etc. without raw data in context.';
+  }
+
   if (hasWorkspaceCodeEdit) {
     toolContextMap[Tools.workspace_read_file] =
       toolContextMap[Tools.workspace_edit_file] =
@@ -1066,7 +1084,8 @@ async function loadToolDefinitionsWrapper({
       toolContextMap[Tools.workspace_glob_files] =
       toolContextMap[Tools.workspace_send_file_to_user] =
       toolContextMap[Tools.workspace_pull_file] =
-        '- Workspace tools: operate on the conversation-scoped workspace (shared with execute_code). Files from email attachments or file_search are NOT in the workspace—use file_search for those. Use workspace_pull_file to copy a file from My Files (e.g. from file_search results) into the workspace.';
+      toolContextMap[Tools.list_my_files] =
+        '- Workspace tools: operate on the conversation-scoped workspace (shared with execute_code). Use list_my_files to list files in My Files (no embeddings). Use workspace_pull_file with filename to copy a file from My Files into the workspace.';
   }
 
   if (hasFileSearch) {
@@ -1250,6 +1269,10 @@ async function loadAgentTools({
   let toolsToFilter = [
     ...new Set((agent.tools ?? []).filter((t) => t != null && typeof t === 'string')),
   ];
+
+  /** Inject run_tool_and_save on every agent run - allows exporting any tool output to JSON/CSV file */
+  toolsToFilter = [...new Set([...toolsToFilter, Tools.run_tool_and_save])];
+
   if (toolsToFilter.includes(Tools.execute_code)) {
     const workspaceTools = [
       Tools.workspace_read_file,
@@ -1261,6 +1284,7 @@ async function loadAgentTools({
       Tools.workspace_glob_files,
       Tools.workspace_send_file_to_user,
       Tools.workspace_pull_file,
+      Tools.list_my_files,
       Tools.generate_code,
       Tools.install_dependencies,
       Tools.lint,
@@ -1439,7 +1463,8 @@ async function loadAgentTools({
       tool === Tools.search_user_files ||
       tool === Tools.workspace_glob_files ||
       tool === Tools.workspace_send_file_to_user ||
-      tool === Tools.workspace_pull_file
+      tool === Tools.workspace_pull_file ||
+      tool === Tools.list_my_files
     ) {
       if (isPersistentAgent) {
         if (ephemeralAgent?.execute_code === false) return false;
@@ -1470,6 +1495,8 @@ async function loadAgentTools({
         return ephemeralAgent.create_pdf === true;
       }
       return checkCapability(AgentCapabilities.create_pdf);
+    } else if (tool === Tools.run_tool_and_save) {
+      return true; /* Always allow - auto-injected on every agent run */
     } else if (!areToolsEnabled && !tool.includes(actionDelimiter)) {
       return false;
     }
@@ -1846,7 +1873,8 @@ async function loadToolsForExecution({
       n === Tools.search_user_files ||
       n === Tools.workspace_glob_files ||
       n === Tools.workspace_send_file_to_user ||
-      n === Tools.workspace_pull_file,
+      n === Tools.workspace_pull_file ||
+      n === Tools.list_my_files,
   );
   const hasCoderTools = toolNames.some(
     (n) =>
@@ -1913,10 +1941,25 @@ async function loadToolsForExecution({
     );
   }
 
+  const hasRunToolAndSave = toolNames.includes(Tools.run_tool_and_save);
+  let runToolAndSaveOrchestratedToolNames = [];
+  if (hasRunToolAndSave && toolRegistry) {
+    runToolAndSaveOrchestratedToolNames = Array.from(toolRegistry.keys()).filter(
+      (name) => name !== Tools.run_tool_and_save && !specialToolNames.has(name),
+    );
+  }
+
   const requestedNonSpecialToolNames = toolNames.filter((name) => !specialToolNames.has(name));
-  const allToolNamesToLoad = isPTC
-    ? [...new Set([...requestedNonSpecialToolNames, ...ptcOrchestratedToolNames])]
-    : requestedNonSpecialToolNames;
+  const allToolNamesToLoad =
+    isPTC || hasRunToolAndSave
+      ? [
+          ...new Set([
+            ...requestedNonSpecialToolNames,
+            ...ptcOrchestratedToolNames,
+            ...runToolAndSaveOrchestratedToolNames,
+          ]),
+        ]
+      : requestedNonSpecialToolNames;
 
   const actionToolNames = allToolNamesToLoad.filter((name) => name.includes(actionDelimiter));
   const regularToolNames = allToolNamesToLoad.filter((name) => !name.includes(actionDelimiter));

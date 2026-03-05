@@ -20,7 +20,9 @@ const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
   [Tools.workspace_list_files]: 'List Files',
   [Tools.workspace_send_file_to_user]: 'Send File to User',
   [Tools.workspace_pull_file]: 'Pull File to Workspace',
+  [Tools.list_my_files]: 'List My Files',
   [Tools.create_pdf]: 'Create Document',
+  [Tools.run_tool_and_save]: 'Export to File',
   [Tools.generate_code]: 'Generate Code',
   [Tools.install_dependencies]: 'Install Dependencies',
   [Tools.lint]: 'Lint',
@@ -187,6 +189,7 @@ const WORKSPACE_TOOL_ICONS: Partial<Record<string, React.ComponentType<{ classNa
   [Tools.workspace_glob_files]: Search,
   [Tools.workspace_send_file_to_user]: FilePlus,
   [Tools.workspace_pull_file]: FileDown,
+  [Tools.list_my_files]: FolderOpen,
   [Tools.create_pdf]: FileText,
   [Tools.file_search]: FileSearch,
 };

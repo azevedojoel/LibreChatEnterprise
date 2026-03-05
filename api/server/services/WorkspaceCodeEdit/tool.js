@@ -13,6 +13,7 @@ const {
   searchFiles,
   sendFilesToUser,
   pullFileToWorkspace,
+  listMyFiles,
 } = require('./executor');
 
 /**
@@ -393,6 +394,7 @@ function createPullFileToWorkspaceTool({ workspaceRoot, req, agentId, userId }) 
       const result = await pullFileToWorkspace({
         workspaceRoot,
         file_id: rawInput.file_id,
+        filename: rawInput.filename,
         req,
         userId,
         agentId,
@@ -409,19 +411,61 @@ function createPullFileToWorkspaceTool({ workspaceRoot, req, agentId, userId }) 
     {
       name: 'workspace_pull_file',
       description:
-        "Copy a file from the user's My Files into the workspace. Use file_id from file_search results. After pulling, use workspace_read_file or execute_code to work with the file.",
+        "Copy a file from the user's My Files into the workspace. Provide file_id OR filename (e.g. 'contacts_2024.json'). No embeddings—direct lookup by name. Use list_my_files to discover files. After pulling, use workspace_read_file or execute_code.",
       schema: {
         type: 'object',
+        description: 'At least one of file_id or filename is required.',
         properties: {
           file_id: {
             type: 'string',
-            description: 'File ID from file_search results or user My Files',
+            description: 'File ID (optional if filename provided)',
+          },
+          filename: {
+            type: 'string',
+            description: 'Exact or partial filename (e.g. "contacts_2024.json")',
           },
         },
-        required: ['file_id'],
       },
     },
   );
 }
 
-module.exports = { createWorkspaceCodeEditTools, createPullFileToWorkspaceTool };
+/**
+ * Creates the list_my_files tool. Simple DB lookup—no embeddings.
+ */
+function createListMyFilesTool({ req, agentId, userId }) {
+  return tool(
+    async (rawInput) => {
+      const result = await listMyFiles({
+        userId,
+        filenameFilter: rawInput.filename_filter?.trim() || undefined,
+        agentId,
+        role: req?.user?.role,
+      });
+      if (result.length === 0) {
+        return 'No files found in My Files.';
+      }
+      return result.map((f) => `${f.filename} (file_id: ${f.file_id})`).join('\n');
+    },
+    {
+      name: 'list_my_files',
+      description:
+        "List files in the user's My Files. Optional filename_filter for partial match (e.g. 'contacts' for contacts_*.json). Returns file_id + filename. Use workspace_pull_file to copy into workspace. No embeddings.",
+      schema: {
+        type: 'object',
+        properties: {
+          filename_filter: {
+            type: 'string',
+            description: 'Optional: partial filename match. Omit to list recent files.',
+          },
+        },
+      },
+    },
+  );
+}
+
+module.exports = {
+  createWorkspaceCodeEditTools,
+  createPullFileToWorkspaceTool,
+  createListMyFilesTool,
+};

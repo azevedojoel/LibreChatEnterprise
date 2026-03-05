@@ -44,8 +44,10 @@ const { createLocalCodeExecutionTool } = require('~/server/services/LocalCodeExe
 const {
   createWorkspaceCodeEditTools,
   createPullFileToWorkspaceTool,
+  createListMyFilesTool,
 } = require('~/server/services/WorkspaceCodeEdit');
 const { createCreatePdfTool } = require('~/server/services/CreatePdf/tool');
+const { createRunToolAndSaveTool } = require('~/server/services/RunToolAndSave/tool');
 const { createGenerateCodeTool } = require('~/server/services/GenerateCode');
 const {
   createWorkspaceStatusTool,
@@ -407,7 +409,8 @@ const loadTools = async ({
       tool === Tools.search_user_files ||
       tool === Tools.workspace_glob_files ||
       tool === Tools.workspace_send_file_to_user ||
-      tool === Tools.workspace_pull_file
+      tool === Tools.workspace_pull_file ||
+      tool === Tools.list_my_files
     ) {
       const conversationId = options.req?.body?.conversationId ?? options.conversationId;
       const agentId = agent?.id;
@@ -452,6 +455,11 @@ const loadTools = async ({
         agentId,
         userId,
       });
+      const listMyFilesTool = createListMyFilesTool({
+        req: options.req,
+        agentId,
+        userId,
+      });
       const toolMap = {
         [Tools.workspace_read_file]: readFileTool,
         [Tools.workspace_edit_file]: editFileTool,
@@ -462,6 +470,7 @@ const loadTools = async ({
         [Tools.workspace_glob_files]: globFilesTool,
         [Tools.workspace_send_file_to_user]: sendFileToUserTool,
         [Tools.workspace_pull_file]: pullFileToWorkspaceTool,
+        [Tools.list_my_files]: listMyFilesTool,
       };
       requestedTools[tool] = async () => {
         await ensureWorkspaceInjected();
@@ -528,6 +537,9 @@ const loadTools = async ({
         continue;
       }
       requestedTools[tool] = async () => createCreatePdfTool({ req });
+      continue;
+    } else if (tool === Tools.run_tool_and_save) {
+      requestedTools[tool] = async () => createRunToolAndSaveTool();
       continue;
     } else if (
       tool === Tools.list_schedules ||
@@ -608,6 +620,8 @@ const loadTools = async ({
           files,
           entity_id: agent?.id,
           fileCitations,
+          req: options.req,
+          agentId: agent?.id,
         });
       };
       continue;
