@@ -1,15 +1,33 @@
 const mongoose = require('mongoose');
 const { UserProject, ProjectLog } = require('~/db/models');
+const { findUser } = require('~/models');
 
 /**
- * Verify user owns the project.
+ * Verify user has access to the project (owner or workspace member when shared).
  * @param {string} projectId - Project ID
  * @param {string} userId - User ID
  * @returns {Promise<boolean>}
  */
+const verifyProjectAccess = async (projectId, userId) => {
+  const project = await UserProject.findById(projectId).lean();
+  if (!project) return false;
+  if (project.user === userId) return true;
+  if (project.workspace_id) {
+    const userDoc = await findUser({ _id: userId }, 'workspace_id');
+    const userWorkspaceId = userDoc?.workspace_id?.toString?.() ?? userDoc?.workspace_id;
+    const projectWorkspaceId = project.workspace_id?.toString?.() ?? project.workspace_id;
+    return !!(
+      userWorkspaceId &&
+      projectWorkspaceId &&
+      userWorkspaceId === projectWorkspaceId
+    );
+  }
+  return false;
+};
+
+/** @deprecated Use verifyProjectAccess for workspace-shared project support */
 const verifyProjectOwnership = async (projectId, userId) => {
-  const project = await UserProject.findOne({ _id: projectId, user: userId }).lean();
-  return !!project;
+  return verifyProjectAccess(projectId, userId);
 };
 
 /**
@@ -20,8 +38,8 @@ const verifyProjectOwnership = async (projectId, userId) => {
  * @returns {Promise<Object>}
  */
 const appendLog = async (projectId, userId, entry) => {
-  const owns = await verifyProjectOwnership(projectId, userId);
-  if (!owns) {
+  const hasAccess = await verifyProjectAccess(projectId, userId);
+  if (!hasAccess) {
     throw new Error('Project not found or access denied');
   }
   const doc = await ProjectLog.create({
@@ -39,8 +57,8 @@ const appendLog = async (projectId, userId, entry) => {
  * @returns {Promise<Object[]>}
  */
 const tail = async (projectId, userId, n = 10) => {
-  const owns = await verifyProjectOwnership(projectId, userId);
-  if (!owns) {
+  const hasAccess = await verifyProjectAccess(projectId, userId);
+  if (!hasAccess) {
     throw new Error('Project not found or access denied');
   }
   const limit = Math.min(Math.max(1, parseInt(n, 10) || 10), 100);
@@ -61,8 +79,8 @@ const tail = async (projectId, userId, n = 10) => {
  * @returns {Promise<Object[]>}
  */
 const search = async (projectId, userId, query, { limit = 50 } = {}) => {
-  const owns = await verifyProjectOwnership(projectId, userId);
-  if (!owns) {
+  const hasAccess = await verifyProjectAccess(projectId, userId);
+  if (!hasAccess) {
     throw new Error('Project not found or access denied');
   }
   const searchLimit = Math.min(Math.max(1, parseInt(limit, 10) || 50), 100);
@@ -93,8 +111,8 @@ const search = async (projectId, userId, query, { limit = 50 } = {}) => {
  * @returns {Promise<Object[]>}
  */
 const range = async (projectId, userId, from, to, { limit = 100 } = {}) => {
-  const owns = await verifyProjectOwnership(projectId, userId);
-  if (!owns) {
+  const hasAccess = await verifyProjectAccess(projectId, userId);
+  if (!hasAccess) {
     throw new Error('Project not found or access denied');
   }
   const rangeLimit = Math.min(Math.max(1, parseInt(limit, 10) || 100), 500);
@@ -116,5 +134,6 @@ module.exports = {
   tail,
   search,
   range,
+  verifyProjectAccess,
   verifyProjectOwnership,
 };

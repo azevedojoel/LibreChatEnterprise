@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const { UserProject, ProjectContextSection } = require('~/db/models');
-const { verifyProjectOwnership } = require('./projectLogService');
+const { verifyProjectAccess } = require('./projectLogService');
 
 const MAX_CONTENT_LENGTH = 50 * 1024; // 50KB per section
 
@@ -11,8 +11,8 @@ const MAX_CONTENT_LENGTH = 50 * 1024; // 50KB per section
  * @returns {Promise<Array<{ sectionId: string, title: string, content: string, order: number }>>}
  */
 const getSections = async (projectId, userId) => {
-  const owns = await verifyProjectOwnership(projectId, userId);
-  if (!owns) {
+  const hasAccess = await verifyProjectAccess(projectId, userId);
+  if (!hasAccess) {
     throw new Error('Project not found or access denied');
   }
   const sections = await ProjectContextSection.find({
@@ -57,8 +57,8 @@ const getFormattedContext = async (projectId, userId) => {
  * @returns {Promise<Object>}
  */
 const upsertSection = async (projectId, userId, { sectionId, title, content }) => {
-  const owns = await verifyProjectOwnership(projectId, userId);
-  if (!owns) {
+  const hasAccess = await verifyProjectAccess(projectId, userId);
+  if (!hasAccess) {
     throw new Error('Project not found or access denied');
   }
   const trimmedContent = String(content ?? '').slice(0, MAX_CONTENT_LENGTH);
@@ -84,8 +84,8 @@ const upsertSection = async (projectId, userId, { sectionId, title, content }) =
  * @returns {Promise<{ upserted: number, deleted: number, skipped: string[] }>}
  */
 const patchSections = async (projectId, userId, { sections = [], deleteIds = [] }) => {
-  const owns = await verifyProjectOwnership(projectId, userId);
-  if (!owns) {
+  const hasAccess = await verifyProjectAccess(projectId, userId);
+  if (!hasAccess) {
     throw new Error('Project not found or access denied');
   }
   const pid = new mongoose.Types.ObjectId(projectId);
@@ -127,8 +127,8 @@ const patchSections = async (projectId, userId, { sections = [], deleteIds = [] 
  * @returns {Promise<boolean>}
  */
 const deleteSection = async (projectId, userId, sectionId) => {
-  const owns = await verifyProjectOwnership(projectId, userId);
-  if (!owns) {
+  const hasAccess = await verifyProjectAccess(projectId, userId);
+  if (!hasAccess) {
     throw new Error('Project not found or access denied');
   }
   const slug = String(sectionId ?? '').trim().replace(/\s+/g, '-').toLowerCase();
