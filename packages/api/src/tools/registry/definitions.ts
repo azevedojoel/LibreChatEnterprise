@@ -1387,17 +1387,17 @@ const pullFileToWorkspaceDefinition: ToolRegistryDefinition = {
 const createPdfDefinition: ToolRegistryDefinition = {
   name: 'create_pdf',
   description:
-    'Convert HTML/CSS content to a PDF document. Use when the user or task requires a PDF. Provide valid HTML (optionally with inline CSS). The PDF is saved to the user\'s files and displayed in chat.',
+    'Create an HTML document for viewing and printing. Use when the user needs a document they can preview and print to PDF. Provide valid HTML (optionally with inline CSS). The HTML is saved to the user\'s files. User opens it in the Artifact preview and uses browser Print (Cmd/Ctrl+P) to save as PDF.',
   schema: {
     type: 'object',
     properties: {
       html: {
         type: 'string',
-        description: 'HTML content to convert to PDF. Can include inline CSS in <style> tags.',
+        description: 'HTML content. Can include inline CSS in <style> tags.',
       },
       filename: {
         type: 'string',
-        description: 'Optional filename for the PDF (e.g. "report.pdf"). Defaults to "document.pdf".',
+        description: 'Optional filename (e.g. "report.html"). Defaults to "document.html".',
       },
     },
     required: ['html'],

@@ -310,7 +310,7 @@ export default function AgentConfig() {
             {artifactsEnabled && <Artifacts />}
             {/* File Search */}
             {fileSearchEnabled && <FileSearch agent_id={agent_id} files={knowledge_files} />}
-            {/* Create PDF */}
+            {/* Create Document */}
             {createPdfEnabled && <CreatePdfCheckbox />}
             {/* Manage Scheduling */}
             {manageSchedulingEnabled && (

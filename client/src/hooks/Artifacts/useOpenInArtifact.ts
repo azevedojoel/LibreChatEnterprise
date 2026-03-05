@@ -3,11 +3,37 @@ import { useSetRecoilState } from 'recoil';
 import type { Artifact } from '~/common';
 import store from '~/store';
 
+/** Extensions that can be previewed in the artifact viewer (text-based files) */
+export const PREVIEWABLE_EXTENSIONS = new Set([
+  'html',
+  'htm',
+  'tsx',
+  'jsx',
+  'md',
+  'mdx',
+  'mermaid',
+  'mmd',
+  'py',
+  'js',
+  'ts',
+  'json',
+  'txt',
+  'css',
+  'xml',
+  'yaml',
+  'yml',
+]);
+
+export function isPreviewable(filename: string): boolean {
+  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+  return PREVIEWABLE_EXTENSIONS.has(ext);
+}
+
 /**
  * Maps file extensions to MIME types supported by the artifact viewer.
  * Uses types from utils/artifacts.ts for proper Sandpack template selection.
  */
-function inferMimeType(filename: string): string {
+export function inferMimeType(filename: string): string {
   const ext = filename.split('.').pop()?.toLowerCase() ?? '';
   const mimeMap: Record<string, string> = {
     html: 'text/html',

@@ -11,7 +11,7 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   [Tools.workspace_list_files]: 'List Files',
   [Tools.workspace_send_file_to_user]: 'Send File to User',
   [Tools.workspace_pull_file]: 'Pull File to Workspace',
-  [Tools.create_pdf]: 'Create PDF',
+  [Tools.create_pdf]: 'Create Document',
   [Tools.execute_code]: 'Code Interpreter',
   [Constants.TOOL_SEARCH]: 'Discovery',
   // Google Workspace MCP tools (underscore notation)

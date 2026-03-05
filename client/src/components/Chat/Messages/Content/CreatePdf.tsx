@@ -1,12 +1,16 @@
 import { useMemo, useCallback, useState } from 'react';
 import { useRecoilValue, useSetRecoilState } from 'recoil';
-import { FileDown } from 'lucide-react';
+import { FileDown, ExternalLink } from 'lucide-react';
+import { useToastContext } from '@librechat/client';
 import store from '~/store';
 import { useMessageContext } from '~/Providers';
 import { useProgress } from '~/hooks';
 import ToolResultContainer from './ToolResultContainer';
 import { AttachmentGroup } from './Parts';
 import { useAttachmentLink } from './Parts/LogLink';
+import useOpenInArtifact from '~/hooks/Artifacts/useOpenInArtifact';
+import { dataService } from 'librechat-data-provider';
+import { useLocalize } from '~/hooks';
 import type { TAttachment, TFile, TAttachmentMetadata } from 'librechat-data-provider';
 
 type CreatePdfProps = {
@@ -30,7 +34,7 @@ function parseArgs(args: string | Record<string, unknown>): { filename?: string 
   }
 }
 
-/** Extract filename from output text like "Created PDF: X. The file..." or "Error creating PDF: ..." */
+/** Extract filename from output text like "Created document: X. ..." or "Error creating document: ..." */
 function parseOutput(output: string | null | undefined): {
   filename?: string;
   error?: string;
@@ -59,7 +63,7 @@ function parseOutput(output: string | null | undefined): {
   if (text.toLowerCase().startsWith('error')) {
     return { error: text };
   }
-  const match = text.match(/Created PDF:\s*([^.]+)\./);
+  const match = text.match(/Created document:\s*([^.]+)\./);
   if (match?.[1]) {
     return { filename: match[1].trim() };
   }
@@ -113,16 +117,16 @@ export default function CreatePdf({
 
   const firstAttachment = attachments?.[0] as (TAttachment & TFile & TAttachmentMetadata) | undefined;
   const filename =
-    firstAttachment?.filename ?? parsedOutput?.filename ?? parsedArgs?.filename ?? 'document.pdf';
+    firstAttachment?.filename ?? parsedOutput?.filename ?? parsedArgs?.filename ?? 'document.html';
 
   const displayFilename = filename.length > 40 ? `${filename.slice(0, 40)}...` : filename;
 
   const summary =
     isLoading || !hasOutput
-      ? `Creating PDF: ${displayFilename}`
+      ? `Creating document: ${displayFilename}`
       : outputError
-        ? `Failed to create PDF`
-        : `Created PDF: ${displayFilename}`;
+        ? `Failed to create document`
+        : `Created document: ${displayFilename}`;
 
   const hasError = error || cancelled || !!outputError;
   const hasExpandableContent = hasOutput || (attachments?.length ?? 0) > 0;
@@ -134,7 +138,7 @@ export default function CreatePdf({
   return (
     <>
       <ToolResultContainer
-        icon={<FileDown className="size-5 shrink-0 text-text-secondary" aria-hidden="true" />}
+        icon={<ExternalLink className="size-5 shrink-0 text-text-secondary" aria-hidden="true" />}
         summary={summary}
         isExpanded={isExpanded}
         onToggle={toggleExpand}
@@ -142,11 +146,21 @@ export default function CreatePdf({
         error={hasError}
         hasExpandableContent={hasExpandableContent}
         minExpandHeight={80}
+        headerActions={
+          !outputError &&
+          firstAttachment?.file_id &&
+          firstAttachment?.user && (
+            <CreateDocumentHeaderActions
+              attachment={firstAttachment}
+              filename={filename}
+            />
+          )
+        }
       >
         {outputError ? (
           <p className="text-sm text-red-500">{outputError}</p>
         ) : (
-          <CreatePdfDownloadLink
+          <CreateDocumentLinks
             attachment={firstAttachment}
             filename={filename}
           />
@@ -157,13 +171,71 @@ export default function CreatePdf({
   );
 }
 
-function CreatePdfDownloadLink({
+function CreateDocumentHeaderActions({
+  attachment,
+  filename,
+}: {
+  attachment: TAttachment & TFile & TAttachmentMetadata;
+  filename: string;
+}) {
+  const localize = useLocalize();
+  const { showToast } = useToastContext();
+  const openInArtifact = useOpenInArtifact();
+  const [isOpening, setIsOpening] = useState(false);
+
+  const handleOpenInArtifact = useCallback(async () => {
+    if (!attachment?.file_id || !attachment?.user) return;
+    setIsOpening(true);
+    try {
+      const response = await dataService.getFileDownload(attachment.user, attachment.file_id);
+      const blob = response.data as Blob;
+      const content = await blob.text();
+      openInArtifact({
+        content,
+        filename: attachment.filename ?? filename,
+        type: 'text/html',
+      });
+    } catch (err) {
+      console.error('Failed to open document in artifact:', err);
+      showToast({
+        status: 'error',
+        message: localize('com_ui_open_in_artifact_error'),
+      });
+    } finally {
+      setIsOpening(false);
+    }
+  }, [
+    attachment?.file_id,
+    attachment?.user,
+    attachment?.filename,
+    filename,
+    openInArtifact,
+    showToast,
+    localize,
+  ]);
+
+  return (
+    <button
+      type="button"
+      onClick={handleOpenInArtifact}
+      disabled={isOpening}
+      className="inline-flex shrink-0 items-center gap-1 text-sm text-primary hover:underline disabled:opacity-50"
+      title={localize('com_ui_open_in_artifact')}
+    >
+      <ExternalLink className="size-3.5" aria-hidden="true" />
+      {isOpening ? '...' : localize('com_ui_open_in_artifact')}
+    </button>
+  );
+}
+
+function CreateDocumentLinks({
   attachment,
   filename,
 }: {
   attachment?: TAttachment & TFile & TAttachmentMetadata;
   filename: string;
 }) {
+  const localize = useLocalize();
   const { handleDownload } = useAttachmentLink({
     href: attachment?.filepath ?? '',
     filename: attachment?.filename ?? filename,
@@ -195,7 +267,7 @@ function CreatePdfDownloadLink({
           title={filename}
         >
           <FileDown className="size-3.5" aria-hidden="true" />
-          Download
+          {localize('com_ui_download')}
         </button>
       </div>
     </div>

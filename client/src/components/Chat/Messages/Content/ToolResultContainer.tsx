@@ -16,6 +16,8 @@ type ToolResultContainerProps = {
   hasExpandableContent?: boolean;
   /** Minimum height when expanded (e.g. 120) to avoid cramped single-line content */
   minExpandHeight?: number;
+  /** Actions shown in the header row (always visible). Use for primary actions like "Open in Artifact". */
+  headerActions?: React.ReactNode;
   children?: React.ReactNode;
 };
 
@@ -29,6 +31,7 @@ export default function ToolResultContainer({
   error = false,
   hasExpandableContent = true,
   minExpandHeight,
+  headerActions,
   children,
 }: ToolResultContainerProps) {
   const contentRef = useRef<HTMLDivElement>(null);
@@ -97,6 +100,14 @@ export default function ToolResultContainer({
       >
         <span className="flex shrink-0">{icon}</span>
         <span className="min-w-0 flex-1 truncate text-sm text-text-primary">{summary}</span>
+        {headerActions && (
+          <span
+            className="flex shrink-0 items-center gap-1"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {headerActions}
+          </span>
+        )}
         {resultsCount != null && (
           <span className="shrink-0 text-sm text-text-secondary">{resultsCount} results</span>
         )}

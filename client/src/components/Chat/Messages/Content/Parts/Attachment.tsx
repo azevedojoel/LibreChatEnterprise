@@ -1,14 +1,21 @@
-import { memo, useState, useEffect } from 'react';
+import { memo, useState, useEffect, useCallback } from 'react';
+import { ExternalLink } from 'lucide-react';
 import { imageExtRegex, Tools } from 'librechat-data-provider';
+import { dataService } from 'librechat-data-provider';
 import type { TAttachment, TFile, TAttachmentMetadata } from 'librechat-data-provider';
 import FileContainer from '~/components/Chat/Input/Files/FileContainer';
 import Image from '~/components/Chat/Messages/Content/Image';
 import { useAttachmentLink } from './LogLink';
+import useOpenInArtifact, { isPreviewable, inferMimeType } from '~/hooks/Artifacts/useOpenInArtifact';
+import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
 
 const FileAttachment = memo(({ attachment }: { attachment: Partial<TAttachment> }) => {
+  const localize = useLocalize();
   const [isVisible, setIsVisible] = useState(false);
+  const [isOpening, setIsOpening] = useState(false);
   const file = attachment as TFile & TAttachmentMetadata;
+  const openInArtifact = useOpenInArtifact();
   const { handleDownload } = useAttachmentLink({
     href: attachment.filepath ?? '',
     filename: attachment.filename ?? '',
@@ -17,6 +24,32 @@ const FileAttachment = memo(({ attachment }: { attachment: Partial<TAttachment> 
     source: file.source,
   });
   const extension = attachment.filename?.split('.').pop();
+  const filename = attachment.filename ?? '';
+  const canOpenInArtifact =
+    isPreviewable(filename) && file.file_id && file.user;
+
+  const handleOpenInArtifact = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!file.file_id || !file.user) return;
+      setIsOpening(true);
+      try {
+        const response = await dataService.getFileDownload(file.user, file.file_id);
+        const blob = response.data as Blob;
+        const content = await blob.text();
+        openInArtifact({
+          content,
+          filename,
+          type: inferMimeType(filename),
+        });
+      } catch (err) {
+        console.error('Failed to open file in artifact:', err);
+      } finally {
+        setIsOpening(false);
+      }
+    },
+    [file.file_id, file.user, filename, openInArtifact],
+  );
 
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 50);
@@ -30,6 +63,7 @@ const FileAttachment = memo(({ attachment }: { attachment: Partial<TAttachment> 
     <div
       className={cn(
         'file-attachment-container',
+        'relative',
         'transition-all duration-300 ease-out',
         isVisible ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0',
       )}
@@ -46,6 +80,22 @@ const FileAttachment = memo(({ attachment }: { attachment: Partial<TAttachment> 
         containerClassName="max-w-fit"
         buttonClassName="bg-surface-secondary hover:cursor-pointer hover:bg-surface-hover active:bg-surface-secondary focus:bg-surface-hover hover:border-border-heavy active:border-border-heavy"
       />
+      {canOpenInArtifact && (
+        <button
+          type="button"
+          onClick={handleOpenInArtifact}
+          disabled={isOpening}
+          className="absolute bottom-1 left-1 flex size-6 items-center justify-center rounded-md bg-surface-primary/90 text-text-primary shadow-sm transition-opacity hover:bg-surface-hover disabled:opacity-50"
+          title={localize('com_ui_open_in_artifact')}
+          aria-label={localize('com_ui_open_in_artifact')}
+        >
+          {isOpening ? (
+            <span className="text-[10px]">...</span>
+          ) : (
+            <ExternalLink className="size-3" aria-hidden="true" />
+          )}
+        </button>
+      )}
     </div>
   );
 });

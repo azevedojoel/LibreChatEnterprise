@@ -14,7 +14,7 @@ const TOOL_DISPLAY_NAMES = {
   workspace_list_files: 'List Files',
   workspace_send_file_to_user: 'Send File to User',
   workspace_pull_file: 'Pull File to Workspace',
-  create_pdf: 'Create PDF',
+  create_pdf: 'Create Document',
   [Constants.TOOL_SEARCH]: 'Discovery',
   // Google Workspace MCP tools (underscore notation)
   tasks_listTaskLists: 'Fetch Task Lists',
