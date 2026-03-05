@@ -914,11 +914,19 @@ export const useRemoveAdminWorkspaceMemberMutation = (): UseMutationResult<
 };
 
 export const useGetWorkspaceMeQuery = (
-  config?: UseQueryOptions<{ workspace: { id: string; name: string; slug: string } | null }>,
-): QueryObserverResult<{ workspace: { id: string; name: string; slug: string } | null }> => {
-  return useQuery<{ workspace: { id: string; name: string; slug: string } | null }>(
-    [QueryKeys.workspaceMe],
-    () => dataService.getWorkspaceMe(),
-    { refetchOnWindowFocus: false, ...config },
-  );
+  config?: UseQueryOptions<{
+    workspace: { id: string; name: string; slug: string } | null;
+    isAdmin: boolean;
+  }>,
+): QueryObserverResult<{
+  workspace: { id: string; name: string; slug: string } | null;
+  isAdmin: boolean;
+}> => {
+  return useQuery<{
+    workspace: { id: string; name: string; slug: string } | null;
+    isAdmin: boolean;
+  }>([QueryKeys.workspaceMe], () => dataService.getWorkspaceMe(), {
+    refetchOnWindowFocus: false,
+    ...config,
+  });
 };

@@ -19,8 +19,10 @@ jest.mock('~/models', () => ({
   findUser: (...args) => mockFindUser(...args),
 }));
 
+const mockIsWorkspaceAdmin = jest.fn();
 jest.mock('~/models/Workspace', () => ({
   getWorkspaceById: (...args) => mockGetWorkspaceById(...args),
+  isWorkspaceAdmin: (...args) => mockIsWorkspaceAdmin(...args),
 }));
 
 jest.mock('~/db/models', () => ({
@@ -59,7 +61,10 @@ describe('Workspace Routes', () => {
         _id: validWorkspaceId,
         name: 'Acme Corp',
         slug: 'acme',
+        adminIds: [validUserId],
+        createdBy: validUserId,
       });
+      mockIsWorkspaceAdmin.mockReturnValue(true);
 
       const response = await request(app)
         .get('/api/workspace/me')
@@ -71,6 +76,7 @@ describe('Workspace Routes', () => {
           name: 'Acme Corp',
           slug: 'acme',
         },
+        isAdmin: true,
       });
       expect(mockFindUser).toHaveBeenCalledWith(
         { _id: validUserId },
@@ -78,7 +84,7 @@ describe('Workspace Routes', () => {
       );
       expect(mockGetWorkspaceById).toHaveBeenCalledWith(
         validWorkspaceId.toString(),
-        'name slug',
+        'name slug adminIds createdBy',
       );
     });
 
@@ -89,7 +95,7 @@ describe('Workspace Routes', () => {
         .get('/api/workspace/me')
         .expect(200);
 
-      expect(response.body).toEqual({ workspace: null });
+      expect(response.body).toEqual({ workspace: null, isAdmin: false });
       expect(mockGetWorkspaceById).not.toHaveBeenCalled();
     });
 
@@ -104,7 +110,7 @@ describe('Workspace Routes', () => {
         .get('/api/workspace/me')
         .expect(200);
 
-      expect(response.body).toEqual({ workspace: null });
+      expect(response.body).toEqual({ workspace: null, isAdmin: false });
     });
 
     it('returns 500 when findUser throws', async () => {

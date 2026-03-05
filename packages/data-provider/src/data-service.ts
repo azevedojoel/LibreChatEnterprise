@@ -542,7 +542,10 @@ export const listUserProjects = (params?: {
   return request.get(`${endpoints.userProjects()}${qs ? `?${qs}` : ''}`);
 };
 
-export const createUserProject = (data: { name: string }): Promise<t.TUserProject> => {
+export const createUserProject = (data: {
+  name: string;
+  sharedWithWorkspace?: boolean;
+}): Promise<t.TUserProject> => {
   return request.post(endpoints.userProjects(), data);
 };
 
@@ -1345,6 +1348,7 @@ export const removeAdminWorkspaceMember = (
 
 export const getWorkspaceMe = (): Promise<{
   workspace: { id: string; name: string; slug: string } | null;
+  isAdmin: boolean;
 }> => request.get(endpoints.workspaceMe());
 
 export const getWorkspaceMeMembers = (): Promise<{ members: q.TWorkspaceMember[] }> =>

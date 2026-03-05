@@ -6,6 +6,7 @@ const {
   getUserProject,
   updateUserProject,
   deleteUserProject,
+  archiveUserProject,
 } = require('~/models/UserProject');
 const requireJwtAuth = require('~/server/middleware/requireJwtAuth');
 
@@ -15,12 +16,14 @@ router.use(requireJwtAuth);
 /**
  * GET /api/user-projects
  * List user's projects (paginated)
+ * Query: limit, cursor, status (active|archived|all)
  */
 router.get('/', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit, 10) || 25;
     const cursor = req.query.cursor;
-    const result = await listUserProjects(req.user.id, { limit, cursor });
+    const status = req.query.status || 'active';
+    const result = await listUserProjects(req.user.id, { limit, cursor, status });
     res.status(200).json(result);
   } catch (error) {
     logger.error('[userProjects] Error listing projects', error);
@@ -31,20 +34,35 @@ router.get('/', async (req, res) => {
 /**
  * POST /api/user-projects
  * Create a new project
- * Body: { name: string }
+ * Body: { name: string, description?: string, tags?: string[], sharedWithWorkspace?: boolean, templateProjectId?: string }
  */
 router.post('/', async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, description, tags, sharedWithWorkspace, templateProjectId } = req.body;
     if (typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ error: 'Name is required' });
     }
-    const project = await createUserProject(req.user.id, { name });
-    res.status(201).json(project);
+    const result = await createUserProject(req.user.id, {
+      name,
+      description,
+      tags,
+      sharedWithWorkspace: !!sharedWithWorkspace,
+      templateProjectId,
+    });
+    if (result.error) {
+      return res.status(403).json({
+        error: result.error,
+        ...(result.adminMemberId && { adminMemberId: result.adminMemberId }),
+      });
+    }
+    res.status(201).json(result.project);
   } catch (error) {
     logger.error('[userProjects] Error creating project', error);
     if (error.code === 11000) {
       return res.status(409).json({ error: 'A project with this name already exists' });
+    }
+    if (error.message?.includes('workspace admin') || error.message?.includes('no workspace')) {
+      return res.status(403).json({ error: error.message });
     }
     res.status(500).json({ error: 'Error creating project' });
   }
@@ -69,13 +87,19 @@ router.get('/:id', async (req, res) => {
 
 /**
  * PATCH /api/user-projects/:id
- * Update project name or context
- * Body: { name?: string, context?: string }
+ * Update project name, context, or metadata
+ * Body: { name?: string, context?: string, description?: string, tags?: string[], ownerId?: string }
  */
 router.patch('/:id', async (req, res) => {
   try {
-    const { name, context } = req.body;
-    const project = await updateUserProject(req.user.id, req.params.id, { name, context });
+    const { name, context, description, tags, ownerId } = req.body;
+    const project = await updateUserProject(req.user.id, req.params.id, {
+      name,
+      context,
+      description,
+      tags,
+      ownerId,
+    });
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
@@ -83,6 +107,23 @@ router.patch('/:id', async (req, res) => {
   } catch (error) {
     logger.error('[userProjects] Error updating project', error);
     res.status(500).json({ error: 'Error updating project' });
+  }
+});
+
+/**
+ * POST /api/user-projects/:id/archive
+ * Archive a project (soft delete). Only owner or workspace admin can archive.
+ */
+router.post('/:id/archive', async (req, res) => {
+  try {
+    const archived = await archiveUserProject(req.user.id, req.params.id);
+    if (!archived) {
+      return res.status(404).json({ error: 'Project not found or access denied' });
+    }
+    res.status(200).json({ archived: true });
+  } catch (error) {
+    logger.error('[userProjects] Error archiving project', error);
+    res.status(500).json({ error: 'Error archiving project' });
   }
 });
 
