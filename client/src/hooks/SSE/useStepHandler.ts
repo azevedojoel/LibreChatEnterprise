@@ -569,12 +569,23 @@ export default function useStepHandler({
             return;
           }
 
-          const currentIndex = calculateContentIndex(
-            runStep.index,
-            initialContent,
-            contentPart.type || '',
-            response.content,
-          );
+          // When last part is TOOL_CALL, we're adding text AFTER tools - append instead of merging.
+          const content = response.content ?? [];
+          const lastPart = content[content.length - 1];
+          const isTextAfterTools =
+            lastPart?.type === ContentTypes.TOOL_CALL &&
+            (contentPart.type === ContentTypes.TEXT ||
+              (typeof contentPart.type === 'string' &&
+                contentPart.type.startsWith(ContentTypes.TEXT)));
+
+          const currentIndex = isTextAfterTools
+            ? content.length
+            : calculateContentIndex(
+                runStep.index,
+                initialContent,
+                contentPart.type || '',
+                response.content,
+              );
           const updatedResponse = updateContent(
             response,
             currentIndex,
@@ -619,12 +630,27 @@ export default function useStepHandler({
             return;
           }
 
-          const currentIndex = calculateContentIndex(
-            runStep.index,
-            initialContent,
-            contentPart.type || '',
-            response.content,
-          );
+          // When last part is TOOL_CALL, we're adding think AFTER tools - append instead of merging.
+          const content = response.content ?? [];
+          const lastPart = content[content.length - 1];
+          const isThinkAfterTools =
+            lastPart?.type === ContentTypes.TOOL_CALL &&
+            (contentPart.type === ContentTypes.THINK ||
+              contentPart.type === 'thinking' ||
+              (typeof contentPart.type === 'string' &&
+                (contentPart.type.startsWith(ContentTypes.THINK) ||
+                  contentPart.type.startsWith('thinking') ||
+                  contentPart.type.startsWith('reasoning') ||
+                  contentPart.type === 'reasoning_content')));
+
+          const currentIndex = isThinkAfterTools
+            ? content.length
+            : calculateContentIndex(
+                runStep.index,
+                initialContent,
+                contentPart.type || '',
+                response.content,
+              );
           const updatedResponse = updateContent(
             response,
             currentIndex,
