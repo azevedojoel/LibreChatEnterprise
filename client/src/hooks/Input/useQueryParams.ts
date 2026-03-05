@@ -295,6 +295,17 @@ export default function useQueryParams({
   }, [methods, submitMessage, conversation]);
 
   useEffect(() => {
+    // Reset refs when we have new params to process (e.g. user clicked agent starter prompt)
+    const hasParamsToProcess =
+      searchParams.get('agent_id') || searchParams.get('prompt') || searchParams.get('q');
+    if (hasParamsToProcess) {
+      processedRef.current = false;
+      submissionHandledRef.current = false;
+      pendingSubmitRef.current = false;
+      settingsAppliedRef.current = false;
+      attemptsRef.current = 0;
+    }
+
     const processQueryParams = () => {
       const queryParams: Record<string, string> = {};
       searchParams.forEach((value, key) => {

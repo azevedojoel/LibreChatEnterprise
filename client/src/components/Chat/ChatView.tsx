@@ -3,13 +3,7 @@ import { useRecoilValue } from 'recoil';
 import { useForm } from 'react-hook-form';
 import { Spinner } from '@librechat/client';
 import { useParams } from 'react-router-dom';
-import {
-  Constants,
-  EModelEndpoint,
-  Permissions,
-  PermissionTypes,
-  buildTree,
-} from 'librechat-data-provider';
+import { Constants, buildTree } from 'librechat-data-provider';
 import type { TMessage } from 'librechat-data-provider';
 import type { ChatFormValues } from '~/common';
 import { ChatContext, AddedChatContext, useFileMapContext, ChatFormProvider } from '~/Providers';
@@ -19,22 +13,9 @@ import {
   useAdaptiveSSE,
   useChatHelpers,
   useOAuthCompleteListener,
-  useAuthContext,
 } from '~/hooks';
-import { useGetAgentsConfig } from '~/hooks/Agents';
-import { useHasAccess } from '~/hooks';
-import {
-  useGetStartupConfig,
-  useGetEndpointsQuery,
-  useMCPServersQuery,
-} from '~/data-provider';
-import ConversationStarters from './Input/ConversationStarters';
-import {
-  EmailEllisWidget,
-  CRMWidget,
-  IntegrationsWidget,
-  ScheduledAgentsWidget,
-} from './Dashboard';
+import AgentStarterPrompts from './Input/AgentStarterPrompts';
+import Landing from './Landing';
 import { useGetMessagesByConvoId } from '~/data-provider';
 import MessagesView from './Messages/MessagesView';
 import Presentation from './Presentation';
@@ -56,22 +37,6 @@ function LoadingSpinner() {
 
 function ChatView({ index = 0 }: { index?: number }) {
   const { conversationId } = useParams();
-  const { user } = useAuthContext();
-  const { agentsConfig } = useGetAgentsConfig();
-  const { data: startupConfig } = useGetStartupConfig();
-  const { data: endpointsConfig } = useGetEndpointsQuery();
-  const { data: mcpServers } = useMCPServersQuery();
-  const hasAccessToAgents = useHasAccess({
-    permissionType: PermissionTypes.AGENTS,
-    permission: Permissions.USE,
-  });
-  const showIntegrationsGrid =
-    !!mcpServers && Object.keys(mcpServers).length > 0;
-  const interfaceConfig = startupConfig?.interface ?? {};
-  const showScheduledAgentsWidget =
-    interfaceConfig.scheduledAgents !== false &&
-    !!endpointsConfig?.[EModelEndpoint.agents] &&
-    hasAccessToAgents;
   const rootSubmission = useRecoilValue(store.submissionByIndex(index));
   const centerFormOnLanding = useRecoilValue(store.centerFormOnLanding);
 
@@ -117,7 +82,7 @@ function ChatView({ index = 0 }: { index?: number }) {
   } else if (!isLandingPage) {
     content = <MessagesView messagesTree={messagesTree} />;
   } else {
-    content = centerFormOnLanding ? null : <div className="min-h-0 flex-1" />;
+    content = <Landing centerFormOnLanding={centerFormOnLanding} />;
   }
 
   return (
@@ -131,34 +96,11 @@ function ChatView({ index = 0 }: { index?: number }) {
                 <div
                   className={cn(
                     'flex min-h-0 flex-col overflow-y-auto',
-                    isLandingPage ? 'flex-1 items-center' : 'h-full',
-                    isLandingPage &&
-                      !(
-                        agentsConfig?.inboundEmailAddress ||
-                        user?.projectId ||
-                        showIntegrationsGrid ||
-                        showScheduledAgentsWidget
-                      ) && 'justify-end sm:justify-center',
-                    isLandingPage &&
-                      (agentsConfig?.inboundEmailAddress ||
-                        user?.projectId ||
-                        showIntegrationsGrid ||
-                        showScheduledAgentsWidget) &&
-                      'justify-start',
+                    isLandingPage
+                      ? 'flex-1 items-center justify-end sm:justify-center'
+                      : 'h-full',
                   )}
                 >
-                  {isLandingPage &&
-                    (agentsConfig?.inboundEmailAddress ||
-                      user?.projectId ||
-                      showIntegrationsGrid ||
-                      showScheduledAgentsWidget) && (
-                      <div className="mb-6 grid w-full max-w-3xl grid-cols-1 gap-4 px-4 pt-16 sm:grid-cols-2 xl:max-w-4xl [&>*:only-child]:sm:col-span-2">
-                        <EmailEllisWidget />
-                        <CRMWidget />
-                        <IntegrationsWidget />
-                        <ScheduledAgentsWidget />
-                      </div>
-                    )}
                   {content}
                   <div
                     className={cn(
@@ -166,8 +108,9 @@ function ChatView({ index = 0 }: { index?: number }) {
                       isLandingPage && 'max-w-3xl transition-all duration-200 xl:max-w-4xl',
                     )}
                   >
+                    {isLandingPage && <AgentStarterPrompts />}
                     <ChatForm index={index} />
-                    {isLandingPage ? <ConversationStarters /> : <Footer />}
+                    {!isLandingPage && <Footer />}
                   </div>
                 </div>
                 {isLandingPage && <Footer />}

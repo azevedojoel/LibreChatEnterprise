@@ -774,6 +774,12 @@ export function forkConversation(payload: t.TForkConvoRequest): Promise<t.TForkC
   return request.post(endpoints.forkConversation(), payload);
 }
 
+export function summarizeThread(
+  payload: t.TSummarizeThreadRequest,
+): Promise<t.TSummarizeThreadResponse> {
+  return request.post(endpoints.messagesSummarize(), payload);
+}
+
 export function deleteConversation(payload: t.TDeleteConversationRequest) {
   return request.deleteWithOptions(endpoints.deleteConversation(), { data: { arg: payload } });
 }

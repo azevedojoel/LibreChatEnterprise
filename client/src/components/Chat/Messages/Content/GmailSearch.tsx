@@ -1,6 +1,6 @@
 import { useMemo, useCallback, useState } from 'react';
 import { useRecoilValue, useSetRecoilState } from 'recoil';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Star, Flag } from 'lucide-react';
 import store from '~/store';
 import { useMessageContext } from '~/Providers';
 import { useProgress } from '~/hooks';
@@ -20,10 +20,15 @@ type GmailMessage = {
   id?: string;
   threadId?: string;
   subject?: string;
+  from?: string;
+  date?: string;
+  isUnread?: boolean;
+  isStarred?: boolean;
+  isImportant?: boolean;
   snippet?: string;
 };
 
-/** Compact JSON from API: m=messages, m[].i=id, m[].t=threadId, m[].s=subject, m[].b=snippet, e=error. */
+/** Compact JSON from API: m=messages, m[].i=id, m[].t=threadId, m[].s=subject, m[].f=from, m[].d=date, m[].u=unread, m[].st=starred, m[].imp=important, m[].b=snippet, e=error. */
 function parseOutput(output: string | null | undefined): {
   messages: GmailMessage[];
   error?: string;
@@ -52,7 +57,17 @@ function parseOutput(output: string | null | undefined): {
       return trimmed ? { messages: [], error: trimmed } : null;
     }
     const parsed = JSON.parse(trimmed) as {
-      m?: Array<{ i?: string; t?: string; s?: string; b?: string }>;
+      m?: Array<{
+        i?: string;
+        t?: string;
+        s?: string;
+        f?: string;
+        d?: string;
+        u?: boolean;
+        st?: boolean;
+        imp?: boolean;
+        b?: string;
+      }>;
       e?: string;
     };
     if (!parsed || typeof parsed !== 'object') return null;
@@ -63,6 +78,11 @@ function parseOutput(output: string | null | undefined): {
           id: item?.i,
           threadId: item?.t,
           subject: item?.s,
+          from: item?.f,
+          date: item?.d,
+          isUnread: item?.u,
+          isStarred: item?.st,
+          isImportant: item?.imp,
           snippet: item?.b,
         }))
       : [];
@@ -171,28 +191,59 @@ export default function GmailSearch({
             const snippetPreview = showSnippet
               ? trimmedSnippet.slice(0, 60) + (trimmedSnippet.length > 60 ? '…' : '')
               : null;
+            const metaLine = [msg.from, msg.date].filter(Boolean).join(' · ');
             return (
               <li key={msg.id ?? msg.threadId ?? idx} className="flex items-start gap-2">
-                <span className="mt-0.5 shrink-0 text-text-secondary">-</span>
+                <span className="mt-0.5 flex shrink-0 items-center gap-1">
+                  {msg.isUnread && (
+                    <span
+                      className="size-2 rounded-full bg-primary"
+                      title="Unread"
+                      aria-hidden="true"
+                    />
+                  )}
+                  {!msg.isUnread && <span className="text-text-secondary">-</span>}
+                </span>
                 <div className="min-w-0 flex-1">
                   <span className="block truncate text-text-primary">{primary}</span>
+                  {metaLine && (
+                    <span className="mt-0.5 block truncate text-xs text-text-secondary">
+                      {metaLine}
+                    </span>
+                  )}
                   {snippetPreview && (
                     <span className="mt-0.5 block truncate text-xs text-text-secondary">
                       {snippetPreview}
                     </span>
                   )}
                 </div>
-                {url && (
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-0.5 inline-flex shrink-0 items-center gap-1 text-primary hover:underline"
-                    title={primary}
-                  >
-                    <ExternalLink className="size-3.5" aria-hidden="true" />
-                  </a>
-                )}
+                <span className="mt-0.5 flex shrink-0 items-center gap-0.5">
+                  {msg.isStarred && (
+                    <Star
+                      className="size-3.5 fill-amber-400 text-amber-400"
+                      title="Starred"
+                      aria-hidden="true"
+                    />
+                  )}
+                  {msg.isImportant && (
+                    <Flag
+                      className="size-3.5 text-red-500"
+                      title="Important"
+                      aria-hidden="true"
+                    />
+                  )}
+                  {url && (
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-primary hover:underline"
+                      title={primary}
+                    >
+                      <ExternalLink className="size-3.5" aria-hidden="true" />
+                    </a>
+                  )}
+                </span>
               </li>
             );
           })}

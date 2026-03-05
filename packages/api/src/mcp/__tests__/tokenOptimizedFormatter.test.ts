@@ -168,13 +168,18 @@ describe('tokenOptimizedFormatter', () => {
       expect(parsed.m?.[1]).toEqual({ i: 'msg2', t: 'th2' });
     });
 
-    it('includes s (subject) and b (snippet) when present, truncated', () => {
+    it('includes s (subject), f (from), d (date), u/st/imp (labels), b (snippet) when present', () => {
       const input = JSON.stringify({
         messages: [
           {
             id: 'msg1',
             threadId: 'th1',
             subject: 'Re: Project update',
+            from: 'alice@example.com',
+            date: '2025-03-04',
+            isUnread: true,
+            isStarred: true,
+            isImportant: false,
             snippet: 'Thanks for the update. I will review and get back to you soon.',
           },
           {
@@ -189,12 +194,18 @@ describe('tokenOptimizedFormatter', () => {
         serverName: 'Google',
         toolName: 'gmail_search',
       });
-      const parsed = JSON.parse(result) as { m?: Array<{ i?: string; s?: string; b?: string }> };
+      const parsed = JSON.parse(result) as {
+        m?: Array<{ i?: string; s?: string; f?: string; d?: string; u?: boolean; st?: boolean; b?: string }>;
+      };
       expect(parsed.m).toHaveLength(2);
       expect(parsed.m?.[0]).toEqual({
         i: 'msg1',
         t: 'th1',
         s: 'Re: Project update',
+        f: 'alice@example.com',
+        d: '2025-03-04',
+        u: true,
+        st: true,
         b: 'Thanks for the update. I will review and get back to you soon.',
       });
       expect(parsed.m?.[1].s).toHaveLength(80);

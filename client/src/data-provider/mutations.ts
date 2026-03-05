@@ -660,6 +660,43 @@ export const useForkConvoMutation = (
   });
 };
 
+export const useSummarizeThreadMutation = (
+  options?: t.SummarizeThreadOptions,
+): UseMutationResult<t.TSummarizeThreadResponse, unknown, t.TSummarizeThreadRequest, unknown> => {
+  const queryClient = useQueryClient();
+  const { onSuccess, ..._options } = options || {};
+
+  return useMutation(
+    (payload: t.TSummarizeThreadRequest) => dataService.summarizeThread(payload),
+    {
+      onSuccess: (data, vars, context) => {
+        const { conversationId, mode } = vars;
+        const conversation = data.conversation;
+
+        if (mode === 'inPlace') {
+          if (data.messages) {
+            queryClient.setQueryData([QueryKeys.messages, conversationId], data.messages);
+          }
+          queryClient.invalidateQueries({ queryKey: [QueryKeys.conversation, conversationId] });
+        } else if (mode === 'fork' && conversation.conversationId) {
+          queryClient.setQueryData([QueryKeys.conversation, conversation.conversationId], conversation);
+          addConvoToAllQueries(queryClient, conversation);
+          if (data.messages) {
+            queryClient.setQueryData([QueryKeys.messages, conversation.conversationId], data.messages);
+          }
+          queryClient.invalidateQueries({
+            queryKey: [QueryKeys.allConversations],
+            refetchPage: (_, index) => index === 0,
+          });
+        }
+
+        onSuccess?.(data, vars, context);
+      },
+      ..._options,
+    },
+  );
+};
+
 export const useUploadConversationsMutation = (
   _options?: t.MutationOptions<t.TImportResponse, FormData>,
 ) => {

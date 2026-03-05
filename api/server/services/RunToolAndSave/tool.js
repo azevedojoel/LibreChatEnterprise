@@ -34,31 +34,62 @@ function buildFilename(base, format, toolName) {
 /** Escape CSV value (handles commas, newlines, quotes) */
 function escapeCsvValue(val) {
   if (val == null) return '';
-  const str = typeof val === 'object' ? JSON.stringify(val) : String(val);
+  const str = String(val);
   if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
     return `"${str.replace(/"/g, '""')}"`;
   }
   return str;
 }
 
-/** Convert array of objects to CSV string */
-function jsonToCsv(data) {
-  if (!Array.isArray(data) || data.length === 0) {
-    return '';
+/** Flatten nested object for CSV: { a: 1, b: { c: 2 } } -> { a: 1, "b.c": 2 }. Arrays become joined strings. */
+function flattenForCsv(obj, prefix = '') {
+  if (obj == null) return {};
+  if (Array.isArray(obj)) {
+    return { [prefix || 'value']: obj.map((v) => (v != null && typeof v === 'object' ? JSON.stringify(v) : v)).join('; ') };
   }
-  const allKeys = new Set();
-  for (const row of data) {
-    if (row && typeof row === 'object') {
-      Object.keys(row).forEach((k) => allKeys.add(k));
+  if (typeof obj !== 'object') return { [prefix || 'value']: obj };
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    const key = prefix ? `${prefix}.${k}` : k;
+    if (v != null && typeof v === 'object' && !Array.isArray(v)) {
+      Object.assign(out, flattenForCsv(v, key));
+    } else if (Array.isArray(v)) {
+      const primitives = v.every((x) => x == null || typeof x !== 'object');
+      out[key] = primitives ? v.join('; ') : v.map((x) => (x != null && typeof x === 'object' ? JSON.stringify(x) : x)).join('; ');
+    } else {
+      out[key] = v;
     }
+  }
+  return out;
+}
+
+/** Common keys where API responses nest arrays (e.g. { taskLists: [...] }, { items: [...] }) */
+const ARRAY_KEYS = ['data', 'items', 'taskLists', 'tasks', 'files', 'messages', 'results', 'records', 'entries', 'list'];
+
+/** Extract array from parsed response - handles nested shapes from MCP/API tools */
+function extractArrayForCsv(parsed) {
+  if (Array.isArray(parsed)) return parsed;
+  if (!parsed || typeof parsed !== 'object') return [parsed];
+  for (const key of ARRAY_KEYS) {
+    const arr = parsed[key];
+    if (Array.isArray(arr) && arr.length > 0) return arr;
+  }
+  return [parsed];
+}
+
+/** Convert array of objects to CSV string (flattens nested objects so cells are primitives, not JSON) */
+function jsonToCsv(data) {
+  if (!Array.isArray(data) || data.length === 0) return '';
+  const flattened = data.map((row) => (row && typeof row === 'object' ? flattenForCsv(row) : { value: row }));
+  const allKeys = new Set();
+  for (const row of flattened) {
+    Object.keys(row).forEach((k) => allKeys.add(k));
   }
   const headers = Array.from(allKeys);
   const lines = [headers.map(escapeCsvValue).join(',')];
-  for (const row of data) {
-    if (row && typeof row === 'object') {
-      const values = headers.map((h) => escapeCsvValue(row[h]));
-      lines.push(values.join(','));
-    }
+  for (const row of flattened) {
+    const values = headers.map((h) => escapeCsvValue(row[h]));
+    lines.push(values.join(','));
   }
   return lines.join('\n');
 }
@@ -91,7 +122,7 @@ function createRunToolAndSaveTool() {
 
   return tool(
     async (rawInput, config) => {
-      let params = rawInput?.args ?? rawInput ?? {};
+      let params = rawInput ?? {};
       if (typeof params === 'string') {
         try {
           params = JSON.parse(params);
@@ -99,9 +130,24 @@ function createRunToolAndSaveTool() {
           params = {};
         }
       }
-      const { toolName, args = {}, format = 'json', filename } = params;
+      // Params may be at top level (LangChain validated input) or in params.args (ToolNode invokeParams)
+      const p =
+        params.toolName != null || params.tool_name != null || params.format != null
+          ? params
+          : params.args ?? {};
+      // Accept toolName, tool_name, or name (some LLMs use snake_case)
+      let toolName = p.toolName ?? p.tool_name ?? p.name ?? rawInput?.toolName ?? rawInput?.tool_name;
+      const args = p.args ?? {};
+      const format = p.format ?? 'json';
+      const filename = p.filename;
+
       if (!toolName || typeof toolName !== 'string') {
-        return ['Error: toolName is required.', {}];
+        logger.debug('[run_tool_and_save] Missing toolName:', {
+          rawInputKeys: Object.keys(rawInput ?? {}),
+          paramsKeys: Object.keys(p ?? {}),
+        });
+        const received = JSON.stringify({ paramsKeys: Object.keys(p ?? {}) });
+        return [`Error: toolName is required. Received: ${received}`, {}];
       }
 
       const toolMap =
@@ -113,17 +159,27 @@ function createRunToolAndSaveTool() {
         ];
       }
 
-      const innerTool = toolMap.get(toolName);
+      let innerTool = toolMap.get(toolName);
+      if (!innerTool && typeof toolMap.entries === 'function') {
+        // MCP tools use suffixed names (e.g. tasks_listTasks_mcp_Google).
+        // If LLM sends base name "tasks_listTasks", try prefix match.
+        const candidates = [];
+        for (const [key] of toolMap.entries()) {
+          if (key === toolName || key.startsWith(`${toolName}_mcp_`)) candidates.push(key);
+        }
+        if (candidates.length === 1) {
+          innerTool = toolMap.get(candidates[0]);
+        }
+      }
       if (!innerTool) {
         return [`Error: Tool "${toolName}" not found. Use tool_search to find available tools.`, {}];
       }
 
       try {
-        const invokeParams = {
-          ...(args ?? {}),
-          type: 'tool_call',
-          ...(config?.toolCall ?? {}),
-        };
+        const cleanArgs = args ?? {};
+        const invokeParams = Object.fromEntries(
+          Object.entries(cleanArgs).filter(([, v]) => v !== undefined)
+        );
         const output = await innerTool.invoke(invokeParams, config);
         const content = extractContent(output);
 
@@ -137,7 +193,7 @@ function createRunToolAndSaveTool() {
           } catch {
             parsed = [{ output: content }];
           }
-          const arr = Array.isArray(parsed) ? parsed : parsed?.data ?? [parsed];
+          const arr = extractArrayForCsv(parsed);
           fileContent = jsonToCsv(arr);
         } else {
           try {
@@ -179,14 +235,14 @@ function createRunToolAndSaveTool() {
     {
       name: 'run_tool_and_save',
       description:
-        'Run any available tool with given arguments and save the output to a file. Use when the user wants to export data (e.g. CRM contacts, Gmail search results) to a file without the raw data passing through the model. Output format can be JSON or CSV. Filename gets a timestamp suffix automatically.',
+        'Run any available tool with given arguments and save the output to a file. Use when the user wants to export data (e.g. CRM contacts, Gmail search results, Google Tasks) to a file without the raw data passing through the model. Output format can be JSON or CSV. Filename gets a timestamp suffix automatically.',
       schema: {
         type: 'object',
         properties: {
           toolName: {
             type: 'string',
             description:
-              'Exact tool name (e.g. "crm_list_contacts" or "gmail_search_mcp_Google-Workspace"). Use tool_search to find available tools.',
+              'Exact tool name (e.g. "crm_list_contacts", "gmail_search_mcp_Google", "tasks_listTasks_mcp_Google"). Use tool_search to find available tools.',
           },
           args: {
             type: 'object',

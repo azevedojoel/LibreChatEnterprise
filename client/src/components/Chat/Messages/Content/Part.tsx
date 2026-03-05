@@ -26,7 +26,6 @@ import DocsCreate from './DocsCreate';
 import DriveCreateFolder from './DriveCreateFolder';
 import DriveDownloadFile from './DriveDownloadFile';
 import CreatePdf from './CreatePdf';
-import DiscoverySearch from './DiscoverySearch';
 import GoogleTasksList from './GoogleTasksList';
 import GoogleTaskLists from './GoogleTaskLists';
 import GoogleTaskCreate from './GoogleTaskCreate';
@@ -170,8 +169,7 @@ const Part = memo(
       if (
         isToolCall &&
         (toolCall.name === Tools.execute_code ||
-          toolCall.name === Constants.PROGRAMMATIC_TOOL_CALLING ||
-          toolCall.name === Tools.run_tool_and_save)
+          toolCall.name === Constants.PROGRAMMATIC_TOOL_CALLING)
       ) {
         const argsStr =
           typeof toolCall.args === 'string'
@@ -335,21 +333,6 @@ const Part = memo(
       } else if (isToolCall && isToolMatch(toolCall.name, 'drive_downloadFile')) {
         return (
           <DriveDownloadFile
-            args={toolCall.args ?? ''}
-            output={toolCall.output ?? ''}
-            initialProgress={toolCall.progress ?? 0.1}
-            isSubmitting={isSubmitting}
-            isLast={isLast}
-            toolCallId={toolCall.id}
-          />
-        );
-      } else if (
-        isToolCall &&
-        (toolCall.name === Constants.TOOL_SEARCH ||
-          (typeof toolCall.name === 'string' && toolCall.name.startsWith('tool_search_mcp_')))
-      ) {
-        return (
-          <DiscoverySearch
             args={toolCall.args ?? ''}
             output={toolCall.output ?? ''}
             initialProgress={toolCall.progress ?? 0.1}
@@ -1192,21 +1175,6 @@ const Part = memo(
         ) {
           return (
             <DriveDownloadFile
-              args={toolCall.function.arguments ?? ''}
-              output={toolCall.function.output ?? ''}
-              initialProgress={toolCall.progress ?? 0.1}
-              isSubmitting={isSubmitting}
-              isLast={isLast}
-              toolCallId={toolCall.id}
-            />
-          );
-        }
-        if (
-          funcName === Constants.TOOL_SEARCH ||
-          (typeof funcName === 'string' && funcName.startsWith('tool_search_mcp_'))
-        ) {
-          return (
-            <DiscoverySearch
               args={toolCall.function.arguments ?? ''}
               output={toolCall.function.output ?? ''}
               initialProgress={toolCall.progress ?? 0.1}

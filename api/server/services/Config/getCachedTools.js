@@ -14,7 +14,7 @@ const ToolCacheKeys = {
 /**
  * Invalidates all MCP tool caches for a given server name (all users).
  * Requires Redis with scanIterator. No-op if Redis is not available.
- * @param {string} serverName - MCP server name (e.g. 'Google', 'Google-Workspace')
+ * @param {string} serverName - MCP server name (e.g. 'Google', 'Microsoft')
  * @returns {Promise<number>} Number of cache keys deleted
  */
 async function invalidateMCPServerByName(serverName) {

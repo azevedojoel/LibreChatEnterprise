@@ -202,6 +202,44 @@ router.post('/branch', async (req, res) => {
   }
 });
 
+/**
+ * Summarize and truncate a thread. Summarizes all messages before the anchor message
+ * and either applies in-place or forks to a new conversation.
+ *
+ * @route POST /summarize
+ * @param {string} req.body.conversationId - Conversation ID
+ * @param {string} req.body.messageId - Anchor message ID (messages before this are summarized)
+ * @param {'inPlace' | 'fork'} req.body.mode - In-place or fork to new conversation
+ * @returns {{ conversation: TConversation, messages?: TMessage[] }}
+ */
+router.post('/summarize', async (req, res) => {
+  try {
+    const { conversationId, messageId, mode } = req.body;
+
+    if (!conversationId || !messageId || !mode) {
+      return res.status(400).json({
+        error: 'conversationId, messageId, and mode are required',
+      });
+    }
+
+    if (mode !== 'inPlace' && mode !== 'fork') {
+      return res.status(400).json({
+        error: 'mode must be "inPlace" or "fork"',
+      });
+    }
+
+    const { summarizeThread } = require('~/server/services/SummarizeThread');
+    const result = await summarizeThread(req, { conversationId, messageId, mode });
+    res.json(result);
+  } catch (error) {
+    logger.error('Error summarizing thread:', error);
+    const status = error.message?.includes('not found') ? 404 : 500;
+    res.status(status).json({
+      error: error.message || 'Failed to summarize thread',
+    });
+  }
+});
+
 router.post('/artifact/:messageId', async (req, res) => {
   try {
     const { messageId } = req.params;

@@ -68,6 +68,8 @@ export const messagesArtifacts = (messageId: string) => `${messagesRoot}/artifac
 
 export const messagesBranch = () => `${messagesRoot}/branch`;
 
+export const messagesSummarize = () => `${messagesRoot}/summarize`;
+
 const shareRoot = `${BASE_URL}/api/share`;
 export const shareMessages = (shareId: string) => `${shareRoot}/${shareId}`;
 export const getSharedLink = (conversationId: string) => `${shareRoot}/link/${conversationId}`;

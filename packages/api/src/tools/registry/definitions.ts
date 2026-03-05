@@ -1429,14 +1429,14 @@ const createPdfDefinition: ToolRegistryDefinition = {
 const runToolAndSaveDefinition: ToolRegistryDefinition = {
   name: 'run_tool_and_save',
   description:
-    'Run any available tool with given arguments and save the output to a file. Use when the user wants to export data (e.g. CRM contacts, Gmail search results) to a file without the raw data passing through the model. Output format can be JSON or CSV. Filename gets a timestamp suffix automatically.',
+    'Run any available tool with given arguments and save the output to a file. Use when the user wants to export data (e.g. CRM contacts, Gmail search results, Google Tasks) to a file without the raw data passing through the model. Output format can be JSON or CSV. Filename gets a timestamp suffix automatically.',
   schema: {
     type: 'object',
     properties: {
       toolName: {
         type: 'string',
         description:
-          'Exact tool name (e.g. "crm_list_contacts" or "gmail_search_mcp_Google-Workspace"). Use tool_search to find available tools.',
+          'Exact tool name (e.g. "crm_list_contacts", "gmail_search_mcp_Google", "tasks_listTasks_mcp_Google"). Use tool_search to find available tools.',
       },
       args: {
         type: 'object',
@@ -1451,7 +1451,7 @@ const runToolAndSaveDefinition: ToolRegistryDefinition = {
       filename: {
         type: 'string',
         description:
-          'Optional base filename (e.g. "contacts"). Extension and timestamp are added automatically.',
+          'Optional base filename (e.g. "contacts", "tasks"). Extension and timestamp are added automatically.',
       },
     },
     required: ['toolName'],

@@ -372,6 +372,17 @@ export type TForkConvoResponse = {
   messages: TMessage[];
 };
 
+export type TSummarizeThreadRequest = {
+  conversationId: string;
+  messageId: string;
+  mode: 'inPlace' | 'fork';
+};
+
+export type TSummarizeThreadResponse = {
+  conversation: TConversation;
+  messages?: TMessage[];
+};
+
 export type TSearchResults = {
   conversations: TConversation[];
   messages: TMessage[];

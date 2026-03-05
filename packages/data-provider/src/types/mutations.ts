@@ -189,6 +189,11 @@ export type DuplicateConvoOptions = MutationOptions<
 
 export type ForkConvoOptions = MutationOptions<types.TForkConvoResponse, types.TForkConvoRequest>;
 
+export type SummarizeThreadOptions = MutationOptions<
+  types.TSummarizeThreadResponse,
+  types.TSummarizeThreadRequest
+>;
+
 export type CreateSharedLinkOptions = MutationOptions<
   types.TSharedLink,
   Partial<types.TSharedLink>

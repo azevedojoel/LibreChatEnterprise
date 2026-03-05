@@ -4,6 +4,7 @@ import type { TConversation, TMessage, TFeedback } from 'librechat-data-provider
 import { EditIcon, Clipboard, CheckMark, ContinueIcon, RegenerateIcon } from '@librechat/client';
 import { useGenerationsByLatest, useLocalize } from '~/hooks';
 import { Fork } from '~/components/Conversations';
+import SummarizeButton from './SummarizeButton';
 import MessageAudio from './MessageAudio';
 import Feedback from './Feedback';
 import MessageToolsIcons from './MessageToolsIcons';
@@ -242,6 +243,15 @@ const HoverButtons = ({
         forkingSupported={forkingSupported}
         latestMessageId={latestMessage?.messageId}
         isLast={isLast}
+      />
+
+      {/* Summarize Button */}
+      <SummarizeButton
+        messageId={message.messageId}
+        conversationId={conversation.conversationId}
+        parentMessageId={message.parentMessageId}
+        isLast={isLast}
+        isSubmitting={isSubmitting}
       />
 
       {/* Feedback Buttons */}

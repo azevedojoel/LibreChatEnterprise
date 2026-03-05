@@ -1,10 +1,12 @@
 import { useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import { easings } from '@react-spring/web';
+import { EModelEndpoint } from 'librechat-data-provider';
 import { BirthdayIcon, TooltipAnchor, SplitText } from '@librechat/client';
 import { useChatContext, useAgentsMapContext, useAssistantsMapContext } from '~/Providers';
 import { useGetEndpointsQuery, useGetStartupConfig } from '~/data-provider';
 import ConvoIcon from '~/components/Endpoints/ConvoIcon';
 import { useLocalize, useAuthContext } from '~/hooks';
+import { getIconEndpoint, getEntity } from '~/utils';
 const containerClassName =
   'shadow-stroke relative flex h-full items-center justify-center rounded-full bg-white dark:bg-presentation dark:text-white text-black dark:after:shadow-none ';
 
@@ -37,6 +39,29 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
   const [lineCount, setLineCount] = useState(1);
   const [contentHeight, setContentHeight] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  const endpointType = useMemo(() => {
+    let ep = conversation?.endpoint ?? '';
+    if (ep === EModelEndpoint.azureOpenAI) {
+      ep = EModelEndpoint.openAI;
+    }
+    return getIconEndpoint({
+      endpointsConfig,
+      iconURL: conversation?.iconURL,
+      endpoint: ep,
+    });
+  }, [conversation?.endpoint, conversation?.iconURL, endpointsConfig]);
+
+  const { entity, isAgent, isAssistant } = getEntity({
+    endpoint: endpointType,
+    agentsMap,
+    assistantMap,
+    agent_id: conversation?.agent_id,
+    assistant_id: conversation?.assistant_id,
+  });
+
+  const name = entity?.name ?? '';
+  const description = (entity?.description || conversation?.greeting) ?? '';
 
   const getGreeting = useCallback(() => {
     if (typeof startupConfig?.interface?.customWelcome === 'string') {
@@ -84,14 +109,14 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
     if (contentRef.current) {
       setContentHeight(contentRef.current.offsetHeight);
     }
-  }, [lineCount]);
+  }, [lineCount, description]);
 
   const getDynamicMargin = useMemo(() => {
     let margin = 'mb-0';
 
-    if (lineCount > 2) {
+    if (lineCount > 2 || (description && description.length > 100)) {
       margin = 'mb-10';
-    } else if (lineCount > 1) {
+    } else if (lineCount > 1 || (description && description.length > 0)) {
       margin = 'mb-6';
     } else if (textHasMultipleLines) {
       margin = 'mb-4';
@@ -104,7 +129,7 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
     }
 
     return margin;
-  }, [lineCount, textHasMultipleLines, contentHeight]);
+  }, [lineCount, description, textHasMultipleLines, contentHeight]);
 
   const greetingText =
     typeof startupConfig?.interface?.customWelcome === 'string'
@@ -140,20 +165,43 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
               </TooltipAnchor>
             )}
           </div>
-          <SplitText
-            key={`split-text-${greetingText}${user?.name ? '-user' : ''}`}
-            text={greetingText}
-            className={`${getTextSizeClass(greetingText)} font-medium text-text-primary`}
-            delay={50}
-            textAlign="center"
-            animationFrom={{ opacity: 0, transform: 'translate3d(0,50px,0)' }}
-            animationTo={{ opacity: 1, transform: 'translate3d(0,0,0)' }}
-            easing={easings.easeOutCubic}
-            threshold={0}
-            rootMargin="0px"
-            onLineCountChange={handleLineCountChange}
-          />
+          {((isAgent || isAssistant) && name) || name ? (
+            <div className="flex flex-col items-center gap-0 p-2">
+              <SplitText
+                key={`split-text-${name}`}
+                text={name}
+                className={`${getTextSizeClass(name)} font-medium text-text-primary`}
+                delay={50}
+                textAlign="center"
+                animationFrom={{ opacity: 0, transform: 'translate3d(0,50px,0)' }}
+                animationTo={{ opacity: 1, transform: 'translate3d(0,0,0)' }}
+                easing={easings.easeOutCubic}
+                threshold={0}
+                rootMargin="0px"
+                onLineCountChange={handleLineCountChange}
+              />
+            </div>
+          ) : (
+            <SplitText
+              key={`split-text-${greetingText}${user?.name ? '-user' : ''}`}
+              text={greetingText}
+              className={`${getTextSizeClass(greetingText)} font-medium text-text-primary`}
+              delay={50}
+              textAlign="center"
+              animationFrom={{ opacity: 0, transform: 'translate3d(0,50px,0)' }}
+              animationTo={{ opacity: 1, transform: 'translate3d(0,0,0)' }}
+              easing={easings.easeOutCubic}
+              threshold={0}
+              rootMargin="0px"
+              onLineCountChange={handleLineCountChange}
+            />
+          )}
         </div>
+        {description && (
+          <div className="animate-fadeIn mt-4 max-w-md text-center text-sm font-normal text-text-primary">
+            {description}
+          </div>
+        )}
       </div>
     </div>
   );
