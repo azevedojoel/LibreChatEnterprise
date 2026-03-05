@@ -23,7 +23,7 @@ export default function FileIcon({
       aria-hidden="true"
     >
       <rect width="36" height="36" rx="6" fill={fileType.fill} />
-      {(file?.['progress'] ?? 1) >= 1 && <>{<fileType.paths />}</>}
+      {((file?.['progress'] ?? 1) >= 1 || file?.file_id) && <>{<fileType.paths />}</>}
     </svg>
   );
 }

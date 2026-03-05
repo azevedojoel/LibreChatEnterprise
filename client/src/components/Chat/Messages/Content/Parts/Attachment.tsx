@@ -10,14 +10,19 @@ import useOpenInArtifact, { isPreviewable, inferMimeType } from '~/hooks/Artifac
 import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
 
+/** Resolve file path - client expects filepath, Responses API may send url */
+const getFilePath = (a: Partial<TAttachment> & { url?: string }) =>
+  a?.filepath ?? a?.url ?? '';
+
 const FileAttachment = memo(({ attachment }: { attachment: Partial<TAttachment> }) => {
   const localize = useLocalize();
   const [isVisible, setIsVisible] = useState(false);
   const [isOpening, setIsOpening] = useState(false);
-  const file = attachment as TFile & TAttachmentMetadata;
+  const file = attachment as TFile & TAttachmentMetadata & { url?: string; skipPreview?: boolean };
+  const filepath = getFilePath(attachment as Partial<TAttachment> & { url?: string });
   const openInArtifact = useOpenInArtifact();
   const { handleDownload } = useAttachmentLink({
-    href: attachment.filepath ?? '',
+    href: filepath,
     filename: attachment.filename ?? '',
     file_id: file.file_id,
     user: file.user,
@@ -26,7 +31,10 @@ const FileAttachment = memo(({ attachment }: { attachment: Partial<TAttachment> 
   const extension = attachment.filename?.split('.').pop();
   const filename = attachment.filename ?? '';
   const canOpenInArtifact =
-    isPreviewable(filename) && file.file_id && file.user;
+    file?.skipPreview !== true &&
+    isPreviewable(filename) &&
+    file.file_id &&
+    file.user;
 
   const handleOpenInArtifact = useCallback(
     async (e: React.MouseEvent) => {
@@ -56,7 +64,7 @@ const FileAttachment = memo(({ attachment }: { attachment: Partial<TAttachment> 
     return () => clearTimeout(timer);
   }, []);
 
-  if (!attachment.filepath) {
+  if (!filepath) {
     return null;
   }
   return (
@@ -74,7 +82,11 @@ const FileAttachment = memo(({ attachment }: { attachment: Partial<TAttachment> 
       }}
     >
       <FileContainer
-        file={attachment}
+        file={{
+          ...attachment,
+          filepath: filepath || attachment.filepath,
+          progress: 1,
+        }}
         onClick={handleDownload}
         overrideType={extension}
         containerClassName="max-w-fit"
@@ -102,7 +114,8 @@ const FileAttachment = memo(({ attachment }: { attachment: Partial<TAttachment> 
 
 const ImageAttachment = memo(({ attachment }: { attachment: TAttachment }) => {
   const [isLoaded, setIsLoaded] = useState(false);
-  const { width, height, filepath = null } = attachment as TFile & TAttachmentMetadata;
+  const { width, height } = attachment as TFile & TAttachmentMetadata;
+  const filepath = getFilePath(attachment as Partial<TAttachment> & { url?: string });
 
   useEffect(() => {
     setIsLoaded(false);
@@ -142,14 +155,15 @@ export default function Attachment({ attachment }: { attachment?: TAttachment })
     return null;
   }
 
-  const { width, height, filepath = null } = attachment as TFile & TAttachmentMetadata;
+  const { width, height } = attachment as TFile & TAttachmentMetadata;
+  const filepath = getFilePath(attachment as Partial<TAttachment> & { url?: string });
   const isImage = attachment.filename
     ? imageExtRegex.test(attachment.filename) && width != null && height != null && filepath != null
     : false;
 
   if (isImage) {
     return <ImageAttachment attachment={attachment} />;
-  } else if (!attachment.filepath) {
+  } else if (!filepath) {
     return null;
   }
   return <FileAttachment attachment={attachment} />;
@@ -164,7 +178,9 @@ export function AttachmentGroup({ attachments }: { attachments?: TAttachment[] }
   const imageAttachments: TAttachment[] = [];
 
   attachments.forEach((attachment) => {
-    const { width, height, filepath = null } = attachment as TFile & TAttachmentMetadata;
+    if (!attachment) return;
+    const { width, height } = attachment as TFile & TAttachmentMetadata;
+    const filepath = getFilePath(attachment as Partial<TAttachment> & { url?: string });
     const isImage = attachment.filename
       ? imageExtRegex.test(attachment.filename) &&
         width != null &&
@@ -183,11 +199,13 @@ export function AttachmentGroup({ attachments }: { attachments?: TAttachment[] }
     <>
       {fileAttachments.length > 0 && (
         <div className="my-2 flex flex-wrap items-center gap-2.5">
-          {fileAttachments.map((attachment, index) =>
-            attachment.filepath ? (
+          {fileAttachments.map((attachment, index) => {
+            if (!attachment) return null;
+            const fp = getFilePath(attachment as Partial<TAttachment> & { url?: string });
+            return fp ? (
               <FileAttachment attachment={attachment} key={`file-${index}`} />
-            ) : null,
-          )}
+            ) : null;
+          })}
         </div>
       )}
       {imageAttachments.length > 0 && (

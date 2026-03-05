@@ -558,9 +558,10 @@ function createToolEndCallback({
       output.name === Tools.execute_code || output.name === Constants.PROGRAMMATIC_TOOL_CALLING;
     const isSendFileTool = output.name === Tools.workspace_send_file_to_user;
     const isCreatePdfTool = output.name === Tools.create_pdf;
+    const isRunToolAndSaveTool = output.name === Tools.run_tool_and_save;
     const isDriveDownloadFileTool =
       typeof output.name === 'string' && output.name.includes('drive_downloadFile');
-    if (!isCodeTool && !isSendFileTool && !isCreatePdfTool && !isDriveDownloadFileTool) {
+    if (!isCodeTool && !isSendFileTool && !isCreatePdfTool && !isRunToolAndSaveTool && !isDriveDownloadFileTool) {
       return;
     }
 
@@ -569,7 +570,7 @@ function createToolEndCallback({
     }
 
     for (const file of output.artifact.files) {
-      const { name, buffer } = file;
+      const { name, buffer, skipPreview } = file;
       if (!buffer) {
         logger.warn('[createToolEndCallback] Code artifact file missing buffer, skipping');
         continue;
@@ -593,6 +594,10 @@ function createToolEndCallback({
             return null;
           }
 
+          if (skipPreview) {
+            fileMetadata.skipPreview = true;
+          }
+          fileMetadata.progress = 1;
           writeAttachment(res, streamId, fileMetadata);
           return fileMetadata;
         })().catch((error) => {
@@ -769,9 +774,10 @@ function createResponsesToolEndCallback({ req, res, tracker, artifactPromises })
       output.name === Tools.execute_code || output.name === Constants.PROGRAMMATIC_TOOL_CALLING;
     const isSendFileTool = output.name === Tools.workspace_send_file_to_user;
     const isCreatePdfTool = output.name === Tools.create_pdf;
+    const isRunToolAndSaveTool = output.name === Tools.run_tool_and_save;
     const isDriveDownloadFileTool =
       typeof output.name === 'string' && output.name.includes('drive_downloadFile');
-    if (!isCodeTool && !isSendFileTool && !isCreatePdfTool && !isDriveDownloadFileTool) {
+    if (!isCodeTool && !isSendFileTool && !isCreatePdfTool && !isRunToolAndSaveTool && !isDriveDownloadFileTool) {
       return;
     }
 
@@ -780,7 +786,7 @@ function createResponsesToolEndCallback({ req, res, tracker, artifactPromises })
     }
 
     for (const file of output.artifact.files) {
-      const { name, buffer } = file;
+      const { name, buffer, skipPreview } = file;
       if (!buffer) {
         logger.warn('[createResponsesToolEndCallback] Code artifact file missing buffer, skipping');
         continue;
@@ -807,10 +813,13 @@ function createResponsesToolEndCallback({ req, res, tracker, artifactPromises })
               file_id: fileMetadata.file_id,
               filename: fileMetadata.filename,
               type: fileMetadata.type,
+              filepath: fileMetadata.filepath,
               url: fileMetadata.filepath,
               width: fileMetadata.width,
               height: fileMetadata.height,
               tool_call_id: output.tool_call_id,
+              progress: 1,
+              ...(skipPreview && { skipPreview: true }),
             };
             writeResponsesAttachment(res, tracker, attachment, metadata);
           }

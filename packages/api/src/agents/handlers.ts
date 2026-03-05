@@ -152,6 +152,10 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
                 }
               }
 
+              if (tc.name === Constants.RUN_TOOL_AND_SAVE) {
+                toolCallConfig.toolMap = toolMap;
+              }
+
               if (isDestructiveTool?.(tc.name) && requestToolConfirmation) {
                 const metadataRecord = (metadata ?? {}) as Record<string, unknown>;
                 const { approved } = await requestToolConfirmation(tc, metadataRecord);
@@ -171,14 +175,26 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
                 metadata,
               } as Record<string, unknown>);
 
+              const isTuple = Array.isArray(result) && result.length >= 2;
+              const content = isTuple
+                ? result[0]
+                : typeof result === 'string'
+                  ? result
+                  : (result as { content?: unknown })?.content;
+              const artifact = isTuple
+                ? result[1]
+                : typeof result === 'string'
+                  ? undefined
+                  : (result as { artifact?: unknown })?.artifact;
+
               if (toolEndCallback) {
                 await toolEndCallback(
                   {
                     output: {
                       name: tc.name,
                       tool_call_id: tc.id,
-                      content: result.content,
-                      artifact: result.artifact,
+                      content,
+                      artifact,
                     },
                   },
                   {
@@ -193,8 +209,8 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
 
               return {
                 toolCallId: tc.id,
-                content: result.content,
-                artifact: result.artifact,
+                content,
+                artifact,
                 status: 'success' as const,
               };
             } catch (toolError) {

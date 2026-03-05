@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useRecoilValue } from 'recoil';
-import { TerminalSquareIcon } from 'lucide-react';
-import type { TAttachment } from 'librechat-data-provider';
+import { TerminalSquareIcon, FileDown } from 'lucide-react';
+import { Tools, type TAttachment } from 'librechat-data-provider';
 import MarkdownLite from '~/components/Chat/Messages/Content/MarkdownLite';
 import ToolResultContainer from '~/components/Chat/Messages/Content/ToolResultContainer';
 import ToolApprovalBar from '~/components/Chat/Messages/Content/ToolApprovalBar';
@@ -53,6 +53,7 @@ export default function ExecuteCode({
   output = '',
   attachments,
   toolCallId,
+  toolName,
 }: {
   initialProgress: number;
   isSubmitting: boolean;
@@ -60,6 +61,7 @@ export default function ExecuteCode({
   output?: string;
   attachments?: TAttachment[];
   toolCallId?: string;
+  toolName?: string;
 }) {
   const localize = useLocalize();
   const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting, waitingForApprover, approverName } =
@@ -153,13 +155,18 @@ export default function ExecuteCode({
   const cancelled = !isSubmitting && progress < 1;
   const showApprovalBar = approvalStatus !== null;
   const isComplete = progress >= 1;
+  const isExportToFile = toolName === Tools.run_tool_and_save;
   let summaryText: string;
   if (cancelled) {
     summaryText = localize('com_ui_cancelled');
   } else if (isComplete) {
-    summaryText = localize('com_ui_analyzing_finished');
+    summaryText = isExportToFile
+      ? localize('com_ui_export_to_file_complete')
+      : localize('com_ui_analyzing_finished');
   } else {
-    summaryText = localize('com_ui_analyzing');
+    summaryText = isExportToFile
+      ? localize('com_ui_exporting_to_file')
+      : localize('com_ui_analyzing');
   }
   const hasExpandableContent = (code?.length ?? 0) > 0 || hasOutput;
 
@@ -270,11 +277,12 @@ export default function ExecuteCode({
     );
   }
 
+  const ResultIcon = isExportToFile ? FileDown : TerminalSquareIcon;
   return (
     <>
       <ToolResultContainer
         icon={
-          <TerminalSquareIcon className="size-5 shrink-0 text-text-secondary" aria-hidden="true" />
+          <ResultIcon className="size-5 shrink-0 text-text-secondary" aria-hidden="true" />
         }
         summary={summaryText}
         isExpanded={showCode}

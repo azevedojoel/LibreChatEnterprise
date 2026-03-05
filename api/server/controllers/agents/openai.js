@@ -1,6 +1,11 @@
 const { nanoid } = require('nanoid');
 const { logger } = require('@librechat/data-schemas');
-const { EModelEndpoint, ResourceType, PermissionBits } = require('librechat-data-provider');
+const {
+  EModelEndpoint,
+  ResourceType,
+  PermissionBits,
+  Tools,
+} = require('librechat-data-provider');
 const {
   Callback,
   ToolEndHandler,

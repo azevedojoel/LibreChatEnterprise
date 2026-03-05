@@ -170,7 +170,8 @@ const Part = memo(
       if (
         isToolCall &&
         (toolCall.name === Tools.execute_code ||
-          toolCall.name === Constants.PROGRAMMATIC_TOOL_CALLING)
+          toolCall.name === Constants.PROGRAMMATIC_TOOL_CALLING ||
+          toolCall.name === Tools.run_tool_and_save)
       ) {
         const argsStr =
           typeof toolCall.args === 'string'
@@ -186,6 +187,7 @@ const Part = memo(
             initialProgress={toolCall.progress ?? 0.1}
             args={argsStr}
             toolCallId={toolCall.id}
+            toolName={toolCall.name != null ? String(toolCall.name) : undefined}
           />
         );
       } else if (

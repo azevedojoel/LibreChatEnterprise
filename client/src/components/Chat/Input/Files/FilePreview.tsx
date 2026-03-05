@@ -21,7 +21,9 @@ const FilePreview = ({
     <div className={cn('relative size-10 shrink-0 overflow-hidden rounded-xl', className)}>
       <FileIcon file={file} fileType={fileType} />
       <SourceIcon source={file?.source} isCodeFile={!!file?.['metadata']?.fileIdentifier} />
-      {typeof file?.['progress'] === 'number' && file?.['progress'] < 1 && (
+      {typeof file?.['progress'] === 'number' &&
+        file?.['progress'] < 1 &&
+        !file?.file_id && (
         <Spinner
           bgOpacity={0.2}
           color="white"

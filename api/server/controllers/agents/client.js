@@ -34,6 +34,7 @@ const {
 const {
   Constants,
   Permissions,
+  Tools,
   VisionModes,
   ContentTypes,
   EModelEndpoint,
