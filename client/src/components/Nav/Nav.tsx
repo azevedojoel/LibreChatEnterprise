@@ -34,11 +34,13 @@ import AgentMarketplaceNav from './AgentMarketplaceNav';
 import AgentsNav from './Agents/AgentsNav';
 import FavoritesList from './Favorites/FavoritesList';
 import ProjectNav from './Projects/ProjectNav';
+import SchedulesNav from './Schedules/SchedulesNav';
 import { cn } from '~/utils';
 import store from '~/store';
 
 const BookmarkNav = lazy(() => import('./Bookmarks/BookmarkNav'));
 const AccountSettings = lazy(() => import('./AccountSettings'));
+const NotificationBell = lazy(() => import('./NotificationBell'));
 
 export const NAV_WIDTH = {
   MOBILE: 320,
@@ -195,6 +197,9 @@ const Nav = memo(
     const headerButtons = useMemo(
       () => (
         <>
+          <Suspense fallback={null}>
+            <NotificationBell />
+          </Suspense>
           {hasAccessToBookmarks && (
             <>
               <div className="mt-1.5" />
@@ -245,6 +250,7 @@ const Nav = memo(
             <AgentMarketplaceNav isSmallScreen={isSmallScreen} toggleNav={itemToggleNav} />
             <AgentsNav isSmallScreen={isSmallScreen} toggleNav={itemToggleNav} />
             <FavoritesList isSmallScreen={isSmallScreen} toggleNav={itemToggleNav} />
+            <SchedulesNav />
             <ProjectNav />
             <div className="flex min-h-0 flex-grow flex-col overflow-hidden">
               <Conversations

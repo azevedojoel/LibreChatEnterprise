@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { useRecoilValue } from 'recoil';
 import { QueryKeys } from 'librechat-data-provider';
 import { useQueryClient } from '@tanstack/react-query';
@@ -6,6 +6,8 @@ import type { Dispatch, SetStateAction } from 'react';
 import { useLocalize, useNewConvo } from '~/hooks';
 import { clearMessagesCache } from '~/utils';
 import store from '~/store';
+
+const NotificationBell = lazy(() => import('./NotificationBell'));
 
 export default function MobileNav({
   setNavVisible,
@@ -59,6 +61,9 @@ export default function MobileNav({
       <h1 className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-center text-sm font-normal">
         {title ?? localize('com_ui_new_chat')}
       </h1>
+      <Suspense fallback={null}>
+        <NotificationBell />
+      </Suspense>
       <button
         type="button"
         aria-label={localize('com_ui_new_chat')}
