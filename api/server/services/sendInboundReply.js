@@ -1,6 +1,7 @@
 const { getEnvironmentVariable } = require('@langchain/core/utils/env');
 const fetch = require('node-fetch');
 const { logger } = require('@librechat/data-schemas');
+const { logEmailSent } = require('~/server/services/EventLogService');
 
 /**
  * Send reply email via Postmark.
@@ -10,9 +11,20 @@ const { logger } = require('@librechat/data-schemas');
  * @param {string} params.body - Plain text body (TextBody)
  * @param {string} [params.html] - HTML body (HtmlBody); when provided, both HtmlBody and TextBody are sent
  * @param {string} [params.replyTo] - Reply-To header for correct threading
+ * @param {Object} [params.auditContext] - Optional audit context for EventLog
+ * @param {string} [params.auditContext.userId]
+ * @param {string} [params.auditContext.agentId]
+ * @param {string} [params.auditContext.agentName]
+ * @param {string} [params.auditContext.conversationId]
+ * @param {string} [params.auditContext.runId]
+ * @param {string} [params.auditContext.scheduleId]
+ * @param {string} [params.auditContext.scheduleName]
+ * @param {string} [params.auditContext.toolCallId]
+ * @param {string} [params.auditContext.toolName]
+ * @param {string} [params.auditContext.source]
  * @returns {Promise<{success: boolean, messageId?: string, error?: string}>}
  */
-async function sendInboundReply({ to, subject, body, html, replyTo }) {
+async function sendInboundReply({ to, subject, body, html, replyTo, auditContext }) {
   const apiKey = getEnvironmentVariable('POSTMARK_API_KEY');
 
   if (!apiKey) {
@@ -66,6 +78,29 @@ async function sendInboundReply({ to, subject, body, html, replyTo }) {
       to,
       messageId: data.MessageID,
     });
+
+    if (auditContext?.userId) {
+      await logEmailSent({
+        userId: auditContext.userId,
+        to,
+        subject,
+        provider: 'postmark',
+        metadata: {
+          messageId: data.MessageID,
+          agentId: auditContext.agentId,
+          agentName: auditContext.agentName,
+          conversationId: auditContext.conversationId,
+          runId: auditContext.runId,
+          scheduleId: auditContext.scheduleId,
+          scheduleName: auditContext.scheduleName,
+          toolCallId: auditContext.toolCallId,
+          toolName: auditContext.toolName,
+          source: auditContext.source,
+        },
+        success: true,
+      });
+    }
+
     return { success: true, messageId: data.MessageID };
   } catch (err) {
     logger.error('[sendInboundReply] Error sending email:', err);

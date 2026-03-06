@@ -102,6 +102,7 @@ const sendVerificationEmail = async (user) => {
       year: new Date().getFullYear(),
     },
     template: 'verifyEmail.handlebars',
+    auditContext: { userId: user._id, source: 'auth_verification' },
   });
 
   await createToken({
@@ -315,6 +316,7 @@ const requestPasswordReset = async (req) => {
         year: new Date().getFullYear(),
       },
       template: 'requestPasswordReset.handlebars',
+      auditContext: { userId: user._id, source: 'auth_reset' },
     });
     logger.info(
       `[requestPasswordReset] Link emailed. [Email: ${email}] [ID: ${user._id}] [IP: ${req.ip}]`,
@@ -370,6 +372,7 @@ const resetPassword = async (userId, token, password) => {
         year: new Date().getFullYear(),
       },
       template: 'passwordReset.handlebars',
+      auditContext: { userId: user._id, source: 'auth_reset' },
     });
   }
 
@@ -548,6 +551,7 @@ const resendVerificationEmail = async (req) => {
         year: new Date().getFullYear(),
       },
       template: 'verifyEmail.handlebars',
+      auditContext: { userId: user._id, source: 'auth_resend' },
     });
 
     await createToken({

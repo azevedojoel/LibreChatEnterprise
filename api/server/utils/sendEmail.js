@@ -1,10 +1,62 @@
 const path = require('path');
+const fetch = require('node-fetch');
 const axios = require('axios');
 const FormData = require('form-data');
 const nodemailer = require('nodemailer');
 const handlebars = require('handlebars');
 const { logger } = require('@librechat/data-schemas');
 const { logAxiosError, isEnabled, readFileAsString } = require('@librechat/api');
+const { logEmailSent } = require('~/server/services/EventLogService');
+
+/**
+ * Sends an email using Postmark API.
+ *
+ * @async
+ * @function sendEmailViaPostmark
+ * @param {Object} params - The parameters for sending the email.
+ * @param {string} params.to - The recipient's email address.
+ * @param {string} params.from - The sender's email address.
+ * @param {string} params.subject - The subject of the email.
+ * @param {string} params.html - The HTML content of the email.
+ * @returns {Promise<Object>} - A promise that resolves to the response from Postmark API.
+ */
+const sendEmailViaPostmark = async ({ to, from, subject, html }) => {
+  const apiKey = process.env.POSTMARK_API_KEY;
+
+  if (!apiKey) {
+    throw new Error('Postmark API key (POSTMARK_API_KEY) is required');
+  }
+
+  const payload = {
+    From: from,
+    To: to,
+    Subject: subject,
+    HtmlBody: html,
+    TextBody:
+      html
+        ?.replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim() || '(No content)',
+  };
+
+  const res = await fetch('https://api.postmarkapp.com/email', {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'X-Postmark-Server-Token': apiKey,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.Message || `Postmark API failed (${res.status})`);
+  }
+
+  return data;
+};
 
 /**
  * Sends an email using Mailgun API.
@@ -74,6 +126,12 @@ const sendEmailViaSMTP = async ({ transporterOptions, mailOptions }) => {
  * @param {Record<string, string>} params.payload - The data to be used in the email template.
  * @param {string} params.template - The filename of the email template.
  * @param {boolean} [throwError=true] - Whether to throw an error if the email sending process fails.
+ * @param {Object} [params.auditContext] - Optional audit context for EventLog
+ * @param {string} [params.auditContext.userId] - User ID of actor/recipient
+ * @param {string} [params.auditContext.agentId]
+ * @param {string} [params.auditContext.conversationId]
+ * @param {string} [params.auditContext.scheduleId]
+ * @param {string} [params.auditContext.source]
  * @returns {Promise<Object>} - A promise that resolves to the info object of the sent email or the error if sending the email fails.
  *
  * @example
@@ -90,7 +148,21 @@ const sendEmailViaSMTP = async ({ transporterOptions, mailOptions }) => {
  *
  * @throws Will throw an error if the email sending process fails and throwError is `true`.
  */
-const sendEmail = async ({ email, subject, payload, template, throwError = true }) => {
+const sendEmail = async ({
+  email,
+  subject,
+  payload,
+  template,
+  throwError = true,
+  auditContext,
+}) => {
+  const hasPostmark =
+    process.env.POSTMARK_API_KEY && (process.env.POSTMARK_FROM || process.env.EMAIL_FROM);
+  const hasMailgun = process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN;
+  let provider = 'smtp';
+  if (hasPostmark) provider = 'postmark';
+  else if (hasMailgun) provider = 'mailgun';
+
   try {
     const { content: source } = await readFileAsString(path.join(__dirname, 'emails', template));
     const compiledTemplate = handlebars.compile(source);
@@ -98,67 +170,112 @@ const sendEmail = async ({ email, subject, payload, template, throwError = true 
 
     // Prepare common email data
     const fromName = process.env.EMAIL_FROM_NAME || process.env.APP_TITLE;
-    const fromEmail = process.env.EMAIL_FROM;
+    const fromEmail = hasPostmark
+      ? process.env.POSTMARK_FROM || process.env.EMAIL_FROM
+      : process.env.EMAIL_FROM;
     const fromAddress = `"${fromName}" <${fromEmail}>`;
     const toAddress = payload?.name ? `"${payload.name}" <${email}>` : email;
 
-    // Check if Mailgun is configured
-    if (process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN) {
-      logger.debug('[sendEmail] Using Mailgun provider');
-      return await sendEmailViaMailgun({
+    let result;
+
+    if (hasPostmark) {
+      logger.debug('[sendEmail] Using Postmark provider');
+      result = await sendEmailViaPostmark({
         from: fromAddress,
         to: toAddress,
         subject: subject,
         html: html,
       });
-    }
-
-    // Default to SMTP
-    logger.debug('[sendEmail] Using SMTP provider');
-    const transporterOptions = {
-      // Use STARTTLS by default instead of obligatory TLS
-      secure: process.env.EMAIL_ENCRYPTION === 'tls',
-      // If explicit STARTTLS is set, require it when connecting
-      requireTls: process.env.EMAIL_ENCRYPTION === 'starttls',
-      tls: {
-        // Whether to accept unsigned certificates
-        rejectUnauthorized: !isEnabled(process.env.EMAIL_ALLOW_SELFSIGNED),
-      },
-      auth: {
-        user: process.env.EMAIL_USERNAME,
-        pass: process.env.EMAIL_PASSWORD,
-      },
-    };
-
-    if (process.env.EMAIL_ENCRYPTION_HOSTNAME) {
-      // Check the certificate against this name explicitly
-      transporterOptions.tls.servername = process.env.EMAIL_ENCRYPTION_HOSTNAME;
-    }
-
-    // Mailer service definition has precedence
-    if (process.env.EMAIL_SERVICE) {
-      transporterOptions.service = process.env.EMAIL_SERVICE;
+    } else if (hasMailgun) {
+      logger.debug('[sendEmail] Using Mailgun provider');
+      result = await sendEmailViaMailgun({
+        from: fromAddress,
+        to: toAddress,
+        subject: subject,
+        html: html,
+      });
     } else {
-      transporterOptions.host = process.env.EMAIL_HOST;
-      transporterOptions.port = process.env.EMAIL_PORT ?? 25;
+      // Default to SMTP
+      logger.debug('[sendEmail] Using SMTP provider');
+      const transporterOptions = {
+        // Use STARTTLS by default instead of obligatory TLS
+        secure: process.env.EMAIL_ENCRYPTION === 'tls',
+        // If explicit STARTTLS is set, require it when connecting
+        requireTls: process.env.EMAIL_ENCRYPTION === 'starttls',
+        tls: {
+          // Whether to accept unsigned certificates
+          rejectUnauthorized: !isEnabled(process.env.EMAIL_ALLOW_SELFSIGNED),
+        },
+        auth: {
+          user: process.env.EMAIL_USERNAME,
+          pass: process.env.EMAIL_PASSWORD,
+        },
+      };
+
+      if (process.env.EMAIL_ENCRYPTION_HOSTNAME) {
+        // Check the certificate against this name explicitly
+        transporterOptions.tls.servername = process.env.EMAIL_ENCRYPTION_HOSTNAME;
+      }
+
+      // Mailer service definition has precedence
+      if (process.env.EMAIL_SERVICE) {
+        transporterOptions.service = process.env.EMAIL_SERVICE;
+      } else {
+        transporterOptions.host = process.env.EMAIL_HOST;
+        transporterOptions.port = process.env.EMAIL_PORT ?? 25;
+      }
+
+      const mailOptions = {
+        // Header address should contain name-addr
+        from: fromAddress,
+        to: toAddress,
+        envelope: {
+          // Envelope from should contain addr-spec
+          // Mistake in the Nodemailer documentation?
+          from: fromEmail,
+          to: email,
+        },
+        subject: subject,
+        html: html,
+      };
+
+      result = await sendEmailViaSMTP({ transporterOptions, mailOptions });
     }
 
-    const mailOptions = {
-      // Header address should contain name-addr
-      from: fromAddress,
-      to: toAddress,
-      envelope: {
-        // Envelope from should contain addr-spec
-        // Mistake in the Nodemailer documentation?
-        from: fromEmail,
+    if (auditContext?.userId) {
+      await logEmailSent({
+        userId: auditContext.userId,
         to: email,
-      },
-      subject: subject,
-      html: html,
-    };
+        subject,
+        provider,
+        metadata: {
+          agentId: auditContext.agentId,
+          conversationId: auditContext.conversationId,
+          scheduleId: auditContext.scheduleId,
+          source: auditContext.source,
+        },
+        success: true,
+      });
+    }
 
-    return await sendEmailViaSMTP({ transporterOptions, mailOptions });
+    return result;
   } catch (error) {
+    if (auditContext?.userId) {
+      logEmailSent({
+        userId: auditContext.userId,
+        to: email,
+        subject,
+        provider,
+        metadata: {
+          agentId: auditContext.agentId,
+          conversationId: auditContext.conversationId,
+          scheduleId: auditContext.scheduleId,
+          source: auditContext.source,
+          errorMessage: error?.message,
+        },
+        success: false,
+      }).catch((err) => logger.error('[sendEmail] Failed to persist audit:', err));
+    }
     if (throwError) {
       throw error;
     }

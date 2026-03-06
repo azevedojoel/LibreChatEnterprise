@@ -3,6 +3,7 @@ const { getEnvironmentVariable } = require('@langchain/core/utils/env');
 const fetch = require('node-fetch');
 const { getUserById } = require('~/models');
 const { formatEmailContent } = require('~/server/utils/formatEmailHighlights');
+const { logEmailSent } = require('~/server/services/EventLogService');
 
 const postmarkSendUserEmailSchema = {
   type: 'object',
@@ -50,7 +51,11 @@ class PostmarkSendUserEmail extends Tool {
       fields.POSTMARK_FROM ?? fields.EMAIL_FROM ?? this.getDefaultFrom();
     this.userId = fields.userId;
     this.agentName = fields.agentName ?? null;
+    this.agentId = fields.agentId ?? null;
     this.scheduleName = fields.scheduleName ?? null;
+    this.scheduleId = fields.scheduleId ?? null;
+    this.conversationId = fields.conversationId ?? null;
+    this.runId = fields.runId ?? null;
   }
 
   getApiKey() {
@@ -113,7 +118,46 @@ class PostmarkSendUserEmail extends Tool {
       const data = await res.json();
 
       if (!res.ok) {
+        if (this.userId) {
+          logEmailSent({
+            userId: this.userId,
+            to: user.email,
+            subject,
+            provider: 'postmark',
+            metadata: {
+              agentId: this.agentId,
+              agentName: this.agentName,
+              conversationId: this.conversationId,
+              runId: this.runId,
+              scheduleId: this.scheduleId?.toString?.() ?? this.scheduleId,
+              scheduleName: this.scheduleName,
+              source: 'send_user_email',
+              errorMessage: data.Message || `Postmark API failed (${res.status})`,
+            },
+            success: false,
+          }).catch(() => {});
+        }
         return `Error: Postmark API failed (${res.status}): ${data.Message || JSON.stringify(data)}`;
+      }
+
+      if (this.userId) {
+        await logEmailSent({
+          userId: this.userId,
+          to: user.email,
+          subject,
+          provider: 'postmark',
+          metadata: {
+            messageId: data.MessageID,
+            agentId: this.agentId,
+            agentName: this.agentName,
+            conversationId: this.conversationId,
+            runId: this.runId,
+            scheduleId: this.scheduleId?.toString?.() ?? this.scheduleId,
+            scheduleName: this.scheduleName,
+            source: 'send_user_email',
+          },
+          success: true,
+        });
       }
 
       return JSON.stringify({
@@ -123,6 +167,28 @@ class PostmarkSendUserEmail extends Tool {
         to: data.To,
       });
     } catch (err) {
+      if (this.userId) {
+        const user = await getUserById(this.userId, 'email').catch(() => null);
+        if (user?.email) {
+          logEmailSent({
+            userId: this.userId,
+            to: user.email,
+            subject: args?.subject ?? '(unknown)',
+            provider: 'postmark',
+            metadata: {
+              agentId: this.agentId,
+              agentName: this.agentName,
+              conversationId: this.conversationId,
+              runId: this.runId,
+              scheduleId: this.scheduleId?.toString?.() ?? this.scheduleId,
+              scheduleName: this.scheduleName,
+              source: 'send_user_email',
+              errorMessage: err?.message,
+            },
+            success: false,
+          }).catch(() => {});
+        }
+      }
       return `Error: ${err.message}`;
     }
   }

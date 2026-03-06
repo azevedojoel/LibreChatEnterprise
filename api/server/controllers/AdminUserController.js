@@ -355,6 +355,7 @@ const inviteUser = async (req, res) => {
           year: new Date().getFullYear(),
         },
         template: 'inviteUser.handlebars',
+        auditContext: { userId: req.user?.id, source: 'admin_invite' },
       });
       logger.info(`[AdminUserController.inviteUser] Invitation sent. [Email: ${normalizedEmail}]`);
       return res.status(200).json({ message: 'Invitation sent successfully' });
@@ -415,6 +416,7 @@ const sendPasswordResetEmail = async (req, res) => {
           year: new Date().getFullYear(),
         },
         template: 'requestPasswordReset.handlebars',
+        auditContext: { userId: req.user?.id, source: 'admin_password_reset' },
       });
       logger.info(`[AdminUserController.sendPasswordResetEmail] Link emailed. [Email: ${user.email}]`);
     }

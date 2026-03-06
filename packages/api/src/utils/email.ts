@@ -1,8 +1,11 @@
 /**
  * Check if email configuration is set
- * @returns Returns `true` if either Mailgun or SMTP is properly configured
+ * @returns Returns `true` if Postmark, Mailgun, or SMTP is properly configured
  */
 export function checkEmailConfig(): boolean {
+  const hasPostmarkConfig =
+    !!process.env.POSTMARK_API_KEY && !!(process.env.POSTMARK_FROM || process.env.EMAIL_FROM);
+
   const hasMailgunConfig =
     !!process.env.MAILGUN_API_KEY && !!process.env.MAILGUN_DOMAIN && !!process.env.EMAIL_FROM;
 
@@ -12,5 +15,5 @@ export function checkEmailConfig(): boolean {
     !!process.env.EMAIL_PASSWORD &&
     !!process.env.EMAIL_FROM;
 
-  return hasMailgunConfig || hasSMTPConfig;
+  return hasPostmarkConfig || hasMailgunConfig || hasSMTPConfig;
 }

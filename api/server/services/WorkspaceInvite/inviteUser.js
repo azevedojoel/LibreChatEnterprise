@@ -106,6 +106,7 @@ const inviteUserToWorkspace = async ({ workspaceId, email, invitedBy }) => {
           year: new Date().getFullYear(),
         },
         template: 'inviteUser.handlebars',
+        auditContext: invitedBy ? { userId: invitedBy, source: 'workspace_invite' } : undefined,
       });
       logger.info(`[inviteUserToWorkspace] Invitation sent. [Email: ${normalizedEmail}] [Workspace: ${workspaceId}]`);
       return { success: true, message: 'Invitation sent successfully' };

@@ -46,6 +46,7 @@ const {
   createToolEndCallback,
 } = require('~/server/controllers/agents/callbacks');
 const { loadAgentTools, loadToolsForExecution } = require('~/server/services/ToolService');
+const { logToolCallFailure } = require('~/server/services/EventLogService');
 const { findAccessibleResources } = require('~/server/services/PermissionService');
 const { getConvoFiles, saveConvo, getConvo } = require('~/models/Conversation');
 const { spendTokens, spendStructuredTokens } = require('~/models/spendTokens');
@@ -445,6 +446,23 @@ const createResponse = async (req, res) => {
           });
         },
         toolEndCallback,
+        onToolFailure: async ({ toolName, toolCallId, errorMessage, agentId, metadata }) => {
+          const userId = metadata?.user_id ?? req?.user?.id;
+          if (userId) {
+            logToolCallFailure({
+              userId,
+              toolName,
+              toolCallId,
+              errorMessage,
+              metadata: {
+                conversationId: metadata?.thread_id ?? conversationId,
+                agentId: agentId ?? metadata?.agent_id ?? agent?.id,
+                runId: metadata?.run_id,
+                scheduleId: req?.body?.scheduledRunContext?.scheduleId,
+              },
+            }).catch((err) => logger.warn('[EventLog] logToolCallFailure failed', err));
+          }
+        },
       };
 
       // Combine handlers
@@ -606,6 +624,23 @@ const createResponse = async (req, res) => {
           });
         },
         toolEndCallback,
+        onToolFailure: async ({ toolName, toolCallId, errorMessage, agentId, metadata }) => {
+          const userId = metadata?.user_id ?? req?.user?.id;
+          if (userId) {
+            logToolCallFailure({
+              userId,
+              toolName,
+              toolCallId,
+              errorMessage,
+              metadata: {
+                conversationId: metadata?.thread_id ?? conversationId,
+                agentId: agentId ?? metadata?.agent_id ?? agent?.id,
+                runId: metadata?.run_id,
+                scheduleId: req?.body?.scheduledRunContext?.scheduleId,
+              },
+            }).catch((err) => logger.warn('[EventLog] logToolCallFailure failed', err));
+          }
+        },
       };
 
       const handlers = {
