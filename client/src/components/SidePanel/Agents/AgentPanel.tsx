@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react';
-import React, { useMemo, useCallback, useRef, useState } from 'react';
+import React, { useMemo, useCallback, useRef, useState, useEffect } from 'react';
 import { Button, useToastContext } from '@librechat/client';
 import { useWatch, useForm, FormProvider, type FieldNamesMarkedBoolean } from 'react-hook-form';
 import { useGetModelsQuery } from 'librechat-data-provider/react-query';
@@ -234,7 +234,14 @@ export const isAvatarUploadOnlyDirty = (
   return result.sawDirty && result.onlyAvatarDirty;
 };
 
-export default function AgentPanel() {
+export type AgentPanelVariant = 'panel' | 'page';
+
+export interface AgentPanelProps {
+  /** When 'page', hides AgentSelect and Create/Select buttons (parent provides selection UX) */
+  variant?: AgentPanelVariant;
+}
+
+export default function AgentPanel({ variant = 'panel' }: AgentPanelProps = {}) {
   const localize = useLocalize();
   const { user } = useAuthContext();
   const { showToast } = useToastContext();
@@ -329,6 +336,13 @@ export default function AgentPanel() {
   );
   const agent_id = useWatch({ control, name: 'id' });
   const previousVersionRef = useRef<number | undefined>();
+
+  // When in page variant and switching to create mode, reset form
+  useEffect(() => {
+    if (variant === 'page' && !current_agent_id) {
+      reset(getDefaultAgentFormValues());
+    }
+  }, [variant, current_agent_id, reset]);
 
   const allowedProviders = useMemo(
     () => new Set(agentsConfig?.allowedProviders),
@@ -535,46 +549,57 @@ export default function AgentPanel() {
         className="scrollbar-gutter-stable h-auto w-full flex-shrink-0 overflow-y-hidden overflow-x-visible"
         aria-label="Agent configuration form"
       >
-        <div className="mx-1 mt-2 flex w-full flex-wrap gap-2">
-          <div className="w-full">
-            <AgentSelect
-              createMutation={create}
-              agentQuery={agentQuery}
-              setCurrentAgentId={setCurrentAgentId}
-              selectedAgentId={current_agent_id ?? null}
-            />
-          </div>
-          {/* Create + Select Button */}
-          {agent_id && (
-            <div className="flex w-full gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full justify-center"
-                onClick={() => {
-                  reset(getDefaultAgentFormValues());
-                  setCurrentAgentId(undefined);
-                }}
-                disabled={agentQuery.isInitialLoading}
-                aria-label={localize('com_ui_create_new_agent')}
-              >
-                <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
-                {localize('com_ui_create_new_agent')}
-              </Button>
-              <Button
-                variant="submit"
-                disabled={isEphemeralAgent(agent_id) || agentQuery.isInitialLoading}
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleSelectAgent();
-                }}
-                aria-label={localize('com_ui_select_agent')}
-              >
-                {localize('com_ui_select')}
-              </Button>
+        {variant === 'page' && (
+          <AgentSelect
+            createMutation={create}
+            agentQuery={agentQuery}
+            setCurrentAgentId={setCurrentAgentId}
+            selectedAgentId={current_agent_id ?? null}
+            syncOnly
+          />
+        )}
+        {variant === 'panel' && (
+          <div className="mx-1 mt-2 flex w-full flex-wrap gap-2">
+            <div className="w-full">
+              <AgentSelect
+                createMutation={create}
+                agentQuery={agentQuery}
+                setCurrentAgentId={setCurrentAgentId}
+                selectedAgentId={current_agent_id ?? null}
+              />
             </div>
-          )}
-        </div>
+            {/* Create + Select Button */}
+            {agent_id && (
+              <div className="flex w-full gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-center"
+                  onClick={() => {
+                    reset(getDefaultAgentFormValues());
+                    setCurrentAgentId(undefined);
+                  }}
+                  disabled={agentQuery.isInitialLoading}
+                  aria-label={localize('com_ui_create_new_agent')}
+                >
+                  <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
+                  {localize('com_ui_create_new_agent')}
+                </Button>
+                <Button
+                  variant="submit"
+                  disabled={isEphemeralAgent(agent_id) || agentQuery.isInitialLoading}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleSelectAgent();
+                  }}
+                  aria-label={localize('com_ui_select_agent')}
+                >
+                  {localize('com_ui_select')}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
         {agentQuery.isInitialLoading && <AgentPanelSkeleton />}
         {!canEditAgent && !agentQuery.isInitialLoading && (
           <div className="flex h-[30vh] w-full items-center justify-center">

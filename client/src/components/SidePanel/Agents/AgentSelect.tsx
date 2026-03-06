@@ -26,11 +26,14 @@ export default function AgentSelect({
   selectedAgentId = null,
   setCurrentAgentId,
   createMutation,
+  syncOnly = false,
 }: {
   selectedAgentId: string | null;
   agentQuery: QueryObserverResult<Agent>;
   setCurrentAgentId: React.Dispatch<React.SetStateAction<string | undefined>>;
   createMutation: UseMutationResult<Agent, Error, AgentCreateParams>;
+  /** When true, only syncs form from agentQuery (no dropdown UI). Used by page variant. */
+  syncOnly?: boolean;
 }) {
   const localize = useLocalize();
   const { reset } = useFormContext();
@@ -251,6 +254,10 @@ export default function AgentSelect({
       resetAgentForm(agentQuery.data);
     }
   }, [agentQuery.data, agentQuery.isSuccess, selectedAgentId, resetAgentForm]);
+
+  if (syncOnly) {
+    return null;
+  }
 
   const createAgent = localize('com_ui_create_new_agent');
   const currentValue = selectedAgentId ?? '';

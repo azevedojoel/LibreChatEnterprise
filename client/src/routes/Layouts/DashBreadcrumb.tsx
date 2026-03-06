@@ -3,7 +3,7 @@ import { useSetRecoilState } from 'recoil';
 import { Sidebar } from '@librechat/client';
 import { useLocation } from 'react-router-dom';
 import { SystemRoles } from 'librechat-data-provider';
-import { ArrowLeft, Building2, MessageSquareQuote, Users } from 'lucide-react';
+import { ArrowLeft, Bot, Building2, MessageSquareQuote, Users } from 'lucide-react';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -20,6 +20,7 @@ import store from '~/store';
 const promptsPathPattern = /prompts\/(?!new(?:\/|$)).*$/;
 const usersPathPattern = /^\/d\/users(\/|$)/;
 const workspacesPathPattern = /^\/d\/workspaces(\/|$)/;
+const agentsPathPattern = /^\/d\/agents(\/|$)/;
 
 const getConversationId = (prevLocationPath: string) => {
   if (!prevLocationPath || prevLocationPath.includes('/d/')) {
@@ -66,20 +67,40 @@ export default function DashBreadcrumb({
     () => workspacesPathPattern.test(location.pathname),
     [location.pathname],
   );
+  const isAgentsPath = useMemo(
+    () => agentsPathPattern.test(location.pathname),
+    [location.pathname],
+  );
 
   const sectionLabel = isUsersPath
     ? localize('com_nav_user_management')
     : isWorkspacesPath
       ? localize('com_ui_workspaces')
-      : localize('com_ui_prompts');
+      : isAgentsPath
+        ? localize('com_sidepanel_agent_builder')
+        : localize('com_ui_prompts');
   const sectionHref = isUsersPath
     ? '/d/users'
     : isWorkspacesPath
       ? '/d/workspaces'
-      : '/d/prompts';
-  const SectionIcon = isUsersPath ? Users : isWorkspacesPath ? Building2 : MessageSquareQuote;
+      : isAgentsPath
+        ? '/d/agents'
+        : '/d/prompts';
+  const SectionIcon = isUsersPath
+    ? Users
+    : isWorkspacesPath
+      ? Building2
+      : isAgentsPath
+        ? Bot
+        : MessageSquareQuote;
   const promptsLinkHandler = useCustomLink(sectionHref);
-  const panelId = isUsersPath ? 'users-panel' : isWorkspacesPath ? 'workspaces-panel' : 'prompts-panel';
+  const panelId = isUsersPath
+    ? 'users-panel'
+    : isWorkspacesPath
+      ? 'workspaces-panel'
+      : isAgentsPath
+        ? 'agents-panel'
+        : 'prompts-panel';
 
   return (
     <div className="mr-2 mt-2 flex h-10 items-center justify-between">
@@ -148,7 +169,10 @@ export default function DashBreadcrumb({
       </Breadcrumb>
       <div className="flex items-center justify-center gap-2">
         {isPromptsPath && <AdvancedSwitch />}
-        {user?.role === SystemRoles.ADMIN && !isUsersPath && !isWorkspacesPath && <AdminSettings />}
+        {user?.role === SystemRoles.ADMIN &&
+          !isUsersPath &&
+          !isWorkspacesPath &&
+          !isAgentsPath && <AdminSettings />}
       </div>
     </div>
   );

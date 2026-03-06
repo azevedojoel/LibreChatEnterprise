@@ -7,6 +7,7 @@ import {
 } from '~/components/Prompts';
 import { UsersView } from '~/components/Users';
 import { WorkspacesView } from '~/components/Workspaces';
+import { AgentsView } from '~/components/Agents';
 import DashboardRoute from './Layouts/Dashboard';
 
 const dashboardRoutes = {
@@ -81,6 +82,10 @@ const dashboardRoutes = {
     {
       path: 'workspaces/*',
       element: <WorkspacesView />,
+    },
+    {
+      path: 'agents/*',
+      element: <AgentsView />,
     },
     {
       path: '*',
