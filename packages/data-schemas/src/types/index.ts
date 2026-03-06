@@ -43,3 +43,4 @@ export * from './workspace';
 export * from './toolApprovalLink';
 export * from './toolApprovalRecord';
 export * from './notification';
+export * from './telegramLink';

@@ -41,6 +41,7 @@ import { createToolApprovalRecordModel } from './toolApprovalRecord';
 import { createToolOverrideModel } from './toolOverride';
 import { createFeatureFlagModel } from './featureFlag';
 import { createEventLogModel } from './eventLog';
+import { createTelegramLinkModel } from './telegramLink';
 import { createUserProjectModel } from './userProject';
 import { createProjectLogModel } from './projectLog';
 import { createProjectContextSectionModel } from './projectContextSection';
@@ -94,6 +95,7 @@ export function createModels(mongoose: typeof import('mongoose')) {
     ToolOverride: createToolOverrideModel(mongoose),
     FeatureFlag: createFeatureFlagModel(mongoose),
     EventLog: createEventLogModel(mongoose),
+    TelegramLink: createTelegramLinkModel(mongoose),
     UserProject: createUserProjectModel(mongoose),
     ProjectLog: createProjectLogModel(mongoose),
     ProjectContextSection: createProjectContextSectionModel(mongoose),

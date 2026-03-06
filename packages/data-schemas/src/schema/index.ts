@@ -40,3 +40,4 @@ export { default as toolApprovalRecordSchema } from './toolApprovalRecord';
 export { default as toolOverrideSchema } from './toolOverride';
 export { default as featureFlagSchema } from './featureFlag';
 export { default as eventLogSchema } from './eventLog';
+export { default as telegramLinkSchema } from './telegramLink';
