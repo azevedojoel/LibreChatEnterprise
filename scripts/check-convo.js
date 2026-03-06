@@ -14,6 +14,24 @@ const { createModels } = require('@librechat/data-schemas');
 
 const conversationId = process.argv[2] || '09e0766c-2d0d-404f-b398-c65d6aa6d6f3';
 
+function findAgentReturnInContent(messages) {
+  const found = [];
+  for (const msg of messages) {
+    if (!Array.isArray(msg.content)) continue;
+    for (let i = 0; i < msg.content.length; i++) {
+      const part = msg.content[i];
+      if (part?.type === 'agent_return') {
+        found.push({
+          messageId: msg.messageId,
+          index: i,
+          agent_return: part.agent_return,
+        });
+      }
+    }
+  }
+  return found;
+}
+
 function findDuplicateToolCallIds(messages) {
   const duplicates = [];
   for (const msg of messages) {
@@ -79,6 +97,12 @@ async function main() {
   if (duplicateToolIds.length > 0) {
     console.log('*** DUPLICATE tool_call IDs FOUND (likely cause of tool_use error) ***\n');
     console.log(JSON.stringify(duplicateToolIds, null, 2));
+  }
+
+  const agentReturns = findAgentReturnInContent(messages);
+  if (agentReturns.length > 0) {
+    console.log('*** agent_return PARTS FOUND (can cause 400 Invalid value when sent to LLM) ***\n');
+    console.log(JSON.stringify(agentReturns, null, 2));
   }
 
   for (let i = 0; i < messages.length; i++) {
