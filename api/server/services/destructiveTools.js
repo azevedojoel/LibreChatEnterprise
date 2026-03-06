@@ -88,6 +88,30 @@ const DESTRUCTIVE_TOOLS = new Set([
   'reply-to-group-thread',
   // Alex - blocks until target member approves
   Tools.human_await_response,
+  // Sys Admin - mutating/destructive (require approval)
+  Tools.sys_admin_create_user,
+  Tools.sys_admin_update_user,
+  Tools.sys_admin_delete_user,
+  Tools.sys_admin_ban_user,
+  Tools.sys_admin_unban_user,
+  Tools.sys_admin_grant_agent_access,
+  Tools.sys_admin_revoke_agent_access,
+  Tools.sys_admin_invite_user,
+  Tools.sys_admin_send_password_reset,
+  Tools.sys_admin_create_workspace,
+  Tools.sys_admin_update_workspace,
+  Tools.sys_admin_delete_workspace,
+  Tools.sys_admin_invite_workspace_member,
+  Tools.sys_admin_remove_workspace_member,
+  // Sys Admin - agent management (mutating)
+  Tools.sys_admin_create_agent,
+  Tools.sys_admin_update_agent,
+  Tools.sys_admin_delete_agent,
+  Tools.sys_admin_duplicate_agent,
+  Tools.sys_admin_revert_agent_version,
+  Tools.sys_admin_seed_system_agents,
+  Tools.sys_admin_tail_logs,
+  Tools.sys_admin_list_env,
 ]);
 
 /**

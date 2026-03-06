@@ -37,6 +37,7 @@ const {
   ImageVisionTool,
   openapiToFunction,
   AgentCapabilities,
+  SystemRoles,
   isEphemeralAgentId,
   validateActionDomain,
   actionDomainSeparator,
@@ -484,7 +485,78 @@ const nativeTools = new Set([
   Tools.human_await_response,
   Tools.human_invite_to_workspace,
   Tools.human_remove_from_workspace,
+  Tools.sys_admin_help,
+  Tools.sys_admin_list_users,
+  Tools.sys_admin_get_user,
+  Tools.sys_admin_create_user,
+  Tools.sys_admin_update_user,
+  Tools.sys_admin_delete_user,
+  Tools.sys_admin_ban_user,
+  Tools.sys_admin_unban_user,
+  Tools.sys_admin_grant_agent_access,
+  Tools.sys_admin_revoke_agent_access,
+  Tools.sys_admin_invite_user,
+  Tools.sys_admin_send_password_reset,
+  Tools.sys_admin_list_workspaces,
+  Tools.sys_admin_get_workspace,
+  Tools.sys_admin_create_workspace,
+  Tools.sys_admin_update_workspace,
+  Tools.sys_admin_delete_workspace,
+  Tools.sys_admin_list_workspace_members,
+  Tools.sys_admin_invite_workspace_member,
+  Tools.sys_admin_remove_workspace_member,
+  Tools.sys_admin_get_user_usage,
+  Tools.sys_admin_get_user_balance,
+  Tools.sys_admin_list_usage,
+  Tools.sys_admin_usage_aggregate,
+  Tools.sys_admin_list_agents,
+  Tools.sys_admin_list_assignable_tools,
+  Tools.sys_admin_get_agent,
+  Tools.sys_admin_create_agent,
+  Tools.sys_admin_update_agent,
+  Tools.sys_admin_delete_agent,
+  Tools.sys_admin_duplicate_agent,
+  Tools.sys_admin_list_agent_versions,
+  Tools.sys_admin_revert_agent_version,
+  Tools.sys_admin_seed_system_agents,
+  Tools.sys_admin_tail_logs,
+  Tools.sys_admin_list_env,
 ]);
+
+const SYS_ADMIN_TOOLS = [
+  Tools.sys_admin_help,
+  Tools.sys_admin_list_users,
+  Tools.sys_admin_get_user,
+  Tools.sys_admin_create_user,
+  Tools.sys_admin_update_user,
+  Tools.sys_admin_delete_user,
+  Tools.sys_admin_invite_user,
+  Tools.sys_admin_send_password_reset,
+  Tools.sys_admin_list_workspaces,
+  Tools.sys_admin_get_workspace,
+  Tools.sys_admin_create_workspace,
+  Tools.sys_admin_update_workspace,
+  Tools.sys_admin_delete_workspace,
+  Tools.sys_admin_list_workspace_members,
+  Tools.sys_admin_invite_workspace_member,
+  Tools.sys_admin_remove_workspace_member,
+  Tools.sys_admin_get_user_usage,
+  Tools.sys_admin_get_user_balance,
+  Tools.sys_admin_list_usage,
+  Tools.sys_admin_usage_aggregate,
+  Tools.sys_admin_list_agents,
+  Tools.sys_admin_list_assignable_tools,
+  Tools.sys_admin_get_agent,
+  Tools.sys_admin_create_agent,
+  Tools.sys_admin_update_agent,
+  Tools.sys_admin_delete_agent,
+  Tools.sys_admin_duplicate_agent,
+  Tools.sys_admin_list_agent_versions,
+  Tools.sys_admin_revert_agent_version,
+  Tools.sys_admin_seed_system_agents,
+  Tools.sys_admin_tail_logs,
+  Tools.sys_admin_list_env,
+];
 
 const { isDestructiveTool } = require('./destructiveTools');
 
@@ -521,6 +593,7 @@ async function loadToolDefinitionsWrapper({
   streamId = null,
   tool_resources,
   primaryAgentId,
+  definitionsOnly = false,
 }) {
   if (!agent.tools || agent.tools.length === 0) {
     return { toolDefinitions: [] };
@@ -552,7 +625,7 @@ async function loadToolDefinitionsWrapper({
     ...new Set((agent.tools ?? []).filter((t) => t != null && typeof t === 'string')),
   ];
 
-  /** Inject run_tool_and_save on every agent run - allows exporting any tool output to JSON/CSV file */
+  /** Inject run_tool_and_save on every agent run - allows exporting any tool output to JSON file */
   toolsToFilter = [...new Set([...toolsToFilter, Tools.run_tool_and_save])];
 
   if (toolsToFilter.includes(Tools.execute_code)) {
@@ -608,6 +681,16 @@ async function loadToolDefinitionsWrapper({
       Tools.human_remove_from_workspace,
     ];
     toolsToFilter = [...new Set([...toolsToFilter, ...humanTools])];
+  }
+
+  /** Inject sys_admin tools when sys_admin capability is enabled AND user is ADMIN */
+  if (toolsToFilter.includes(AgentCapabilities.sys_admin) && req.user?.role === SystemRoles.ADMIN) {
+    toolsToFilter = [...new Set([...toolsToFilter, ...SYS_ADMIN_TOOLS])];
+  } else if (toolsToFilter.includes(AgentCapabilities.sys_admin)) {
+    /** User is not ADMIN - remove sys_admin capability and tools */
+    toolsToFilter = toolsToFilter.filter(
+      (t) => t !== AgentCapabilities.sys_admin && (typeof t !== 'string' || !t.startsWith('sys_admin_')),
+    );
   }
 
   /** Filter by ephemeralAgent (chat badge overrides) - only for primary agent; handoff targets get full tools */
@@ -994,7 +1077,7 @@ async function loadToolDefinitionsWrapper({
     },
   );
 
-  if (pendingOAuthServers.size > 0 && (res || streamId)) {
+  if (!definitionsOnly && pendingOAuthServers.size > 0 && (res || streamId)) {
     const isHeadless = Array.isArray(req._headlessOAuthUrls);
     if (isHeadless) {
       // Lazy OAuth capture: don't capture during tool load.
@@ -1103,7 +1186,7 @@ async function loadToolDefinitionsWrapper({
   const hasRunToolAndSave = filteredTools.includes(Tools.run_tool_and_save);
   if (hasRunToolAndSave) {
     toolContextMap[Tools.run_tool_and_save] =
-      '- Runs any tool with given args and saves output to JSON or CSV file. Filename gets timestamp. Use to export CRM, Gmail, etc. without raw data in context.';
+      '- Runs any tool with given args and saves output to JSON file. Filename gets timestamp. Use to export CRM, Gmail, etc. without raw data in context.';
   }
 
   if (hasWorkspaceCodeEdit) {
@@ -1257,6 +1340,7 @@ async function loadAgentTools({
       streamId,
       tool_resources,
       primaryAgentId,
+      definitionsOnly: true,
     });
   }
 
@@ -1302,7 +1386,7 @@ async function loadAgentTools({
     ...new Set((agent.tools ?? []).filter((t) => t != null && typeof t === 'string')),
   ];
 
-  /** Inject run_tool_and_save on every agent run - allows exporting any tool output to JSON/CSV file */
+  /** Inject run_tool_and_save on every agent run - allows exporting any tool output to JSON file */
   toolsToFilter = [...new Set([...toolsToFilter, Tools.run_tool_and_save])];
 
   if (toolsToFilter.includes(Tools.execute_code)) {
@@ -1356,6 +1440,14 @@ async function loadAgentTools({
       Tools.human_remove_from_workspace,
     ];
     toolsToFilter = [...new Set([...toolsToFilter, ...humanTools])];
+  }
+
+  if (toolsToFilter.includes(AgentCapabilities.sys_admin) && req.user?.role === SystemRoles.ADMIN) {
+    toolsToFilter = [...new Set([...toolsToFilter, ...SYS_ADMIN_TOOLS])];
+  } else if (toolsToFilter.includes(AgentCapabilities.sys_admin)) {
+    toolsToFilter = toolsToFilter.filter(
+      (t) => t !== AgentCapabilities.sys_admin && (typeof t !== 'string' || !t.startsWith('sys_admin_')),
+    );
   }
 
   const ephemeralAgentLoadAgent =
@@ -1493,6 +1585,14 @@ async function loadAgentTools({
       if (appConfig?.interfaceConfig?.scheduledAgents === false) return false;
       return checkCapability(AgentCapabilities.manage_scheduling);
     } else if (tool === AgentCapabilities.human_in_the_loop) {
+      return false;
+    } else if (tool === AgentCapabilities.sys_admin) {
+      return false;
+    } else if (
+      typeof tool === 'string' &&
+      tool.startsWith('sys_admin_') &&
+      (req.user?.role !== SystemRoles.ADMIN || !checkCapability(AgentCapabilities.sys_admin))
+    ) {
       return false;
     } else if (tool === Tools.web_search) {
       if (isPersistentAgent) {

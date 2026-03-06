@@ -1562,7 +1562,7 @@ const createPdfDefinition: ToolRegistryDefinition = {
 const runToolAndSaveDefinition: ToolRegistryDefinition = {
   name: 'run_tool_and_save',
   description:
-    'Run any available tool with given arguments and save the output to a file. Use when the user wants to export data (e.g. CRM contacts, Gmail search results, Google Tasks) to a file without the raw data passing through the model. Output format can be JSON or CSV. Filename gets a timestamp suffix automatically.',
+    'Run any available tool with given arguments and save the output to a JSON file. Use when the user wants to export data (e.g. CRM contacts, Gmail search results, Google Tasks) to a file without the raw data passing through the model. Filename gets a timestamp suffix automatically.',
   schema: {
     type: 'object',
     properties: {
@@ -1575,11 +1575,6 @@ const runToolAndSaveDefinition: ToolRegistryDefinition = {
         type: 'object',
         description:
           'Arguments to pass to the tool. Use {} when the tool needs no arguments (e.g. crm_list_contacts).',
-      },
-      format: {
-        type: 'string',
-        enum: ['json', 'csv'],
-        description: 'Output format: "json" (default) or "csv". CSV works best for array-of-objects data.',
       },
       filename: {
         type: 'string',
@@ -2341,6 +2336,518 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
     name: WebSearchToolDefinition.name,
     description: WebSearchToolDefinition.description,
     schema: WebSearchToolDefinition.schema as unknown as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  /* Sys Admin tools - admin only */
+  sys_admin_help: {
+    name: 'sys_admin_help',
+    description:
+      'Returns description of all sys_admin tools and example questions. Use when the user asks what you can do, how to manage users, or about token usage.',
+    schema: { type: 'object', properties: {}, required: [] } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_list_users: {
+    name: 'sys_admin_list_users',
+    description:
+      'List users with optional search and pagination. Optional: search (email, name, username), limit (default 50), page (default 1).',
+    schema: {
+      type: 'object',
+      properties: {
+        search: { type: 'string', description: 'Search by email, name, username' },
+        limit: { type: 'number', description: 'Max users to return (default 50, max 100)' },
+        page: { type: 'number', description: 'Page number (default 1)' },
+      },
+      required: [],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_get_user: {
+    name: 'sys_admin_get_user',
+    description: 'Get a user by ID. Required: userId.',
+    schema: {
+      type: 'object',
+      properties: { userId: { type: 'string', description: 'User ID' } },
+      required: ['userId'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_create_user: {
+    name: 'sys_admin_create_user',
+    description:
+      'Create a new user (local auth). Required: email. Optional: password, name, username, role (ADMIN|USER), workspace_id, inboundEmailToken.',
+    schema: {
+      type: 'object',
+      properties: {
+        email: { type: 'string', description: 'User email (required)' },
+        password: { type: 'string', description: 'Password for local auth' },
+        name: { type: 'string', description: 'Display name' },
+        username: { type: 'string', description: 'Username' },
+        role: { type: 'string', enum: ['ADMIN', 'USER'], description: 'User role' },
+        workspace_id: { type: 'string', description: 'Workspace ID to assign' },
+        inboundEmailToken: { type: 'string', description: 'Inbound email token' },
+      },
+      required: ['email'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_update_user: {
+    name: 'sys_admin_update_user',
+    description:
+      'Update a user. Required: userId. Optional: name, username, email, role, password, workspace_id, inboundEmailToken.',
+    schema: {
+      type: 'object',
+      properties: {
+        userId: { type: 'string', description: 'User ID to update' },
+        name: { type: 'string' },
+        username: { type: 'string' },
+        email: { type: 'string' },
+        role: { type: 'string', enum: ['ADMIN', 'USER'] },
+        password: { type: 'string' },
+        workspace_id: { type: 'string' },
+        inboundEmailToken: { type: 'string' },
+      },
+      required: ['userId'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_delete_user: {
+    name: 'sys_admin_delete_user',
+    description: 'Delete a user by ID. Cannot delete yourself. Required: userId.',
+    schema: {
+      type: 'object',
+      properties: { userId: { type: 'string', description: 'User ID to delete' } },
+      required: ['userId'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_ban_user: {
+    name: 'sys_admin_ban_user',
+    description:
+      'Ban a user by ID or email. Revokes sessions and blocks access. Required: userId or email. Optional: durationMinutes (default 60, 0 for indefinite).',
+    schema: {
+      type: 'object',
+      properties: {
+        userId: { type: 'string', description: 'User ID to ban' },
+        email: { type: 'string', description: 'Email to ban (use if userId not known)' },
+        durationMinutes: {
+          type: 'integer',
+          minimum: 0,
+          description: 'Ban duration in minutes. 0 = indefinite (100 years). Default 60.',
+        },
+      },
+      required: [],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_unban_user: {
+    name: 'sys_admin_unban_user',
+    description: 'Remove a user ban by ID or email. Required: userId or email.',
+    schema: {
+      type: 'object',
+      properties: {
+        userId: { type: 'string', description: 'User ID to unban' },
+        email: { type: 'string', description: 'Email to unban (use if userId not known)' },
+      },
+      required: [],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_grant_agent_access: {
+    name: 'sys_admin_grant_agent_access',
+    description:
+      'Grant a user access to an agent. Required: agentId, userId or email. Optional: accessRole (viewer, editor, owner; default viewer).',
+    schema: {
+      type: 'object',
+      properties: {
+        agentId: { type: 'string', description: 'Agent ID (e.g. agent_abc123)' },
+        userId: { type: 'string', description: 'User ID to grant access' },
+        email: { type: 'string', description: 'Email to grant access (use if userId not known)' },
+        accessRole: {
+          type: 'string',
+          enum: ['viewer', 'editor', 'owner'],
+          description: 'Access level: viewer (view only), editor (view+edit), owner (full). Default: viewer.',
+        },
+      },
+      required: ['agentId'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_revoke_agent_access: {
+    name: 'sys_admin_revoke_agent_access',
+    description: 'Revoke a user\'s access to an agent. Required: agentId, userId or email.',
+    schema: {
+      type: 'object',
+      properties: {
+        agentId: { type: 'string', description: 'Agent ID (e.g. agent_abc123)' },
+        userId: { type: 'string', description: 'User ID to revoke access' },
+        email: { type: 'string', description: 'Email to revoke access (use if userId not known)' },
+      },
+      required: ['agentId'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_invite_user: {
+    name: 'sys_admin_invite_user',
+    description: 'Invite a user by email. Creates invite and sends email. Required: email.',
+    schema: {
+      type: 'object',
+      properties: { email: { type: 'string', description: 'Email to invite' } },
+      required: ['email'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_send_password_reset: {
+    name: 'sys_admin_send_password_reset',
+    description: 'Send password reset email to a user. Required: userId.',
+    schema: {
+      type: 'object',
+      properties: { userId: { type: 'string', description: 'User ID' } },
+      required: ['userId'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_list_workspaces: {
+    name: 'sys_admin_list_workspaces',
+    description: 'List all workspaces. Returns id, name, slug, maxMembers, adminIds.',
+    schema: { type: 'object', properties: {}, required: [] } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_get_workspace: {
+    name: 'sys_admin_get_workspace',
+    description: 'Get a workspace by ID. Required: workspaceId.',
+    schema: {
+      type: 'object',
+      properties: { workspaceId: { type: 'string', description: 'Workspace ID' } },
+      required: ['workspaceId'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_create_workspace: {
+    name: 'sys_admin_create_workspace',
+    description: 'Create a workspace. Required: name, slug.',
+    schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Workspace name' },
+        slug: { type: 'string', description: 'Workspace slug (unique)' },
+      },
+      required: ['name', 'slug'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_update_workspace: {
+    name: 'sys_admin_update_workspace',
+    description:
+      'Update a workspace. Required: workspaceId. Optional: name, slug, maxMembers, adminIds.',
+    schema: {
+      type: 'object',
+      properties: {
+        workspaceId: { type: 'string', description: 'Workspace ID' },
+        name: { type: 'string' },
+        slug: { type: 'string' },
+        maxMembers: { type: 'number' },
+        adminIds: { type: 'array', items: { type: 'string' }, description: 'Admin user IDs' },
+      },
+      required: ['workspaceId'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_delete_workspace: {
+    name: 'sys_admin_delete_workspace',
+    description: 'Delete a workspace. Required: workspaceId.',
+    schema: {
+      type: 'object',
+      properties: { workspaceId: { type: 'string', description: 'Workspace ID' } },
+      required: ['workspaceId'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_list_workspace_members: {
+    name: 'sys_admin_list_workspace_members',
+    description: 'List members of a workspace. Required: workspaceId.',
+    schema: {
+      type: 'object',
+      properties: { workspaceId: { type: 'string', description: 'Workspace ID' } },
+      required: ['workspaceId'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_invite_workspace_member: {
+    name: 'sys_admin_invite_workspace_member',
+    description: 'Invite a user to a workspace by email. Required: workspaceId, email.',
+    schema: {
+      type: 'object',
+      properties: {
+        workspaceId: { type: 'string', description: 'Workspace ID' },
+        email: { type: 'string', description: 'Email to invite' },
+      },
+      required: ['workspaceId', 'email'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_remove_workspace_member: {
+    name: 'sys_admin_remove_workspace_member',
+    description: 'Remove a member from a workspace. Required: workspaceId, userId.',
+    schema: {
+      type: 'object',
+      properties: {
+        workspaceId: { type: 'string', description: 'Workspace ID' },
+        userId: { type: 'string', description: 'User ID to remove' },
+      },
+      required: ['workspaceId', 'userId'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_get_user_usage: {
+    name: 'sys_admin_get_user_usage',
+    description:
+      'Get token usage for a user. Required: userId. Optional: limit (default 50), startDate, endDate (ISO dates).',
+    schema: {
+      type: 'object',
+      properties: {
+        userId: { type: 'string', description: 'User ID' },
+        limit: { type: 'number', description: 'Max transactions to return (default 50)' },
+        startDate: { type: 'string', description: 'Start date (ISO)' },
+        endDate: { type: 'string', description: 'End date (ISO)' },
+      },
+      required: ['userId'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_get_user_balance: {
+    name: 'sys_admin_get_user_balance',
+    description:
+      "Get a user's current token balance. Required: userId. Optional: includeTransactions (true to include recent transactions).",
+    schema: {
+      type: 'object',
+      properties: {
+        userId: { type: 'string', description: 'User ID' },
+        includeTransactions: {
+          type: 'boolean',
+          description: 'Include recent transactions in response',
+        },
+      },
+      required: ['userId'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_list_usage: {
+    name: 'sys_admin_list_usage',
+    description:
+      'List transactions with filters. Optional: userId, conversationId, model, tokenType, startDate, endDate, limit (default 50), page (default 1).',
+    schema: {
+      type: 'object',
+      properties: {
+        userId: { type: 'string' },
+        conversationId: { type: 'string' },
+        model: { type: 'string' },
+        tokenType: { type: 'string', enum: ['prompt', 'completion', 'credits'] },
+        startDate: { type: 'string', description: 'ISO date' },
+        endDate: { type: 'string', description: 'ISO date' },
+        limit: { type: 'number' },
+        page: { type: 'number' },
+      },
+      required: [],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_usage_aggregate: {
+    name: 'sys_admin_usage_aggregate',
+    description:
+      'Aggregate token usage by user. Optional: userId (filter to one user), startDate, endDate (ISO dates). Returns per-user totals.',
+    schema: {
+      type: 'object',
+      properties: {
+        userId: { type: 'string', description: 'Filter to specific user' },
+        startDate: { type: 'string', description: 'ISO date' },
+        endDate: { type: 'string', description: 'ISO date' },
+      },
+      required: [],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_list_agents: {
+    name: 'sys_admin_list_agents',
+    description:
+      'List all agents (admin bypasses ACL). Optional: search (name), limit (default 50), after (cursor for pagination).',
+    schema: {
+      type: 'object',
+      properties: {
+        search: { type: 'string', description: 'Search by agent name' },
+        limit: { type: 'number', description: 'Max agents to return (default 50)' },
+        after: { type: 'string', description: 'Cursor for pagination' },
+      },
+      required: [],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_list_assignable_tools: {
+    name: 'sys_admin_list_assignable_tools',
+    description:
+      'List all capabilities and tools that can be assigned to an agent. Use when creating/updating agents to populate tools and capabilities.',
+    schema: { type: 'object', properties: {}, required: [] } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_get_agent: {
+    name: 'sys_admin_get_agent',
+    description: 'Get full agent details by ID. Required: agentId.',
+    schema: {
+      type: 'object',
+      properties: { agentId: { type: 'string', description: 'Agent ID' } },
+      required: ['agentId'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_create_agent: {
+    name: 'sys_admin_create_agent',
+    description:
+      'Create an agent. Required: name, provider, model. Optional: instructions, tools, description, category, edges, model_parameters.',
+    schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Agent name' },
+        provider: { type: 'string', description: 'Provider (e.g. openAI)' },
+        model: { type: 'string', description: 'Model name' },
+        instructions: { type: 'string', description: 'System instructions' },
+        tools: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Tool IDs (e.g. file_search, web_search)',
+        },
+        description: { type: 'string', description: 'Agent description' },
+        category: { type: 'string', description: 'Category (e.g. general)' },
+        edges: {
+          type: 'array',
+          items: { type: 'object' },
+          description: 'Handoff edges',
+        },
+      },
+      required: ['name', 'provider', 'model'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_update_agent: {
+    name: 'sys_admin_update_agent',
+    description:
+      'Update an agent. Required: agentId. Optional: name, instructions, tools, model, provider, description, category, edges.',
+    schema: {
+      type: 'object',
+      properties: {
+        agentId: { type: 'string', description: 'Agent ID to update' },
+        name: { type: 'string', description: 'Agent name' },
+        instructions: { type: 'string', description: 'System instructions' },
+        tools: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Tool IDs',
+        },
+        model: { type: 'string', description: 'Model name' },
+        provider: { type: 'string', description: 'Provider' },
+        description: { type: 'string', description: 'Agent description' },
+        category: { type: 'string', description: 'Category' },
+        edges: {
+          type: 'array',
+          items: { type: 'object' },
+          description: 'Handoff edges',
+        },
+      },
+      required: ['agentId'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_delete_agent: {
+    name: 'sys_admin_delete_agent',
+    description: 'Delete an agent by ID. Required: agentId.',
+    schema: {
+      type: 'object',
+      properties: { agentId: { type: 'string', description: 'Agent ID to delete' } },
+      required: ['agentId'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_duplicate_agent: {
+    name: 'sys_admin_duplicate_agent',
+    description: 'Duplicate an agent (creates a copy with new ID). Required: agentId.',
+    schema: {
+      type: 'object',
+      properties: { agentId: { type: 'string', description: 'Agent ID to duplicate' } },
+      required: ['agentId'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_list_agent_versions: {
+    name: 'sys_admin_list_agent_versions',
+    description:
+      'List version history for an agent. Returns index, createdAt, name for each version. Use before revert to pick versionIndex. Required: agentId.',
+    schema: {
+      type: 'object',
+      properties: { agentId: { type: 'string', description: 'Agent ID' } },
+      required: ['agentId'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_revert_agent_version: {
+    name: 'sys_admin_revert_agent_version',
+    description:
+      'Revert an agent to a version. Required: agentId. versionIndex: 0-based index (use sys_admin_list_agent_versions first), or -1 for previous version.',
+    schema: {
+      type: 'object',
+      properties: {
+        agentId: { type: 'string', description: 'Agent ID' },
+        versionIndex: {
+          type: 'number',
+          description: '0-based index, or -1 to revert to previous version',
+        },
+      },
+      required: ['agentId', 'versionIndex'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_seed_system_agents: {
+    name: 'sys_admin_seed_system_agents',
+    description:
+      'Re-run seed from librechat.yaml systemAgents. Creates missing agents only; does not overwrite existing.',
+    schema: { type: 'object', properties: {}, required: [] } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_tail_logs: {
+    name: 'sys_admin_tail_logs',
+    description:
+      'Read recent lines from Winston application logs (error or debug). Optional: level (error|debug), date (YYYY-MM-DD), limit (1-200), search (substring filter).',
+    schema: {
+      type: 'object',
+      properties: {
+        level: {
+          type: 'string',
+          enum: ['error', 'debug'],
+          description: 'Log level: error or debug',
+        },
+        date: { type: 'string', description: 'Date in YYYY-MM-DD format (default: today)' },
+        limit: {
+          type: 'number',
+          description: 'Max lines to return (1-200, default 50)',
+        },
+        search: { type: 'string', description: 'Optional substring filter in message' },
+      },
+      required: [],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_list_env: {
+    name: 'sys_admin_list_env',
+    description:
+      'List environment variable names. Sensitive values are redacted. Optional: prefix (filter keys), includeValues (include values; sensitive still redacted).',
+    schema: {
+      type: 'object',
+      properties: {
+        prefix: { type: 'string', description: 'Filter to keys starting with prefix (e.g. OPENAI)' },
+        includeValues: {
+          type: 'boolean',
+          description: 'If true, include values; sensitive keys still redacted',
+        },
+      },
+      required: [],
+    } as ExtendedJsonSchema,
     toolType: 'builtin',
   },
 };

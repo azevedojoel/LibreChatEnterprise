@@ -82,6 +82,8 @@ const { getConvo } = require('~/models/Conversation');
 const { createCRMTools } = require('../structured/CRMTools');
 const { createProjectTools, createProjectManagementTools } = require('../structured/ProjectTools');
 const { createHumanTools } = require('~/server/services/HumanAgent');
+const { createSysAdminTools } = require('~/server/services/SysAdmin');
+const { SystemRoles } = require('librechat-data-provider');
 
 const PROJECT_MANAGEMENT_TOOL_NAMES = new Set([
   Tools.project_create,
@@ -226,6 +228,9 @@ const loadTools = async ({
   );
   const HUMAN_TOOL_NAMES = new Set(
     Object.values(Tools).filter((t) => typeof t === 'string' && t.startsWith('human_')),
+  );
+  const SYS_ADMIN_TOOL_NAMES = new Set(
+    Object.values(Tools).filter((t) => typeof t === 'string' && t.startsWith('sys_admin_')),
   );
   const hasCRMTools = tools.some((t) => CRM_TOOL_NAMES.has(t));
   const hasProjectTools = tools.some((t) => PROJECT_TOOL_NAMES.has(t));
@@ -679,6 +684,15 @@ const loadTools = async ({
           agentId: agent?.id,
         });
         return humanTools[tool];
+      };
+      continue;
+    } else if (SYS_ADMIN_TOOL_NAMES.has(tool) && options.req?.user?.role === SystemRoles.ADMIN) {
+      requestedTools[tool] = async () => {
+        const sysAdminTools = createSysAdminTools({
+          userId: user,
+          userRole: options.req?.user?.role,
+        });
+        return sysAdminTools[tool];
       };
       continue;
     } else if (PROJECT_TOOL_NAMES.has(tool)) {

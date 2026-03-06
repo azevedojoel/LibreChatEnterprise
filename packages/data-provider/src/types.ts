@@ -339,6 +339,28 @@ export type TUserProjectsListResponse = {
   nextCursor: string | null;
 };
 
+/** Project context section */
+export type TProjectContextSection = {
+  sectionId: string;
+  title: string;
+  content: string;
+  order?: number;
+};
+
+export type TProjectSectionsResponse = {
+  sections: TProjectContextSection[];
+};
+
+/** Project log entry */
+export type TProjectLogEntry = {
+  timestamp: string;
+  entry: string;
+};
+
+export type TProjectLogResponse = {
+  entries: TProjectLogEntry[];
+};
+
 // type for creating conversation tag
 export type TConversationTagRequest = Partial<
   Omit<TConversationTag, 'createdAt' | 'updatedAt' | 'count' | 'user'>
