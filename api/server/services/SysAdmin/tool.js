@@ -39,7 +39,10 @@ const {
   deleteWorkspace,
   getWorkspaceById,
 } = require('~/models/Workspace');
-const { inviteUserToWorkspace, INVITE_ERROR_CODES } = require('~/server/services/WorkspaceInvite/inviteUser');
+const {
+  inviteUserToWorkspace,
+  INVITE_ERROR_CODES,
+} = require('~/server/services/WorkspaceInvite/inviteUser');
 const { getAppConfig, getCachedTools } = require('~/server/services/Config');
 const {
   checkEmailConfig,
@@ -176,7 +179,8 @@ function createSysAdminTools({ userId, userRole }) {
           },
           {
             name: 'sys_admin_search',
-            purpose: 'Search sys_admin tools by query (e.g. "ban user", "logs", "feature flag") - use to discover the right tool',
+            purpose:
+              'Search sys_admin tools by query (e.g. "ban user", "logs", "feature flag") - use to discover the right tool',
           },
           {
             name: 'sys_admin_list_users',
@@ -212,7 +216,7 @@ function createSysAdminTools({ userId, userRole }) {
           },
           {
             name: 'sys_admin_revoke_agent_access',
-            purpose: 'Revoke a user\'s access to an agent',
+            purpose: "Revoke a user's access to an agent",
           },
           {
             name: 'sys_admin_invite_user',
@@ -345,7 +349,8 @@ function createSysAdminTools({ userId, userRole }) {
           },
           {
             name: 'sys_admin_list_tool_overrides',
-            purpose: 'List tool overrides with filters (toolId, agentId, userId). Returns requiresApproval.',
+            purpose:
+              'List tool overrides with filters (toolId, agentId, userId). Returns requiresApproval.',
           },
           {
             name: 'sys_admin_list_feature_flags',
@@ -366,7 +371,7 @@ function createSysAdminTools({ userId, userRole }) {
           'Ban user X for 60 minutes',
           'Unban user X',
           'Grant user X access to agent Y',
-          'Revoke user X\'s access to agent Y',
+          "Revoke user X's access to agent Y",
           'Invite user X to workspace Y',
           'What workspaces exist?',
           'Add user X to workspace Y',
@@ -462,7 +467,12 @@ function createSysAdminTools({ userId, userRole }) {
 
         const filter = {};
         if (search && String(search).trim()) {
-          const regex = new RegExp(String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+          const regex = new RegExp(
+            String(search)
+              .trim()
+              .replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+            'i',
+          );
           filter.$or = [
             { email: regex },
             { name: regex },
@@ -471,7 +481,8 @@ function createSysAdminTools({ userId, userRole }) {
           ];
         }
 
-        const skip = (Math.max(1, parseInt(page, 10)) - 1) * Math.min(100, parseInt(limit, 10) || 50);
+        const skip =
+          (Math.max(1, parseInt(page, 10)) - 1) * Math.min(100, parseInt(limit, 10) || 50);
         const limitNum = Math.min(100, parseInt(limit, 10) || 50);
 
         const users = await User.find(filter, EXCLUDED_FIELDS)
@@ -487,7 +498,12 @@ function createSysAdminTools({ userId, userRole }) {
           ...u,
         }));
 
-        return toJson({ users: sanitized, total, page: Math.floor(skip / limitNum) + 1, limit: limitNum });
+        return toJson({
+          users: sanitized,
+          total,
+          page: Math.floor(skip / limitNum) + 1,
+          limit: limitNum,
+        });
       } catch (e) {
         logger.error('[SysAdmin.listUsers]', e);
         return toJson({ error: e.message || 'Failed to list users' });
@@ -495,8 +511,7 @@ function createSysAdminTools({ userId, userRole }) {
     },
     {
       name: Tools.sys_admin_list_users,
-      description:
-        'List users with optional search and pagination. Optional: search, limit, page.',
+      description: 'List users with optional search and pagination. Optional: search, limit, page.',
       schema: {
         type: 'object',
         properties: {
@@ -623,8 +638,16 @@ function createSysAdminTools({ userId, userRole }) {
     async (rawInput) => {
       const err = requireAdmin();
       if (err) return toJson(err);
-      const { userId: targetUserId, name, username, email, role, password, workspace_id, inboundEmailToken } =
-        rawInput || {};
+      const {
+        userId: targetUserId,
+        name,
+        username,
+        email,
+        role,
+        password,
+        workspace_id,
+        inboundEmailToken,
+      } = rawInput || {};
       if (!targetUserId) return toJson({ error: 'userId is required' });
       try {
         const existingUser = await getUserById(targetUserId);
@@ -644,7 +667,8 @@ function createSysAdminTools({ userId, userRole }) {
           if (otherUser) return toJson({ error: 'Another user with this email already exists' });
           updateData.email = normalizedEmail;
         }
-        if (role !== undefined) updateData.role = role === SystemRoles.ADMIN ? SystemRoles.ADMIN : SystemRoles.USER;
+        if (role !== undefined)
+          updateData.role = role === SystemRoles.ADMIN ? SystemRoles.ADMIN : SystemRoles.USER;
         if (password !== undefined && password?.trim()) {
           updateData.password = bcrypt.hashSync(password.trim(), bcrypt.genSaltSync(10));
         }
@@ -704,7 +728,8 @@ function createSysAdminTools({ userId, userRole }) {
     },
     {
       name: Tools.sys_admin_update_user,
-      description: 'Update a user. Required: userId. Optional: name, username, email, role, password, workspace_id.',
+      description:
+        'Update a user. Required: userId. Optional: name, username, email, role, password, workspace_id.',
       schema: {
         type: 'object',
         properties: {
@@ -772,7 +797,9 @@ function createSysAdminTools({ userId, userRole }) {
         const type = 'sys_admin_ban';
         await banLogs.set(targetUserId, { type, duration: durationMs, expiresAt });
 
-        logger.info(`[SysAdmin.banUser] Banned user ${targetUserId} for ${durationMs / 60000} minutes`);
+        logger.info(
+          `[SysAdmin.banUser] Banned user ${targetUserId} for ${durationMs / 60000} minutes`,
+        );
         return toJson({
           message: `User banned for ${durationMinutes <= 0 ? 'indefinite' : durationMinutes} minutes`,
           userId: targetUserId,
@@ -845,7 +872,12 @@ function createSysAdminTools({ userId, userRole }) {
     async (rawInput) => {
       const err = requireAdmin();
       if (err) return toJson(err);
-      const { agentId, userId: inputUserId, email: inputEmail, accessRole = 'viewer' } = rawInput || {};
+      const {
+        agentId,
+        userId: inputUserId,
+        email: inputEmail,
+        accessRole = 'viewer',
+      } = rawInput || {};
       if (!agentId) return toJson({ error: 'agentId is required' });
       if (!inputUserId && !inputEmail) return toJson({ error: 'userId or email is required' });
       const roleKey = String(accessRole).toLowerCase();
@@ -875,7 +907,9 @@ function createSysAdminTools({ userId, userRole }) {
           accessRoleId: roles.remote,
           grantedBy: userId,
         });
-        logger.info(`[SysAdmin.grantAgentAccess] Granted ${roleKey} to user ${targetUserId} for agent ${agentId}`);
+        logger.info(
+          `[SysAdmin.grantAgentAccess] Granted ${roleKey} to user ${targetUserId} for agent ${agentId}`,
+        );
         return toJson({
           message: `User granted ${roleKey} access`,
           agentId,
@@ -930,7 +964,9 @@ function createSysAdminTools({ userId, userRole }) {
           revokedPrincipals: [revokedPrincipal],
           grantedBy: userId,
         });
-        logger.info(`[SysAdmin.revokeAgentAccess] Revoked access for user ${targetUserId} from agent ${agentId}`);
+        logger.info(
+          `[SysAdmin.revokeAgentAccess] Revoked access for user ${targetUserId} from agent ${agentId}`,
+        );
         return toJson({
           message: 'User access revoked',
           agentId,
@@ -943,7 +979,7 @@ function createSysAdminTools({ userId, userRole }) {
     },
     {
       name: Tools.sys_admin_revoke_agent_access,
-      description: 'Revoke a user\'s access to an agent. Required: agentId, userId or email.',
+      description: "Revoke a user's access to an agent. Required: agentId, userId or email.",
       schema: {
         type: 'object',
         properties: {
@@ -1206,7 +1242,8 @@ function createSysAdminTools({ userId, userRole }) {
     },
     {
       name: Tools.sys_admin_update_workspace,
-      description: 'Update workspace. Required: workspaceId. Optional: name, slug, maxMembers, adminIds.',
+      description:
+        'Update workspace. Required: workspaceId. Optional: name, slug, maxMembers, adminIds.',
       schema: {
         type: 'object',
         properties: {
@@ -1291,7 +1328,8 @@ function createSysAdminTools({ userId, userRole }) {
       const err = requireAdmin();
       if (err) return toJson(err);
       const { workspaceId, email } = rawInput || {};
-      if (!workspaceId || !email?.trim()) return toJson({ error: 'workspaceId and email are required' });
+      if (!workspaceId || !email?.trim())
+        return toJson({ error: 'workspaceId and email are required' });
       try {
         const workspace = await getWorkspaceById(workspaceId);
         if (!workspace) return toJson({ error: 'Workspace not found' });
@@ -1338,7 +1376,8 @@ function createSysAdminTools({ userId, userRole }) {
       const err = requireAdmin();
       if (err) return toJson(err);
       const { workspaceId, userId: targetUserId } = rawInput || {};
-      if (!workspaceId || !targetUserId) return toJson({ error: 'workspaceId and userId are required' });
+      if (!workspaceId || !targetUserId)
+        return toJson({ error: 'workspaceId and userId are required' });
       try {
         const User = require('~/db/models').User;
         if (!mongoose.Types.ObjectId.isValid(targetUserId)) {
@@ -1391,10 +1430,7 @@ function createSysAdminTools({ userId, userRole }) {
           if (endDate) filter.createdAt.$lte = new Date(endDate);
         }
         const limitNum = Math.min(100, parseInt(limit, 10) || 50);
-        const txns = await Transaction.find(filter)
-          .sort({ createdAt: -1 })
-          .limit(limitNum)
-          .lean();
+        const txns = await Transaction.find(filter).sort({ createdAt: -1 }).limit(limitNum).lean();
         const transactions = txns.map((t) => ({
           id: t._id?.toString(),
           user: t.user?.toString(),
@@ -1417,7 +1453,8 @@ function createSysAdminTools({ userId, userRole }) {
     },
     {
       name: Tools.sys_admin_get_user_usage,
-      description: 'Get token usage for a user. Required: userId. Optional: limit, startDate, endDate.',
+      description:
+        'Get token usage for a user. Required: userId. Optional: limit, startDate, endDate.',
       schema: {
         type: 'object',
         properties: {
@@ -1443,7 +1480,11 @@ function createSysAdminTools({ userId, userRole }) {
           userId: targetUserId,
           tokenCredits: balance?.tokenCredits ?? 0,
         };
-        if (includeTransactions === true || includeTransactions === 'true' || includeTransactions === 1) {
+        if (
+          includeTransactions === true ||
+          includeTransactions === 'true' ||
+          includeTransactions === 1
+        ) {
           const txns = await getTransactions({ user: targetUserId });
           result.recentTransactions = txns
             .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
@@ -1482,8 +1523,16 @@ function createSysAdminTools({ userId, userRole }) {
     async (rawInput) => {
       const err = requireAdmin();
       if (err) return toJson(err);
-      const { userId, conversationId, model, tokenType, startDate, endDate, limit = 50, page = 1 } =
-        rawInput || {};
+      const {
+        userId,
+        conversationId,
+        model,
+        tokenType,
+        startDate,
+        endDate,
+        limit = 50,
+        page = 1,
+      } = rawInput || {};
       try {
         const filter = {};
         if (userId) filter.user = userId;
@@ -1611,7 +1660,9 @@ function createSysAdminTools({ userId, userRole }) {
         const { search = '', limit = 50, after } = rawInput || {};
         const query = {};
         if (search && String(search).trim()) {
-          const escaped = String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const escaped = String(search)
+            .trim()
+            .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
           query.name = { $regex: escaped, $options: 'i' };
         }
         const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 50));
@@ -1630,7 +1681,9 @@ function createSysAdminTools({ userId, userRole }) {
             logger.warn('[SysAdmin.listAgents] Invalid cursor:', e.message);
           }
         }
-        const baseQuery = Object.keys(cursorCondition).length ? { $and: [query, cursorCondition] } : query;
+        const baseQuery = Object.keys(cursorCondition).length
+          ? { $and: [query, cursorCondition] }
+          : query;
         const agents = await Agent.find(baseQuery, {
           id: 1,
           _id: 1,
@@ -1730,13 +1783,17 @@ function createSysAdminTools({ userId, userRole }) {
     async (rawInput) => {
       const err = requireAdmin();
       if (err) return toJson(err);
-      const { agentId } = rawInput || {};
-      if (!agentId) return toJson({ error: 'agentId is required' });
+      const { id } = rawInput || {};
+      if (!id) return toJson({ error: 'id is required' });
       try {
-        const agent = await getAgent({ id: agentId });
+        const agent = await getAgent({ id });
         if (!agent) return toJson({ error: 'Agent not found' });
         const { _id, author, ...rest } = agent;
-        return toJson({ _id: _id?.toString(), id: agent.id, author: author?.toString(), ...rest });
+        const payload = { _id: _id?.toString(), id: agent.id, author: author?.toString(), ...rest };
+        if (!('inbound_instructions' in payload) || payload.inbound_instructions == null) {
+          payload.inbound_instructions = {};
+        }
+        return toJson(payload);
       } catch (e) {
         logger.error('[SysAdmin.getAgent]', e);
         return toJson({ error: e.message || 'Failed to get agent' });
@@ -1744,11 +1801,11 @@ function createSysAdminTools({ userId, userRole }) {
     },
     {
       name: Tools.sys_admin_get_agent,
-      description: 'Get full agent by ID. Required: agentId.',
+      description: 'Get full agent by ID. Required: id.',
       schema: {
         type: 'object',
-        properties: { agentId: { type: 'string' } },
-        required: ['agentId'],
+        properties: { id: { type: 'string', description: 'Agent ID (e.g. system-general)' } },
+        required: ['id'],
       },
     },
   );
@@ -1768,7 +1825,11 @@ function createSysAdminTools({ userId, userRole }) {
         agentData.tools = [];
         const availableTools = (await getCachedTools()) ?? {};
         for (const tool of tools) {
-          if (availableTools[tool] || systemTools[tool] || (typeof tool === 'string' && tool.includes(Constants.mcp_delimiter))) {
+          if (
+            availableTools[tool] ||
+            systemTools[tool] ||
+            (typeof tool === 'string' && tool.includes(Constants.mcp_delimiter))
+          ) {
             agentData.tools.push(tool);
           }
         }
@@ -1807,7 +1868,8 @@ function createSysAdminTools({ userId, userRole }) {
     },
     {
       name: Tools.sys_admin_create_agent,
-      description: 'Create agent. Required: name, provider, model. Optional: instructions, tools, description, category, edges.',
+      description:
+        'Create agent. Required: name, provider, model. Optional: instructions, tools, description, category, edges.',
       schema: {
         type: 'object',
         properties: {
@@ -1842,7 +1904,12 @@ function createSysAdminTools({ userId, userRole }) {
         const updated = await updateAgent({ id: agentId }, updateData, { updatingUserId: userId });
         if (!updated) return toJson({ error: 'Failed to update agent' });
         const { _id, author, ...rest } = updated;
-        return toJson({ _id: _id?.toString(), id: updated.id, author: author?.toString(), ...rest });
+        return toJson({
+          _id: _id?.toString(),
+          id: updated.id,
+          author: author?.toString(),
+          ...rest,
+        });
       } catch (e) {
         if (e.name === 'ZodError') {
           return toJson({ error: 'Validation failed', details: e.errors });
@@ -1853,7 +1920,8 @@ function createSysAdminTools({ userId, userRole }) {
     },
     {
       name: Tools.sys_admin_update_agent,
-      description: 'Update agent. Required: agentId. Optional: name, instructions, tools, model, provider, description, category, edges.',
+      description:
+        'Update agent. Required: agentId. Optional: name, instructions, tools, model, provider, description, category, edges, inbound_instructions (object: telegram, email, etc. -> instruction string).',
       schema: {
         type: 'object',
         properties: {
@@ -1866,6 +1934,11 @@ function createSysAdminTools({ userId, userRole }) {
           description: { type: 'string' },
           category: { type: 'string' },
           edges: { type: 'array', items: { type: 'object' } },
+          inbound_instructions: {
+            type: 'object',
+            additionalProperties: { type: 'string' },
+            description: 'Per-channel instructions (e.g. telegram, email) when run comes from that inbound source.',
+          },
         },
         required: ['agentId'],
       },
@@ -2021,7 +2094,9 @@ function createSysAdminTools({ userId, userRole }) {
           name: v.name ?? agent.name,
           createdAt: v.createdAt,
           updatedAt: v.updatedAt,
-          ...(i === versions.length - 2 && { note: 'Previous version (use versionIndex: -1 to revert)' }),
+          ...(i === versions.length - 2 && {
+            note: 'Previous version (use versionIndex: -1 to revert)',
+          }),
         }));
         return toJson({
           agentId,
@@ -2036,7 +2111,8 @@ function createSysAdminTools({ userId, userRole }) {
     },
     {
       name: Tools.sys_admin_list_agent_versions,
-      description: 'List version history. Required: agentId. Use before revert to pick versionIndex.',
+      description:
+        'List version history. Required: agentId. Use before revert to pick versionIndex.',
       schema: {
         type: 'object',
         properties: { agentId: { type: 'string' } },
@@ -2051,7 +2127,8 @@ function createSysAdminTools({ userId, userRole }) {
       if (err) return toJson(err);
       const { agentId, versionIndex } = rawInput || {};
       if (!agentId) return toJson({ error: 'agentId is required' });
-      if (versionIndex === undefined || versionIndex === null) return toJson({ error: 'versionIndex is required' });
+      if (versionIndex === undefined || versionIndex === null)
+        return toJson({ error: 'versionIndex is required' });
       const idx = parseInt(versionIndex, 10);
       if (isNaN(idx)) return toJson({ error: 'versionIndex must be a number' });
       try {
@@ -2075,7 +2152,8 @@ function createSysAdminTools({ userId, userRole }) {
     },
     {
       name: Tools.sys_admin_revert_agent_version,
-      description: 'Revert agent to version. Required: agentId, versionIndex (0-based or -1 for previous).',
+      description:
+        'Revert agent to version. Required: agentId, versionIndex (0-based or -1 for previous).',
       schema: {
         type: 'object',
         properties: {

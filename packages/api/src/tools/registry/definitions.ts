@@ -2713,11 +2713,11 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
   },
   sys_admin_get_agent: {
     name: 'sys_admin_get_agent',
-    description: 'Get full agent details by ID. Required: agentId.',
+    description: 'Get full agent details by ID. Required: id.',
     schema: {
       type: 'object',
-      properties: { agentId: { type: 'string', description: 'Agent ID' } },
-      required: ['agentId'],
+      properties: { id: { type: 'string', description: 'Agent ID (e.g. system-general)' } },
+      required: ['id'],
     } as ExtendedJsonSchema,
     toolType: 'builtin',
   },
@@ -2752,7 +2752,7 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
   sys_admin_update_agent: {
     name: 'sys_admin_update_agent',
     description:
-      'Update an agent. Required: agentId. Optional: name, instructions, tools, model, provider, description, category, edges.',
+      'Update an agent. Required: agentId. Optional: name, instructions, tools, model, provider, description, category, edges, inbound_instructions (object: telegram, email, etc. -> instruction string for that channel).',
     schema: {
       type: 'object',
       properties: {
@@ -2772,6 +2772,12 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
           type: 'array',
           items: { type: 'object' },
           description: 'Handoff edges',
+        },
+        inbound_instructions: {
+          type: 'object',
+          additionalProperties: { type: 'string' },
+          description:
+            'Per-channel instructions when run comes from that inbound source. Keys: telegram, email, etc. Values: instruction string.',
         },
       },
       required: ['agentId'],

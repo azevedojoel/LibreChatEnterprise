@@ -45,5 +45,6 @@ export interface IAgent extends Omit<Document, 'model'> {
   tool_options?: AgentToolOptions;
   /** Agent IDs this Schedule Manager can schedule (when manage_scheduling is enabled) */
   schedulerTargetAgentIds?: string[];
-  /** Token for inbound email routing; when set, agent can receive email at hash+token@inbound */
+  /** Per-channel instructions when run comes from that inbound source (e.g. telegram, email). Overrides config. */
+  inbound_instructions?: Record<string, string>;
 }

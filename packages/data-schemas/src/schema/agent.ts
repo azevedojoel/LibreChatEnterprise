@@ -123,6 +123,11 @@ const agentSchema = new Schema<IAgent>(
       type: [String],
       default: undefined,
     },
+    /** Per-channel instructions when run comes from that inbound source (e.g. telegram, email). Overrides config. */
+    inbound_instructions: {
+      type: Schema.Types.Mixed,
+      default: undefined,
+    },
   },
   {
     timestamps: true,

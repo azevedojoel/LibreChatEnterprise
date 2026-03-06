@@ -88,6 +88,8 @@ export const agentBaseSchema = z.object({
   support_contact: agentSupportContactSchema,
   category: z.string().optional(),
   schedulerTargetAgentIds: z.array(z.string()).optional(),
+  /** Per-channel instructions when run comes from that inbound source (e.g. telegram, email). */
+  inbound_instructions: z.record(z.string()).optional(),
 });
 
 /** Create schema extends base with required fields for creation */

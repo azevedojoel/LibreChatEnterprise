@@ -563,6 +563,18 @@ You are running in a headless scheduled agent run. No user is present in the cha
       sharedRunContextParts.push(scheduledPrompt);
     }
 
+    /** Inbound channel instructions - when run comes from Telegram, email, etc. Agent overrides config. */
+    const inboundSource = this.options.req?._inboundSource;
+    if (inboundSource) {
+      const agent = this.options?.agent;
+      const agentsConfig = this.options.req?.config?.endpoints?.[EModelEndpoint.agents];
+      const instruction =
+        agent?.inbound_instructions?.[inboundSource] ?? agentsConfig?.inboundInstructions?.[inboundSource];
+      if (instruction && typeof instruction === 'string' && instruction.trim()) {
+        sharedRunContextParts.push(`# Inbound context (${inboundSource})\n\n${instruction.trim()}`);
+      }
+    }
+
     /** Project context - curated context doc, always injected when conversation has a project */
     const conversationId = this.conversationId + '';
     const userId = this.user ?? this.options.req?.user?.id;
