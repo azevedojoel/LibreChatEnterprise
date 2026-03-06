@@ -1,3 +1,4 @@
+const { logger } = require('@librechat/data-schemas');
 const { Workspace } = require('~/db/models');
 
 /**
@@ -73,6 +74,17 @@ const createWorkspace = async function (data) {
     adminIds: [createdBy],
     maxMembers: 3,
   });
+
+  try {
+    const { createInboundProjectForWorkspace } = require('~/models/UserProject');
+    await createInboundProjectForWorkspace(workspace._id, createdBy);
+  } catch (err) {
+    logger.warn('[Workspace] Failed to create Inbound project for workspace', {
+      workspaceId: workspace._id?.toString(),
+      error: err?.message,
+    });
+  }
+
   return workspace.toObject ? workspace.toObject() : workspace;
 };
 

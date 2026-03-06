@@ -116,6 +116,13 @@ router.patch('/:id', async (req, res) => {
  */
 router.post('/:id/archive', async (req, res) => {
   try {
+    const project = await getUserProject(req.user.id, req.params.id);
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found or access denied' });
+    }
+    if (project.isInbound) {
+      return res.status(403).json({ error: 'Inbound project cannot be archived' });
+    }
     const archived = await archiveUserProject(req.user.id, req.params.id);
     if (!archived) {
       return res.status(404).json({ error: 'Project not found or access denied' });
@@ -133,6 +140,13 @@ router.post('/:id/archive', async (req, res) => {
  */
 router.delete('/:id', async (req, res) => {
   try {
+    const project = await getUserProject(req.user.id, req.params.id);
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    if (project.isInbound) {
+      return res.status(403).json({ error: 'Inbound project cannot be deleted' });
+    }
     const deleted = await deleteUserProject(req.user.id, req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: 'Project not found' });

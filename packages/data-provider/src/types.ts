@@ -329,6 +329,7 @@ export type TUserProject = {
   workspace_id?: string | null;
   shared?: boolean;
   owner?: string;
+  isInbound?: boolean;
   createdAt?: string;
   updatedAt?: string;
 };

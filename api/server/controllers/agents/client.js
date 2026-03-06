@@ -609,10 +609,19 @@ This project is shared with your workspace. All workspace members can view and u
 `;
             }
 
+            let inboundBlurb = '';
+            if (project.isInbound) {
+              inboundBlurb = `
+## Inbound project
+
+This is the Inbound project for your workspace. It stores email routing rules in the email-rules section. When inbound emails arrive, the agent runs with this project first, reads the rules, and can use project_switch to route to the matched target project.
+`;
+            }
+
             const projectPrompt = `# Project
 
 You are working in a project. Projects are user-scoped workspaces that organize work and persist context across conversations. This conversation is assigned to the project "${projectName}".
-
+${inboundBlurb}
 ## Current project: ${projectName}
 
 ## Project context

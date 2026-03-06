@@ -48,7 +48,7 @@ const listUserProjects = async (userId, { limit = 25, cursor, status = 'active' 
   }
 
   const projects = await UserProject.find(query)
-    .select('_id name context description tags status workspace_id createdAt updatedAt user ownerId')
+    .select('_id name context description tags status workspace_id createdAt updatedAt user ownerId isInbound')
     .sort(sort)
     .limit(limit + 1)
     .lean();
@@ -63,6 +63,7 @@ const listUserProjects = async (userId, { limit = 25, cursor, status = 'active' 
     status: p.status ?? 'active',
     owner: p.ownerId?.toString?.() ?? p.user,
     shared: !!p.workspace_id,
+    isInbound: !!p.isInbound,
     lastUpdated: p.updatedAt,
     workspace_id: p.workspace_id?.toString?.() ?? p.workspace_id ?? null,
     createdAt: p.createdAt,
@@ -176,6 +177,59 @@ const createUserProject = async (
   return { project: result };
 };
 
+const INBOUND_PROJECT_EMAIL_RULES_TEMPLATE = `# Email routing rules
+
+Match sender or subject to route to a project. Use project_switch to assign the conversation.
+
+## Examples
+
+From: brad.eye@cenegenicsjax.com → Project: John Smith
+From: @cenegenicsjax.com → Search CRM for sender, assign to their project
+Subject contains: "Martinez" → Project: Martinez Family`;
+
+/**
+ * Create the Inbound project for a workspace. Used for email routing rules.
+ * One Inbound project per workspace; cannot be deleted.
+ * @param {string} workspaceId - Workspace ID
+ * @param {string} createdBy - User ID (workspace creator/admin)
+ * @returns {Promise<Object>} Created project
+ */
+const createInboundProjectForWorkspace = async (workspaceId, createdBy) => {
+  const workspaceObjId = new mongoose.Types.ObjectId(workspaceId);
+  const createdByObjId = new mongoose.Types.ObjectId(createdBy);
+
+  const project = await UserProject.create({
+    user: createdBy,
+    name: 'Inbound',
+    description: 'Email routing rules for inbound emails. Edit the email-rules section to configure routing.',
+    tags: ['inbound', 'email'],
+    status: 'active',
+    ownerId: createdByObjId,
+    workspace_id: workspaceObjId,
+    isInbound: true,
+  });
+
+  const projectId = project._id.toString();
+  await patchSections(projectId, createdBy, {
+    sections: [
+      {
+        sectionId: 'email-rules',
+        title: 'Email routing rules',
+        content: INBOUND_PROJECT_EMAIL_RULES_TEMPLATE,
+      },
+    ],
+  });
+
+  const obj = project.toObject();
+  return {
+    ...obj,
+    _id: obj._id?.toString?.() ?? obj._id,
+    workspace_id: obj.workspace_id?.toString?.() ?? obj.workspace_id ?? null,
+    shared: true,
+    isInbound: true,
+  };
+};
+
 /**
  * Get a user project by ID. Allows access for owner or workspace members (when project is shared).
  * @param {string} userId - User ID
@@ -191,6 +245,7 @@ const getUserProject = async (userId, projectId) => {
     _id: p._id?.toString?.() ?? p._id,
     workspace_id: p.workspace_id?.toString?.() ?? p.workspace_id ?? null,
     shared: !!p.workspace_id,
+    isInbound: !!p.isInbound,
     description: p.description ?? '',
     tags: p.tags ?? [],
     status: p.status ?? 'active',
@@ -291,6 +346,10 @@ const archiveUserProject = async (userId, projectId) => {
   const project = await UserProject.findById(projectId).lean();
   if (!project) return false;
 
+  if (project.isInbound) {
+    return false;
+  }
+
   if (project.workspace_id) {
     const workspace = await getWorkspaceById(project.workspace_id.toString(), 'adminIds createdBy');
     if (!isWorkspaceAdmin(workspace, userId)) {
@@ -321,6 +380,10 @@ const deleteUserProject = async (userId, projectId) => {
   const project = await UserProject.findById(projectId).lean();
   if (!project) return false;
 
+  if (project.isInbound) {
+    return false;
+  }
+
   if (project.workspace_id) {
     const workspace = await getWorkspaceById(project.workspace_id.toString(), 'adminIds createdBy');
     if (!isWorkspaceAdmin(workspace, userId)) {
@@ -342,6 +405,7 @@ const deleteUserProject = async (userId, projectId) => {
 module.exports = {
   listUserProjects,
   createUserProject,
+  createInboundProjectForWorkspace,
   getUserProject,
   updateUserProject,
   deleteUserProject,

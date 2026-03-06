@@ -11,6 +11,7 @@ export interface IUserProject extends Document {
   status?: UserProjectStatus;
   ownerId?: Types.ObjectId | null;
   workspace_id?: Types.ObjectId | null;
+  isInbound?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }

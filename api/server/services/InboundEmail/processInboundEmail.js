@@ -8,6 +8,7 @@ const { EModelEndpoint, Constants } = require('librechat-data-provider');
 const { GenerationJobManager } = require('@librechat/api');
 const { getUserByInboundToken, findUser } = require('~/models');
 const { getWorkspaceBySlug } = require('~/models/Workspace');
+const { createInboundProjectForWorkspace } = require('~/models/UserProject');
 const {
   formatEmailContent,
   formatToolApprovalEmail,
@@ -111,7 +112,7 @@ async function processInboundEmail(payload) {
   let workspaceSlug = null;
 
   // Try workspace lookup first (slug from To address, e.g. companyx@domain)
-  const workspace = await getWorkspaceBySlug(userToken, '_id slug');
+  const workspace = await getWorkspaceBySlug(userToken, '_id slug createdBy');
   if (workspace) {
     const senderUserByEmail = await findUser(
       { email: senderEmail },
@@ -229,6 +230,35 @@ async function processInboundEmail(payload) {
 
   const capturedOAuthUrls = [];
 
+  /** Resolve Inbound project for workspace flow - run starts with email-rules context */
+  let inboundProjectId = null;
+  if (isWorkspaceFlow && workspace) {
+    const { UserProject } = require('~/db/models');
+    let inboundProject = await UserProject.findOne({
+      workspace_id: workspace._id,
+      isInbound: true,
+    })
+      .select('_id')
+      .lean();
+    if (!inboundProject) {
+      try {
+        const created = await createInboundProjectForWorkspace(
+          workspace._id.toString(),
+          workspace.createdBy?.toString?.() ?? workspace.createdBy,
+        );
+        inboundProject = { _id: created._id };
+      } catch (err) {
+        logger.warn('[InboundEmail] Failed to create Inbound project for workspace', {
+          workspaceSlug: workspaceSlug,
+          error: err?.message,
+        });
+      }
+    }
+    if (inboundProject) {
+      inboundProjectId = inboundProject._id?.toString?.() ?? inboundProject._id;
+    }
+  }
+
   const body = {
     text: messageText,
     conversationId,
@@ -237,6 +267,7 @@ async function processInboundEmail(payload) {
     endpoint: EModelEndpoint.agents,
     endpointType: EModelEndpoint.agents,
     files: requestFiles,
+    ...(inboundProjectId && { userProjectId: inboundProjectId }),
   };
 
   const syntheticReq = {
@@ -406,6 +437,7 @@ async function processInboundEmail(payload) {
         agentId: agent.id,
         model: agent.model,
         files: allFileIds,
+        ...(inboundProjectId && { userProjectId: inboundProjectId }),
       },
       { context: 'InboundEmail - save conversation' },
     );

@@ -42,6 +42,10 @@ const userProjectSchema = new Schema<IUserProject>(
       default: null,
       index: true,
     },
+    isInbound: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
@@ -52,5 +56,9 @@ userProjectSchema.index({ user: 1 });
 userProjectSchema.index({ user: 1, name: 1 }, { unique: true });
 userProjectSchema.index({ workspace_id: 1 });
 userProjectSchema.index({ status: 1 });
+userProjectSchema.index(
+  { workspace_id: 1 },
+  { unique: true, partialFilterExpression: { isInbound: true } },
+);
 
 export default userProjectSchema;

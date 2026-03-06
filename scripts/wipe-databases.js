@@ -34,10 +34,12 @@ async function wipePostgres(uri) {
   }
   try {
     const { Client } = require('pg');
+    // Use SSL only when URL explicitly requires it; Railway internal/private often does not
+    const useSsl = url.includes('sslmode=require') || url.includes('ssl=true');
     const client = new Client({
       connectionString: url,
       connectionTimeoutMillis: 10000,
-      ssl: { rejectUnauthorized: false },
+      ssl: useSsl ? { rejectUnauthorized: false } : false,
     });
     await client.connect();
     await client.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
