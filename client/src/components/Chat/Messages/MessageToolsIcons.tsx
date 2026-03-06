@@ -5,6 +5,7 @@ import {
   TerminalSquareIcon,
   Box,
   Wrench,
+  ShieldCheck,
   FileText,
   FileEdit,
   FilePlus,
@@ -79,7 +80,11 @@ const BUILT_IN_ICONS: Record<string, React.ComponentType<{ className?: string; s
 };
 
 function getToolIcon(toolId: string): React.ComponentType<{ className?: string; size?: number }> {
+  if (toolId.startsWith('sys_admin_')) {
+    return ShieldCheck;
+  }
   return BUILT_IN_ICONS[toolId] ?? Wrench;
+
 }
 
 function getToolDisplayName(
@@ -134,6 +139,9 @@ function getToolDisplayName(
     [Tools.create_plan]: 'Create Plan',
     [Tools.create_brainstorm_doc]: 'Brainstorm Doc',
   };
+  if (toolId.startsWith('sys_admin_')) {
+    return labels[toolId] ?? 'Sys Admin';
+  }
   return labels[toolId] ?? toolId;
 }
 

@@ -454,6 +454,9 @@ export default function AgentPanel() {
           ...EXECUTE_CODE_TOOLS.filter((t): t is string => t != null && t !== ''),
         );
       }
+      if (data.sys_admin === true) {
+        tools.push(AgentCapabilities.sys_admin);
+      }
       if (data.manage_scheduling === true) {
         tools.push(AgentCapabilities.manage_scheduling);
 
@@ -538,9 +541,7 @@ export default function AgentPanel() {
               createMutation={create}
               agentQuery={agentQuery}
               setCurrentAgentId={setCurrentAgentId}
-              // The following is required to force re-render the component when the form's agent ID changes
-              // Also maintains ComboBox Focus for Accessibility
-              selectedAgentId={agentQuery.isInitialLoading ? null : (current_agent_id ?? null)}
+              selectedAgentId={current_agent_id ?? null}
             />
           </div>
           {/* Create + Select Button */}

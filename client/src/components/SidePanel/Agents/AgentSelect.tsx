@@ -1,11 +1,9 @@
 import { EarthIcon } from 'lucide-react';
-import { ControlCombobox } from '@librechat/client';
-import { useCallback, useEffect, useRef } from 'react';
-import { useFormContext, Controller } from 'react-hook-form';
+import { useCallback, useEffect } from 'react';
+import { useFormContext } from 'react-hook-form';
 import {
   AgentCapabilities,
   Tools,
-  EToolResources,
   defaultAgentFormValues,
 } from 'librechat-data-provider';
 import type { UseMutationResult, QueryObserverResult } from '@tanstack/react-query';
@@ -35,8 +33,7 @@ export default function AgentSelect({
   createMutation: UseMutationResult<Agent, Error, AgentCreateParams>;
 }) {
   const localize = useLocalize();
-  const lastSelectedAgent = useRef<string | null>(null);
-  const { control, reset } = useFormContext();
+  const { reset } = useFormContext();
   const permissionLevel = useAgentDefaultPermissionLevel();
 
   const { data: agents = null } = useListAgentsQuery(
@@ -57,9 +54,13 @@ export default function AgentSelect({
   const resetAgentForm = useCallback(
     (fullAgent: Agent) => {
       const isGlobal = fullAgent.isPublic ?? false;
+      const providerValue =
+        typeof fullAgent.provider === 'string'
+          ? fullAgent.provider
+          : (fullAgent.provider as { value?: string })?.value ?? '';
       const update = {
         ...fullAgent,
-        provider: createProviderOption(fullAgent.provider),
+        provider: createProviderOption(providerValue),
         label: fullAgent.name ?? '',
         value: fullAgent.id || '',
         icon: isGlobal ? <EarthIcon className={'icon-lg text-green-400'} /> : null,
@@ -71,6 +72,7 @@ export default function AgentSelect({
         [AgentCapabilities.execute_code]: false,
         [AgentCapabilities.create_pdf]: false,
         [AgentCapabilities.manage_scheduling]: false,
+        [AgentCapabilities.sys_admin]: false,
         [AgentCapabilities.end_after_tools]: false,
         [AgentCapabilities.hide_sequential_outputs]: false,
       };
@@ -121,6 +123,13 @@ export default function AgentSelect({
           }
           return;
         }
+        if (typeof tool === 'string' && tool.startsWith('sys_admin_')) {
+          capabilities[AgentCapabilities.sys_admin] = true;
+          if (!agentTools.includes(AgentCapabilities.sys_admin)) {
+            agentTools.push(AgentCapabilities.sys_admin);
+          }
+          return;
+        }
         if (tool === Tools.create_pdf) {
           capabilities[AgentCapabilities.create_pdf] = true;
           return;
@@ -130,12 +139,14 @@ export default function AgentSelect({
 
       const formValues: Partial<AgentForm & TAgentCapabilities> = {
         ...capabilities,
+        id: fullAgent.id || '',
+        name: fullAgent.name ?? '',
+        description: fullAgent.description ?? '',
+        instructions: fullAgent.instructions ?? '',
         agent: update,
-        model: update.model,
+        model: update.model ?? '',
         tools: agentTools,
-        // Ensure the category is properly set for the form
         category: fullAgent.category || 'general',
-        // Make sure support_contact is properly loaded
         support_contact: fullAgent.support_contact,
         avatar_file: null,
         avatar_preview: getAbsoluteImageUrl(fullAgent.avatar?.filepath) ?? '',
@@ -147,12 +158,10 @@ export default function AgentSelect({
           formValues[name] = value;
           return;
         }
-
         if (capabilities[name] !== undefined) {
           formValues[name] = value;
           return;
         }
-
         if (
           name === 'agent_ids' &&
           Array.isArray(value) &&
@@ -161,12 +170,10 @@ export default function AgentSelect({
           formValues[name] = value;
           return;
         }
-
         if (name === 'edges' && Array.isArray(value)) {
           formValues[name] = value;
           return;
         }
-
         if (
           name === 'schedulerTargetAgentIds' &&
           Array.isArray(value) &&
@@ -175,21 +182,15 @@ export default function AgentSelect({
           formValues[name] = value;
           return;
         }
-
         if (name === 'tool_options' && typeof value === 'object' && value !== null) {
           formValues[name] = value;
           return;
         }
-
-        if (!keys.has(name)) {
-          return;
-        }
-
+        if (!keys.has(name)) return;
         if (name === 'recursion_limit' && typeof value === 'number') {
           formValues[name] = value;
           return;
         }
-
         if (typeof value !== 'number' && typeof value !== 'object') {
           formValues[name] = value;
         }
@@ -200,93 +201,79 @@ export default function AgentSelect({
     [reset],
   );
 
-  const onSelect = useCallback(
-    (selectedId: string) => {
-      const agentExists = !!(selectedId
-        ? (agents ?? []).find((agent) => agent.id === selectedId)
-        : undefined);
-
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const selectedId = e.target.value;
       createMutation.reset();
+
+      if (!selectedId) {
+        setCurrentAgentId(undefined);
+        return reset(getDefaultAgentFormValues());
+      }
+
+      const agentMatch = (a: { id?: string; value?: string | number | null }) =>
+        String(a.id ?? a.value ?? '') === selectedId;
+      const agentExists = (agents ?? []).some(agentMatch);
+
       if (!agentExists) {
         setCurrentAgentId(undefined);
         return reset(getDefaultAgentFormValues());
       }
 
       setCurrentAgentId(selectedId);
+
       const agent = agentQuery.data;
-      if (!agent) {
-        console.warn('Agent not found');
+      if (agent?.id === selectedId) {
+        resetAgentForm(agent);
         return;
       }
 
-      resetAgentForm(agent);
+      const selectedAgent = (agents ?? []).find(agentMatch);
+      if (selectedAgent) {
+        const agentForForm: Agent = {
+          ...selectedAgent,
+          id: String(selectedAgent.id ?? selectedAgent.value ?? selectedId),
+        };
+        resetAgentForm(agentForForm);
+      }
     },
     [agents, createMutation, setCurrentAgentId, agentQuery.data, resetAgentForm, reset],
   );
 
   useEffect(() => {
-    if (agentQuery.data && agentQuery.isSuccess) {
+    const agentId = agentQuery.data?.id ?? agentQuery.data?._id;
+    if (
+      agentQuery.data &&
+      agentQuery.isSuccess &&
+      agentId != null &&
+      String(agentId) === selectedAgentId
+    ) {
       resetAgentForm(agentQuery.data);
     }
-  }, [agentQuery.data, agentQuery.isSuccess, resetAgentForm]);
-
-  useEffect(() => {
-    let timerId: NodeJS.Timeout | null = null;
-
-    if (selectedAgentId === lastSelectedAgent.current) {
-      return;
-    }
-
-    if (selectedAgentId != null && selectedAgentId !== '' && agents) {
-      timerId = setTimeout(() => {
-        lastSelectedAgent.current = selectedAgentId;
-        onSelect(selectedAgentId);
-      }, 5);
-    }
-
-    return () => {
-      if (timerId) {
-        clearTimeout(timerId);
-      }
-    };
-  }, [selectedAgentId, agents, onSelect]);
+  }, [agentQuery.data, agentQuery.isSuccess, selectedAgentId, resetAgentForm]);
 
   const createAgent = localize('com_ui_create_new_agent');
+  const currentValue = selectedAgentId ?? '';
 
   return (
-    <Controller
-      name="agent"
-      control={control}
-      render={({ field }) => (
-        <ControlCombobox
-          containerClassName="px-0"
-          selectedValue={(field?.value?.value ?? '') + ''}
-          displayValue={field?.value?.label ?? ''}
-          selectPlaceholder={field?.value?.value ?? createAgent}
-          iconSide="right"
-          searchPlaceholder={localize('com_agents_search_name')}
-          SelectIcon={field?.value?.icon}
-          setValue={onSelect}
-          items={
-            agents?.map((agent) => ({
-              label: agent.name ?? '',
-              value: agent.id ?? '',
-              icon: agent.icon,
-            })) ?? [
-              {
-                label: 'Loading...',
-                value: '',
-              },
-            ]
-          }
-          className={cn(
-            'z-50 flex h-[40px] w-full flex-none items-center justify-center truncate rounded-md bg-transparent font-bold',
-          )}
-          ariaLabel={localize('com_ui_agent')}
-          isCollapsed={false}
-          showCarat={true}
-        />
+    <select
+      value={currentValue}
+      onChange={handleChange}
+      aria-label={localize('com_ui_agent')}
+      className={cn(
+        'flex h-10 w-full flex-none cursor-pointer items-center justify-center truncate rounded-md border border-border-light bg-surface-secondary px-3 py-2 text-sm font-bold text-text-primary',
+        'focus:outline-none focus:ring-2 focus:ring-ring-primary',
       )}
-    />
+    >
+      <option value="">{createAgent}</option>
+      {(agents ?? []).map((agent) => {
+        const id = String(agent.id ?? agent.value ?? '');
+        return (
+          <option key={id} value={id}>
+            {agent.name ?? agent.label ?? id}
+          </option>
+        );
+      })}
+    </select>
   );
 }

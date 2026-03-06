@@ -13,49 +13,32 @@ import {
 import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
 
-interface MCPServerMenuItemProps {
+export interface MCPServerRowProps {
   server: MCPServerDefinition;
   isSelected: boolean;
   connectionStatus?: ConnectionStatusMap;
   isInitializing?: (serverName: string) => boolean;
   statusIconProps?: MCPServerStatusIconProps | null;
-  onToggle: (serverName: string) => void;
 }
 
-export default function MCPServerMenuItem({
+/**
+ * Shared presentational component for MCP server row UI.
+ * Used by both MCPServerMenuItem (nested submenu) and flat ToolsDropdown items (mobile).
+ */
+export function MCPServerRow({
   server,
   isSelected,
   connectionStatus,
   isInitializing,
   statusIconProps,
-  onToggle,
-}: MCPServerMenuItemProps) {
+}: MCPServerRowProps) {
   const localize = useLocalize();
   const displayName = server.config?.title || server.serverName;
   const statusColor = getStatusColor(server.serverName, connectionStatus, isInitializing);
-  const statusTextKey = getStatusTextKey(server.serverName, connectionStatus, isInitializing);
-  const statusText = localize(statusTextKey as Parameters<typeof localize>[0]);
   const showActionButton = shouldShowActionButton(statusIconProps);
 
-  // Include status in aria-label so screen readers announce it
-  const accessibleLabel = `${displayName}, ${statusText}`;
-
   return (
-    <Ariakit.MenuItemCheckbox
-      hideOnClick={false}
-      name="mcp-servers"
-      value={server.serverName}
-      checked={isSelected}
-      setValueOnChange={false}
-      onChange={() => onToggle(server.serverName)}
-      aria-label={accessibleLabel}
-      className={cn(
-        'group flex w-full cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2',
-        'outline-none transition-all duration-150',
-        'hover:bg-surface-hover data-[active-item]:bg-surface-hover',
-        isSelected && 'bg-surface-active-alt',
-      )}
-    >
+    <>
       {/* Server Icon with Status Dot */}
       <div className="relative flex-shrink-0">
         {server.config?.iconPath ? (
@@ -108,6 +91,58 @@ export default function MCPServerMenuItem({
       >
         {isSelected && <Check className="h-4 w-4" />}
       </span>
+    </>
+  );
+}
+
+interface MCPServerMenuItemProps {
+  server: MCPServerDefinition;
+  isSelected: boolean;
+  connectionStatus?: ConnectionStatusMap;
+  isInitializing?: (serverName: string) => boolean;
+  statusIconProps?: MCPServerStatusIconProps | null;
+  onToggle: (serverName: string) => void;
+}
+
+export default function MCPServerMenuItem({
+  server,
+  isSelected,
+  connectionStatus,
+  isInitializing,
+  statusIconProps,
+  onToggle,
+}: MCPServerMenuItemProps) {
+  const localize = useLocalize();
+  const displayName = server.config?.title || server.serverName;
+  const statusTextKey = getStatusTextKey(server.serverName, connectionStatus, isInitializing);
+  const statusText = localize(statusTextKey as Parameters<typeof localize>[0]);
+
+  // Include status in aria-label so screen readers announce it
+  const accessibleLabel = `${displayName}, ${statusText}`;
+
+  return (
+    <Ariakit.MenuItemCheckbox
+      hideOnClick={false}
+      name="mcp-servers"
+      value={server.serverName}
+      checked={isSelected}
+      setValueOnChange={false}
+      onChange={() => onToggle(server.serverName)}
+      aria-label={accessibleLabel}
+      className={cn(
+        'group flex min-h-[44px] w-full cursor-pointer items-center gap-3 rounded-lg px-2.5 py-3',
+        'outline-none transition-all duration-150',
+        'hover:bg-surface-hover data-[active-item]:bg-surface-hover',
+        isSelected && 'bg-surface-active-alt',
+      )}
+    >
+      <MCPServerRow
+        server={server}
+        isSelected={isSelected}
+        connectionStatus={connectionStatus}
+        isInitializing={isInitializing}
+        statusIconProps={statusIconProps}
+      />
     </Ariakit.MenuItemCheckbox>
   );
 }

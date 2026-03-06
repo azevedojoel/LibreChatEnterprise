@@ -1,4 +1,5 @@
 import { memo, useRef, useMemo, useEffect, useState, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
 import { useWatch } from 'react-hook-form';
 import { TextareaAutosize } from '@librechat/client';
 import { useRecoilState, useRecoilValue } from 'recoil';
@@ -37,6 +38,7 @@ import ProjectIndicator from './ProjectIndicator';
 import store from '~/store';
 
 const ChatForm = memo(({ index = 0 }: { index?: number }) => {
+  const { conversationId: paramConversationId } = useParams<{ conversationId?: string }>();
   const submitButtonRef = useRef<HTMLButtonElement>(null);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
   useFocusChatEffect(textAreaRef);
@@ -63,10 +65,12 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
 
   const { requiresKey } = useRequiresKey();
   const methods = useChatFormContext();
+  const selectedProjectId = useRecoilValue(store.selectedProjectIdAtom);
   const {
     files,
     setFiles,
     conversation,
+    setConversation,
     isSubmitting,
     filesLoading,
     newConversation,
@@ -125,6 +129,22 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
     conversationId,
     isSubmitting,
   });
+
+  // Sync selectedProjectId to conversation when on new chat (e.g. from "Start Conversation" on project landing)
+  const isNewChatPage = paramConversationId === 'new' || !paramConversationId;
+  useEffect(() => {
+    if (
+      !isNewChatPage ||
+      !selectedProjectId ||
+      conversation?.userProjectId === selectedProjectId
+    ) {
+      return;
+    }
+    setConversation?.((prev) => {
+      if (!prev) return prev;
+      return { ...prev, userProjectId: selectedProjectId };
+    });
+  }, [isNewChatPage, selectedProjectId, conversation?.userProjectId, setConversation]);
 
   const { submitMessage, submitPrompt } = useSubmitMessage();
 

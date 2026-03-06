@@ -1,7 +1,7 @@
 import React from 'react';
 import * as Ariakit from '@ariakit/react';
 import { ChevronRight } from 'lucide-react';
-import { MCPIcon } from '@librechat/client';
+import { MCPIcon, useMediaQuery } from '@librechat/client';
 import MCPServerMenuItem from '~/components/MCP/MCPServerMenuItem';
 import MCPConfigDialog from '~/components/MCP/MCPConfigDialog';
 import { useBadgeRowContext } from '~/Providers';
@@ -15,6 +15,7 @@ interface MCPSubMenuProps {
 const MCPSubMenu = React.forwardRef<HTMLDivElement, MCPSubMenuProps>(
   ({ placeholder, ...props }, ref) => {
     const localize = useLocalize();
+    const isSmallScreen = useMediaQuery('(max-width: 768px)');
     const { mcpServerManager } = useBadgeRowContext();
     const {
       mcpValues,
@@ -30,7 +31,7 @@ const MCPSubMenu = React.forwardRef<HTMLDivElement, MCPSubMenuProps>(
     const menuStore = Ariakit.useMenuStore({
       focusLoop: true,
       showTimeout: 100,
-      placement: 'right',
+      placement: isSmallScreen ? 'bottom-start' : 'right',
     });
 
     // Don't render if no MCP servers are configured

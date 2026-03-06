@@ -18,6 +18,8 @@ import LoginLayout from './Layouts/Login';
 import dashboardRoutes from './Dashboard';
 import ShareRoute from './ShareRoute';
 import ChatRoute from './ChatRoute';
+import InboundProjectRoute from './InboundProjectRoute';
+import ProjectRoute from './ProjectRoute';
 import Search from './Search';
 import ToolApprovalPage from './ToolApprovalPage';
 import Root from './Root';
@@ -112,6 +114,14 @@ export const router = createBrowserRouter(
             {
               index: true,
               element: <Navigate to="/c/new" replace={true} />,
+            },
+            {
+              path: 'c/inbound',
+              element: <InboundProjectRoute />,
+            },
+            {
+              path: 'c/project/:projectId',
+              element: <ProjectRoute />,
             },
             {
               path: 'c/:conversationId?',

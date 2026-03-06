@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useToastContext } from '@librechat/client';
 import { Controller, useWatch, useFormContext } from 'react-hook-form';
-import { EModelEndpoint, getEndpointField } from 'librechat-data-provider';
+import { EModelEndpoint, getEndpointField, SystemRoles } from 'librechat-data-provider';
 import type { AgentForm, IconComponentTypes } from '~/common';
 import {
   removeFocusOutlines,
@@ -16,7 +16,7 @@ import useAgentCapabilities from '~/hooks/Agents/useAgentCapabilities';
 import { useFileMapContext, useAgentPanelContext } from '~/Providers';
 import AgentCategorySelector from './AgentCategorySelector';
 import Action from '~/components/SidePanel/Builder/Action';
-import { useLocalize, useVisibleTools } from '~/hooks';
+import { useLocalize, useVisibleTools, useAuthContext } from '~/hooks';
 import { Panel, isEphemeralAgent } from '~/common';
 import { useGetAgentFiles } from '~/data-provider';
 import { icons } from '~/hooks/Endpoint/Icons';
@@ -26,6 +26,7 @@ import FileContext from './FileContext';
 import SearchForm from './Search/Form';
 import FileSearch from './FileSearch';
 import SchedulingCheckbox from './SchedulingCheckbox';
+import SysAdminCheckbox from './SysAdminCheckbox';
 import CreatePdfCheckbox from './CreatePdfCheckbox';
 import SchedulerTargetAgents from './SchedulerTargetAgents';
 import Artifacts from './Artifacts';
@@ -42,6 +43,7 @@ const inputClass = cn(
 
 export default function AgentConfig() {
   const localize = useLocalize();
+  const { user } = useAuthContext();
   const fileMap = useFileMapContext();
   const { showToast } = useToastContext();
   const methods = useFormContext<AgentForm>();
@@ -90,6 +92,7 @@ export default function AgentConfig() {
     fileSearchEnabled,
     createPdfEnabled,
     manageSchedulingEnabled,
+    sysAdminEnabled,
   } = useAgentCapabilities(agentsConfig?.capabilities);
 
   const context_files = useMemo(() => {
@@ -295,7 +298,8 @@ export default function AgentConfig() {
           contextEnabled ||
           webSearchEnabled ||
           createPdfEnabled ||
-          manageSchedulingEnabled) && (
+          manageSchedulingEnabled ||
+          (sysAdminEnabled && user?.role === SystemRoles.ADMIN)) && (
           <div className="mb-4 flex w-full flex-col items-start gap-3">
             <label className="text-token-text-primary block font-medium">
               {localize('com_assistants_capabilities')}
@@ -328,6 +332,7 @@ export default function AgentConfig() {
                 />
               </>
             )}
+            {sysAdminEnabled && user?.role === SystemRoles.ADMIN && <SysAdminCheckbox />}
           </div>
         )}
         {/* MCP Section */}

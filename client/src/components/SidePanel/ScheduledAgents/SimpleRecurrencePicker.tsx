@@ -62,7 +62,14 @@ function cronToState(cron: string): State {
 
   const parts = trimmed.split(/\s+/);
   if (parts.length < 5) {
-    return { frequency: 'custom', hour: 9, minute: 0, weekDays: [], monthDay: 1, customCron: trimmed };
+    return {
+      frequency: 'custom',
+      hour: 9,
+      minute: 0,
+      weekDays: [],
+      monthDay: 1,
+      customCron: trimmed,
+    };
   }
 
   const min = parseInt(parts[0], 10);
@@ -72,7 +79,14 @@ function cronToState(cron: string): State {
   const dow = parts[4];
 
   if (isNaN(min) || isNaN(hour)) {
-    return { frequency: 'custom', hour: 9, minute: 0, weekDays: [], monthDay: 1, customCron: trimmed };
+    return {
+      frequency: 'custom',
+      hour: 9,
+      minute: 0,
+      weekDays: [],
+      monthDay: 1,
+      customCron: trimmed,
+    };
   }
 
   if (dom === '*' && month === '*' && dow === '*') {
@@ -95,7 +109,14 @@ function cronToState(cron: string): State {
     }
   }
 
-  return { frequency: 'custom', hour: 9, minute: 0, weekDays: [], monthDay: 1, customCron: trimmed };
+  return {
+    frequency: 'custom',
+    hour: 9,
+    minute: 0,
+    weekDays: [],
+    monthDay: 1,
+    customCron: trimmed,
+  };
 }
 
 type Props = {
@@ -114,7 +135,7 @@ export default function SimpleRecurrencePicker({ value, onChange }: Props) {
     frequency: effectiveFrequency,
     customCron:
       effectiveFrequency === 'custom' && !parsed.customCron
-        ? (value || '0 9 * * *')
+        ? value || '0 9 * * *'
         : parsed.customCron,
   };
 

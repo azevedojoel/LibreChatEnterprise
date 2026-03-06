@@ -14,6 +14,7 @@ interface AgentCapabilitiesResult {
   deferredToolsEnabled: boolean;
   programmaticToolsEnabled: boolean;
   manageSchedulingEnabled: boolean;
+  sysAdminEnabled: boolean;
   inboundEmailEnabled: boolean;
 }
 
@@ -80,6 +81,11 @@ export default function useAgentCapabilities(
     [capabilities],
   );
 
+  const sysAdminEnabled = useMemo(
+    () => capabilities?.includes(AgentCapabilities.sys_admin) ?? false,
+    [capabilities],
+  );
+
   const inboundEmailEnabled = useMemo(
     () => capabilities?.includes(AgentCapabilities.inbound_email) ?? false,
     [capabilities],
@@ -98,6 +104,7 @@ export default function useAgentCapabilities(
     deferredToolsEnabled,
     programmaticToolsEnabled,
     manageSchedulingEnabled,
+    sysAdminEnabled,
     inboundEmailEnabled,
   };
 }

@@ -274,7 +274,10 @@ export default function ProjectNav() {
                           className="group flex w-full items-center gap-0.5"
                         >
                           <button
-                            onClick={() => handleSelectProject(project._id)}
+                            onClick={() => {
+                              setSelectedProjectId(project._id);
+                              navigate('/c/project/' + project._id);
+                            }}
                             className={cn(
                               'flex flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm',
                               selectedProjectId === project._id
@@ -313,13 +316,17 @@ export default function ProjectNav() {
                     </div>
                     {workspaceProjects.map((project: TUserProject) => {
                       const canDelete = !!workspaceMeData?.isAdmin && !project.isInbound;
+                      const handleProjectClick = () => {
+                        setSelectedProjectId(project._id);
+                        navigate('/c/project/' + project._id);
+                      };
                       return (
                         <div
                           key={project._id}
                           className="group flex w-full items-center gap-0.5"
                         >
                           <button
-                            onClick={() => handleSelectProject(project._id)}
+                            onClick={handleProjectClick}
                             className={cn(
                               'flex flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm',
                               selectedProjectId === project._id

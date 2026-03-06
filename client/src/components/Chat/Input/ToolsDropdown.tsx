@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import * as Ariakit from '@ariakit/react';
 import { Globe, Settings, Settings2, TerminalSquareIcon } from 'lucide-react';
 import { useRecoilState } from 'recoil';
-import { TooltipAnchor, DropdownPopup, PinIcon, VectorIcon } from '@librechat/client';
+import { TooltipAnchor, DropdownPopup, PinIcon, VectorIcon, useMediaQuery } from '@librechat/client';
 import type { MenuItemProps } from '~/common';
 import {
   AuthType,
@@ -17,6 +17,8 @@ import { useLocalize, useHasAccess, useAgentCapabilities } from '~/hooks';
 import store from '~/store';
 import ArtifactsSubMenu from '~/components/Chat/Input/ArtifactsSubMenu';
 import MCPSubMenu from '~/components/Chat/Input/MCPSubMenu';
+import { MCPServerRow } from '~/components/MCP/MCPServerMenuItem';
+import MCPConfigDialog from '~/components/MCP/MCPConfigDialog';
 import { useGetStartupConfig } from '~/data-provider';
 import { useBadgeRowContext } from '~/Providers';
 import { cn } from '~/utils';
@@ -28,6 +30,7 @@ interface ToolsDropdownProps {
 const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
   const localize = useLocalize();
   const isDisabled = disabled ?? false;
+  const isSmallScreen = useMediaQuery('(max-width: 768px)');
   const [isPopoverActive, setIsPopoverActive] = useState(false);
   const {
     webSearch,
@@ -320,13 +323,53 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
     });
   }
 
-  const { selectableServers } = mcpServerManager;
+  const {
+    selectableServers,
+    mcpValues,
+    connectionStatus,
+    isInitializing,
+    getConfigDialogProps,
+    getServerStatusIconProps,
+    toggleServerSelection,
+  } = mcpServerManager;
+
   if (canUseMcp && selectableServers && selectableServers.length > 0) {
-    dropdownItems.push({
-      hideOnClick: false,
-      render: (props) => <MCPSubMenu {...props} placeholder={mcpPlaceholder} />,
-    });
+    if (isSmallScreen) {
+      // On mobile: flatten MCP servers inline to avoid nested menu and touch issues
+      selectableServers.forEach((server) => {
+        const isSelected = mcpValues?.includes(server.serverName) ?? false;
+        dropdownItems.push({
+          hideOnClick: false,
+          onClick: () => toggleServerSelection(server.serverName),
+          render: (props) => (
+            <div
+              {...props}
+              className={cn(
+                'flex min-h-[44px] w-full cursor-pointer items-center gap-3 rounded-lg px-2.5 py-3',
+                'hover:bg-surface-hover',
+                isSelected && 'bg-surface-active-alt',
+              )}
+            >
+              <MCPServerRow
+                server={server}
+                isSelected={isSelected}
+                connectionStatus={connectionStatus}
+                isInitializing={isInitializing}
+                statusIconProps={getServerStatusIconProps(server.serverName)}
+              />
+            </div>
+          ),
+        });
+      });
+    } else {
+      dropdownItems.push({
+        hideOnClick: false,
+        render: (props) => <MCPSubMenu {...props} placeholder={mcpPlaceholder} />,
+      });
+    }
   }
+
+  const mcpConfigDialogProps = isSmallScreen ? getConfigDialogProps() : null;
 
   if (dropdownItems.length === 0) {
     return null;
@@ -356,17 +399,20 @@ const ToolsDropdown = ({ disabled }: ToolsDropdownProps) => {
   );
 
   return (
-    <DropdownPopup
-      itemClassName="flex w-full cursor-pointer rounded-lg items-center justify-between hover:bg-surface-hover gap-5"
-      menuId="tools-dropdown-menu"
-      isOpen={isPopoverActive}
-      setIsOpen={setIsPopoverActive}
-      modal={true}
-      unmountOnHide={true}
-      trigger={menuTrigger}
-      items={dropdownItems}
-      iconClassName="mr-0"
-    />
+    <>
+      <DropdownPopup
+        itemClassName="flex w-full cursor-pointer rounded-lg items-center justify-between hover:bg-surface-hover gap-5"
+        menuId="tools-dropdown-menu"
+        isOpen={isPopoverActive}
+        setIsOpen={setIsPopoverActive}
+        modal={true}
+        unmountOnHide={true}
+        trigger={menuTrigger}
+        items={dropdownItems}
+        iconClassName="mr-0"
+      />
+      {mcpConfigDialogProps && <MCPConfigDialog {...mcpConfigDialogProps} />}
+    </>
   );
 };
 
