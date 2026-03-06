@@ -21,6 +21,7 @@ const PROJECT_MANAGEMENT_TOOLS = [
   Tools.project_list,
   Tools.project_archive,
   Tools.project_update_metadata,
+  Tools.project_switch,
 ];
 
 const PROJECT_CONTEXT_TOOLS = [

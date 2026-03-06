@@ -87,6 +87,7 @@ const PROJECT_MANAGEMENT_TOOL_NAMES = new Set([
   Tools.project_list,
   Tools.project_archive,
   Tools.project_update_metadata,
+  Tools.project_switch,
 ]);
 
 /**
@@ -266,8 +267,8 @@ const loadTools = async ({
     conversationUserProjectId =
       conversationUserProjectId ?? options.req?.body?.userProjectId ?? null;
     if (!conversationUserProjectId) {
-      logger.warn(
-        `[handleTools] No userProjectId for project tools - will skip creating project tool instances`,
+      logger.debug(
+        `[handleTools] No userProjectId at run start - project context tools will resolve at call time (e.g. after project_switch)`,
       );
     } else {
       logger.debug(
@@ -682,11 +683,12 @@ const loadTools = async ({
           });
           return mgmtTools[tool];
         };
-      } else if (conversationUserProjectId) {
+      } else {
         requestedTools[tool] = async () => {
           const projectTools = createProjectTools({
             userId: user,
-            projectId: conversationUserProjectId,
+            conversationId: options.req?.body?.conversationId ?? options.conversationId,
+            req: options.req,
           });
           return projectTools[tool];
         };

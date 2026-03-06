@@ -13,6 +13,7 @@ import { ErrorMessage } from './MessageContent';
 import RetrievalCall from './RetrievalCall';
 import AgentHandoff from './AgentHandoff';
 import AgentReturn from './AgentReturn';
+import ProjectSwitch from './ProjectSwitch';
 import CodeAnalyze from './CodeAnalyze';
 import Container from './Container';
 import WebSearch from './WebSearch';
@@ -22,6 +23,7 @@ import GmailSearch from './GmailSearch';
 import GmailGet from './GmailGet';
 import GmailSend from './GmailSend';
 import GmailSendDraft from './GmailSendDraft';
+import SendUserEmail from './SendUserEmail';
 import DocsCreate from './DocsCreate';
 import DriveCreateFolder from './DriveCreateFolder';
 import DriveDownloadFile from './DriveDownloadFile';
@@ -222,6 +224,13 @@ const Part = memo(
             output={toolCall.output ?? ''}
           />
         );
+      } else if (isToolCall && (toolCall.name === Tools.project_switch || toolCall.name === 'project_switch')) {
+        return (
+          <ProjectSwitch
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+          />
+        );
       } else if (isToolCall && toolCall.name === Tools.file_search) {
         return (
           <AgentFileSearch
@@ -309,6 +318,18 @@ const Part = memo(
       } else if (isToolCall && isToolMatch(toolCall.name, 'gmail_sendDraft')) {
         return (
           <GmailSendDraft
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            toolName={toolCall.name}
+          />
+        );
+      } else if (isToolCall && isToolMatch(toolCall.name, 'send_user_email')) {
+        return (
+          <SendUserEmail
             args={toolCall.args ?? ''}
             output={toolCall.output ?? ''}
             initialProgress={toolCall.progress ?? 0.1}
@@ -1143,6 +1164,22 @@ const Part = memo(
         ) {
           return (
             <GmailSendDraft
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
+              toolName={funcName}
+            />
+          );
+        }
+        if (
+          funcName === 'send_user_email' ||
+          (typeof funcName === 'string' && funcName.startsWith('send_user_email_mcp_'))
+        ) {
+          return (
+            <SendUserEmail
               args={toolCall.function.arguments ?? ''}
               output={toolCall.function.output ?? ''}
               initialProgress={toolCall.progress ?? 0.1}

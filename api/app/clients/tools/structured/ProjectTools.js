@@ -9,16 +9,20 @@ const {
   upsertSection,
   patchSections,
   deleteSection,
+  getFormattedContext,
 } = require('~/server/services/UserProject/projectContextSectionService');
 const {
   createUserProject,
   listUserProjects,
   archiveUserProject,
   updateUserProject,
+  getUserProject,
 } = require('~/models/UserProject');
-const { saveConvo } = require('~/models/Conversation');
+const { saveConvo, getConvo } = require('~/models/Conversation');
 
 const toJson = (obj) => (typeof obj === 'string' ? obj : JSON.stringify(obj ?? null));
+
+const NO_PROJECT_ERROR = 'No project assigned. Use project_switch to assign a project first.';
 
 function sanitizeError(msg) {
   if (!msg) return 'Unable to access project data';
@@ -27,17 +31,39 @@ function sanitizeError(msg) {
 }
 
 /**
- * @param {{ userId: string, projectId: string }} options
+ * Resolve projectId at call time. Supports:
+ * - { userId, projectId }: returns projectId (static)
+ * - { userId, conversationId, req }: fetches via getConvo (dynamic)
+ * @param {{ userId?: string, projectId?: string, conversationId?: string, req?: Object }} options
+ * @returns {Promise<string|null>}
+ */
+async function resolveProjectId(options) {
+  if (options.projectId != null && options.projectId !== '') {
+    return typeof options.projectId === 'string'
+      ? options.projectId
+      : options.projectId?.toString?.() ?? null;
+  }
+  if (options.conversationId && options.req?.user?.id) {
+    const convo = await getConvo(options.req.user.id, options.conversationId);
+    const up = convo?.userProjectId?.toString?.() ?? convo?.userProjectId ?? null;
+    return up;
+  }
+  return null;
+}
+
+/**
+ * @param {{ userId?: string, projectId?: string, conversationId?: string, req?: Object }} options
  * @returns {Record<string, Tool>}
  */
-function createProjectTools({ userId, projectId }) {
-  if (!projectId) {
+function createProjectTools({ userId, projectId, conversationId, req }) {
+  const uid = userId ?? 'agent';
+  const hasStaticProject = projectId != null && projectId !== '';
+  const hasDynamicResolution = conversationId && req?.user?.id;
+  if (!hasStaticProject && !hasDynamicResolution) {
     return {};
   }
 
-  const pid = typeof projectId === 'string' ? projectId : projectId?.toString?.();
-  const uid = userId ?? 'agent';
-
+  const opts = { userId, projectId, conversationId, req };
   const tools = {};
 
   tools.project_section_update = new (class extends Tool {
@@ -57,6 +83,8 @@ function createProjectTools({ userId, projectId }) {
       return this.prototype.schema;
     }
     async _call(args) {
+      const pid = await resolveProjectId(opts);
+      if (!pid) return toJson({ error: NO_PROJECT_ERROR });
       const { sectionId, title, content } = args || {};
       if (!sectionId || !title) return toJson({ error: 'sectionId and title are required' });
       try {
@@ -99,6 +127,8 @@ function createProjectTools({ userId, projectId }) {
       return this.prototype.schema;
     }
     async _call(args) {
+      const pid = await resolveProjectId(opts);
+      if (!pid) return toJson({ error: NO_PROJECT_ERROR });
       const { sections = [], deleteIds = [] } = args || {};
       const sec = Array.isArray(sections) ? sections : [];
       const del = Array.isArray(deleteIds) ? deleteIds : [];
@@ -128,6 +158,8 @@ function createProjectTools({ userId, projectId }) {
       return this.prototype.schema;
     }
     async _call(args) {
+      const pid = await resolveProjectId(opts);
+      if (!pid) return toJson({ error: NO_PROJECT_ERROR });
       const { sectionId } = args || {};
       if (!sectionId) return toJson({ error: 'sectionId is required' });
       try {
@@ -154,6 +186,8 @@ function createProjectTools({ userId, projectId }) {
       return this.prototype.schema;
     }
     async _call(args) {
+      const pid = await resolveProjectId(opts);
+      if (!pid) return toJson({ error: NO_PROJECT_ERROR });
       const { entry } = args || {};
       if (!entry) return toJson({ error: 'entry is required' });
       try {
@@ -178,6 +212,8 @@ function createProjectTools({ userId, projectId }) {
       return this.prototype.schema;
     }
     async _call(args) {
+      const pid = await resolveProjectId(opts);
+      if (!pid) return toJson({ error: NO_PROJECT_ERROR });
       const { n } = args || {};
       try {
         const entries = await tail(pid, uid, n);
@@ -203,6 +239,8 @@ function createProjectTools({ userId, projectId }) {
       return this.prototype.schema;
     }
     async _call(args) {
+      const pid = await resolveProjectId(opts);
+      if (!pid) return toJson({ error: NO_PROJECT_ERROR });
       const { query, limit } = args || {};
       if (!query) return toJson({ error: 'query is required' });
       try {
@@ -230,6 +268,8 @@ function createProjectTools({ userId, projectId }) {
       return this.prototype.schema;
     }
     async _call(args) {
+      const pid = await resolveProjectId(opts);
+      if (!pid) return toJson({ error: NO_PROJECT_ERROR });
       const { from, to, limit } = args || {};
       if (!from || !to) return toJson({ error: 'from and to are required' });
       try {
@@ -304,11 +344,17 @@ function createProjectManagementTools({ userId, conversationId, req } = {}) {
             // Ignore - project was created, just couldn't assign to conversation
           }
         }
+        const projectContext =
+          project?._id
+            ? (await getFormattedContext(project._id.toString(), uid)) ||
+              '(No context yet. Use project_section_patch or project_section_update to add sections.)'
+            : null;
         return toJson({
           success: true,
           projectId: project._id,
           name: project.name,
           shared: project.shared,
+          ...(projectContext != null && { projectContext }),
           ...project,
         });
       } catch (e) {
@@ -412,6 +458,58 @@ function createProjectManagementTools({ userId, conversationId, req } = {}) {
         return toJson({ success: true, project });
       } catch (e) {
         return toJson({ error: e?.message || 'Failed to update project' });
+      }
+    }
+  })();
+
+  tools.project_switch = new (class extends Tool {
+    name = 'project_switch';
+    description =
+      'Assign a project to this conversation. Required: projectId (use project_list to get IDs). Pass null to clear the project.';
+    schema = {
+      type: 'object',
+      properties: {
+        projectId: {
+          oneOf: [{ type: 'string' }, { type: 'null' }],
+          description: 'Project ID to assign, or null to clear',
+        },
+      },
+      required: ['projectId'],
+    };
+    static get jsonSchema() {
+      return this.prototype.schema;
+    }
+    async _call(args) {
+      const { projectId } = args || {};
+      if (!conversationId || !req) {
+        return toJson({ error: 'conversationId and req are required' });
+      }
+      if (conversationId === 'new') {
+        return toJson({
+          error:
+            'Conversation not yet created. Send a message first, then use project_switch to assign a project.',
+        });
+      }
+      try {
+        if (projectId == null || projectId === '') {
+          await saveConvo(req, { conversationId, userProjectId: null });
+          return toJson({ success: true, message: 'Project cleared from conversation' });
+        }
+        const project = await getUserProject(uid, projectId);
+        if (!project) {
+          return toJson({ error: 'Project not found or access denied' });
+        }
+        await saveConvo(req, { conversationId, userProjectId: projectId });
+        const projectContext =
+          (await getFormattedContext(projectId, uid)) ||
+          '(No context yet. Use project_section_patch or project_section_update to add sections.)';
+        return toJson({
+          success: true,
+          project,
+          projectContext,
+        });
+      } catch (e) {
+        return toJson({ error: e?.message || 'Failed to switch project' });
       }
     }
   })();

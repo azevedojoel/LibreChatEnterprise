@@ -82,6 +82,7 @@ const TOOL_DISPLAY_NAMES = {
   project_list: 'List Projects',
   project_archive: 'Archive Project',
   project_update_metadata: 'Update Project Metadata',
+  project_switch: 'Switch to Project',
   // Coder tools
   generate_code: 'Generate Code',
   install_dependencies: 'Install Dependencies',

@@ -75,6 +75,7 @@ const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
   'gmail_get': 'Retrieved email',
   'gmail_send': 'Sent email',
   'gmail_sendDraft': 'Sent draft',
+  'send_user_email': 'Sent email',
   'gmail_createDraft': 'Created draft',
   'gmail_downloadAttachment': 'Downloaded attachment',
   'gmail_modify': 'Modified email labels',
@@ -154,6 +155,7 @@ const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
   [Tools.project_list]: 'List Projects',
   [Tools.project_archive]: 'Archive Project',
   [Tools.project_update_metadata]: 'Update Project Metadata',
+  [Tools.project_switch]: 'Switch to Project',
   // Scheduler tools
   [Tools.list_schedules]: 'List Schedules',
   [Tools.list_user_projects]: 'List Projects',
@@ -187,6 +189,7 @@ const PROJECT_TOOL_ICONS: Partial<Record<string, React.ComponentType<{ className
   [Tools.project_list]: List,
   [Tools.project_archive]: Archive,
   [Tools.project_update_metadata]: FileEdit,
+  [Tools.project_switch]: FolderInput,
 };
 
 /** Icons for workspace file edit tools */
@@ -285,6 +288,11 @@ const HUMAN_TOOL_ICONS: Partial<Record<string, React.ComponentType<{ className?:
   [Tools.human_routing_rules_delete]: Trash2,
 };
 
+/** Icons for email tools */
+const EMAIL_TOOL_ICONS: Partial<Record<string, React.ComponentType<{ className?: string }>>> = {
+  send_user_email: Mail,
+};
+
 import type { TAttachment } from 'librechat-data-provider';
 import {
   Plug,
@@ -295,6 +303,7 @@ import {
   FileDown,
   FolderOpen,
   FolderPlus,
+  FolderInput,
   Archive,
   ListPlus,
   List,
@@ -463,6 +472,9 @@ export default function ToolCall({
     }
     if (function_name && HUMAN_TOOL_ICONS[function_name]) {
       return HUMAN_TOOL_ICONS[function_name] as React.ComponentType<{ className?: string }>;
+    }
+    if (function_name && EMAIL_TOOL_ICONS[function_name]) {
+      return EMAIL_TOOL_ICONS[function_name] as React.ComponentType<{ className?: string }>;
     }
     return Plug;
   }, [function_name, lintData?.hasErrors]);

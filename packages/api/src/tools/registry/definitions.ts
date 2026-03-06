@@ -1225,6 +1225,22 @@ export const toolDefinitions: Record<string, ToolRegistryDefinition> = {
     },
     toolType: 'builtin',
   },
+  project_switch: {
+    name: 'project_switch',
+    description:
+      'Assign a project to this conversation. Required: projectId (use project_list to get IDs). Pass null to clear the project.',
+    schema: {
+      type: 'object',
+      properties: {
+        projectId: {
+          oneOf: [{ type: 'string' }, { type: 'null' }],
+          description: 'Project ID to assign, or null to clear',
+        },
+      },
+      required: ['projectId'],
+    },
+    toolType: 'builtin',
+  },
   file_search: {
     name: 'file_search',
     description:
@@ -2179,6 +2195,22 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
           description: 'New tags (replaces existing)',
         },
         ownerId: { type: 'string', description: 'New owner user ID' },
+      },
+      required: ['projectId'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  project_switch: {
+    name: 'project_switch',
+    description:
+      'Assign a project to this conversation. Required: projectId (use project_list to get IDs). Pass null to clear the project.',
+    schema: {
+      type: 'object',
+      properties: {
+        projectId: {
+          oneOf: [{ type: 'string' }, { type: 'null' }],
+          description: 'Project ID to assign, or null to clear',
+        },
       },
       required: ['projectId'],
     } as ExtendedJsonSchema,

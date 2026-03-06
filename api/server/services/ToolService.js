@@ -465,6 +465,7 @@ const nativeTools = new Set([
   Tools.project_list,
   Tools.project_archive,
   Tools.project_update_metadata,
+  Tools.project_switch,
   Tools.generate_code,
   Tools.install_dependencies,
   Tools.lint,
@@ -671,19 +672,11 @@ async function loadToolDefinitionsWrapper({
     Tools.project_list,
     Tools.project_archive,
     Tools.project_update_metadata,
+    Tools.project_switch,
   ];
-  if (hasProjectTools && !conversationUserProjectId) {
-    toolsToFilter = toolsToFilter.filter(
-      (t) =>
-        typeof t !== 'string' ||
-        !t.startsWith('project_') ||
-        PROJECT_MANAGEMENT_TOOLS.includes(t),
-    );
-  }
-
-  /** Inject project context tools when conversation has userProjectId */
+  /** Inject project context tools when agent has project tools (resolve userProjectId at call time) */
   if (
-    conversationUserProjectId &&
+    hasProjectTools &&
     !toolsToFilter.some((t) => typeof t === 'string' && PROJECT_CONTEXT_TOOLS.includes(t))
   ) {
     toolsToFilter = [...new Set([...toolsToFilter, ...PROJECT_CONTEXT_TOOLS])];
@@ -1415,19 +1408,11 @@ async function loadAgentTools({
     Tools.project_list,
     Tools.project_archive,
     Tools.project_update_metadata,
+    Tools.project_switch,
   ];
-  if (hasProjectToolsLoadAgent && !conversationUserProjectIdLoadAgent) {
-    toolsToFilter = toolsToFilter.filter(
-      (t) =>
-        typeof t !== 'string' ||
-        !t.startsWith('project_') ||
-        PROJECT_MANAGEMENT_TOOLS_LOAD.includes(t),
-    );
-  }
-
-  /** Inject project context tools when conversation has userProjectId */
+  /** Inject project context tools when agent has project tools (resolve userProjectId at call time) */
   if (
-    conversationUserProjectIdLoadAgent &&
+    hasProjectToolsLoadAgent &&
     !toolsToFilter.some((t) => typeof t === 'string' && PROJECT_CONTEXT_TOOLS_LOAD.includes(t))
   ) {
     toolsToFilter = [...new Set([...toolsToFilter, ...PROJECT_CONTEXT_TOOLS_LOAD])];

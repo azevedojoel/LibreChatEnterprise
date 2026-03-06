@@ -12,6 +12,7 @@ import {
   FileDown,
   FolderOpen,
   FolderPlus,
+  FolderInput,
   Archive,
   ListPlus,
   List,
@@ -51,6 +52,7 @@ const BUILT_IN_ICONS: Record<string, React.ComponentType<{ className?: string; s
   [Tools.project_list]: List,
   [Tools.project_archive]: Archive,
   [Tools.project_update_metadata]: FileEdit,
+  project_switch: FolderInput,
   // Workspace tools
   [Tools.workspace_read_file]: FileText,
   [Tools.workspace_edit_file]: FileEdit,
@@ -106,6 +108,7 @@ function getToolDisplayName(
     [Tools.project_list]: 'List Projects',
     [Tools.project_archive]: 'Archive Project',
     [Tools.project_update_metadata]: 'Update Project Metadata',
+    project_switch: 'Switch to Project',
     // Workspace tools
     [Tools.workspace_read_file]: 'Read File',
     [Tools.workspace_edit_file]: 'Edit File',

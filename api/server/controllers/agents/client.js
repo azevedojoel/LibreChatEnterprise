@@ -636,7 +636,8 @@ ${sharedSection}
 - project_create: Create a project. Required: name. Optional: description, tags[], sharedWithWorkspace (workspace admin only), templateProjectId. If sharedWithWorkspace and you are not admin, use human_notify_human.
 - project_list: List projects. Optional: limit, cursor, status (active|archived|all)
 - project_archive: Archive a project. Required: projectId
-- project_update_metadata: Update name, description, tags. Required: projectId. ownerId: workspace admin only (shared projects).`;
+- project_update_metadata: Update name, description, tags. Required: projectId. ownerId: workspace admin only (shared projects).
+- project_switch: Assign project to this conversation. Required: projectId (from project_list). Pass null to clear.`;
             sharedRunContextParts.unshift(projectPrompt);
           }
         }

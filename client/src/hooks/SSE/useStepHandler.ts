@@ -13,6 +13,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import type {
   Agents,
   TMessage,
+  TConversation,
   PartMetadata,
   ContentMetadata,
   EventSubmission,
@@ -21,8 +22,17 @@ import type {
 import type { SetterOrUpdater } from 'recoil';
 import type { AnnounceOptions } from '~/common';
 import { MESSAGE_UPDATE_INTERVAL } from '~/common';
+import { useToastContext } from '@librechat/client';
+import { useLocalize } from '~/hooks';
 
 const PROJECT_MUTATING_TOOLS = new Set([Tools.project_create, Tools.project_update_metadata]);
+const SCHEDULE_MUTATING_TOOLS = new Set([
+  Tools.create_schedule,
+  Tools.update_schedule,
+  Tools.delete_schedule,
+  Tools.run_schedule,
+]);
+const PROJECT_SWITCH_TOOL = 'project_switch';
 
 type TUseStepHandler = {
   announcePolite: (options: AnnounceOptions) => void;
@@ -36,6 +46,8 @@ type TUseStepHandler = {
   onAuthMerged?: (authUrl: string, toolName: string) => void;
   /** Called when a tool completes - clears overlay if it was the auth tool (pass tool name to verify) */
   onAuthCleared?: (completedToolName?: string) => void;
+  /** Updates Recoil conversation state (used by ProjectIndicator when project_switch completes) */
+  setConversation?: SetterOrUpdater<TConversation | null>;
 };
 
 type TStepEvent = {
@@ -74,7 +86,10 @@ export default function useStepHandler({
   queryClient,
   onAuthMerged,
   onAuthCleared,
+  setConversation,
 }: TUseStepHandler) {
+  const { showToast } = useToastContext();
+  const localize = useLocalize();
   /** runStepId -> toolCallId[] for parallel delta routing (index -> id) */
   const toolCallIdMap = useRef(new Map<string, string[]>());
   const messageMap = useRef(new Map<string, TMessage>());
@@ -467,6 +482,15 @@ export default function useStepHandler({
           );
           if (hasProjectMutatingTool) {
             queryClient.invalidateQueries([QueryKeys.userProjects]);
+          }
+
+          // Invalidate schedules when AI calls create_schedule, update_schedule, delete_schedule, or run_schedule
+          const hasScheduleMutatingTool = stepCalls.some((tc) =>
+            SCHEDULE_MUTATING_TOOLS.has(tc.name ?? ''),
+          );
+          if (hasScheduleMutatingTool) {
+            queryClient.invalidateQueries([QueryKeys.scheduledAgents]);
+            queryClient.invalidateQueries([QueryKeys.scheduledAgentRuns]);
           }
         }
 
@@ -997,6 +1021,53 @@ export default function useStepHandler({
 
           setMessages(updatedMessages);
         }
+
+        // project_switch: update conversation project when tool completes (toast + picker)
+        if (toolCallResult.name === PROJECT_SWITCH_TOOL) {
+          const conversationId = submission?.userMessage?.conversationId;
+          if (conversationId) {
+            let projectId: string | null = null;
+            const outputStr = toolCallResult.output;
+            if (outputStr) {
+              try {
+                const output = JSON.parse(outputStr) as {
+                  success?: boolean;
+                  project?: { _id?: string };
+                };
+                if (output.success && output.project?._id) {
+                  projectId = String(output.project._id);
+                }
+              } catch {
+                /* ignore */
+              }
+            }
+            const convo = queryClient.getQueryData([QueryKeys.conversation, conversationId]) as
+              | Record<string, unknown>
+              | undefined;
+            if (convo && typeof convo === 'object') {
+              queryClient.setQueryData([QueryKeys.conversation, conversationId], {
+                ...convo,
+                userProjectId: projectId,
+              });
+            }
+            setConversation?.((prev) =>
+              prev ? { ...prev, userProjectId: projectId } : prev,
+            );
+            queryClient.invalidateQueries([QueryKeys.conversation, conversationId]);
+            showToast({
+              message: projectId
+                ? localize('com_ui_added_to_project')
+                : localize('com_ui_removed_from_project'),
+              status: 'success',
+            });
+          }
+        }
+
+        // Invalidate schedules when create_schedule, update_schedule, delete_schedule, or run_schedule completes
+        if (SCHEDULE_MUTATING_TOOLS.has(toolCallResult.name)) {
+          queryClient.invalidateQueries([QueryKeys.scheduledAgents]);
+          queryClient.invalidateQueries([QueryKeys.scheduledAgentRuns]);
+        }
       }
 
       return () => {
@@ -1013,6 +1084,10 @@ export default function useStepHandler({
       calculateContentIndex,
       onAuthMerged,
       onAuthCleared,
+      queryClient,
+      setConversation,
+      showToast,
+      localize,
     ],
   );
 

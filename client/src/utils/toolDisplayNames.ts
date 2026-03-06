@@ -35,6 +35,7 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   gmail_get: 'Retrieved email',
   gmail_send: 'Sent email',
   gmail_sendDraft: 'Sent draft',
+  send_user_email: 'Sent email',
   gmail_createDraft: 'Created draft',
   gmail_downloadAttachment: 'Downloaded attachment',
   gmail_modify: 'Modified email labels',
@@ -113,6 +114,7 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   project_list: 'List Projects',
   project_archive: 'Archive Project',
   project_update_metadata: 'Update Project Metadata',
+  project_switch: 'Switch to Project',
   // Scheduler tools
   [Tools.list_schedules]: 'List Schedules',
   [Tools.list_user_projects]: 'List Projects',
