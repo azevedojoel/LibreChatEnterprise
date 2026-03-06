@@ -475,6 +475,7 @@ const nativeTools = new Set([
   Tools.reset_workspace,
   Tools.update_todo,
   Tools.create_plan,
+  Tools.create_brainstorm_doc,
   Tools.human_list_workspace_members,
   Tools.human_routing_rules_list,
   Tools.human_routing_rules_set,
@@ -609,6 +610,15 @@ async function loadToolDefinitionsWrapper({
     toolsToFilter = [...new Set([...toolsToFilter, ...humanTools])];
   }
 
+  /** Filter by ephemeralAgent (chat badge overrides) - only for primary agent; handoff targets get full tools */
+  const ephemeralAgentForInject =
+    primaryAgentId && agent?.id !== primaryAgentId ? undefined : req?.body?.ephemeralAgent;
+  /** Inject brainstorm tools when ephemeralAgent.brainstorm is true */
+  if (ephemeralAgentForInject?.brainstorm === true) {
+    const brainstormTools = [Tools.create_brainstorm_doc, Tools.web_search, Tools.file_search];
+    toolsToFilter = [...new Set([...toolsToFilter, ...brainstormTools])];
+  }
+
   /** Filter CRM native tools when user has no projectId - CRM requires user.projectId */
   const hasCRMTools = toolsToFilter.some(
     (t) => typeof t === 'string' && t.startsWith('crm_'),
@@ -693,7 +703,10 @@ async function loadToolDefinitionsWrapper({
   const ephemeralAgent =
     primaryAgentId && agent?.id !== primaryAgentId ? undefined : req?.body?.ephemeralAgent;
   const isPersistentAgent = !isEphemeralAgentId(agent?.id);
-  if (Array.isArray(ephemeralAgent?.tools)) {
+  if (ephemeralAgent?.brainstorm === true) {
+    const brainstormToolsSet = new Set([Tools.create_brainstorm_doc, Tools.web_search, Tools.file_search]);
+    toolsToFilter = toolsToFilter.filter((tool) => brainstormToolsSet.has(tool));
+  } else if (Array.isArray(ephemeralAgent?.tools)) {
     const toolsSet = new Set(ephemeralAgent.tools);
     toolsToFilter = toolsToFilter.filter((tool) => toolsSet.has(tool));
   } else if (Array.isArray(ephemeralAgent?.mcp)) {
@@ -708,6 +721,7 @@ async function loadToolDefinitionsWrapper({
 
   const filteredTools = toolsToFilter.filter((tool) => {
     if (tool == null || typeof tool !== 'string') return false;
+    if (ephemeralAgent?.brainstorm === true) return true;
     if (Array.isArray(ephemeralAgent?.tools)) return true;
     if (tool === Tools.file_search) {
       if (isPersistentAgent) {
@@ -1344,6 +1358,13 @@ async function loadAgentTools({
     toolsToFilter = [...new Set([...toolsToFilter, ...humanTools])];
   }
 
+  const ephemeralAgentLoadAgent =
+    primaryAgentId && agent?.id !== primaryAgentId ? undefined : req?.body?.ephemeralAgent;
+  if (ephemeralAgentLoadAgent?.brainstorm === true) {
+    const brainstormTools = [Tools.create_brainstorm_doc, Tools.web_search, Tools.file_search];
+    toolsToFilter = [...new Set([...toolsToFilter, ...brainstormTools])];
+  }
+
   /** Filter CRM native tools when user has no projectId - CRM requires user.projectId */
   const hasCRMToolsLoadAgent = toolsToFilter.some(
     (t) => typeof t === 'string' && t.startsWith('crm_'),
@@ -1429,7 +1450,10 @@ async function loadAgentTools({
   const ephemeralAgent =
     primaryAgentId && agent?.id !== primaryAgentId ? undefined : req?.body?.ephemeralAgent;
   const isPersistentAgent = !isEphemeralAgentId(agent?.id);
-  if (Array.isArray(ephemeralAgent?.tools)) {
+  if (ephemeralAgent?.brainstorm === true) {
+    const brainstormToolsSet = new Set([Tools.create_brainstorm_doc, Tools.web_search, Tools.file_search]);
+    toolsToFilter = toolsToFilter.filter((tool) => brainstormToolsSet.has(tool));
+  } else if (Array.isArray(ephemeralAgent?.tools)) {
     const toolsSet = new Set(ephemeralAgent.tools);
     toolsToFilter = toolsToFilter.filter((tool) => toolsSet.has(tool));
   } else if (Array.isArray(ephemeralAgent?.mcp)) {
@@ -1445,6 +1469,7 @@ async function loadAgentTools({
   let includesWebSearch = false;
   const _agentTools = toolsToFilter.filter((tool) => {
     if (tool == null || typeof tool !== 'string') return false;
+    if (ephemeralAgent?.brainstorm === true) return true;
     if (Array.isArray(ephemeralAgent?.tools)) return true;
     if (tool === Tools.file_search) {
       if (isPersistentAgent) {

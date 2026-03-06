@@ -101,6 +101,8 @@ export type TEphemeralAgent = {
   execute_code?: boolean;
   /** Artifact mode override for per-chat toggle (ArtifactModes.DEFAULT, etc.) */
   artifacts?: string;
+  /** Brainstorm mode: create_plan + research tools, mutually exclusive with other tool badges */
+  brainstorm?: boolean;
 };
 
 export type TPayload = Partial<TMessage> &

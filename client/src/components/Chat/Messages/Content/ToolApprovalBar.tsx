@@ -30,25 +30,30 @@ export default function ToolApprovalBar({
   approverName,
 }: ToolApprovalBarProps) {
   const localize = useLocalize();
-  const label = toolName ? getToolDisplayName(toolName) : (localize('com_ui_tool_approval_required') || 'Tool approval required');
+  const label = toolName
+    ? getToolDisplayName(toolName)
+    : localize('com_ui_tool_approval_required') || 'Tool approval required';
   const waitingLabel = approverName
-    ? `Waiting for ${approverName} to approve. They will receive an email.`
+    ? `Waiting for ${approverName} to approve.`
     : 'Waiting for approval. The approver will receive an email.';
 
   return (
     <div className="flex min-h-7 flex-wrap items-center gap-x-3 gap-y-2 py-0.5">
       <span className="flex items-center gap-1.5 text-sm text-text-secondary">
         {resolved === 'approved' ? (
-          <CheckCircle className="h-4 w-4 shrink-0 text-green-600 dark:text-green-400" aria-hidden="true" />
+          <CheckCircle
+            className="h-4 w-4 shrink-0 text-green-600 dark:text-green-400"
+            aria-hidden="true"
+          />
         ) : resolved === 'denied' ? (
           <XCircle className="h-4 w-4 shrink-0 text-red-600 dark:text-red-400" aria-hidden="true" />
         ) : (
           <ShieldAlert className="h-4 w-4 shrink-0 text-text-warning" aria-hidden="true" />
         )}
         {resolved === 'approved'
-          ? (localize('com_ui_tool_approved') || 'Approved')
+          ? localize('com_ui_tool_approved') || 'Approved'
           : resolved === 'denied'
-            ? (localize('com_ui_tool_denied') || 'Denied')
+            ? localize('com_ui_tool_denied') || 'Denied'
             : waitingForApprover
               ? waitingLabel
               : label}
@@ -80,7 +85,9 @@ export default function ToolApprovalBar({
         onClick={onToggleExpand}
         className="text-xs text-text-secondary hover:text-text-primary"
       >
-        {isExpanded ? (localize('com_ui_collapse') || 'Collapse') : (localize('com_ui_expand') || 'Expand')}
+        {isExpanded
+          ? localize('com_ui_collapse') || 'Collapse'
+          : localize('com_ui_expand') || 'Expand'}
       </button>
     </div>
   );

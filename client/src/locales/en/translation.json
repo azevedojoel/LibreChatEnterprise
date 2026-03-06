@@ -838,6 +838,7 @@
   "com_ui_archive_error": "Failed to archive conversation",
   "com_ui_artifact_click": "Click to open",
   "com_ui_artifacts": "Artifacts",
+  "com_ui_brainstorm": "Brainstorm",
   "com_ui_artifacts_options": "Artifacts Options",
   "com_ui_artifacts_toggle": "Toggle Artifacts UI",
   "com_ui_artifacts_toggle_agent": "Enable Artifacts",

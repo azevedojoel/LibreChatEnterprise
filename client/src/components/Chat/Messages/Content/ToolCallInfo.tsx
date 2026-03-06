@@ -570,6 +570,20 @@ export default function ToolCallInfo({
 
   const [planViewExpanded, setPlanViewExpanded] = useState(false);
 
+  const brainstormDocData = useMemo(() => {
+    if (function_name !== Tools.create_brainstorm_doc) return null;
+    try {
+      const inputParsed = typeof input === 'string' ? JSON.parse(input || '{}') : input;
+      const content = inputParsed?.content ?? inputParsed?.args?.content;
+      if (typeof content === 'string' && content.length > 0) {
+        return { content };
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  }, [function_name, input]);
+
   const planData = useMemo(() => {
     if (function_name !== Tools.create_plan) return null;
     try {
@@ -1031,6 +1045,19 @@ export default function ToolCallInfo({
             );
           })}
         </ul>
+      </div>
+    );
+  }
+
+  // create_brainstorm_doc: simple markdown preview card
+  if (brainstormDocData) {
+    return (
+      <div className="w-full p-2">
+        <div className="rounded-lg border border-border-light overflow-hidden">
+          <div className="markdown p-3 text-sm text-text-primary prose dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0 prose-headings:mb-1 prose-headings:mt-2 first:prose-headings:mt-0">
+            <MarkdownLite content={brainstormDocData.content} codeExecution={false} />
+          </div>
+        </div>
       </div>
     );
   }

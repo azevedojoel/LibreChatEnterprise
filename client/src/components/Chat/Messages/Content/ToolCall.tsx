@@ -32,6 +32,7 @@ const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
   [Tools.reset_workspace]: 'Reset Workspace',
   [Tools.update_todo]: 'Update Todo',
   [Tools.create_plan]: 'Create Plan',
+  [Tools.create_brainstorm_doc]: 'Brainstorm Doc',
   [Tools.file_search]: 'Searched My Files',
   [Constants.TOOL_SEARCH]: 'Discovery',
   // CRM tools
@@ -217,6 +218,7 @@ const CODER_TOOL_ICONS: Partial<Record<string, React.ComponentType<{ className?:
   [Tools.reset_workspace]: RotateCcw,
   [Tools.update_todo]: ListPlus,
   [Tools.create_plan]: ClipboardList,
+  [Tools.create_brainstorm_doc]: FileText,
 };
 
 /** Icons for scheduler tools */
@@ -680,6 +682,9 @@ export default function ToolCall({
   );
 
   const { resultsCount, summaryText } = useMemo(() => {
+    if (function_name === Tools.create_brainstorm_doc) {
+      return { resultsCount: undefined, summaryText: 'Brainstorm Doc' };
+    }
     if (function_name === Tools.create_plan) {
       if (output?.trim().startsWith('{')) {
         try {

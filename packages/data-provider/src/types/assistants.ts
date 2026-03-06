@@ -83,6 +83,7 @@ export enum Tools {
   reset_workspace = 'reset_workspace',
   update_todo = 'update_todo',
   create_plan = 'create_plan',
+  create_brainstorm_doc = 'create_brainstorm_doc',
   install_dependencies = 'install_dependencies',
   human_list_workspace_members = 'human_list_workspace_members',
   human_routing_rules_list = 'human_routing_rules_list',

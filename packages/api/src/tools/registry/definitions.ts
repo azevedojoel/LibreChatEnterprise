@@ -2305,6 +2305,19 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
     } as ExtendedJsonSchema,
     toolType: 'builtin',
   },
+  create_brainstorm_doc: {
+    name: 'create_brainstorm_doc',
+    description:
+      'Save a brainstorm/plan document as markdown for the user. Use after researching with web_search and file_search. Format: # Title, summary paragraph, ## Sections, markdown content. Creates a downloadable file in the user\'s My Files.',
+    schema: {
+      type: 'object',
+      properties: {
+        content: { type: 'string', description: 'Markdown document content' },
+      },
+      required: ['content'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
   install_dependencies: {
     name: 'install_dependencies',
     description:

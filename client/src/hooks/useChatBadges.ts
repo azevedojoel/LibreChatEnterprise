@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useRecoilValue, useRecoilCallback } from 'recoil';
-import { Globe, TerminalSquareIcon, Box } from 'lucide-react';
+import { Globe, TerminalSquareIcon, Box, Lightbulb } from 'lucide-react';
 import { VectorIcon } from '@librechat/client';
 import type { BadgeItem } from '~/common';
 import { Tools, AgentCapabilities, Constants } from 'librechat-data-provider';
@@ -35,6 +35,12 @@ const badgeConfig: ReadonlyArray<ChatBadgeConfig> = [
     icon: Box,
     label: 'com_ui_artifacts',
     atomKey: AgentCapabilities.artifacts,
+  },
+  {
+    id: 'brainstorm',
+    icon: Lightbulb,
+    label: 'com_ui_brainstorm',
+    atomKey: 'brainstorm',
   },
 ];
 

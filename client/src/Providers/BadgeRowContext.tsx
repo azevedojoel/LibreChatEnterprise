@@ -25,6 +25,8 @@ interface BadgeRowContextType {
   artifacts: ReturnType<typeof useToolToggle>;
   fileSearch: ReturnType<typeof useToolToggle>;
   codeInterpreter: ReturnType<typeof useToolToggle>;
+  brainstorm: ReturnType<typeof useToolToggle>;
+  brainstormMode: boolean;
   codeApiKeyForm: ReturnType<typeof useCodeApiKeyForm>;
   searchApiKeyForm: ReturnType<typeof useSearchApiKeyForm>;
   mcpServerManager: ReturnType<typeof useMCPServerManager>;
@@ -60,7 +62,7 @@ export default function BadgeRowProvider({
   const syncBadgeAtoms = useRecoilCallback(
     ({ set }) =>
       (finalValues: Record<string, boolean>) => {
-        ([Tools.execute_code, Tools.web_search, Tools.file_search, AgentCapabilities.artifacts] as const).forEach(
+        ([Tools.execute_code, Tools.web_search, Tools.file_search, AgentCapabilities.artifacts, 'brainstorm'] as const).forEach(
           (toolKey) => {
             set(agentToolAtomFamily(`${key}__${toolKey}`), finalValues[toolKey] ?? false);
           },
@@ -83,11 +85,13 @@ export default function BadgeRowProvider({
       const webSearchToggleKey = `${LocalStorageKeys.LAST_WEB_SEARCH_TOGGLE_}${key}`;
       const fileSearchToggleKey = `${LocalStorageKeys.LAST_FILE_SEARCH_TOGGLE_}${key}`;
       const artifactsToggleKey = `${LocalStorageKeys.LAST_ARTIFACTS_TOGGLE_}${key}`;
+      const brainstormToggleKey = `${LocalStorageKeys.LAST_BRAINSTORM_TOGGLE_}${key}`;
 
       const codeToggleValue = getTimestampedValue(codeToggleKey);
       const webSearchToggleValue = getTimestampedValue(webSearchToggleKey);
       const fileSearchToggleValue = getTimestampedValue(fileSearchToggleKey);
       const artifactsToggleValue = getTimestampedValue(artifactsToggleKey);
+      const brainstormToggleValue = getTimestampedValue(brainstormToggleKey);
 
       const initialValues: Record<string, any> = {};
 
@@ -123,6 +127,14 @@ export default function BadgeRowProvider({
         }
       }
 
+      if (brainstormToggleValue !== null) {
+        try {
+          initialValues.brainstorm = JSON.parse(brainstormToggleValue);
+        } catch (e) {
+          console.error('Failed to parse brainstorm toggle value:', e);
+        }
+      }
+
       /**
        * Always set values for all tools (use defaults if not in `localStorage`)
        * If `ephemeralAgent` is `null`, create a new object with just our tool values
@@ -132,6 +144,7 @@ export default function BadgeRowProvider({
         [Tools.web_search]: initialValues[Tools.web_search] ?? false,
         [Tools.file_search]: initialValues[Tools.file_search] ?? false,
         [AgentCapabilities.artifacts]: initialValues[AgentCapabilities.artifacts] ?? false,
+        brainstorm: initialValues.brainstorm ?? false,
       };
 
       setEphemeralAgent((prev) => ({
@@ -150,6 +163,8 @@ export default function BadgeRowProvider({
             storageKey = webSearchToggleKey;
           } else if (toolKey === Tools.file_search) {
             storageKey = fileSearchToggleKey;
+          } else if (toolKey === 'brainstorm') {
+            storageKey = brainstormToggleKey;
           }
           // Store the value and set timestamp for existing values
           localStorage.setItem(storageKey, JSON.stringify(value));
@@ -201,6 +216,16 @@ export default function BadgeRowProvider({
     isAuthenticated: true,
   });
 
+  /** Brainstorm hook - mutually exclusive with other tool badges */
+  const brainstorm = useToolToggle({
+    conversationId,
+    toolKey: 'brainstorm',
+    localStorageKey: LocalStorageKeys.LAST_BRAINSTORM_TOGGLE_,
+    isAuthenticated: true,
+  });
+
+  const brainstormMode = brainstorm.isToolEnabled ?? false;
+
   const { conversation } = useChatContext();
   const agentId = conversation?.agent_id;
   const shouldFetchAgent = !!agentId && !isEphemeralAgent(agentId);
@@ -212,6 +237,10 @@ export default function BadgeRowProvider({
     // Artifacts is a capability stored in agent.artifacts, not in agent.tools
     if (agent?.artifacts) {
       toolIds.add(AgentCapabilities.artifacts);
+    }
+    // Brainstorm is available when agent has file_search or web_search (research tools)
+    if (toolIds.has(Tools.file_search) || toolIds.has(Tools.web_search)) {
+      toolIds.add('brainstorm');
     }
     const mcpServers = new Set<string>();
     for (const toolId of tools) {
@@ -232,6 +261,8 @@ export default function BadgeRowProvider({
     webSearch,
     artifacts,
     fileSearch,
+    brainstorm,
+    brainstormMode,
     agentsConfig,
     conversationId,
     agentToolIds,

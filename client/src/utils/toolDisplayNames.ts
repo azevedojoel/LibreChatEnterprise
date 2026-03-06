@@ -134,6 +134,7 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   [Tools.reset_workspace]: 'Reset Workspace',
   [Tools.update_todo]: 'Update Todo',
   [Tools.create_plan]: 'Create Plan',
+  [Tools.create_brainstorm_doc]: 'Brainstorm Doc',
   // Human tools
   [Tools.human_list_workspace_members]: 'List Workspace Members',
   [Tools.human_routing_rules_list]: 'List Routing Rules',

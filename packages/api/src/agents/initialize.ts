@@ -396,10 +396,21 @@ export async function initializeAgent(
   }
 
   /** Per-chat override: use ephemeralAgent.artifacts when set (from Tools dropdown toggle) */
-  const ephemeralAgent = (req as { body?: { ephemeralAgent?: { artifacts?: string } } })?.body
+  const ephemeralAgent = (req as { body?: { ephemeralAgent?: { artifacts?: string; brainstorm?: boolean } } })?.body
     ?.ephemeralAgent;
   if (ephemeralAgent && 'artifacts' in ephemeralAgent) {
     agent.artifacts = ephemeralAgent.artifacts ?? agent.artifacts;
+  }
+
+  if (ephemeralAgent?.brainstorm === true) {
+    const brainstormPrompt = `You are in Brainstorm mode. Your goal is to create a comprehensive plan document for the user.
+
+1. DISCUSS FIRST: Ask clarifying questions, discuss the idea, and align with the user on the concept. Do not run any tools yet.
+2. WHEN AGREED: Once you and the user agree on the concept, use web_search and file_search to research. Run multiple queries if needed.
+3. CREATE DOCUMENT: Call create_brainstorm_doc with markdown content: # Title, one summary paragraph, ## Sections, then markdown content. Creates a downloadable file in the user's My Files.
+
+Do not skip the discussion phase. Only use tools after the user has confirmed the direction.\n\n`;
+    agent.instructions = brainstormPrompt + (agent.instructions ?? '');
   }
 
   if (typeof agent.artifacts === 'string' && agent.artifacts !== '') {

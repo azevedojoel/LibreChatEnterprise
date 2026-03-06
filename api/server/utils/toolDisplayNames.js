@@ -93,6 +93,7 @@ const TOOL_DISPLAY_NAMES = {
   reset_workspace: 'Reset Workspace',
   update_todo: 'Update Todo',
   create_plan: 'Create Plan',
+  create_brainstorm_doc: 'Brainstorm Doc',
   // Human tools
   human_list_workspace_members: 'List Workspace Members',
   human_routing_rules_list: 'List Routing Rules',

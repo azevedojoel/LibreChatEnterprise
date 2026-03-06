@@ -559,9 +559,10 @@ function createToolEndCallback({
     const isSendFileTool = output.name === Tools.workspace_send_file_to_user;
     const isCreatePdfTool = output.name === Tools.create_pdf;
     const isRunToolAndSaveTool = output.name === Tools.run_tool_and_save;
+    const isCreateBrainstormDocTool = output.name === Tools.create_brainstorm_doc;
     const isDriveDownloadFileTool =
       typeof output.name === 'string' && output.name.includes('drive_downloadFile');
-    if (!isCodeTool && !isSendFileTool && !isCreatePdfTool && !isRunToolAndSaveTool && !isDriveDownloadFileTool) {
+    if (!isCodeTool && !isSendFileTool && !isCreatePdfTool && !isRunToolAndSaveTool && !isCreateBrainstormDocTool && !isDriveDownloadFileTool) {
       return;
     }
 
@@ -775,9 +776,10 @@ function createResponsesToolEndCallback({ req, res, tracker, artifactPromises })
     const isSendFileTool = output.name === Tools.workspace_send_file_to_user;
     const isCreatePdfTool = output.name === Tools.create_pdf;
     const isRunToolAndSaveTool = output.name === Tools.run_tool_and_save;
+    const isCreateBrainstormDocTool = output.name === Tools.create_brainstorm_doc;
     const isDriveDownloadFileTool =
       typeof output.name === 'string' && output.name.includes('drive_downloadFile');
-    if (!isCodeTool && !isSendFileTool && !isCreatePdfTool && !isRunToolAndSaveTool && !isDriveDownloadFileTool) {
+    if (!isCodeTool && !isSendFileTool && !isCreatePdfTool && !isRunToolAndSaveTool && !isCreateBrainstormDocTool && !isDriveDownloadFileTool) {
       return;
     }
 

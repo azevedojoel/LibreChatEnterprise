@@ -1,14 +1,14 @@
 import React, { memo, useMemo, useCallback } from 'react';
 import { Badge } from '@librechat/client';
 import { useRecoilValue, useRecoilCallback, useSetRecoilState } from 'recoil';
-import { Constants } from 'librechat-data-provider';
+import { Constants, Tools, AgentCapabilities } from 'librechat-data-provider';
 import type { BadgeItem } from '~/common';
 import { useChatBadges } from '~/hooks';
 import { useBadgeRowContext } from '~/Providers';
 import StackedMCPIcons from '~/components/MCP/StackedMCPIcons';
 import ToolsDropdown from './ToolsDropdown';
 import ToolDialogs from './ToolDialogs';
-import { ephemeralAgentByConvoId } from '~/store';
+import { ephemeralAgentByConvoId, agentToolAtomFamily } from '~/store';
 
 interface BadgeRowProps {
   showEphemeralBadges?: boolean;
@@ -22,12 +22,15 @@ interface BadgeRowProps {
 interface BadgeWrapperProps {
   badge: BadgeItem;
   isInChat: boolean;
+  brainstormMode: boolean;
   onToggle: (badge: BadgeItem) => void;
 }
 
-const BadgeWrapper = React.memo(({ badge, isInChat, onToggle }: BadgeWrapperProps) => {
+const BadgeWrapper = React.memo(({ badge, isInChat, brainstormMode, onToggle }: BadgeWrapperProps) => {
   const atomBadge = useRecoilValue(badge.atom);
   const isActive = badge.atom ? atomBadge : false;
+  const isDisabledByBrainstorm = brainstormMode && badge.id !== 'brainstorm';
+  const isBrainstormActive = badge.id === 'brainstorm' && isActive;
 
   return (
     <div className="badge-icon h-full">
@@ -37,9 +40,10 @@ const BadgeWrapper = React.memo(({ badge, isInChat, onToggle }: BadgeWrapperProp
         label={badge.label}
         isActive={isActive}
         isEditing={false}
-        isAvailable={badge.isAvailable}
+        isAvailable={badge.isAvailable && !isDisabledByBrainstorm}
         isInChat={isInChat}
         onToggle={() => onToggle(badge)}
+        className={isBrainstormActive ? 'bg-amber-100 dark:bg-amber-900/40' : undefined}
       />
     </div>
   );
@@ -55,7 +59,7 @@ function BadgeRow({
 }: BadgeRowProps) {
   const key = conversationId ?? Constants.NEW_CONVO;
   const setEphemeralAgent = useSetRecoilState(ephemeralAgentByConvoId(key));
-  const { agentToolIds, mcpServerManager } = useBadgeRowContext();
+  const { agentToolIds, mcpServerManager, brainstormMode } = useBadgeRowContext();
 
   const allBadges = useChatBadges(conversationId);
   const badges = useMemo(
@@ -83,26 +87,44 @@ function BadgeRow({
         const current = await snapshot.getPromise(badgeAtom);
         const newValue = !current;
         set(badgeAtom, newValue);
-        setEphemeralAgent((prev) => ({
-          ...(prev || {}),
-          [badgeId]: newValue,
-        }));
+        setEphemeralAgent((prev) => {
+          const next = { ...(prev || {}), [badgeId]: newValue };
+          if (badgeId === 'brainstorm' && newValue) {
+            next[Tools.web_search] = false;
+            next[Tools.file_search] = false;
+            next[Tools.execute_code] = false;
+            next[AgentCapabilities.artifacts] = false;
+          } else if (badgeId !== 'brainstorm' && newValue && prev?.brainstorm) {
+            next.brainstorm = false;
+          }
+          return next;
+        });
+        if (badgeId === 'brainstorm' && newValue) {
+          [Tools.web_search, Tools.file_search, Tools.execute_code, AgentCapabilities.artifacts].forEach(
+            (toolKey) => set(agentToolAtomFamily(`${key}__${toolKey}`), false),
+          );
+        } else if (badgeId !== 'brainstorm' && newValue) {
+          set(agentToolAtomFamily(`${key}__brainstorm`), false);
+        }
         return newValue;
       },
-    [setEphemeralAgent],
+    [setEphemeralAgent, key],
   );
 
   const handleBadgeToggle = useCallback(
     async (badge: BadgeItem) => {
       let newActive = false;
       if (badge.atom) {
+        if (brainstormMode && badge.id !== 'brainstorm') {
+          return;
+        }
         newActive = await toggleBadge(badge.atom, badge.id);
       }
       if (onToggle) {
         onToggle(badge.id, newActive);
       }
     },
-    [toggleBadge, onToggle],
+    [toggleBadge, onToggle, brainstormMode],
   );
 
   if (showEphemeralBadges !== true) {
@@ -111,12 +133,13 @@ function BadgeRow({
 
   return (
     <div className="flex h-9 items-center gap-2">
-      <ToolsDropdown disabled={disabled} />
+      <ToolsDropdown disabled={disabled || brainstormMode} />
       {badges.map((badge) => (
         <BadgeWrapper
           key={badge.id}
           badge={badge}
           isInChat={isInChat}
+          brainstormMode={brainstormMode}
           onToggle={handleBadgeToggle}
         />
       ))}

@@ -48,6 +48,7 @@ const {
 } = require('~/server/services/WorkspaceCodeEdit');
 const { createCreatePdfTool } = require('~/server/services/CreatePdf/tool');
 const { createRunToolAndSaveTool } = require('~/server/services/RunToolAndSave/tool');
+const { createBrainstormDocTool } = require('~/server/services/BrainstormDoc/tool');
 const { createGenerateCodeTool } = require('~/server/services/GenerateCode');
 const {
   createWorkspaceStatusTool,
@@ -552,6 +553,9 @@ const loadTools = async ({
       continue;
     } else if (tool === Tools.run_tool_and_save) {
       requestedTools[tool] = async () => createRunToolAndSaveTool();
+      continue;
+    } else if (tool === Tools.create_brainstorm_doc) {
+      requestedTools[tool] = async () => createBrainstormDocTool();
       continue;
     } else if (
       tool === Tools.list_schedules ||

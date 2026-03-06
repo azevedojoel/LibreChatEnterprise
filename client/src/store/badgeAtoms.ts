@@ -15,4 +15,5 @@ export const AGENT_TOOL_IDS = [
   Tools.execute_code,
   Tools.file_search,
   AgentCapabilities.artifacts,
+  'brainstorm',
 ] as const;

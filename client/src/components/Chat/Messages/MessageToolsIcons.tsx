@@ -74,7 +74,8 @@ const BUILT_IN_ICONS: Record<string, React.ComponentType<{ className?: string; s
   [Tools.workspace_init]: FolderOpen,
   [Tools.reset_workspace]: Wrench,
   [Tools.update_todo]: ListPlus,
-  [Tools.create_plan]: FileText,
+    [Tools.create_plan]: FileText,
+    [Tools.create_brainstorm_doc]: FileText,
 };
 
 function getToolIcon(toolId: string): React.ComponentType<{ className?: string; size?: number }> {
@@ -131,6 +132,7 @@ function getToolDisplayName(
     [Tools.reset_workspace]: 'Reset Workspace',
     [Tools.update_todo]: 'Update Todo',
     [Tools.create_plan]: 'Create Plan',
+    [Tools.create_brainstorm_doc]: 'Brainstorm Doc',
   };
   return labels[toolId] ?? toolId;
 }

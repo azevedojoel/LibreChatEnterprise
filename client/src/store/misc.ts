@@ -57,6 +57,7 @@ const chatBadges = atomWithLocalStorage<Array<{ id: string }>>('chatBadges', [
   { id: 'execute_code' },
   { id: 'file_search' },
   { id: 'artifacts' },
+  { id: 'brainstorm' },
 ]);
 
 /** Selected user project ID for filtering conversations in sidebar (null = all) */

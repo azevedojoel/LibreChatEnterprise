@@ -130,20 +130,24 @@ const loadAddedAgent = async ({ req, conversation, primaryAgent }) => {
 
   /** @type {string[]} */
   const tools = [];
-  if (ephemeralAgent?.execute_code === true || modelSpec?.executeCode === true) {
-    tools.push(Tools.execute_code);
-  }
-  if (ephemeralAgent?.file_search === true || modelSpec?.fileSearch === true) {
-    tools.push(Tools.file_search);
-  }
-  if (ephemeralAgent?.web_search === true || modelSpec?.webSearch === true) {
-    tools.push(Tools.web_search);
-  }
-  if (ephemeralAgent?.create_pdf === true || modelSpec?.createPdf === true) {
-    tools.push(Tools.create_pdf);
+  if (ephemeralAgent?.brainstorm === true) {
+    tools.push(Tools.create_brainstorm_doc, Tools.web_search, Tools.file_search);
+  } else {
+    if (ephemeralAgent?.execute_code === true || modelSpec?.executeCode === true) {
+      tools.push(Tools.execute_code);
+    }
+    if (ephemeralAgent?.file_search === true || modelSpec?.fileSearch === true) {
+      tools.push(Tools.file_search);
+    }
+    if (ephemeralAgent?.web_search === true || modelSpec?.webSearch === true) {
+      tools.push(Tools.web_search);
+    }
+    if (ephemeralAgent?.create_pdf === true || modelSpec?.createPdf === true) {
+      tools.push(Tools.create_pdf);
+    }
   }
   const addedServers = new Set();
-  if (mcpServers.size > 0) {
+  if (ephemeralAgent?.brainstorm !== true && mcpServers.size > 0) {
     for (const mcpServer of mcpServers) {
       if (addedServers.has(mcpServer)) {
         continue;
