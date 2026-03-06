@@ -189,6 +189,10 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
         typeof argsRaw === 'string' ? (() => { try { return JSON.parse(argsRaw); } catch { return {}; } })() : argsRaw;
       const argsStr = typeof argsRaw === 'string' ? argsRaw : JSON.stringify(argsRaw ?? {});
       const argsSummary = argsStr.length > 200 ? argsStr.slice(0, 200) + '...' : argsStr;
+      const requestMessage =
+        toolCall.name === Tools.human_await_response && args?.message && typeof args.message === 'string'
+          ? String(args.message).trim()
+          : null;
 
       let approverUserId = conversationOwnerId;
       let approverName = null;
@@ -260,6 +264,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
           userId: approverUserId,
           toolName: toolCall.name,
           argsSummary,
+          requestMessage: requestMessage || undefined,
           status: 'pending',
           expiresAt,
         });
@@ -282,6 +287,15 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
             to: targetUser.email,
           });
         }
+        const { createNotification } = require('~/server/services/NotificationService');
+        await createNotification({
+          userId: approverUserId,
+          type: 'tool_approval',
+          title: 'Approval requested',
+          body: args?.message || argsSummary || 'A tool requires your approval.',
+          link: `/approve/tool?id=${token}`,
+          metadata: { conversationId, runId, toolCallId: toolCall.id, toolName: toolCall.name },
+        }).catch((err) => logger.warn('[ToolConfirmation] createNotification failed', err));
         emitToolConfirmationEvent({
           event: 'tool_confirmation_required',
           data: {
@@ -318,6 +332,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
             userId: approverUserId,
             toolName: toolCall.name,
             argsSummary,
+            requestMessage: requestMessage || undefined,
             status: 'pending',
             expiresAt,
           });

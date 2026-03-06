@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@librechat/client';
+import { QueryKeys, Tools } from 'librechat-data-provider';
 import { ShieldAlert, CheckCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { useLocalize } from '~/hooks';
 import { getToolDisplayName, humanizeToolName } from '~/utils';
@@ -8,6 +10,13 @@ import useAuthRedirect from './useAuthRedirect';
 import { getPendingToolConfirmation, submitToolConfirmation } from '~/data-provider/SSE/mutations';
 
 const MAX_ARG_VALUE_LENGTH = 60;
+
+const SCHEDULE_MUTATING_TOOLS = new Set([
+  Tools.create_schedule,
+  Tools.update_schedule,
+  Tools.delete_schedule,
+  Tools.run_schedule,
+]);
 
 /** Parse argsSummary JSON into key-value pairs for token bubbles. Falls back to raw display when truncated or invalid. */
 function parseArgsToBubbles(argsSummary: string): Array<{ key: string; value: string }> {
@@ -36,6 +45,7 @@ function parseArgsToBubbles(argsSummary: string): Array<{ key: string; value: st
 
 export default function ToolApprovalPage() {
   const { isAuthenticated } = useAuthRedirect();
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const localize = useLocalize();
@@ -49,12 +59,15 @@ export default function ToolApprovalPage() {
     contextLabel?: string;
     conversationTitle?: string;
     recentMessages?: Array<{ role: 'user' | 'assistant'; text: string }>;
+    agentName?: string;
+    requestMessage?: string;
+    requesterName?: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [resolved, setResolved] = useState<'approved' | 'denied' | null>(null);
-  const [messagesExpanded, setMessagesExpanded] = useState(false);
+  const [messagesExpanded, setMessagesExpanded] = useState(true);
 
   useEffect(() => {
     if (!isAuthenticated || !id) {
@@ -96,6 +109,10 @@ export default function ToolApprovalPage() {
       const result = await submitToolConfirmation({ id, approved: true });
       if (result.success) {
         setResolved('approved');
+        if (SCHEDULE_MUTATING_TOOLS.has(pending.toolName)) {
+          queryClient.invalidateQueries([QueryKeys.scheduledAgents]);
+          queryClient.invalidateQueries([QueryKeys.scheduledAgentRuns]);
+        }
       } else {
         setError(result.error || 'Failed to submit');
       }
@@ -104,7 +121,7 @@ export default function ToolApprovalPage() {
     } finally {
       setSubmitting(false);
     }
-  }, [id, pending]);
+  }, [id, pending, queryClient]);
 
   const handleDeny = useCallback(async () => {
     if (!pending) return;
@@ -186,48 +203,65 @@ export default function ToolApprovalPage() {
     );
   }
 
+  const isHumanAwaitResponse = pending?.toolName === 'human_await_response';
+  const showTechnicalBlock = !isHumanAwaitResponse;
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-4">
-      <div className="mx-auto flex w-full max-w-md flex-col gap-4 rounded-xl border border-border-medium bg-surface-primary p-6 shadow-xl">
+      <div className="mx-auto flex w-full max-w-lg flex-col gap-5 rounded-xl border border-border-medium bg-surface-primary p-6 shadow-xl">
         <h1
           id="tool-approval-page-title"
-          className="flex items-center gap-2 text-lg font-semibold text-text-primary"
+          className="flex items-center gap-2 text-xl font-semibold text-text-primary"
         >
           <ShieldAlert className="h-5 w-5 shrink-0 text-text-warning" aria-hidden="true" />
-          {localize('com_ui_tool_approval_required') || 'Tool approval required'}
+          {isHumanAwaitResponse
+            ? (localize('com_ui_tool_approval_await_title') || 'Approval needed')
+            : (localize('com_ui_tool_approval_required') || 'Tool approval required')}
         </h1>
-        <p className="text-sm text-text-secondary">
-          {localize('com_ui_tool_approval_prompt') ||
-            'Your agent is requesting to run a potentially destructive tool. Approve or deny to continue.'}
+        <p className="text-base text-text-secondary">
+          {isHumanAwaitResponse
+            ? pending?.agentName
+              ? (localize('com_ui_tool_approval_await_agent', { name: pending.agentName }) ||
+                  `${pending.agentName} needs your approval to continue.`)
+              : (localize('com_ui_tool_approval_await_prompt') ||
+                  'Someone needs your approval to continue.')
+            : pending?.agentName
+              ? (localize('com_ui_tool_approval_agent_requesting', { name: pending.agentName }) ||
+                  `${pending.agentName} is requesting your approval.`)
+              : (localize('com_ui_tool_approval_prompt') ||
+                  'Your agent is requesting to run a potentially destructive tool. Approve or deny to continue.')}
         </p>
-        {pending && (pending.contextLabel || pending.conversationTitle) && (
-          <p className="text-sm text-text-secondary">
-            {pending.contextLabel || pending.conversationTitle}
-          </p>
+        {(pending?.agentName || pending?.requesterName || pending?.conversationTitle) && (
+          <div className="flex flex-col gap-2 rounded-lg border border-border-medium bg-surface-secondary p-4">
+            {pending.agentName && (
+              <p className="text-sm">
+                <span className="font-semibold text-text-primary">
+                  {localize('com_ui_tool_approval_from') || 'From'}:{' '}
+                </span>
+                <span className="text-text-primary">{pending.agentName}</span>
+              </p>
+            )}
+            {pending.requesterName && (
+              <p className="text-sm">
+                <span className="font-semibold text-text-primary">
+                  {localize('com_ui_tool_approval_requested_by') || 'Requested by'}:{' '}
+                </span>
+                <span className="text-text-primary">{pending.requesterName}</span>
+              </p>
+            )}
+            {pending.conversationTitle && (
+              <p className="text-sm text-text-secondary">{pending.conversationTitle}</p>
+            )}
+          </div>
         )}
-        {pending && (
-          <div className="rounded-lg border border-border-medium bg-surface-secondary p-3">
-            <p className="text-sm font-medium text-text-primary">
-              {localize('com_ui_tool_name') || 'Tool'}: {getToolDisplayName(pending.toolName)}
+        {pending?.requestMessage && (
+          <div className="rounded-lg border border-border-medium bg-surface-secondary p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+              {localize('com_ui_tool_approval_message_label') || 'What they need'}
             </p>
-            {(() => {
-              const bubbles = parseArgsToBubbles(pending.argsSummary ?? '');
-              if (bubbles.length === 0) return null;
-              return (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {bubbles.map(({ key, value }) => (
-                    <span
-                      key={key}
-                      className="inline-flex max-w-full items-center gap-1 rounded-md border border-border-medium bg-surface-primary px-2 py-1 text-xs text-text-secondary"
-                      title={value.length >= MAX_ARG_VALUE_LENGTH ? value : undefined}
-                    >
-                      <span className="font-medium text-text-primary">{key}:</span>
-                      <span className="truncate">{value}</span>
-                    </span>
-                  ))}
-                </div>
-              );
-            })()}
+            <p className="mt-2 text-base text-text-primary whitespace-pre-wrap break-words">
+              {pending.requestMessage}
+            </p>
           </div>
         )}
         {pending?.recentMessages && pending.recentMessages.length > 0 && (
@@ -264,6 +298,31 @@ export default function ToolApprovalPage() {
             )}
           </div>
         )}
+        {pending && showTechnicalBlock && (() => {
+          const bubbles = parseArgsToBubbles(pending.argsSummary ?? '');
+          const hasArgs = bubbles.length > 0;
+          return (
+            <div className="rounded-lg border border-border-medium bg-surface-secondary p-3">
+              <p className="text-sm font-medium text-text-primary">
+                {localize('com_ui_tool_name') || 'Tool'}: {getToolDisplayName(pending.toolName)}
+              </p>
+              {hasArgs && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {bubbles.map(({ key, value }) => (
+                    <span
+                      key={key}
+                      className="inline-flex max-w-full items-center gap-1 rounded-md border border-border-medium bg-surface-primary px-2 py-1 text-xs text-text-secondary"
+                      title={value.length >= MAX_ARG_VALUE_LENGTH ? value : undefined}
+                    >
+                      <span className="font-medium text-text-primary">{key}:</span>
+                      <span className="truncate">{value}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
         {error && <p className="text-sm text-red-500">{error}</p>}
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           <Button

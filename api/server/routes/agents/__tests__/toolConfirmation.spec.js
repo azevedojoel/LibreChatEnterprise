@@ -58,11 +58,13 @@ jest.mock('~/server/middleware', () => ({
 const mockConversationFindOne = jest.fn();
 const mockGetMessages = jest.fn();
 const mockGetAgent = jest.fn();
+const mockUserFindById = jest.fn();
 
 jest.mock('~/db/models', () => ({
   ToolApprovalLink: mockToolApprovalLink,
   ToolApprovalRecord: mockToolApprovalRecord,
   Conversation: { findOne: (...args) => mockConversationFindOne(...args) },
+  User: { findById: (...args) => mockUserFindById(...args) },
   ScheduledRun: { findById: jest.fn() },
   ScheduledPrompt: {},
 }));
@@ -103,6 +105,7 @@ describe('Tool Confirmation API Routes', () => {
     jest.clearAllMocks();
     mockConversationFindOne.mockResolvedValue(null);
     mockGetMessages.mockResolvedValue([]);
+    mockUserFindById.mockResolvedValue(null);
   });
 
   describe('GET /chat/tool-confirmation/pending', () => {
@@ -235,6 +238,80 @@ describe('Tool Confirmation API Routes', () => {
           { role: 'user', text: 'Summarize deals' },
           { role: 'assistant', text: 'Here is the summary' },
         ],
+      });
+    });
+
+    it('should return agentName and requestMessage when conversation has agent_id and tool is human_await_response', async () => {
+      const link = {
+        _id: 'link-3',
+        token: 'token-3',
+        userId: 'test-user-123',
+        toolName: 'human_await_response',
+        argsSummary: '{"memberId":"123","message":"Please approve sending this email."}',
+        conversationId: 'conv-3',
+        expiresAt: new Date(Date.now() + 3600000),
+        clickedAt: null,
+      };
+      mockToolApprovalLink.findOne.mockResolvedValue(link);
+      mockToolApprovalLink.updateOne.mockResolvedValue({});
+      mockConversationFindOne.mockResolvedValue({
+        title: 'Ellis support',
+        scheduledRunId: null,
+        agent_id: 'agent-ellis-1',
+        user: 'test-user-123',
+      });
+      mockGetAgent.mockResolvedValue({ name: 'Ellis' });
+      mockGetMessages.mockResolvedValue([]);
+
+      const response = await request(app)
+        .get('/api/agents/chat/tool-confirmation/pending')
+        .query({ id: 'token-3' });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        toolName: 'human_await_response',
+        conversationId: 'conv-3',
+        agentName: 'Ellis',
+        requestMessage: 'Please approve sending this email.',
+        contextLabel: 'Ellis support',
+      });
+    });
+
+    it('should return requesterName when approver is different from conversation owner', async () => {
+      const link = {
+        _id: 'link-4',
+        token: 'token-4',
+        userId: 'test-user-123',
+        toolName: 'human_await_response',
+        requestMessage: 'Please approve this action.',
+        argsSummary: '{}',
+        conversationId: 'conv-4',
+        expiresAt: new Date(Date.now() + 3600000),
+        clickedAt: null,
+      };
+      mockToolApprovalLink.findOne.mockResolvedValue(link);
+      mockToolApprovalLink.updateOne.mockResolvedValue({});
+      mockConversationFindOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          title: 'Support chat',
+          scheduledRunId: null,
+          agent_id: 'agent-1',
+          user: 'owner-user-789',
+        });
+      mockGetAgent.mockResolvedValue({ name: 'Ellis' });
+      mockUserFindById.mockResolvedValue({ name: 'Joel', email: 'joel@example.com' });
+      mockGetMessages.mockResolvedValue([]);
+
+      const response = await request(app)
+        .get('/api/agents/chat/tool-confirmation/pending')
+        .query({ id: 'token-4' });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        agentName: 'Ellis',
+        requesterName: 'Joel',
+        requestMessage: 'Please approve this action.',
       });
     });
   });

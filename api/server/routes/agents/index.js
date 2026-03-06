@@ -320,20 +320,31 @@ router.get('/chat/tool-confirmation/pending', async (req, res) => {
   };
 
   try {
-    const { Conversation, ScheduledRun, ScheduledPrompt } = require('~/db/models');
+    const { Conversation, ScheduledRun, ScheduledPrompt, User } = require('~/db/models');
     const { getMessages } = require('~/models/Message');
     const { getAgent } = require('~/models/Agent');
 
-    const convo = await Conversation.findOne({
+    let convo = await Conversation.findOne({
       conversationId: link.conversationId,
       user: userId,
     })
-      .select('title scheduledRunId')
+      .select('title scheduledRunId agent_id user')
       .lean();
 
+    if (!convo) {
+      convo = await Conversation.findOne({ conversationId: link.conversationId })
+        .select('title scheduledRunId agent_id user')
+        .lean();
+    }
+
     if (convo) {
-      payload.canViewConversation = true;
+      const convoOwnerId = convo.user?.toString?.() || convo.user;
+      payload.canViewConversation = String(convoOwnerId) === String(userId);
       payload.conversationTitle = convo.title || null;
+      if (convoOwnerId && String(convoOwnerId) !== String(userId)) {
+        const owner = await User.findById(convoOwnerId).select('name email').lean();
+        payload.requesterName = owner?.name || owner?.email || null;
+      }
 
       if (convo.scheduledRunId) {
         const run = await ScheduledRun.findById(convo.scheduledRunId)
@@ -343,6 +354,7 @@ router.get('/chat/tool-confirmation/pending', async (req, res) => {
           const schedule = run.scheduleId;
           const agent = await getAgent({ id: schedule.agentId });
           const agentName = agent?.name;
+          payload.agentName = agentName || null;
           const scheduleName = schedule.name || 'Scheduled run';
           payload.contextLabel = agentName
             ? `${scheduleName}, ${agentName}`
@@ -350,12 +362,32 @@ router.get('/chat/tool-confirmation/pending', async (req, res) => {
         } else {
           payload.contextLabel = convo.title || 'Scheduled run';
         }
+      } else if (convo.agent_id) {
+        const agent = await getAgent({ id: convo.agent_id });
+        payload.agentName = agent?.name || null;
+        payload.contextLabel = convo.title || payload.agentName || 'Agent';
       } else {
         payload.contextLabel = convo.title || 'Inbound email';
       }
 
+      if (link.toolName === 'human_await_response') {
+        if (link.requestMessage && typeof link.requestMessage === 'string') {
+          payload.requestMessage = link.requestMessage.trim();
+        } else if (link.argsSummary) {
+          try {
+            const args = JSON.parse(link.argsSummary);
+            if (args?.message && typeof args.message === 'string') {
+              payload.requestMessage = args.message.trim();
+            }
+          } catch {
+            /* ignore - argsSummary may be truncated */
+          }
+        }
+      }
+
+      const messageUser = convoOwnerId || userId;
       const messages = await getMessages(
-        { conversationId: link.conversationId, user: userId },
+        { conversationId: link.conversationId, user: messageUser },
         'text content isCreatedByUser',
       );
       const recent = (messages || []).slice(-8);
@@ -486,6 +518,29 @@ router.post('/chat/tool-confirmation', async (req, res) => {
       { token },
       { status: approved ? 'approved' : 'denied', resolvedAt: new Date() },
     );
+    // Notify requester (conversation owner) when someone else approved or denied
+    try {
+      const { searchConversation } = require('~/models/Conversation');
+      const conversation = await searchConversation(resolvedConversationId);
+      const requesterId = conversation?.user?.toString?.() ?? conversation?.user;
+      if (requesterId && String(requesterId) !== String(userId)) {
+        const { createNotification } = require('~/server/services/NotificationService');
+        const { User } = require('~/db/models');
+        const approverUser = await User.findById(userId).select('name').lean();
+        const approverName = approverUser?.name || 'Someone';
+        await createNotification({
+          userId: requesterId,
+          type: 'tool_approval',
+          title: approved ? 'Approval granted' : 'Request denied',
+          body: approved
+            ? `${approverName} approved your request. The agent will continue.`
+            : `${approverName} denied your request.`,
+          link: `/c/${resolvedConversationId}`,
+        });
+      }
+    } catch (notifyErr) {
+      logger.warn('[ToolConfirmation] Failed to notify requester:', notifyErr);
+    }
     // Token flow: persist audit record for compliance (same as inline flow)
     try {
       const { ToolApprovalRecord } = require('~/db/models');

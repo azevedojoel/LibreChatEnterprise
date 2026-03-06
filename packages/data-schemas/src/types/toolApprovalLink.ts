@@ -10,6 +10,8 @@ export interface IToolApprovalLink extends Document {
   userId: Types.ObjectId;
   toolName: string;
   argsSummary: string;
+  /** Human-readable request message (for human_await_response), stored at creation before argsSummary truncation */
+  requestMessage?: string;
   status: ToolApprovalLinkStatus;
   createdAt?: Date;
   updatedAt?: Date;

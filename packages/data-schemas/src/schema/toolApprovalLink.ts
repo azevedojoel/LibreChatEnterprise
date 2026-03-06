@@ -38,6 +38,10 @@ const toolApprovalLinkSchema = new Schema<IToolApprovalLink>(
       type: String,
       default: '',
     },
+    requestMessage: {
+      type: String,
+      default: '',
+    },
     status: {
       type: String,
       enum: ['pending', 'approved', 'denied'],
