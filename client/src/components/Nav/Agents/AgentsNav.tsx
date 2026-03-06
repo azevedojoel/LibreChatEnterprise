@@ -1,5 +1,5 @@
-import { useState, useCallback, useMemo } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useCallback, useMemo } from 'react';
+import { useRecoilState, useRecoilValue } from 'recoil';
 import { ChevronDown } from 'lucide-react';
 import store from '~/store';
 import { EModelEndpoint } from 'librechat-data-provider';
@@ -18,7 +18,7 @@ interface AgentsNavProps {
 
 export default function AgentsNav({ isSmallScreen, toggleNav }: AgentsNavProps) {
   const localize = useLocalize();
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useRecoilState(store.agentsNavExpandedAtom);
 
   const selectedProjectId = useRecoilValue(store.selectedProjectIdAtom);
   const search = useRecoilValue(store.search);
@@ -80,7 +80,7 @@ export default function AgentsNav({ isSmallScreen, toggleNav }: AgentsNavProps) 
     <div className="mb-1">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="group flex w-full items-center justify-between rounded-lg px-1 py-2 text-xs font-bold text-text-secondary outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black dark:focus-visible:ring-white"
+        className="group flex w-full items-center justify-between rounded-lg px-1 py-2 text-sm font-bold text-text-secondary outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black dark:focus-visible:ring-white"
         type="button"
       >
         <span className="select-none">{localize('com_nav_agents')}</span>

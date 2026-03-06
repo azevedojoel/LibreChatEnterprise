@@ -74,6 +74,7 @@ export enum Tools {
   project_list = 'project_list',
   project_archive = 'project_archive',
   project_update_metadata = 'project_update_metadata',
+  project_switch = 'project_switch',
   generate_code = 'generate_code',
   lint = 'lint',
   run_program = 'run_program',

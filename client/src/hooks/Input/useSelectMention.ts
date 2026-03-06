@@ -170,7 +170,15 @@ export default function useSelectMention({
       if (userProjectId) {
         template.userProjectId = userProjectId;
       }
-      if (isExistingConversation && isCurrentModular && isNewModular && shouldSwitch) {
+      /* When selecting a specific agent, always start a new conversation (navigate to /c/new) */
+      const isAgentSelection = !!kwargs.agent_id;
+      if (
+        !isAgentSelection &&
+        isExistingConversation &&
+        isCurrentModular &&
+        isNewModular &&
+        shouldSwitch
+      ) {
         template.endpointType = newEndpointType;
 
         const currentConvo = getDefaultConversation({

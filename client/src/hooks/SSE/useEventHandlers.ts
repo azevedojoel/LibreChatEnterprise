@@ -284,6 +284,7 @@ export default function useEventHandlers({
     queryClient,
     onAuthMerged,
     onAuthCleared,
+    setConversation,
   });
   const attachmentHandler = useAttachmentHandler(queryClient);
 

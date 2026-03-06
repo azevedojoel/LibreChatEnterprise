@@ -60,10 +60,15 @@ const chatBadges = atomWithLocalStorage<Array<{ id: string }>>('chatBadges', [
 ]);
 
 /** Selected user project ID for filtering conversations in sidebar (null = all) */
-export const selectedProjectIdAtom = atom<string | null>({
-  key: 'selectedProjectId',
-  default: null,
-});
+export const selectedProjectIdAtom = atomWithLocalStorage<string | null>('selectedProjectId', null);
+
+/** Nav section expanded state - persists across refresh */
+export const agentsNavExpandedAtom = atomWithLocalStorage<boolean>('agentsNavExpanded', true);
+export const projectsNavExpandedAtom = atomWithLocalStorage<boolean>('projectsNavExpanded', true);
+export const schedulesNavExpandedAtom = atomWithLocalStorage<boolean>('schedulesNavExpanded', true);
+
+/** Help hint IDs the user has interacted with - after first click, icon shows on hover only */
+export const dismissedHelpHintsAtom = atomWithLocalStorage<string[]>('dismissedHelpHints', []);
 
 /** Pending OAuth for MCP or Action tools - overlay shows Sign-in/Cancel (bypasses cache update delay) */
 export interface PendingMCPOAuth {
@@ -121,6 +126,10 @@ export default {
   queriesEnabled,
   chatBadges,
   selectedProjectIdAtom,
+  agentsNavExpandedAtom,
+  projectsNavExpandedAtom,
+  schedulesNavExpandedAtom,
+  dismissedHelpHintsAtom,
   pendingMCPOAuthAtom,
   pendingToolConfirmationAtom,
   expandedToolCallsAtom,

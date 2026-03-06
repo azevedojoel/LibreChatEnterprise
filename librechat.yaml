@@ -49,7 +49,7 @@ interface:
   # Spacing of tool call rows: 'normal' | 'compact'
   toolCallSpacing: compact
   marketplace:
-    use: true
+    use: false
   remoteAgents:
     use: false
     create: false
@@ -366,6 +366,7 @@ endpoints:
           - project_list
           - project_archive
           - project_update_metadata
+          - project_switch
       - id: system-crm
         name: Morgan
         provider: openAI

@@ -1,12 +1,14 @@
 import { useMemo, memo, type FC, useCallback, useRef } from 'react';
+import { useRecoilValue } from 'recoil';
 import throttle from 'lodash/throttle';
-import { ChevronDown } from 'lucide-react';
-import { Spinner, useMediaQuery } from '@librechat/client';
+import { ChevronDown, ListFilter } from 'lucide-react';
+import { Spinner, TooltipAnchor, useMediaQuery } from '@librechat/client';
 import { List, AutoSizer, CellMeasurer, CellMeasurerCache } from 'react-virtualized';
 import type { TConversation } from 'librechat-data-provider';
 import { useLocalize, TranslationKeys } from '~/hooks';
 import { useActiveJobs } from '~/data-provider';
 import { groupConversationsByDate, cn } from '~/utils';
+import store from '~/store';
 import Convo from './Convo';
 
 export type CellPosition = {
@@ -73,19 +75,33 @@ interface ChatsHeaderProps {
   onToggle: () => void;
 }
 
-/** Collapsible header for the Chats section */
+/** Collapsible header for the Chats section - structure matches SchedulesNav/ProjectNav */
 const ChatsHeader: FC<ChatsHeaderProps> = memo(({ isExpanded, onToggle }) => {
   const localize = useLocalize();
+  const selectedProjectId = useRecoilValue(store.selectedProjectIdAtom);
   return (
     <button
       onClick={onToggle}
-      className="group flex w-full items-center justify-between rounded-lg px-1 py-2 text-xs font-bold text-text-secondary outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black dark:focus-visible:ring-white"
+      className="group flex w-full items-center justify-between rounded-lg px-1 py-2 text-sm font-bold text-text-secondary outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black dark:focus-visible:ring-white"
       type="button"
     >
-      <span className="select-none">{localize('com_ui_chats')}</span>
-      <ChevronDown
-        className={cn('h-3 w-3 transition-transform duration-200', isExpanded ? 'rotate-180' : '')}
-      />
+      <div className="flex items-center gap-0.5">
+        <span className="select-none">{localize('com_ui_chats')}</span>
+        {selectedProjectId && (
+          <TooltipAnchor
+            description={localize('com_ui_filtered_by_project')}
+            side="top"
+            className="inline-flex shrink-0"
+          >
+            <ListFilter className="h-3 w-3 text-text-secondary" aria-hidden />
+          </TooltipAnchor>
+        )}
+      </div>
+      <div className="flex items-center gap-0.5">
+        <ChevronDown
+          className={cn('h-3 w-3 transition-transform duration-200', isExpanded ? 'rotate-180' : '')}
+        />
+      </div>
     </button>
   );
 });
@@ -107,7 +123,6 @@ const DateLabel: FC<{ groupName: string; isFirst?: boolean }> = memo(({ groupNam
 DateLabel.displayName = 'DateLabel';
 
 type FlattenedItem =
-  | { type: 'chats-header' }
   | { type: 'header'; groupName: string }
   | { type: 'convo'; convo: TConversation }
   | { type: 'loading' };
@@ -177,7 +192,6 @@ const Conversations: FC<ConversationsProps> = ({
 
   const flattenedItems = useMemo(() => {
     const items: FlattenedItem[] = [];
-    items.push({ type: 'chats-header' });
 
     if (isChatsExpanded) {
       groupedConversations.forEach(([groupName, convos]) => {
@@ -207,9 +221,6 @@ const Conversations: FC<ConversationsProps> = ({
           if (!item) {
             return `unknown-${index}`;
           }
-          if (item.type === 'chats-header') {
-            return 'chats-header';
-          }
           if (item.type === 'header') {
             return `header-${item.groupName}`;
           }
@@ -238,21 +249,10 @@ const Conversations: FC<ConversationsProps> = ({
         );
       }
 
-      if (item.type === 'chats-header') {
-        return (
-          <MeasuredRow key={key} {...rowProps}>
-            <ChatsHeader
-              isExpanded={isChatsExpanded}
-              onToggle={() => setIsChatsExpanded(!isChatsExpanded)}
-            />
-          </MeasuredRow>
-        );
-      }
-
       if (item.type === 'header') {
         return (
           <MeasuredRow key={key} {...rowProps}>
-            <DateLabel groupName={item.groupName} isFirst={index === 1} />
+            <DateLabel groupName={item.groupName} isFirst={index === 0} />
           </MeasuredRow>
         );
       }
@@ -311,27 +311,35 @@ const Conversations: FC<ConversationsProps> = ({
           <span className="ml-2 text-text-primary">{localize('com_ui_loading')}</span>
         </div>
       ) : (
-        <div className="flex-1">
-          <AutoSizer>
-            {({ width, height }) => (
-              <List
-                ref={containerRef}
-                width={width}
-                height={height}
-                deferredMeasurementCache={cache}
-                rowCount={flattenedItems.length}
-                rowHeight={getRowHeight}
-                rowRenderer={rowRenderer}
-                overscanRowCount={10}
-                aria-readonly={false}
-                className="outline-none"
-                aria-label="Conversations"
-                onRowsRendered={handleRowsRendered}
-                tabIndex={-1}
-                style={{ outline: 'none', scrollbarGutter: 'stable' }}
-              />
-            )}
-          </AutoSizer>
+        <div className="flex flex-1 min-h-0 flex-col">
+          <div className="mb-1 shrink-0">
+            <ChatsHeader
+              isExpanded={isChatsExpanded}
+              onToggle={() => setIsChatsExpanded(!isChatsExpanded)}
+            />
+          </div>
+          <div className="min-h-0 flex-1">
+            <AutoSizer>
+              {({ width, height }) => (
+                <List
+                  ref={containerRef}
+                  width={width}
+                  height={height}
+                  deferredMeasurementCache={cache}
+                  rowCount={flattenedItems.length}
+                  rowHeight={getRowHeight}
+                  rowRenderer={rowRenderer}
+                  overscanRowCount={10}
+                  aria-readonly={false}
+                  className="outline-none"
+                  aria-label="Conversations"
+                  onRowsRendered={handleRowsRendered}
+                  tabIndex={-1}
+                  style={{ outline: 'none', scrollbarGutter: 'stable' }}
+                />
+              )}
+            </AutoSizer>
+          </div>
         </div>
       )}
     </div>

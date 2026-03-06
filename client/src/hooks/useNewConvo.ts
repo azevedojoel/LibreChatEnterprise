@@ -301,6 +301,8 @@ const useNewConvo = (index = 0) => {
         paramEndpoint === true && templateConvoId && templateConvoId === Constants.NEW_CONVO
           ? {
               endpoint: _template.endpoint,
+              ...(_template.agent_id != null && { agent_id: _template.agent_id }),
+              ...(_template.assistant_id != null && { assistant_id: _template.assistant_id }),
               ...(_template.userProjectId != null && { userProjectId: _template.userProjectId }),
             }
           : _template;

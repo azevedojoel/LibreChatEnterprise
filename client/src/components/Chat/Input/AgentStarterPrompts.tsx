@@ -1,7 +1,14 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { EModelEndpoint } from 'librechat-data-provider';
 import { useAgentsMapContext, useChatContext } from '~/Providers';
 import { useSubmitMessage } from '~/hooks';
+
+export const PROJECTS_HELP_PROMPT =
+  'Hey Ellis, please explain how projects work in Daily Thread and provide an example use case.';
+
+export const SCHEDULES_HELP_PROMPT =
+  'Hey Ellis, how do agent schedules work in Daily Thread. Provide a short, concise example.';
 
 const AGENT_STARTERS = [
   {
@@ -49,6 +56,19 @@ export default function AgentStarterPrompts() {
     },
     [newConversation, hasEllis],
   );
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const autoStarterHandledRef = useRef(false);
+  useEffect(() => {
+    if (autoStarterHandledRef.current || !hasEllis) return;
+    const autoStarter = searchParams.get('autoStarter');
+    if (autoStarter !== 'projects' && autoStarter !== 'schedules') return;
+    autoStarterHandledRef.current = true;
+    const next = new URLSearchParams(searchParams);
+    next.delete('autoStarter');
+    setSearchParams(next, { replace: true });
+    handlePromptClick(autoStarter === 'schedules' ? SCHEDULES_HELP_PROMPT : PROJECTS_HELP_PROMPT);
+  }, [hasEllis, searchParams, setSearchParams, handlePromptClick]);
 
   return (
     <div className="scrollbar-hover mb-3 overflow-x-auto overflow-y-hidden px-2">

@@ -40,10 +40,6 @@ export default function ProjectIndicator() {
         if (!base) return prev;
         return { ...base, userProjectId: projectId };
       });
-      showToast({
-        message: localize('com_ui_project_selected_for_new_chat'),
-        status: 'success',
-      });
       popover.hide();
       return;
     }
