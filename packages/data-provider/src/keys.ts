@@ -83,6 +83,8 @@ export enum QueryKeys {
   workspaceMe = 'workspaceMe',
   /* Notifications */
   notifications = 'notifications',
+  /* Telegram */
+  telegramStatus = 'telegramStatus',
 }
 
 // Dynamic query keys that require parameters

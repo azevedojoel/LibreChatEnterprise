@@ -35,6 +35,22 @@ export function getFavorites(): Promise<FavoriteItem[]> {
   return request.get(`${endpoints.apiBaseUrl()}/api/user/settings/favorites`);
 }
 
+export type TelegramConnectResponse = { connectUrl: string };
+export type TelegramStatusResponse = { connected: boolean; enabled: boolean; linkedAt?: string };
+export type TelegramDisconnectResponse = { disconnected: boolean; message?: string };
+
+export function connectTelegram(): Promise<TelegramConnectResponse> {
+  return request.post(`${endpoints.apiBaseUrl()}/api/telegram/connect`);
+}
+
+export function getTelegramStatus(): Promise<TelegramStatusResponse> {
+  return request.get(`${endpoints.apiBaseUrl()}/api/telegram/status`);
+}
+
+export function disconnectTelegram(): Promise<TelegramDisconnectResponse> {
+  return request.delete(`${endpoints.apiBaseUrl()}/api/telegram/disconnect`);
+}
+
 export function updateFavorites(favorites: FavoriteItem[]): Promise<FavoriteItem[]> {
   return request.post(`${endpoints.apiBaseUrl()}/api/user/settings/favorites`, { favorites });
 }

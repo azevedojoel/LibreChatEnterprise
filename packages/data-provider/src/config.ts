@@ -302,6 +302,12 @@ export const agentsEndpointSchema = baseEndpointSchema
       inboundEmailAddress: z.string().optional(),
       /** Domain to show users for their agent email (e.g. dailythread.ai). Falls back to inboundEmailAddress if unset. */
       inboundEmailDisplayDomain: z.string().optional(),
+      /** Telegram bot username for connect link (e.g. DailyThreadBot). */
+      telegramBotUsername: z.string().optional(),
+      /** Enable Telegram inbound (user-scoped connect + chat). */
+      inboundTelegramEnabled: z.boolean().optional().default(false),
+      /** Per-integration instructions appended when run comes from that channel. Keys: telegram, email, etc. */
+      inboundInstructions: z.record(z.string()).optional(),
       /** System agents seeded on startup; shared by all users. */
       systemAgents: z
         .array(
@@ -1528,6 +1534,14 @@ export enum CacheKeys {
    * Key for MCP OAuth confirm tokens (short-lived, for post-callback confirmation).
    */
   MCP_OAUTH_CONFIRM = 'MCP_OAUTH_CONFIRM',
+  /**
+   * Key for Telegram connect tokens (single-use, 5-10 min TTL, for linking chatId to userId).
+   */
+  TELEGRAM_CONNECT_TOKENS = 'TELEGRAM_CONNECT_TOKENS',
+  /**
+   * Key for processed Telegram update_ids (idempotency, 24h TTL, avoids duplicate processing on retries).
+   */
+  TELEGRAM_PROCESSED_UPDATES = 'TELEGRAM_PROCESSED_UPDATES',
 }
 
 /**
