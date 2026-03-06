@@ -9,6 +9,7 @@ const {
 } = require('librechat-data-provider');
 const { getLdapConfig } = require('~/server/services/Config/ldap');
 const { getAppConfig } = require('~/server/services/Config/app');
+const { getMergedStartupConfig } = require('~/server/services/FeatureFlagService');
 const { getProjectByName } = require('~/models/Project');
 const { getLogStores } = require('~/cache');
 const rootPackageJson = require('../../../package.json');
@@ -156,8 +157,9 @@ router.get('/', async function (req, res) {
       payload.customFooter = process.env.CUSTOM_FOOTER;
     }
 
-    await cache.set(CacheKeys.STARTUP_CONFIG, payload);
-    return res.status(200).send(payload);
+    const mergedPayload = await getMergedStartupConfig(payload);
+    await cache.set(CacheKeys.STARTUP_CONFIG, mergedPayload);
+    return res.status(200).send(mergedPayload);
   } catch (err) {
     logger.error('Error in startup config', err);
     return res.status(500).send({ error: err.message });
