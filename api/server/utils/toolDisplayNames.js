@@ -105,6 +105,7 @@ const TOOL_DISPLAY_NAMES = {
   human_remove_from_workspace: 'Remove from Workspace',
   // Sys Admin tools
   sys_admin_help: 'Sys Admin Help',
+  sys_admin_search: 'Sys Admin Search',
   sys_admin_list_users: 'List Users',
   sys_admin_get_user: 'Get User',
   sys_admin_create_user: 'Create User',
@@ -139,7 +140,16 @@ const TOOL_DISPLAY_NAMES = {
   sys_admin_revert_agent_version: 'Revert Agent Version',
   sys_admin_seed_system_agents: 'Seed System Agents',
   sys_admin_tail_logs: 'Tail Logs',
+  sys_admin_search_event_logs: 'Search Event Logs',
   sys_admin_list_env: 'List Environment Variables',
+  sys_admin_list_all_tools: 'List All Tools',
+  sys_admin_create_tool_override: 'Create Tool Override',
+  sys_admin_get_tool_override: 'Get Tool Override',
+  sys_admin_update_tool_override: 'Update Tool Override',
+  sys_admin_delete_tool_override: 'Delete Tool Override',
+  sys_admin_list_tool_overrides: 'List Tool Overrides',
+  sys_admin_list_feature_flags: 'List Feature Flags',
+  sys_admin_set_feature_flag: 'Set Feature Flag',
 };
 
 /**

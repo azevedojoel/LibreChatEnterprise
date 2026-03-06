@@ -74,8 +74,13 @@ const {
 const {
   SCHEDULER_DEFAULT_INSTRUCTIONS,
 } = require('~/server/services/ScheduledAgents/schedulerInstructions');
+const {
+  applyToolOverrides,
+  getApprovalOverride,
+} = require('~/server/services/ToolOverrideService');
 const { getFlowStateManager } = require('~/config');
 const { getLogStores } = require('~/cache');
+const { logToolCallFailure } = require('~/server/services/EventLogService');
 /**
  * Processes the required actions by calling the appropriate tools and returning the outputs.
  * @param {OpenAIClient} client - OpenAI or StreamRunManager Client.
@@ -386,6 +391,17 @@ async function processRequiredActions(client, requiredActions) {
           `tool_call_id: ${currentAction.toolCallId} | Error processing tool ${currentAction.tool}`,
           error,
         );
+        logToolCallFailure({
+          userId: client.req.user.id,
+          toolName: currentAction.tool,
+          toolCallId: currentAction.toolCallId,
+          errorMessage: error?.message ?? 'Tool execution failed',
+          metadata: {
+            conversationId: client.req.body?.conversationId,
+            runId: requiredActions[0]?.run_id,
+            success: false,
+          },
+        }).catch((err) => logger.warn('[EventLog] logToolCallFailure failed', err));
       } else {
         logger.info(
           `tool_call_id: ${currentAction.toolCallId} | User declined OAuth for ${currentAction.tool}`,
@@ -486,6 +502,7 @@ const nativeTools = new Set([
   Tools.human_invite_to_workspace,
   Tools.human_remove_from_workspace,
   Tools.sys_admin_help,
+  Tools.sys_admin_search,
   Tools.sys_admin_list_users,
   Tools.sys_admin_get_user,
   Tools.sys_admin_create_user,
@@ -520,11 +537,21 @@ const nativeTools = new Set([
   Tools.sys_admin_revert_agent_version,
   Tools.sys_admin_seed_system_agents,
   Tools.sys_admin_tail_logs,
+  Tools.sys_admin_search_event_logs,
   Tools.sys_admin_list_env,
+  Tools.sys_admin_list_all_tools,
+  Tools.sys_admin_create_tool_override,
+  Tools.sys_admin_get_tool_override,
+  Tools.sys_admin_update_tool_override,
+  Tools.sys_admin_delete_tool_override,
+  Tools.sys_admin_list_tool_overrides,
+  Tools.sys_admin_list_feature_flags,
+  Tools.sys_admin_set_feature_flag,
 ]);
 
 const SYS_ADMIN_TOOLS = [
   Tools.sys_admin_help,
+  Tools.sys_admin_search,
   Tools.sys_admin_list_users,
   Tools.sys_admin_get_user,
   Tools.sys_admin_create_user,
@@ -555,10 +582,35 @@ const SYS_ADMIN_TOOLS = [
   Tools.sys_admin_revert_agent_version,
   Tools.sys_admin_seed_system_agents,
   Tools.sys_admin_tail_logs,
+  Tools.sys_admin_search_event_logs,
   Tools.sys_admin_list_env,
+  Tools.sys_admin_list_all_tools,
+  Tools.sys_admin_create_tool_override,
+  Tools.sys_admin_get_tool_override,
+  Tools.sys_admin_update_tool_override,
+  Tools.sys_admin_delete_tool_override,
+  Tools.sys_admin_list_tool_overrides,
+  Tools.sys_admin_list_feature_flags,
+  Tools.sys_admin_set_feature_flag,
 ];
 
 const { isDestructiveTool } = require('./destructiveTools');
+
+/**
+ * Check if a tool requires approval. Consults ToolOverride overrides first (per agent/user);
+ * falls back to DESTRUCTIVE_TOOLS when no override applies.
+ * @param {string} toolName - Full tool name (e.g. gmail_send_mcp_Google)
+ * @param {{ agentId?: string; userId?: string }} context - Agent and user for override lookup
+ * @returns {Promise<boolean>}
+ */
+async function checkRequiresApproval(toolName, context = {}) {
+  if (!toolName || typeof toolName !== 'string') return false;
+  const mcpDelimiter = Constants.mcp_delimiter || '_mcp_';
+  const baseName = toolName.includes(mcpDelimiter) ? toolName.split(mcpDelimiter)[0] : toolName;
+  const override = await getApprovalOverride(baseName, context.agentId, context.userId);
+  if (typeof override === 'boolean') return override;
+  return isDestructiveTool(toolName);
+}
 
 /** Checks if a tool name is a known built-in tool */
 const isBuiltInTool = (toolName) =>
@@ -624,9 +676,6 @@ async function loadToolDefinitionsWrapper({
   let toolsToFilter = [
     ...new Set((agent.tools ?? []).filter((t) => t != null && typeof t === 'string')),
   ];
-
-  /** Inject run_tool_and_save on every agent run - allows exporting any tool output to JSON file */
-  toolsToFilter = [...new Set([...toolsToFilter, Tools.run_tool_and_save])];
 
   if (toolsToFilter.includes(Tools.execute_code)) {
     const workspaceTools = [
@@ -887,9 +936,6 @@ async function loadToolDefinitionsWrapper({
       }
       return checkCapability(AgentCapabilities.create_pdf);
     }
-    if (tool === Tools.run_tool_and_save) {
-      return true; /* Always allow - auto-injected on every agent run */
-    }
     const coderTools = [
       Tools.generate_code,
       Tools.install_dependencies,
@@ -1077,6 +1123,14 @@ async function loadToolDefinitionsWrapper({
     },
   );
 
+  const agentObjectId = agent._id ?? agent.id;
+  const overrideResult = await applyToolOverrides(
+    { toolDefinitions, toolRegistry },
+    agentObjectId,
+  );
+  toolDefinitions = overrideResult.toolDefinitions;
+  toolRegistry = overrideResult.toolRegistry;
+
   if (!definitionsOnly && pendingOAuthServers.size > 0 && (res || streamId)) {
     const isHeadless = Array.isArray(req._headlessOAuthUrls);
     if (isHeadless) {
@@ -1143,6 +1197,12 @@ async function loadToolDefinitionsWrapper({
         toolDefinitions = reloadResult.toolDefinitions;
         toolRegistry = reloadResult.toolRegistry;
         hasDeferredTools = reloadResult.hasDeferredTools;
+        const overrideAfterOAuth = await applyToolOverrides(
+          { toolDefinitions, toolRegistry },
+          agentObjectId,
+        );
+        toolDefinitions = overrideAfterOAuth.toolDefinitions;
+        toolRegistry = overrideAfterOAuth.toolRegistry;
       }
     }
   }
@@ -1185,8 +1245,12 @@ async function loadToolDefinitionsWrapper({
 
   const hasRunToolAndSave = filteredTools.includes(Tools.run_tool_and_save);
   if (hasRunToolAndSave) {
-    toolContextMap[Tools.run_tool_and_save] =
-      '- Runs any tool with given args and saves output to JSON file. Filename gets timestamp. Use to export CRM, Gmail, etc. without raw data in context.';
+    const hasCRMTools = filteredTools.some(
+      (t) => typeof t === 'string' && t.startsWith('crm_'),
+    );
+    toolContextMap[Tools.run_tool_and_save] = hasCRMTools
+      ? '- Export to File: Use ONLY when the user explicitly asks to export, download, or save to a file. For listing in chat, use crm_list_contacts, crm_list_organizations, crm_list_deals.'
+      : '- Runs any tool with given args and saves output to JSON file. Use when the user explicitly requests export/download.';
   }
 
   if (hasWorkspaceCodeEdit) {
@@ -1385,9 +1449,6 @@ async function loadAgentTools({
   let toolsToFilter = [
     ...new Set((agent.tools ?? []).filter((t) => t != null && typeof t === 'string')),
   ];
-
-  /** Inject run_tool_and_save on every agent run - allows exporting any tool output to JSON file */
-  toolsToFilter = [...new Set([...toolsToFilter, Tools.run_tool_and_save])];
 
   if (toolsToFilter.includes(Tools.execute_code)) {
     const workspaceTools = [
@@ -1650,8 +1711,6 @@ async function loadAgentTools({
         return ephemeralAgent.create_pdf === true;
       }
       return checkCapability(AgentCapabilities.create_pdf);
-    } else if (tool === Tools.run_tool_and_save) {
-      return true; /* Always allow - auto-injected on every agent run */
     } else if (!areToolsEnabled && !tool.includes(actionDelimiter)) {
       return false;
     }
@@ -2341,6 +2400,7 @@ module.exports = {
   loadTools,
   isBuiltInTool,
   isDestructiveTool,
+  checkRequiresApproval,
   getToolkitKey,
   loadAgentTools,
   loadToolsForExecution,

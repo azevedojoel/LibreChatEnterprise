@@ -111,7 +111,12 @@ const DESTRUCTIVE_TOOLS = new Set([
   Tools.sys_admin_revert_agent_version,
   Tools.sys_admin_seed_system_agents,
   Tools.sys_admin_tail_logs,
+  Tools.sys_admin_search_event_logs,
   Tools.sys_admin_list_env,
+  Tools.sys_admin_create_tool_override,
+  Tools.sys_admin_update_tool_override,
+  Tools.sys_admin_delete_tool_override,
+  Tools.sys_admin_set_feature_flag,
 ]);
 
 /**

@@ -46,7 +46,22 @@ const {
   agentCreateSchema,
   agentUpdateSchema,
   getToolDefinition,
+  getAllToolDefinitions,
 } = require('@librechat/api');
+const {
+  getOverride,
+  listOverrides,
+  createOverride,
+  getOverrideById,
+  updateOverride,
+  deleteOverride,
+} = require('~/server/services/ToolOverrideService');
+const { searchToolsByQuery, formatToolSearchForDiscovery } = require('@librechat/agents');
+const {
+  getEffectiveFeatureFlags,
+  setFeatureFlag,
+  getAllowedKeys,
+} = require('~/server/services/FeatureFlagService');
 const { sendEmail } = require('~/server/utils');
 const { Transaction, Balance } = require('~/db/models');
 const { getTransactions } = require('~/models/Transaction');
@@ -66,6 +81,7 @@ const { seedSystemAgents } = require('~/server/services/seedSystemAgents');
 const { manifestToolMap } = require('~/app/clients/tools/manifest');
 const { getLogStores } = require('~/cache');
 const { ViolationTypes } = require('librechat-data-provider');
+const { searchEventLogs } = require('~/server/services/EventLogService');
 
 const EXCLUDED_FIELDS = '-password -totpSecret -refreshToken -__v';
 
@@ -157,6 +173,10 @@ function createSysAdminTools({ userId, userRole }) {
           {
             name: 'sys_admin_help',
             purpose: 'Get this help and example questions',
+          },
+          {
+            name: 'sys_admin_search',
+            purpose: 'Search sys_admin tools by query (e.g. "ban user", "logs", "feature flag") - use to discover the right tool',
           },
           {
             name: 'sys_admin_list_users',
@@ -295,11 +315,49 @@ function createSysAdminTools({ userId, userRole }) {
             purpose: 'Read recent server log entries (error/debug)',
           },
           {
+            name: 'sys_admin_search_event_logs',
+            purpose: 'Search audit event logs (emails sent, by conversation/schedule/user)',
+          },
+          {
             name: 'sys_admin_list_env',
             purpose: 'List environment variable names (sensitive values redacted)',
           },
+          {
+            name: 'sys_admin_list_all_tools',
+            purpose: 'List all tools with descriptions and schemas',
+          },
+          {
+            name: 'sys_admin_create_tool_override',
+            purpose:
+              'Create tool override (description, schema, or requiresApproval). Optional agentId (per-agent), userId (per-user). requiresApproval: true=gate, false=ungate.',
+          },
+          {
+            name: 'sys_admin_get_tool_override',
+            purpose: 'Get a tool override by id or toolId+agentId+userId',
+          },
+          {
+            name: 'sys_admin_update_tool_override',
+            purpose: 'Update a tool override (description, schema, requiresApproval)',
+          },
+          {
+            name: 'sys_admin_delete_tool_override',
+            purpose: 'Delete a tool override by id or toolId+agentId+userId',
+          },
+          {
+            name: 'sys_admin_list_tool_overrides',
+            purpose: 'List tool overrides with filters (toolId, agentId, userId). Returns requiresApproval.',
+          },
+          {
+            name: 'sys_admin_list_feature_flags',
+            purpose: 'List feature flags (summarizeEnabled, feedbackEnabled, balanceEnabled, etc.)',
+          },
+          {
+            name: 'sys_admin_set_feature_flag',
+            purpose: 'Set a feature flag (changes apply immediately)',
+          },
         ],
         exampleQuestions: [
+          'What tools can I use to ban a user? (use sys_admin_search)',
           'How much token usage does user X have?',
           "What is user X's current balance?",
           'List all users',
@@ -321,7 +379,18 @@ function createSysAdminTools({ userId, userRole }) {
           'Seed system agents from config',
           'What errors are in the logs?',
           'Show recent errors from today',
+          'Find emails sent to user@example.com',
+          'Show events for schedule X',
+          'Find failed email sends',
+          'Events for conversation X',
           'List env vars starting with OPENAI',
+          'List all tools with descriptions',
+          'Create a tool override for file_search',
+          'Ungate execute_code for agent X (no approval required)',
+          'Gate file_search for user X (require approval)',
+          'List tool overrides for agent X',
+          'List feature flags',
+          'Enable or disable summarization',
         ],
       });
     },
@@ -330,6 +399,56 @@ function createSysAdminTools({ userId, userRole }) {
       description:
         'Returns description of all sys_admin tools and example questions. Use when the user asks what you can do or about token usage.',
       schema: { type: 'object', properties: {}, required: [] },
+    },
+  );
+
+  const searchTool = tool(
+    async (rawInput) => {
+      const err = requireAdmin();
+      if (err) return toJson(err);
+      try {
+        const allDefs = getAllToolDefinitions();
+        const sysAdminDefs = allDefs.filter(
+          (d) => d.name?.startsWith?.('sys_admin_') && d.name !== 'sys_admin_search',
+        );
+        const tools = sysAdminDefs.map((d) => ({
+          name: d.name,
+          description: d.description ?? '',
+          parameters: d.schema,
+        }));
+
+        const { query = '', max_results = 10 } = rawInput || {};
+        const response = searchToolsByQuery(tools, String(query || '').trim(), {
+          maxResults: Math.min(20, Math.max(1, parseInt(max_results, 10) || 10)),
+        });
+        return formatToolSearchForDiscovery(response, true);
+      } catch (e) {
+        logger.error('[SysAdmin] sys_admin_search error:', e);
+        return toJson({ error: e?.message ?? 'Search failed' });
+      }
+    },
+    {
+      name: Tools.sys_admin_search,
+      description:
+        'Searches sys_admin tools by query using BM25 ranking. Use to discover which tool to use for a task (e.g. "ban user", "token usage", "read logs").',
+      schema: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description:
+              'Search term to find in tool names and descriptions (e.g. "ban user", "logs", "feature flag")',
+          },
+          max_results: {
+            type: 'integer',
+            minimum: 1,
+            maximum: 20,
+            default: 10,
+            description: 'Maximum number of matching tools to return (default 10)',
+          },
+        },
+        required: [],
+      },
     },
   );
 
@@ -864,6 +983,7 @@ function createSysAdminTools({ userId, userRole }) {
             subject: `Invite to join ${appName}!`,
             payload: { appName, inviteLink, year: new Date().getFullYear() },
             template: 'inviteUser.handlebars',
+            auditContext: { userId, source: 'sys_admin_invite' },
           });
           return toJson({ message: 'Invitation sent successfully' });
         }
@@ -917,6 +1037,7 @@ function createSysAdminTools({ userId, userRole }) {
               year: new Date().getFullYear(),
             },
             template: 'requestPasswordReset.handlebars',
+            auditContext: { userId, source: 'sys_admin_password_reset' },
           });
         }
         return toJson({
@@ -2089,8 +2210,491 @@ function createSysAdminTools({ userId, userRole }) {
     },
   );
 
+  const searchEventLogsTool = tool(
+    async (rawInput) => {
+      const err = requireAdmin();
+      if (err) return toJson(err);
+      try {
+        const result = await searchEventLogs(rawInput || {});
+        const events = result.events.map((e) => ({
+          _id: e._id?.toString(),
+          type: e.type,
+          event: e.event,
+          userId: e.userId?.toString(),
+          metadata: e.metadata,
+          createdAt: e.createdAt,
+        }));
+        return toJson({ events, total: result.total, limit: result.limit, skip: result.skip });
+      } catch (e) {
+        logger.error('[SysAdmin.searchEventLogs]', e);
+        return toJson({ error: e.message || 'Failed to search event logs' });
+      }
+    },
+    {
+      name: Tools.sys_admin_search_event_logs,
+      description:
+        'Search audit event logs (email sent, etc.). Optional: type, event, userId, conversationId, agentId, scheduleId, to, subject, source, success, startDate, endDate, search (substring), limit (1-200), skip.',
+      schema: {
+        type: 'object',
+        properties: {
+          type: { type: 'string', description: 'Event type (e.g. email)' },
+          event: { type: 'string', description: 'Event name (e.g. email_sent)' },
+          userId: { type: 'string', description: 'Filter by user' },
+          conversationId: { type: 'string', description: 'metadata.conversationId' },
+          agentId: { type: 'string', description: 'metadata.agentId' },
+          scheduleId: { type: 'string', description: 'metadata.scheduleId' },
+          to: { type: 'string', description: 'Substring match on recipient email' },
+          subject: { type: 'string', description: 'Substring match on subject' },
+          source: { type: 'string', description: 'Exact match on metadata.source' },
+          success: { type: 'boolean', description: 'Filter by metadata.success' },
+          startDate: { type: 'string', description: 'createdAt >= (YYYY-MM-DD or ISO)' },
+          endDate: { type: 'string', description: 'createdAt <= (YYYY-MM-DD or ISO)' },
+          search: { type: 'string', description: 'Substring across to, subject, source' },
+          limit: { type: 'number', description: '1-200, default 50' },
+          skip: { type: 'number', description: 'Offset for pagination' },
+        },
+        required: [],
+      },
+    },
+  );
+
+  const listAllToolsTool = tool(
+    async (rawInput) => {
+      const err = requireAdmin();
+      if (err) return toJson(err);
+      const { agentId: agentIdForOverride } = rawInput || {};
+      try {
+        const registryDefs = getAllToolDefinitions();
+        const cachedTools = (await getCachedTools()) ?? {};
+        const toolsMap = new Map();
+        for (const def of registryDefs) {
+          toolsMap.set(def.name, {
+            id: def.name,
+            name: def.name,
+            description: def.description ?? '',
+            schema: def.schema ?? null,
+          });
+        }
+        for (const toolId of Object.keys(cachedTools)) {
+          if (!toolsMap.has(toolId)) {
+            const def = getToolDefinition(toolId);
+            const manifestEntry = manifestToolMap[toolId];
+            const name = manifestEntry?.name ?? def?.name ?? toolId;
+            const description = manifestEntry?.description ?? def?.description ?? '';
+            const schema = def?.schema ?? null;
+            toolsMap.set(toolId, { id: toolId, name, description, schema });
+          }
+        }
+        const toolsList = Array.from(toolsMap.values());
+        if (agentIdForOverride && toolsList.length > 0) {
+          const agentObjId = mongoose.Types.ObjectId.isValid(agentIdForOverride)
+            ? agentIdForOverride
+            : null;
+          for (const t of toolsList) {
+            const ov = await getOverride(t.id, agentObjId);
+            t.hasOverride = !!ov;
+          }
+        }
+        toolsList.sort((a, b) => a.id.localeCompare(b.id));
+        return toJson({ tools: toolsList });
+      } catch (e) {
+        logger.error('[SysAdmin.listAllTools]', e);
+        return toJson({ error: e.message || 'Failed to list tools' });
+      }
+    },
+    {
+      name: Tools.sys_admin_list_all_tools,
+      description:
+        'List all tools (registry + MCP) with id, name, description, schema. Optional: agentId for hasOverride.',
+      schema: {
+        type: 'object',
+        properties: { agentId: { type: 'string' } },
+        required: [],
+      },
+    },
+  );
+
+  const createToolOverrideTool = tool(
+    async (rawInput) => {
+      const err = requireAdmin();
+      if (err) return toJson(err);
+      const {
+        toolId,
+        agentId,
+        userId: userIdParam,
+        description,
+        schema,
+        requiresApproval,
+      } = rawInput || {};
+      if (!toolId || typeof toolId !== 'string') return toJson({ error: 'toolId is required' });
+      try {
+        const schemaParam =
+          typeof schema === 'string'
+            ? (() => {
+                try {
+                  return JSON.parse(schema);
+                } catch {
+                  return null;
+                }
+              })()
+            : schema;
+        let requiresApprovalVal;
+        if (requiresApproval === true || requiresApproval === false) {
+          requiresApprovalVal = requiresApproval;
+        } else if (requiresApproval === 'true') {
+          requiresApprovalVal = true;
+        } else if (requiresApproval === 'false') {
+          requiresApprovalVal = false;
+        } else {
+          requiresApprovalVal = undefined;
+        }
+        const cachedTools = (await getCachedTools()) ?? {};
+        const def = getToolDefinition(toolId);
+        if (!def && !cachedTools[toolId]) {
+          return toJson({ error: 'toolId not found in registry or cached tools' });
+        }
+        const hasContent =
+          (description != null && description !== '') ||
+          (schemaParam != null && typeof schemaParam === 'object') ||
+          requiresApprovalVal === true ||
+          requiresApprovalVal === false;
+        if (!hasContent) {
+          return toJson({
+            error: 'At least one of description, schema, or requiresApproval is required',
+          });
+        }
+        let agentObjId = null;
+        if (agentId) {
+          if (mongoose.Types.ObjectId.isValid(agentId)) {
+            agentObjId = new mongoose.Types.ObjectId(agentId);
+          } else {
+            const agent = await getAgent({ id: agentId });
+            if (agent) agentObjId = agent._id;
+          }
+        }
+        let userObjId = null;
+        if (userIdParam && mongoose.Types.ObjectId.isValid(userIdParam)) {
+          userObjId = new mongoose.Types.ObjectId(userIdParam);
+        }
+        const existing = await getOverrideById({ toolId, agentId: agentObjId, userId: userObjId });
+        if (existing) {
+          return toJson({ error: 'Override already exists for this toolId, agentId, and userId' });
+        }
+        const doc = await createOverride({
+          toolId: toolId.trim(),
+          agentId: agentObjId,
+          userId: userObjId,
+          description: description ?? null,
+          schema: schemaParam ?? null,
+          requiresApproval: requiresApprovalVal,
+          createdBy: userId,
+        });
+        return toJson({
+          _id: doc._id?.toString(),
+          toolId: doc.toolId,
+          agentId: doc.agentId?.toString() ?? null,
+          userId: doc.userId?.toString() ?? null,
+          description: doc.description,
+          schema: doc.schema,
+          requiresApproval: doc.requiresApproval,
+        });
+      } catch (e) {
+        logger.error('[SysAdmin.createToolOverride]', e);
+        return toJson({ error: e.message || 'Failed to create override' });
+      }
+    },
+    {
+      name: Tools.sys_admin_create_tool_override,
+      description:
+        'Create tool override. Required: toolId. Optional: agentId (omit for global), userId (omit for agent/global), description, schema, requiresApproval (gate/ungate approval). Omit schema if only changing requiresApproval. Example: { "toolId": "file_search", "requiresApproval": false } to ungate.',
+      schema: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          toolId: { type: 'string' },
+          agentId: { type: 'string' },
+          userId: { type: 'string', description: 'User _id for per-user override' },
+          description: { type: 'string' },
+          schema: {
+            oneOf: [
+              { type: 'object', description: 'Full JSON Schema object' },
+              { type: 'string', description: 'JSON string of the schema' },
+            ],
+            description:
+              "Override the tool's JSON Schema. Pass as object or JSON string. Omit if not changing schema.",
+          },
+          requiresApproval: { type: 'boolean', description: 'true=gate, false=ungate' },
+        },
+        required: ['toolId'],
+      },
+    },
+  );
+
+  const getToolOverrideTool = tool(
+    async (rawInput) => {
+      const err = requireAdmin();
+      if (err) return toJson(err);
+      const { overrideId, toolId, agentId, userId } = rawInput || {};
+      if (!overrideId && !toolId) return toJson({ error: 'overrideId or toolId is required' });
+      try {
+        const doc = await getOverrideById({ overrideId, toolId, agentId, userId });
+        if (!doc) return toJson({ error: 'Override not found' });
+        return toJson({
+          _id: doc._id?.toString(),
+          toolId: doc.toolId,
+          agentId: doc.agentId?.toString() ?? null,
+          userId: doc.userId?.toString() ?? null,
+          description: doc.description,
+          schema: doc.schema,
+          requiresApproval: doc.requiresApproval,
+          createdBy: doc.createdBy?.toString(),
+          createdAt: doc.createdAt,
+          updatedAt: doc.updatedAt,
+        });
+      } catch (e) {
+        logger.error('[SysAdmin.getToolOverride]', e);
+        return toJson({ error: e.message || 'Failed to get override' });
+      }
+    },
+    {
+      name: Tools.sys_admin_get_tool_override,
+      description: 'Get override by overrideId or toolId+agentId+userId.',
+      schema: {
+        type: 'object',
+        properties: {
+          overrideId: { type: 'string' },
+          toolId: { type: 'string' },
+          agentId: { type: 'string' },
+          userId: { type: 'string' },
+        },
+        required: [],
+      },
+    },
+  );
+
+  const updateToolOverrideTool = tool(
+    async (rawInput) => {
+      const err = requireAdmin();
+      if (err) return toJson(err);
+      const { overrideId, description, schema, requiresApproval } = rawInput || {};
+      if (!overrideId) return toJson({ error: 'overrideId is required' });
+      try {
+        const schemaParam =
+          typeof schema === 'string'
+            ? (() => {
+                try {
+                  return JSON.parse(schema);
+                } catch {
+                  return null;
+                }
+              })()
+            : schema;
+        let requiresApprovalVal;
+        if (requiresApproval === true || requiresApproval === false) {
+          requiresApprovalVal = requiresApproval;
+        } else if (requiresApproval === 'true') {
+          requiresApprovalVal = true;
+        } else if (requiresApproval === 'false') {
+          requiresApprovalVal = false;
+        } else {
+          requiresApprovalVal = undefined;
+        }
+        const updates = { description };
+        if (schema !== undefined && schemaParam != null && typeof schemaParam === 'object') {
+          updates.schema = schemaParam;
+        }
+        if (requiresApprovalVal !== undefined) {
+          updates.requiresApproval = requiresApprovalVal;
+        }
+        const doc = await updateOverride(overrideId, updates);
+        if (!doc) return toJson({ error: 'Override not found' });
+        return toJson({
+          _id: doc._id?.toString(),
+          toolId: doc.toolId,
+          agentId: doc.agentId?.toString() ?? null,
+          userId: doc.userId?.toString() ?? null,
+          description: doc.description,
+          schema: doc.schema,
+          requiresApproval: doc.requiresApproval,
+        });
+      } catch (e) {
+        logger.error('[SysAdmin.updateToolOverride]', e);
+        return toJson({ error: e.message || 'Failed to update override' });
+      }
+    },
+    {
+      name: Tools.sys_admin_update_tool_override,
+      description:
+        'Update override. Required: overrideId. Optional: description, schema, requiresApproval (gate/ungate). Omit schema if not changing. Pass schema as object or JSON string.',
+      schema: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          overrideId: { type: 'string' },
+          description: { type: 'string' },
+          schema: {
+            oneOf: [
+              { type: 'object', description: 'Full JSON Schema object' },
+              { type: 'string', description: 'JSON string of the schema' },
+            ],
+            description:
+              'New JSON Schema for the tool. Pass as object or JSON string. Omit if not changing schema.',
+          },
+          requiresApproval: { type: 'boolean', description: 'true=gate, false=ungate' },
+        },
+        required: ['overrideId'],
+      },
+    },
+  );
+
+  const deleteToolOverrideTool = tool(
+    async (rawInput) => {
+      const err = requireAdmin();
+      if (err) return toJson(err);
+      const { overrideId, toolId, agentId, userId } = rawInput || {};
+      if (!overrideId && !toolId) return toJson({ error: 'overrideId or toolId is required' });
+      try {
+        const result = await deleteOverride({ overrideId, toolId, agentId, userId });
+        if (!result.deleted) {
+          return toJson({ error: result.error || 'Override not found' });
+        }
+        return toJson({ message: 'Override deleted' });
+      } catch (e) {
+        logger.error('[SysAdmin.deleteToolOverride]', e);
+        return toJson({ error: e.message || 'Failed to delete override' });
+      }
+    },
+    {
+      name: Tools.sys_admin_delete_tool_override,
+      description: 'Delete override by overrideId or toolId+agentId+userId.',
+      schema: {
+        type: 'object',
+        properties: {
+          overrideId: { type: 'string' },
+          toolId: { type: 'string' },
+          agentId: { type: 'string' },
+          userId: { type: 'string' },
+        },
+        required: [],
+      },
+    },
+  );
+
+  const listToolOverridesTool = tool(
+    async (rawInput) => {
+      const err = requireAdmin();
+      if (err) return toJson(err);
+      const { toolId, agentId, userId, globalOnly, limit = 50, page = 1 } = rawInput || {};
+      try {
+        const result = await listOverrides({
+          toolId,
+          agentId,
+          userId,
+          globalOnly,
+          limit,
+          page,
+        });
+        return toJson(result);
+      } catch (e) {
+        logger.error('[SysAdmin.listToolOverrides]', e);
+        return toJson({ error: e.message || 'Failed to list overrides' });
+      }
+    },
+    {
+      name: Tools.sys_admin_list_tool_overrides,
+      description:
+        'List tool overrides. Optional: toolId, agentId, userId, globalOnly, limit, page. Returns requiresApproval, userId.',
+      schema: {
+        type: 'object',
+        properties: {
+          toolId: { type: 'string' },
+          agentId: { type: 'string' },
+          userId: { type: 'string' },
+          globalOnly: { type: 'boolean' },
+          limit: { type: 'number' },
+          page: { type: 'number' },
+        },
+        required: [],
+      },
+    },
+  );
+
+  const listFeatureFlagsTool = tool(
+    async () => {
+      const err = requireAdmin();
+      if (err) return toJson(err);
+      try {
+        const flags = await getEffectiveFeatureFlags();
+        const allowedKeys = getAllowedKeys();
+        return toJson({
+          flags,
+          allowedKeys,
+          hint: 'Use sys_admin_set_feature_flag to change a flag. Changes apply immediately.',
+        });
+      } catch (e) {
+        logger.error('[SysAdmin.listFeatureFlags]', e);
+        return toJson({ error: e.message || 'Failed to list feature flags' });
+      }
+    },
+    {
+      name: Tools.sys_admin_list_feature_flags,
+      description:
+        'List all feature flags (key, value, description). Allowed keys: summarizeEnabled, toolsMenuEnabled, forkEnabled, regenerateEnabled, feedbackEnabled, copyEnabled, editEnabled, continueEnabled, balanceEnabled, toolCallDetailsEnabled, showBirthdayIcon, sharePointFilePickerEnabled, customFooter.',
+      schema: { type: 'object', properties: {}, required: [] },
+    },
+  );
+
+  const setFeatureFlagTool = tool(
+    async (rawInput) => {
+      const err = requireAdmin();
+      if (err) return toJson(err);
+      const { key, value } = rawInput || {};
+      if (!key || value === undefined) {
+        return toJson({ error: 'key and value are required' });
+      }
+      try {
+        const result = await setFeatureFlag(key, value, userId);
+        return toJson({ success: true, ...result });
+      } catch (e) {
+        logger.error('[SysAdmin.setFeatureFlag]', e);
+        return toJson({ error: e.message || 'Failed to set feature flag' });
+      }
+    },
+    {
+      name: Tools.sys_admin_set_feature_flag,
+      description:
+        'Set a feature flag. key: summarizeEnabled|toolsMenuEnabled|forkEnabled|regenerateEnabled|feedbackEnabled|copyEnabled|editEnabled|continueEnabled|balanceEnabled|toolCallDetailsEnabled|showBirthdayIcon|sharePointFilePickerEnabled|customFooter. value: boolean for most, string for customFooter.',
+      schema: {
+        type: 'object',
+        properties: {
+          key: {
+            type: 'string',
+            enum: [
+              'summarizeEnabled',
+              'toolsMenuEnabled',
+              'forkEnabled',
+              'regenerateEnabled',
+              'feedbackEnabled',
+              'copyEnabled',
+              'editEnabled',
+              'continueEnabled',
+              'balanceEnabled',
+              'toolCallDetailsEnabled',
+              'showBirthdayIcon',
+              'sharePointFilePickerEnabled',
+              'customFooter',
+            ],
+          },
+          value: { description: 'boolean or string (for customFooter)' },
+        },
+        required: ['key', 'value'],
+      },
+    },
+  );
+
   return {
     [Tools.sys_admin_help]: helpTool,
+    [Tools.sys_admin_search]: searchTool,
     [Tools.sys_admin_list_users]: listUsersTool,
     [Tools.sys_admin_get_user]: getUserTool,
     [Tools.sys_admin_create_user]: createUserTool,
@@ -2126,6 +2730,15 @@ function createSysAdminTools({ userId, userRole }) {
     [Tools.sys_admin_seed_system_agents]: seedSystemAgentsTool,
     [Tools.sys_admin_tail_logs]: tailLogsTool,
     [Tools.sys_admin_list_env]: listEnvTool,
+    [Tools.sys_admin_search_event_logs]: searchEventLogsTool,
+    [Tools.sys_admin_list_all_tools]: listAllToolsTool,
+    [Tools.sys_admin_create_tool_override]: createToolOverrideTool,
+    [Tools.sys_admin_get_tool_override]: getToolOverrideTool,
+    [Tools.sys_admin_update_tool_override]: updateToolOverrideTool,
+    [Tools.sys_admin_delete_tool_override]: deleteToolOverrideTool,
+    [Tools.sys_admin_list_tool_overrides]: listToolOverridesTool,
+    [Tools.sys_admin_list_feature_flags]: listFeatureFlagsTool,
+    [Tools.sys_admin_set_feature_flag]: setFeatureFlagTool,
   };
 }
 
