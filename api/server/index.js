@@ -31,6 +31,7 @@ const initializeMCPs = require('./services/initializeMCPs');
 const { startScheduler } = require('./services/ScheduledAgents/scheduler');
 const { startWorker, requireRedisAtStartup } = require('./services/ScheduledAgents/jobQueue');
 const { startInboundEmailWorker } = require('./services/InboundEmail/jobQueue');
+const { startInboundTelegramWorker } = require('./services/InboundTelegram/jobQueue');
 const configureSocialLogins = require('./socialLogins');
 const { getAppConfig } = require('./services/Config');
 const staticCache = require('./utils/staticCache');
@@ -131,6 +132,10 @@ const startServer = async () => {
   app.use(cors());
   app.use(cookieParser());
 
+  /* Inbound Telegram webhook - must be after express.json() for JSON body */
+  const inboundTelegramRoutes = require('./routes/inboundTelegram');
+  app.use('/api/inbound/telegram', inboundTelegramRoutes);
+
   if (!isEnabled(DISABLE_COMPRESSION)) {
     app.use(compression());
   } else {
@@ -198,6 +203,7 @@ const startServer = async () => {
   app.use('/api/crm', routes.crm);
   app.use('/api/user-projects', routes.userProjects);
   app.use('/api/notifications', routes.notifications);
+  app.use('/api/telegram', routes.telegram);
 
   app.use(ErrorController);
 
@@ -241,6 +247,7 @@ const startServer = async () => {
       startScheduler();
       startWorker();
       startInboundEmailWorker();
+      startInboundTelegramWorker();
     }
 
     // Configure stream services (auto-detects Redis from USE_REDIS env var)

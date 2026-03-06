@@ -35,6 +35,7 @@ const mcp = require('./mcp');
 const crm = require('./crm');
 const userProjects = require('./userProjects');
 const notifications = require('./notifications');
+const telegram = require('./telegram');
 
 module.exports = {
   mcp,
@@ -74,4 +75,5 @@ module.exports = {
   crm,
   userProjects,
   notifications,
+  telegram,
 };
