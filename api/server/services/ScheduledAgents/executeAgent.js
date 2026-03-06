@@ -124,6 +124,7 @@ async function executeScheduledAgent({
       scheduledRunContext: {
         emailOnComplete: schedule.emailOnComplete !== false,
         scheduleName: schedule?.name ?? null,
+        scheduleId: scheduleId?.toString?.() ?? scheduleId,
       },
       ...(Array.isArray(selectedTools) && { ephemeralAgent: { tools: selectedTools } }),
     };
@@ -261,6 +262,15 @@ async function executeScheduledAgent({
           subject,
           body: emailText || '(No response content)',
           html: emailHtml || null,
+          auditContext: {
+            userId,
+            agentId,
+            agentName: agent?.name,
+            conversationId,
+            scheduleId: scheduleId?.toString?.() ?? scheduleId,
+            scheduleName: schedule?.name,
+            source: 'scheduled_complete',
+          },
         });
         if (!sendResult.success) {
           logger.warn('[ScheduledAgents] Failed to send email on complete:', sendResult.error);

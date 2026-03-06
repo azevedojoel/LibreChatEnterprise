@@ -16,7 +16,7 @@ import type { IUser } from '@librechat/data-schemas';
 import type { Agent } from 'librechat-data-provider';
 import type * as t from '~/types';
 import { resolveHeaders, createSafeUser } from '~/utils/env';
-import { isToolSearchTool } from '~/tools/classification';
+import { isDiscoveryTool } from '~/tools/classification';
 
 /** Expected shape of JSON tool search results */
 interface ToolSearchJsonResult {
@@ -89,7 +89,7 @@ export function extractDiscoveredToolsFromHistory(messages: BaseMessage[]): Set<
     }
 
     const name = (message as { name?: string }).name;
-    if (!isToolSearchTool(name ?? '')) {
+    if (!isDiscoveryTool(name ?? '')) {
       continue;
     }
 

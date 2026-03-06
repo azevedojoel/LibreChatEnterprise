@@ -31,6 +31,10 @@ describe('createToolExecuteHandler - destructive tool confirmation', () => {
     loadTools?: typeof mockLoadTools;
     captureOAuthUrl?: (url: string, options?: { serverName?: string }) => void;
     isDestructiveTool?: (name: string) => boolean;
+    checkRequiresApproval?: (
+      name: string,
+      context: { agentId?: string; userId?: string },
+    ) => Promise<boolean>;
     requestToolConfirmation?: (
       toolCall: { id: string; name: string; args: unknown },
       metadata: Record<string, unknown>,
@@ -145,6 +149,53 @@ describe('createToolExecuteHandler - destructive tool confirmation', () => {
     expect(data.resolve).toHaveBeenCalledWith([
       expect.objectContaining({ status: 'success' }),
     ]);
+    expect(requestToolConfirmation).not.toHaveBeenCalled();
+    expect(mockTool.invoke).toHaveBeenCalled();
+  });
+
+  it('uses checkRequiresApproval when provided and requests approval when it returns true', async () => {
+    const checkRequiresApproval = jest.fn().mockResolvedValue(true);
+    const requestToolConfirmation = jest.fn().mockResolvedValue({ approved: true });
+
+    const handler = createHandler({
+      checkRequiresApproval,
+      isDestructiveTool: () => false,
+      requestToolConfirmation,
+    });
+
+    const data = createToolExecuteBatchRequest([
+      { id: 'tool-1', name: 'file_search', args: {} },
+    ]);
+
+    await handler.handle!('ON_TOOL_EXECUTE', data);
+
+    expect(checkRequiresApproval).toHaveBeenCalledWith('file_search', {
+      agentId: 'agent-1',
+      userId: 'user-1',
+    });
+    expect(requestToolConfirmation).toHaveBeenCalled();
+    expect(mockTool.invoke).toHaveBeenCalled();
+  });
+
+  it('uses checkRequiresApproval when provided and skips approval when it returns false', async () => {
+    const checkRequiresApproval = jest.fn().mockResolvedValue(false);
+    const requestToolConfirmation = jest.fn();
+
+    const handler = createHandler({
+      checkRequiresApproval,
+      requestToolConfirmation,
+    });
+
+    const data = createToolExecuteBatchRequest([
+      { id: 'tool-1', name: Constants.EXECUTE_CODE, args: {} },
+    ]);
+
+    await handler.handle!('ON_TOOL_EXECUTE', data);
+
+    expect(checkRequiresApproval).toHaveBeenCalledWith(Constants.EXECUTE_CODE, {
+      agentId: 'agent-1',
+      userId: 'user-1',
+    });
     expect(requestToolConfirmation).not.toHaveBeenCalled();
     expect(mockTool.invoke).toHaveBeenCalled();
   });

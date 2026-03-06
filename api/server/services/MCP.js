@@ -38,6 +38,7 @@ const {
   buildReauthLink,
 } = require('~/server/utils/mcpReauthToken');
 const { disablePermanentlyFailedServer } = require('./MCP/disablePermanentlyFailedServer');
+const { logToolCallFailure } = require('~/server/services/EventLogService');
 
 function isEmptyObjectSchema(jsonSchema) {
   return (
@@ -703,6 +704,24 @@ function createToolInstance({
         throw new Error(
           `The ${serverName} integration requires the user to sign in. A sign-in prompt should appear - please ask the user to complete it, then retry this tool.`,
         );
+      }
+
+      if (userId) {
+        const toolCallId = config?.toolCall?.id;
+        const metadata = config?.metadata ?? {};
+        logToolCallFailure({
+          userId,
+          toolName: normalizedToolKey,
+          toolCallId,
+          errorMessage: error?.message ?? 'MCP tool call failed',
+          metadata: {
+            serverName,
+            conversationId: metadata?.thread_id,
+            agentId: metadata?.agent_id,
+            runId: metadata?.run_id,
+            success: false,
+          },
+        }).catch((err) => logger.warn('[EventLog] logToolCallFailure failed', err));
       }
 
       throw new Error(

@@ -365,7 +365,11 @@ const loadTools = async ({
     gemini_image_gen: imageGenOptions,
     send_user_email: {
       agentName: agent?.name ?? null,
+      agentId: agent?.id ?? null,
       scheduleName: options.req?.body?.scheduledRunContext?.scheduleName ?? null,
+      scheduleId: options.req?.body?.scheduledRunContext?.scheduleId ?? null,
+      conversationId: options.req?.body?.conversationId ?? options.conversationId ?? null,
+      runId: options.req?.body?.runId ?? options.runId ?? null,
     },
   };
 

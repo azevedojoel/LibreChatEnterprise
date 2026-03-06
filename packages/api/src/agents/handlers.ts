@@ -52,13 +52,26 @@ export interface ToolExecuteOptions {
   toolEndCallback?: ToolEndCallback;
   /** Callback to capture OAuth URL when headless OAuth error occurs (e.g., inbound email) */
   captureOAuthUrl?: (url: string, options?: { serverName?: string }) => void;
-  /** Check if a tool requires user confirmation before execution */
+  /** Check if a tool requires user confirmation before execution (sync fallback) */
   isDestructiveTool?: (toolName: string) => boolean;
+  /** Async check with override support (agent/user context). When provided, used instead of isDestructiveTool */
+  checkRequiresApproval?: (
+    toolName: string,
+    context: { agentId?: string; userId?: string },
+  ) => Promise<boolean>;
   /** Request user confirmation for destructive tools. Returns { approved } - if false, tool is not executed */
   requestToolConfirmation?: (
     toolCall: ToolCallRequest,
     metadata: Record<string, unknown>,
   ) => Promise<{ approved: boolean }>;
+  /** Callback when a tool call fails. Used for EventLog auditing. */
+  onToolFailure?: (params: {
+    toolName: string;
+    toolCallId?: string;
+    errorMessage: string;
+    agentId?: string;
+    metadata?: Record<string, unknown>;
+  }) => Promise<void>;
 }
 
 /**
@@ -72,7 +85,9 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
     toolEndCallback,
     captureOAuthUrl,
     isDestructiveTool,
+    checkRequiresApproval,
     requestToolConfirmation,
+    onToolFailure,
   } = options;
 
   return {
@@ -111,6 +126,13 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
               logger.warn(
                 `[ON_TOOL_EXECUTE] Tool "${tc.name}" not found. Available: ${[...toolMap.keys()].join(', ')}`,
               );
+              onToolFailure?.({
+                toolName: tc.name,
+                toolCallId: tc.id,
+                errorMessage: 'Tool not found',
+                agentId: agentId as string | undefined,
+                metadata: metadata as Record<string, unknown>,
+              }).catch(() => {});
               return {
                 toolCallId: tc.id,
                 status: 'error' as const,
@@ -156,7 +178,13 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
                 toolCallConfig.toolMap = toolMap;
               }
 
-              if (isDestructiveTool?.(tc.name) && requestToolConfirmation) {
+              const requiresApproval = checkRequiresApproval
+                ? await checkRequiresApproval(tc.name, {
+                    agentId: agentId as string | undefined,
+                    userId: (metadata as Record<string, unknown>)?.user_id as string | undefined,
+                  })
+                : isDestructiveTool?.(tc.name) ?? false;
+              if (requiresApproval && requestToolConfirmation) {
                 const metadataRecord = (metadata ?? {}) as Record<string, unknown>;
                 const { approved } = await requestToolConfirmation(tc, metadataRecord);
                 if (!approved) {
@@ -169,7 +197,18 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
                 }
               }
 
-              const result = await tool.invoke(tc.args, {
+              let args = tc.args;
+              if (typeof args === 'string') {
+                try {
+                  args = JSON.parse(args);
+                } catch {
+                  args = {};
+                }
+              } else if (args == null) {
+                args = {};
+              }
+
+              const result = await tool.invoke(args, {
                 toolCall: toolCallConfig,
                 configurable: mergedConfigurable,
                 metadata,
@@ -253,6 +292,13 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
                 }
                 messageForModel = HEADLESS_OAUTH_EMAIL_MESSAGE;
               }
+              onToolFailure?.({
+                toolName: tc.name,
+                toolCallId: tc.id,
+                errorMessage,
+                agentId: agentId as string | undefined,
+                metadata: metadata as Record<string, unknown>,
+              }).catch(() => {});
               return {
                 toolCallId: tc.id,
                 status: 'error' as const,

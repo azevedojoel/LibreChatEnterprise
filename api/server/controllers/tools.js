@@ -15,6 +15,7 @@ const { loadAuthValues } = require('~/server/services/Tools/credentials');
 const { loadTools } = require('~/app/clients/tools/util');
 const { getRoleByName } = require('~/models/Role');
 const { getMessage } = require('~/models/Message');
+const { logToolCallFailure } = require('~/server/services/EventLogService');
 
 const fieldsMap = {
   [Tools.execute_code]: [],
@@ -232,6 +233,17 @@ const callTool = async (req, res) => {
     });
   } catch (error) {
     logger.error('Error calling tool', error);
+    const { toolId = '' } = req.params;
+    const { conversationId } = req.body ?? {};
+    if (req.user?.id) {
+      logToolCallFailure({
+        userId: req.user.id,
+        toolName: toolId || 'unknown',
+        toolCallId: undefined,
+        errorMessage: error?.message ?? 'Tool execution failed',
+        metadata: { conversationId, success: false },
+      }).catch((err) => logger.warn('[EventLog] logToolCallFailure failed', err));
+    }
     res.status(500).json({ message: 'Error calling tool' });
   }
 };

@@ -23,6 +23,7 @@ const {
   loadAgentTools,
   loadToolsForExecution,
   isDestructiveTool,
+  checkRequiresApproval,
 } = require('~/server/services/ToolService');
 const { nanoid } = require('nanoid');
 const ToolConfirmationStore = require('~/server/services/ToolConfirmationStore');
@@ -40,6 +41,7 @@ const {
   buildToolApprovalSubject,
 } = require('~/server/utils/formatEmailHighlights');
 const { sendInboundReply } = require('~/server/services/sendInboundReply');
+const { logToolCallFailure } = require('~/server/services/EventLogService');
 
 /**
  * Creates a tool loader function for the agent.
@@ -171,6 +173,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
     },
     toolEndCallback,
     isDestructiveTool,
+    checkRequiresApproval,
     requestToolConfirmation: async (toolCall, metadata) => {
       const conversationId = metadata?.thread_id;
       const runId = metadata?.run_id;
@@ -280,6 +283,14 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
           subject,
           body: text,
           html,
+          auditContext: {
+            userId: approverUserId,
+            conversationId,
+            runId,
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            source: 'tool_approval',
+          },
         });
         if (!emailResult.success) {
           logger.warn('[ToolConfirmation] human_await_response: failed to send approval email', {
@@ -341,6 +352,10 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
             toolName: toolCall.name,
             argsSummary,
             approvalUrl,
+            conversationId,
+            runId,
+            toolCallId: toolCall.id,
+            userId: approverUserId,
           });
         }
       }
@@ -375,6 +390,23 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
         logger.warn(
           '[captureOAuthUrl] req._headlessOAuthUrls not set - URL not captured for email',
         );
+      }
+    },
+    onToolFailure: async ({ toolName, toolCallId, errorMessage, agentId, metadata }) => {
+      const userId = metadata?.user_id ?? req?.user?.id;
+      if (userId) {
+        logToolCallFailure({
+          userId,
+          toolName,
+          toolCallId,
+          errorMessage,
+          metadata: {
+            conversationId: metadata?.thread_id ?? req?.body?.conversationId,
+            agentId: agentId ?? metadata?.agent_id,
+            runId: metadata?.run_id,
+            scheduleId: req?.body?.scheduledRunContext?.scheduleId,
+          },
+        }).catch((err) => logger.warn('[EventLog] logToolCallFailure failed', err));
       }
     },
   };

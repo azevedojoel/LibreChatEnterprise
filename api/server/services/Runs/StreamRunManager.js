@@ -12,6 +12,7 @@ const {
 const { retrieveAndProcessFile } = require('~/server/services/Files/process');
 const { processRequiredActions } = require('~/server/services/ToolService');
 const { processMessages } = require('~/server/services/Threads');
+const { logToolCallFailure } = require('~/server/services/EventLogService');
 const { createOnProgress } = require('~/server/utils');
 
 /**
@@ -535,6 +536,16 @@ class StreamRunManager {
         logger.warn(
           `The "${tool}" tool (ID: ${toolCallId}) failed to produce an output. run_id: ${run_id} thread_id: ${thread_id}`,
         );
+        const userId = this.req?.user?.id;
+        if (userId) {
+          logToolCallFailure({
+            userId,
+            toolName: tool,
+            toolCallId,
+            errorMessage: MISSING_OUTPUT_MESSAGE,
+            metadata: { runId: run_id, threadId: thread_id, success: false },
+          }).catch((err) => logger.warn('[EventLog] logToolCallFailure failed', err));
+        }
         missingOutputs.push({
           tool_call_id: toolCallId,
           output: MISSING_OUTPUT_MESSAGE,

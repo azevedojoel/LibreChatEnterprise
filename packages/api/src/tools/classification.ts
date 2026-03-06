@@ -36,6 +36,20 @@ export function isToolSearchTool(name: string): boolean {
   return name === Constants.TOOL_SEARCH;
 }
 
+/** Tool names that produce discoverable tool output (parse tools[].name for defer_loading override) */
+const DISCOVERY_TOOL_NAMES = new Set([Constants.TOOL_SEARCH, 'sys_admin_search']);
+
+/**
+ * Checks if a tool name is a discovery tool (tool_search or sys_admin_search).
+ * Used to parse tool output for discovered tool names when overriding defer_loading.
+ *
+ * @param name - The tool name to check
+ * @returns True if the tool produces discoverable tool output
+ */
+export function isDiscoveryTool(name: string): boolean {
+  return DISCOVERY_TOOL_NAMES.has(name);
+}
+
 /**
  * Extracts the MCP server name from a tool name.
  * Tool names follow the pattern: toolName_mcp_ServerName

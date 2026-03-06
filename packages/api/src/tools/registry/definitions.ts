@@ -2346,6 +2346,29 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
     schema: { type: 'object', properties: {}, required: [] } as ExtendedJsonSchema,
     toolType: 'builtin',
   },
+  sys_admin_search: {
+    name: 'sys_admin_search',
+    description:
+      'Searches sys_admin tools by query using BM25 ranking. Use to discover which tool to use for a task (e.g. "ban user", "token usage", "read logs"). Returns matching tools with names and descriptions.',
+    schema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Search term to find in tool names and descriptions (e.g. "ban user", "logs", "feature flag")',
+        },
+        max_results: {
+          type: 'integer',
+          minimum: 1,
+          maximum: 20,
+          default: 10,
+          description: 'Maximum number of matching tools to return (default 10)',
+        },
+      },
+      required: [],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
   sys_admin_list_users: {
     name: 'sys_admin_list_users',
     description:
@@ -2833,6 +2856,33 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
     } as ExtendedJsonSchema,
     toolType: 'builtin',
   },
+  sys_admin_search_event_logs: {
+    name: 'sys_admin_search_event_logs',
+    description:
+      'Search audit event logs (email sent, etc.). Optional: type, event, userId, conversationId, agentId, scheduleId, to, subject, source, success, startDate, endDate, search (substring), limit (1-200), skip.',
+    schema: {
+      type: 'object',
+      properties: {
+        type: { type: 'string', description: 'Event type (e.g. email)' },
+        event: { type: 'string', description: 'Event name (e.g. email_sent)' },
+        userId: { type: 'string', description: 'Filter by user' },
+        conversationId: { type: 'string', description: 'metadata.conversationId' },
+        agentId: { type: 'string', description: 'metadata.agentId' },
+        scheduleId: { type: 'string', description: 'metadata.scheduleId' },
+        to: { type: 'string', description: 'Substring match on recipient email' },
+        subject: { type: 'string', description: 'Substring match on subject' },
+        source: { type: 'string', description: 'Exact match on metadata.source' },
+        success: { type: 'boolean', description: 'Filter by metadata.success' },
+        startDate: { type: 'string', description: 'createdAt >= (YYYY-MM-DD or ISO)' },
+        endDate: { type: 'string', description: 'createdAt <= (YYYY-MM-DD or ISO)' },
+        search: { type: 'string', description: 'Substring across to, subject, source' },
+        limit: { type: 'number', description: '1-200, default 50' },
+        skip: { type: 'number', description: 'Offset for pagination' },
+      },
+      required: [],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
   sys_admin_list_env: {
     name: 'sys_admin_list_env',
     description:
@@ -2847,6 +2897,181 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
         },
       },
       required: [],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_list_all_tools: {
+    name: 'sys_admin_list_all_tools',
+    description:
+      'List all tools (registry + MCP) with id, name, description, schema. Optional: agentId (include hasOverride for that agent).',
+    schema: {
+      type: 'object',
+      properties: {
+        agentId: {
+          type: 'string',
+          description: 'When provided, include hasOverride for each tool for this agent',
+        },
+      },
+      required: [],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_create_tool_override: {
+    name: 'sys_admin_create_tool_override',
+    description:
+      'Create a tool override. toolId required. Optional: agentId (omit=global), userId (omit=agent/global), description, schema, requiresApproval (true=gate, false=ungate approval). Omit schema if only changing requiresApproval. Example: { "toolId": "file_search", "requiresApproval": false } to ungate.',
+    schema: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        toolId: { type: 'string', description: 'Tool identifier (e.g. file_search, gmail_send_mcp_Google)' },
+        agentId: {
+          type: 'string',
+          description: 'Agent MongoDB _id for agent-specific override; omit for global',
+        },
+        userId: {
+          type: 'string',
+          description: 'User MongoDB _id for per-user override; omit for agent/global scope',
+        },
+        description: { type: 'string', description: 'Override description' },
+        schema: {
+          oneOf: [
+            { type: 'object', description: 'Full JSON Schema object' },
+            { type: 'string', description: 'JSON string of the schema' },
+          ],
+          description:
+            "Override the tool's JSON Schema. Pass as object or JSON string. Omit if not changing schema.",
+        },
+        requiresApproval: {
+          type: 'boolean',
+          description: 'true=require approval (gate), false=no approval (ungate); overrides default',
+        },
+      },
+      required: ['toolId'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_get_tool_override: {
+    name: 'sys_admin_get_tool_override',
+    description: 'Get a tool override by overrideId or by toolId + agentId + userId.',
+    schema: {
+      type: 'object',
+      properties: {
+        overrideId: { type: 'string', description: 'Override document _id' },
+        toolId: { type: 'string', description: 'Tool ID (use with agentId, userId)' },
+        agentId: { type: 'string', description: 'Agent _id for agent-specific; omit for global' },
+        userId: { type: 'string', description: 'User _id for per-user override; omit for agent/global' },
+      },
+      required: [],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_update_tool_override: {
+    name: 'sys_admin_update_tool_override',
+    description:
+      'Update a tool override. overrideId required. Optional: description, schema, requiresApproval (gate/ungate). Omit schema if not changing. Pass schema as object or JSON string.',
+    schema: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        overrideId: { type: 'string', description: 'Override document _id' },
+        description: { type: 'string', description: 'New description' },
+        schema: {
+          oneOf: [
+            { type: 'object', description: 'Full JSON Schema object' },
+            { type: 'string', description: 'JSON string of the schema' },
+          ],
+          description:
+            'New JSON Schema for the tool. Pass as object or JSON string. Omit if not changing schema.',
+        },
+        requiresApproval: {
+          type: 'boolean',
+          description: 'true=gate, false=ungate approval',
+        },
+      },
+      required: ['overrideId'],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_delete_tool_override: {
+    name: 'sys_admin_delete_tool_override',
+    description: 'Delete a tool override by overrideId or by toolId + agentId + userId.',
+    schema: {
+      type: 'object',
+      properties: {
+        overrideId: { type: 'string', description: 'Override document _id' },
+        toolId: { type: 'string', description: 'Tool ID (use with agentId, userId)' },
+        agentId: { type: 'string', description: 'Agent _id for agent-specific; omit for global' },
+        userId: { type: 'string', description: 'User _id for per-user override; omit for agent/global' },
+      },
+      required: [],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_list_tool_overrides: {
+    name: 'sys_admin_list_tool_overrides',
+    description:
+      'List tool overrides. Optional: toolId, agentId, userId, globalOnly, limit, page. Returns requiresApproval, userId.',
+    schema: {
+      type: 'object',
+      properties: {
+        toolId: { type: 'string', description: 'Filter by tool ID' },
+        agentId: { type: 'string', description: 'Filter by agent _id' },
+        userId: { type: 'string', description: 'Filter by user _id' },
+        globalOnly: {
+          type: 'boolean',
+          description: 'If true, only return global overrides (agentId null)',
+        },
+        limit: { type: 'number', description: 'Max results (default 50)' },
+        page: { type: 'number', description: 'Page number (default 1)' },
+      },
+      required: [],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_list_feature_flags: {
+    name: 'sys_admin_list_feature_flags',
+    description:
+      'List all feature flags (key, value, description). Use to see runtime toggles like summarizeEnabled, feedbackEnabled, balanceEnabled.',
+    schema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    } as ExtendedJsonSchema,
+    toolType: 'builtin',
+  },
+  sys_admin_set_feature_flag: {
+    name: 'sys_admin_set_feature_flag',
+    description:
+      'Set a feature flag. Allowed keys: summarizeEnabled, toolsMenuEnabled, forkEnabled, regenerateEnabled, feedbackEnabled, copyEnabled, editEnabled, continueEnabled, balanceEnabled, toolCallDetailsEnabled, showBirthdayIcon, sharePointFilePickerEnabled, customFooter. Changes apply immediately.',
+    schema: {
+      type: 'object',
+      properties: {
+        key: {
+          type: 'string',
+          description:
+            'Flag key: summarizeEnabled, toolsMenuEnabled, forkEnabled, regenerateEnabled, feedbackEnabled, copyEnabled, editEnabled, continueEnabled, balanceEnabled, toolCallDetailsEnabled, showBirthdayIcon, sharePointFilePickerEnabled, customFooter',
+          enum: [
+            'summarizeEnabled',
+            'toolsMenuEnabled',
+            'forkEnabled',
+            'regenerateEnabled',
+            'feedbackEnabled',
+            'copyEnabled',
+            'editEnabled',
+            'continueEnabled',
+            'balanceEnabled',
+            'toolCallDetailsEnabled',
+            'showBirthdayIcon',
+            'sharePointFilePickerEnabled',
+            'customFooter',
+          ],
+        },
+        value: {
+          description: 'Value: boolean for most flags, string for customFooter',
+        },
+      },
+      required: ['key', 'value'],
     } as ExtendedJsonSchema,
     toolType: 'builtin',
   },

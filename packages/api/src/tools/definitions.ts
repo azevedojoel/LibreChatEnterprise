@@ -236,26 +236,41 @@ export async function loadToolDefinitions(
     }
   }
 
+  const SYS_ADMIN_DISCOVERY_TOOLS = new Set(['sys_admin_search', 'sys_admin_help']);
   for (const builtInDef of builtInToolDefs) {
     if (!toolRegistry.has(builtInDef.name)) {
+      const isDeferredSysAdmin =
+        deferredToolsEnabled &&
+        builtInDef.name.startsWith('sys_admin_') &&
+        !SYS_ADMIN_DISCOVERY_TOOLS.has(builtInDef.name);
       toolRegistry.set(builtInDef.name, {
         name: builtInDef.name,
         description: builtInDef.description,
         parameters: builtInDef.parameters,
         allowed_callers: ['direct'],
+        ...(isDeferredSysAdmin && { defer_loading: true }),
       });
     }
   }
 
+  const builtInFromRegistry = builtInToolDefs
+    .filter((d) => !toolDefinitions.some((td) => td.name === d.name))
+    .map((d) => toolRegistry.get(d.name))
+    .filter((d): d is LCTool => d != null);
+
   const allDefinitions: (ToolDefinition | LCTool)[] = [
     ...toolDefinitions,
     ...actionToolDefs.filter((d) => !toolDefinitions.some((td) => td.name === d.name)),
-    ...builtInToolDefs.filter((d) => !toolDefinitions.some((td) => td.name === d.name)),
+    ...builtInFromRegistry,
   ];
+
+  const finalHasDeferredTools =
+    hasDeferredTools ||
+    Array.from(toolRegistry.values()).some((d) => d.defer_loading === true);
 
   return {
     toolDefinitions: allDefinitions,
     toolRegistry,
-    hasDeferredTools,
+    hasDeferredTools: finalHasDeferredTools,
   };
 }

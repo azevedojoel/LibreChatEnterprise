@@ -344,14 +344,37 @@ async function processInboundEmail(payload) {
     /** Tracks MCP servers we've already captured a URL for (deduplicates per-server) */
     syntheticReq._headlessOAuthServers = new Set();
     /** When set, sends approval email for destructive tools (headless flow) */
-    syntheticReq._headlessSendApprovalEmail = async ({ toolName, argsSummary, approvalUrl }) => {
+    syntheticReq._headlessSendApprovalEmail = async ({
+      toolName,
+      argsSummary,
+      approvalUrl,
+      conversationId: auditConversationId,
+      runId: auditRunId,
+      toolCallId: auditToolCallId,
+      userId: auditUserId,
+    }) => {
       const appName = process.env.APP_TITLE || 'Daily Thread';
       const { html, text } = formatToolApprovalEmail(
         { toolName, argsSummary, approvalUrl },
         { appName },
       );
       const subject = buildToolApprovalSubject({ toolName, argsSummary }, { appName });
-      await sendInboundReply({ to: fromEmail, subject, body: text, html });
+      await sendInboundReply({
+        to: fromEmail,
+        subject,
+        body: text,
+        html,
+        auditContext: {
+          userId: auditUserId ?? senderUserId,
+          agentId: agent?.id,
+          agentName: agent?.name,
+          conversationId: auditConversationId ?? conversationId,
+          runId: auditRunId,
+          toolCallId: auditToolCallId,
+          toolName,
+          source: 'tool_approval',
+        },
+      });
     };
 
     const result = await initializeClient({
@@ -443,6 +466,13 @@ async function processInboundEmail(payload) {
     body: emailBody || '(No response content)',
     html: emailHtmlBody,
     replyTo,
+    auditContext: {
+      userId: senderUserId,
+      agentId: agent?.id,
+      agentName: agent?.name,
+      conversationId,
+      source: 'inbound_reply',
+    },
   });
   logger.info(`[InboundEmail] Reply sent success=${sendResult.success}`);
   if (!sendResult.success) {
