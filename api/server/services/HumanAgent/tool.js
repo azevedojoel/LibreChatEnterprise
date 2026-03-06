@@ -1,6 +1,6 @@
 /**
- * LangChain tools for the Human agent (human-in-the-loop).
- * Used when Ellis or another agent transfers to Human for real-person actions.
+ * LangChain tools for Alex (human-in-the-loop agent).
+ * Used when Ellis or another agent transfers to Alex for real-person actions.
  */
 const { tool } = require('@langchain/core/tools');
 const { Tools } = require('librechat-data-provider');
