@@ -19,6 +19,8 @@ jest.mock('sanitize-html', () => (html) => html);
 const {
   formatToolApprovalEmail,
   buildToolApprovalSubject,
+  formatHumanNotifyEmail,
+  buildHumanNotifySubject,
 } = require('./formatEmailHighlights');
 
 describe('formatEmailHighlights - tool approval', () => {
@@ -149,8 +151,92 @@ describe('formatEmailHighlights - tool approval', () => {
       });
 
       expect(html).toContain('href="#"');
-      expect(text).toContain('To approve or deny');
+      expect(text).toContain('approve or deny');
       expect(text).toContain('This link expires in 1 hour');
+    });
+  });
+});
+
+describe('formatEmailHighlights - human notification', () => {
+  describe('buildHumanNotifySubject', () => {
+    it('returns subject with message preview and default app name', () => {
+      const result = buildHumanNotifySubject({ message: 'Please review the report' });
+      expect(result).toMatch(/^Team notification: .+ — Daily Thread$/);
+      expect(result).toContain('Please review the report');
+    });
+
+    it('truncates long message with ellipsis', () => {
+      const longMessage = 'A'.repeat(60);
+      const result = buildHumanNotifySubject({ message: longMessage });
+      expect(result).toContain('A'.repeat(47) + '…');
+    });
+
+    it('uses custom appName when provided', () => {
+      const result = buildHumanNotifySubject(
+        { message: 'Hello' },
+        { appName: 'My App' },
+      );
+      expect(result).toContain('— My App');
+    });
+  });
+
+  describe('formatHumanNotifyEmail', () => {
+    it('returns html and text with message and Open conversation link when convUrl provided', () => {
+      const { html, text } = formatHumanNotifyEmail({
+        message: 'Please review the attached document',
+        convUrl: 'https://app.example.com/c/conv123',
+        appName: 'Test App',
+      });
+
+      expect(html).toContain('Team member notification');
+      expect(html).toContain('Please review the attached document');
+      expect(html).toContain('https://app.example.com/c/conv123');
+      expect(html).toContain('Open conversation');
+      expect(html).toContain('Test App');
+
+      expect(text).toContain('Please review the attached document');
+      expect(text).toContain('Open conversation: https://app.example.com/c/conv123');
+    });
+
+    it('includes context block when context provided', () => {
+      const { html, text } = formatHumanNotifyEmail({
+        message: 'Action needed',
+        context: 'The client requested an update by EOD',
+        appName: 'Test App',
+      });
+
+      expect(html).toContain('Context');
+      expect(html).toContain('The client requested an update by EOD');
+      expect(text).toContain('Context: The client requested an update by EOD');
+    });
+
+    it('shows Contact conversation owner when no convUrl', () => {
+      const { html, text } = formatHumanNotifyEmail({
+        message: 'FYI: Task completed',
+        appName: 'Test App',
+      });
+
+      expect(html).toContain('Contact the conversation owner');
+      expect(text).toContain('Contact the conversation owner if you need to respond.');
+    });
+
+    it('uses custom appName when provided in options', () => {
+      const { html } = formatHumanNotifyEmail(
+        { message: 'Hello' },
+        { appName: 'Custom App' },
+      );
+
+      expect(html).toContain('Custom App');
+    });
+
+    it('escapes HTML in context', () => {
+      const { html } = formatHumanNotifyEmail({
+        message: 'Please review',
+        context: 'Context with "quotes" & ampersands',
+      });
+
+      expect(html).toContain('&quot;');
+      expect(html).toContain('&amp;');
     });
   });
 });

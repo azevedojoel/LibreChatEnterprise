@@ -610,6 +610,105 @@ This link expires in 1 hour.`;
 }
 
 /**
+ * Build subject line for human notification email.
+ * @param {Object} params
+ * @param {string} params.message
+ * @param {Object} [options]
+ * @param {string} [options.appName]
+ * @returns {string}
+ */
+function buildHumanNotifySubject({ message }, options = {}) {
+  const appName = options.appName || process.env.APP_TITLE || 'Daily Thread';
+  const preview = (message || '').trim().slice(0, 47);
+  const suffix = (message || '').length > 47 ? '…' : '';
+  return `Team notification: ${preview}${suffix} — ${appName}`;
+}
+
+/**
+ * Format human notification email (HTML and plain text). Dark theme matching reply emails.
+ * @param {Object} params
+ * @param {string} params.message - The notification message (supports markdown)
+ * @param {string} [params.context] - Additional context for the human
+ * @param {string} [params.convUrl] - URL to open conversation (when recipient is owner)
+ * @param {string} [params.appName]
+ * @param {Object} [options]
+ * @param {string} [options.appName]
+ * @returns {{ html: string, text: string }}
+ */
+function formatHumanNotifyEmail({ message, context, convUrl, appName }, options = {}) {
+  const appNameResolved = appName || options.appName || process.env.APP_TITLE || 'Daily Thread';
+  const btnPrimary = '#10a37f';
+
+  const messageHtml = markdownToEmailHtml((message || '').trim()) || `<p style="margin: 0 0 12px 0; color: ${STYLES.text}; font-size: 16px; line-height: 1.6;">${escapeHtml((message || '').trim() || 'Notification')}</p>`;
+  const contextBlock =
+    context && String(context).trim()
+      ? `
+      <div style="margin: 16px 0; padding: 12px 16px; background: ${STYLES.pillBg}; border-radius: 8px; border: 1px solid ${STYLES.border};">
+        <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: ${STYLES.text};">Context</p>
+        <p style="margin: 0; font-size: 14px; line-height: 1.5; color: ${STYLES.text};">${escapeHtml(String(context).trim())}</p>
+      </div>`
+      : '';
+
+  const ctaBlock = convUrl
+    ? `
+      <p style="margin: 0 0 16px 0; color: ${STYLES.text}; font-size: 16px; line-height: 1.6;">Reply in ${escapeHtml(appNameResolved)} to continue the conversation.</p>
+      <div style="margin: 24px 0; text-align: center;">
+        <a href="${escapeHtml(convUrl)}" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 10px 20px; background: ${btnPrimary}; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; border-radius: 8px;">Open conversation</a>
+      </div>`
+    : `
+      <p style="margin: 0; color: ${STYLES.text}; font-size: 16px; line-height: 1.6;">Contact the conversation owner if you need to respond.</p>`;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <meta name="supported-color-schemes" content="dark">
+</head>
+<body style="margin: 0; padding: 24px 16px; background: ${STYLES.bg}; color: ${STYLES.text}; font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 16px; line-height: 1.6;">
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width: 600px; margin: 0 auto;">
+  <tr>
+    <td style="background: ${STYLES.bgCard}; padding: 32px; border-radius: 8px; border: 1px solid ${STYLES.border};">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom: 24px;">
+        <tr>
+          <td style="font-size: 13px; color: ${STYLES.textMuted};">${escapeHtml(appNameResolved)}</td>
+        </tr>
+      </table>
+      <h1 style="margin: 0 0 12px 0; font-size: 1.25em; font-weight: 600; color: ${STYLES.text};">Team member notification</h1>
+      <div style="margin: 0 0 16px 0;">
+        ${messageHtml}
+      </div>
+      ${contextBlock}
+      ${ctaBlock}
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid ${STYLES.border};">
+        <tr>
+          <td style="font-size: 12px; color: ${STYLES.textMuted};">— ${escapeHtml(appNameResolved)}</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>`.trim();
+
+  const textParts = [(message || '').trim() || 'Notification'];
+  if (context && String(context).trim()) {
+    textParts.push(`Context: ${String(context).trim()}`);
+  }
+  if (convUrl) {
+    textParts.push(`Reply in ${appNameResolved} to continue the conversation.`);
+    textParts.push(`Open conversation: ${convUrl}`);
+  } else {
+    textParts.push('Contact the conversation owner if you need to respond.');
+  }
+  const text = textParts.join('\n\n');
+
+  return { html, text };
+}
+
+/**
  * Format content parts (from message.content array) for email (legacy).
  */
 function formatContentPartsForEmail(contentParts) {
@@ -641,4 +740,6 @@ module.exports = {
   markdownToEmailHtml,
   formatToolApprovalEmail,
   buildToolApprovalSubject,
+  formatHumanNotifyEmail,
+  buildHumanNotifySubject,
 };

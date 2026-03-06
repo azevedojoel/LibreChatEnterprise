@@ -28,6 +28,7 @@ const {
   parseRoutingToken,
   buildReplyToAddress,
   buildWorkspaceReplyTo,
+  formatEmailHeadersForLLM,
 } = require('./processInboundEmailUtils');
 
 /**
@@ -182,6 +183,13 @@ async function processInboundEmail(payload) {
     return;
   }
 
+  if (isWorkspaceFlow) {
+    const headersBlock = formatEmailHeadersForLLM(payload);
+    if (headersBlock) {
+      messageText = `${headersBlock}\n\n${messageText}`;
+    }
+  }
+
   if (parsedConversationId) {
     const { searchConversation } = require('~/models/Conversation');
     const existing = await searchConversation(parsedConversationId);
@@ -281,6 +289,26 @@ async function processInboundEmail(payload) {
     config: appConfig,
     body,
   };
+
+  /** Pre-create conversation with inbound project so it exists before the agent run */
+  if (inboundProjectId && !parsedConversationId) {
+    const { saveConvo } = require('~/models/Conversation');
+    await saveConvo(
+      syntheticReq,
+      {
+        conversationId,
+        endpoint: EModelEndpoint.agents,
+        agentId: agent.id,
+        model: agent.model,
+        userProjectId: inboundProjectId,
+      },
+      { context: 'InboundEmail - pre-create conversation with inbound project' },
+    );
+    logger.debug('[InboundEmail] Pre-created conversation with inbound project', {
+      conversationId,
+      inboundProjectId,
+    });
+  }
 
   const parsedBody = {
     endpoint: EModelEndpoint.agents,

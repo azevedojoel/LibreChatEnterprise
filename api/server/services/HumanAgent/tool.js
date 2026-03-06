@@ -13,6 +13,10 @@ const {
 } = require('~/models/Workspace');
 const { inviteUserToWorkspace } = require('~/server/services/WorkspaceInvite/inviteUser');
 const { sendInboundReply } = require('~/server/services/sendInboundReply');
+const {
+  formatHumanNotifyEmail,
+  buildHumanNotifySubject,
+} = require('~/server/utils/formatEmailHighlights');
 const { listInvitesByWorkspace, markExpiredInvites } = require('~/models/Invite');
 const { createNotification } = require('~/server/services/NotificationService');
 
@@ -225,31 +229,19 @@ function createHumanTools({ userId, workspaceId, conversationId, agentId }) {
           ? `**[Human]** Notifying ${targetUser.name || targetUser.email}: ${message}\n\nContext: ${context}`
           : `**[Human]** Notifying ${targetUser.name || targetUser.email}: ${message}`;
 
-        const subject =
-          message.length > 50 ? `[Human] ${message.slice(0, 47)}...` : `[Human] ${message}`;
-        const bodyParts = [message];
-        if (context) bodyParts.push(`\nContext: ${context}`);
         const appName = process.env.APP_TITLE || 'Daily Thread';
         const targetIsOwner = targetUser._id?.toString() === userId;
         let convUrl = null;
         if (conversationId && targetIsOwner) {
           const baseUrl = process.env.DOMAIN_CLIENT || process.env.DOMAIN_SERVER || 'http://localhost:3080';
           convUrl = `${baseUrl}/c/${conversationId}`;
-          bodyParts.push(`\n\nReply in ${appName} to continue the conversation.`);
-          bodyParts.push(`\n\nOpen conversation: ${convUrl}`);
-        } else {
-          bodyParts.push(`\n\nContact the conversation owner if you need to respond.`);
         }
-        const body = bodyParts.join('');
 
-        let html = null;
-        const escapedMessage = (message || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-        const escapedContext = context ? (context || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') : '';
-        if (convUrl) {
-          html = `<p>${escapedMessage}</p>${escapedContext ? `<p><strong>Context:</strong><br>${escapedContext}</p>` : ''}<p>Reply in ${appName} to continue the conversation.</p><p><a href="${convUrl}">Open conversation</a></p>`;
-        } else {
-          html = `<p>${escapedMessage}</p>${escapedContext ? `<p><strong>Context:</strong><br>${escapedContext}</p>` : ''}<p>Contact the conversation owner if you need to respond.</p>`;
-        }
+        const subject = buildHumanNotifySubject({ message }, { appName });
+        const { html, text: body } = formatHumanNotifyEmail(
+          { message, context, convUrl, appName },
+          { appName },
+        );
 
         const emailResult = await sendInboundReply({
           to: targetUser.email,
