@@ -14,6 +14,7 @@ const {
 const { inviteUserToWorkspace } = require('~/server/services/WorkspaceInvite/inviteUser');
 const { sendInboundReply } = require('~/server/services/sendInboundReply');
 const { listInvitesByWorkspace, markExpiredInvites } = require('~/models/Invite');
+const { createNotification } = require('~/server/services/NotificationService');
 
 /**
  * @param {Object} params
@@ -256,6 +257,17 @@ function createHumanTools({ userId, workspaceId, conversationId, agentId }) {
           body,
           html,
         });
+
+        const targetMemberId = targetUser._id?.toString();
+        const conversationLink = conversationId ? `/c/${conversationId}` : undefined;
+        await createNotification({
+          userId: targetMemberId,
+          type: 'human_notify',
+          title: 'Team member notification',
+          body: message,
+          link: targetIsOwner ? conversationLink : undefined,
+          metadata: { conversationId: conversationId || undefined, context: context || undefined },
+        }).catch(() => {});
 
         if (emailResult.success) {
           return toJson({

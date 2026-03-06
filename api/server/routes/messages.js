@@ -10,14 +10,54 @@ const {
   getMessages,
   updateMessage,
   deleteMessages,
+  getConvo,
 } = require('~/models');
 const { findAllArtifacts, replaceArtifactContent } = require('~/server/services/Artifacts/update');
 const { requireJwtAuth, validateMessageReq } = require('~/server/middleware');
 const { getConvosQueried } = require('~/models/Conversation');
-const { Message } = require('~/db/models');
+const { Message, UserProject, User } = require('~/db/models');
+const { createNotification } = require('~/server/services/NotificationService');
 
 const router = express.Router();
 router.use(requireJwtAuth);
+
+/**
+ * Creates notifications for workspace members when a message is posted to a workspace project conversation.
+ * @param {Object} req - Request with user
+ * @param {Object} savedMessage - Saved message with conversationId, text
+ */
+async function createWorkspaceMessageNotifications(req, savedMessage) {
+  const convo = await getConvo(req.user.id, savedMessage.conversationId);
+  const userProjectId = convo?.userProjectId?.toString?.() ?? convo?.userProjectId;
+  if (!userProjectId) return;
+
+  const project = await UserProject.findById(userProjectId).select('workspace_id name').lean();
+  const workspaceId = project?.workspace_id?.toString?.() ?? project?.workspace_id;
+  if (!workspaceId) return;
+
+  const members = await User.find({ workspace_id: workspaceId })
+    .select('_id')
+    .lean();
+  const senderId = req.user.id?.toString?.() ?? req.user.id;
+  const channelName = project?.name ?? 'channel';
+  const preview =
+    typeof savedMessage.text === 'string'
+      ? savedMessage.text.slice(0, 100) + (savedMessage.text.length > 100 ? '…' : '')
+      : 'New message';
+
+  for (const m of members) {
+    const memberId = m._id?.toString?.() ?? m._id;
+    if (memberId === senderId) continue;
+    await createNotification({
+      userId: memberId,
+      type: 'workspace_message',
+      title: `New message in ${channelName}`,
+      body: preview,
+      link: `/c/${savedMessage.conversationId}`,
+      metadata: { conversationId: savedMessage.conversationId },
+    });
+  }
+}
 
 router.get('/', async (req, res) => {
   try {
@@ -341,6 +381,12 @@ router.post('/:conversationId', validateMessageReq, async (req, res) => {
       return res.status(400).json({ error: 'Message not saved' });
     }
     await saveConvo(req, savedMessage, { context: 'POST /api/messages/:conversationId' });
+
+    // Notify workspace members when message is posted to a workspace project conversation
+    createWorkspaceMessageNotifications(req, savedMessage).catch((err) =>
+      logger.error('createWorkspaceMessageNotifications failed', err),
+    );
+
     res.status(201).json(savedMessage);
   } catch (error) {
     logger.error('Error saving message:', error);
