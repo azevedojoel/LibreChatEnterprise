@@ -38,6 +38,9 @@ import { createActivityModel } from './activity';
 import { createPipelineModel } from './pipeline';
 import { createToolApprovalLinkModel } from './toolApprovalLink';
 import { createToolApprovalRecordModel } from './toolApprovalRecord';
+import { createToolOverrideModel } from './toolOverride';
+import { createFeatureFlagModel } from './featureFlag';
+import { createEventLogModel } from './eventLog';
 import { createUserProjectModel } from './userProject';
 import { createProjectLogModel } from './projectLog';
 import { createProjectContextSectionModel } from './projectContextSection';
@@ -88,6 +91,9 @@ export function createModels(mongoose: typeof import('mongoose')) {
     Pipeline: createPipelineModel(mongoose),
     ToolApprovalLink: createToolApprovalLinkModel(mongoose),
     ToolApprovalRecord: createToolApprovalRecordModel(mongoose),
+    ToolOverride: createToolOverrideModel(mongoose),
+    FeatureFlag: createFeatureFlagModel(mongoose),
+    EventLog: createEventLogModel(mongoose),
     UserProject: createUserProjectModel(mongoose),
     ProjectLog: createProjectLogModel(mongoose),
     ProjectContextSection: createProjectContextSectionModel(mongoose),

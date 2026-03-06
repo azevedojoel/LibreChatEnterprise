@@ -37,3 +37,6 @@ export { default as activitySchema } from './activity';
 export { default as pipelineSchema } from './pipeline';
 export { default as toolApprovalLinkSchema } from './toolApprovalLink';
 export { default as toolApprovalRecordSchema } from './toolApprovalRecord';
+export { default as toolOverrideSchema } from './toolOverride';
+export { default as featureFlagSchema } from './featureFlag';
+export { default as eventLogSchema } from './eventLog';
