@@ -5,6 +5,7 @@ const categories = require('./categories');
 const adminAuth = require('./admin/auth');
 const adminUsers = require('./admin/users');
 const adminWorkspaces = require('./admin/workspaces');
+const adminUsage = require('./admin/usage');
 const workspace = require('./workspace');
 const endpoints = require('./endpoints');
 const staticRoute = require('./static');
@@ -42,6 +43,7 @@ module.exports = {
   adminAuth,
   adminUsers,
   adminWorkspaces,
+  adminUsage,
   workspace,
   keys,
   apiKeys,
