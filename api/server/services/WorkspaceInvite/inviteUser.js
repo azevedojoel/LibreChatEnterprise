@@ -92,7 +92,7 @@ const inviteUserToWorkspace = async ({ workspaceId, email, invitedBy }) => {
 
   const domainClient = process.env.DOMAIN_CLIENT || 'http://localhost:3080';
   const inviteLink = `${domainClient}/register?token=${token}`;
-  const appName = process.env.APP_TITLE || 'LibreChat';
+  const appName = process.env.APP_TITLE || 'Daily Thread';
 
   if (checkEmailConfig()) {
     try {

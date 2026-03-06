@@ -343,7 +343,7 @@ const inviteUser = async (req, res) => {
 
     const domainClient = process.env.DOMAIN_CLIENT || 'http://localhost:3080';
     const inviteLink = `${domainClient}/register?token=${token}`;
-    const appName = process.env.APP_TITLE || 'LibreChat';
+    const appName = process.env.APP_TITLE || 'Daily Thread';
 
     if (checkEmailConfig()) {
       await sendEmail({
@@ -409,7 +409,7 @@ const sendPasswordResetEmail = async (req, res) => {
         email: user.email,
         subject: 'Password Reset Request',
         payload: {
-          appName: process.env.APP_TITLE || 'LibreChat',
+          appName: process.env.APP_TITLE || 'Daily Thread',
           name: user.name || user.username || user.email,
           link,
           year: new Date().getFullYear(),

@@ -87,7 +87,7 @@ const primeFiles = async (options) => {
   return { files, toolContext };
 };
 
-/** Query looks like a filename (e.g. "contacts.json" or "report_2024.csv") */
+/** Query looks like a filename (e.g. "contacts.json" or "report_2024.txt") */
 const looksLikeFilename = (q) =>
   typeof q === 'string' &&
   q.trim().length > 0 &&
@@ -146,7 +146,7 @@ const createFileSearchTool = async ({
 }) => {
   return tool(
     async ({ query }) => {
-      // Filename lookup: run_tool_and_save JSON/CSV files are not embedded; search by name
+      // Filename lookup: run_tool_and_save JSON files are not embedded; search by name
       let filenameResults = [];
       if (looksLikeFilename(query)) {
         filenameResults = await fetchFilesByFilename(userId, query, { req, agentId });
@@ -236,7 +236,7 @@ const createFileSearchTool = async ({
           .slice(0, 10);
       }
 
-      // Prepend filename matches (e.g. run_tool_and_save JSON/CSV) so they rank first
+      // Prepend filename matches (e.g. run_tool_and_save JSON) so they rank first
       const seenIds = new Set(formattedResults.map((r) => r.file_id));
       for (const r of filenameResults) {
         if (!seenIds.has(r.file_id)) {
@@ -311,7 +311,7 @@ const createFileSearchTool = async ({
     {
       name: Tools.file_search,
       responseFormat: 'content_and_artifact',
-      description: `Performs semantic search across the user's My Files using natural language queries. Also supports filename search: when the query looks like a filename (e.g. "contacts_2024.json" or "export.csv"), returns matching files by name—including JSON/CSV exports from run_tool_and_save. Use this when the user asks to search their files, find information in their documents, or locate a file by name.${
+      description: `Performs semantic search across the user's My Files using natural language queries. Also supports filename search: when the query looks like a filename (e.g. "contacts_2024.json" or "export.csv"), returns matching files by name—including JSON exports from run_tool_and_save. Use this when the user asks to search their files, find information in their documents, or locate a file by name.${
         fileCitations
           ? `
 

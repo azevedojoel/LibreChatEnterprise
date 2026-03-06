@@ -84,7 +84,7 @@ class PostmarkSendUserEmail extends Tool {
       }
 
       const contentParts = [{ type: 'text', text: body || '' }];
-      const appName = process.env.APP_TITLE || 'LibreChat';
+      const appName = process.env.APP_TITLE || 'Daily Thread';
       const { html, text } = formatEmailContent(contentParts, [], {
         appName,
         standalone: true,

@@ -248,7 +248,7 @@ async function executeScheduledAgent({
     if (schedule.emailOnComplete !== false && user.email) {
       try {
         const contentParts = client?.getContentParts?.() ?? client?.contentParts ?? [];
-        const appName = process.env.APP_TITLE || 'LibreChat';
+        const appName = process.env.APP_TITLE || 'Daily Thread';
         const agentName = agent?.name;
         const { html: emailHtml, text: emailText } = formatEmailContent(contentParts, [], {
           appName,

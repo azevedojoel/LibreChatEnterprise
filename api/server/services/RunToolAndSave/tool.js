@@ -23,75 +23,11 @@ function getShortHash(input) {
   return crypto.createHash('sha256').update(String(input)).digest('hex').slice(0, 8);
 }
 
-/** Build filename with timestamp and correct extension */
-function buildFilename(base, format, toolName) {
-  const ext = format === 'csv' ? '.csv' : '.json';
+/** Build filename with timestamp and .json extension */
+function buildFilename(base, toolName) {
   const safeBase = (base || toolName || 'output').replace(/[^a-zA-Z0-9_-]/g, '_');
   const suffix = `${getTimestampSuffix()}_${getShortHash(Date.now())}`;
-  return `${safeBase}_${suffix}${ext}`;
-}
-
-/** Escape CSV value (handles commas, newlines, quotes) */
-function escapeCsvValue(val) {
-  if (val == null) return '';
-  const str = String(val);
-  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
-    return `"${str.replace(/"/g, '""')}"`;
-  }
-  return str;
-}
-
-/** Flatten nested object for CSV: { a: 1, b: { c: 2 } } -> { a: 1, "b.c": 2 }. Arrays become joined strings. */
-function flattenForCsv(obj, prefix = '') {
-  if (obj == null) return {};
-  if (Array.isArray(obj)) {
-    return { [prefix || 'value']: obj.map((v) => (v != null && typeof v === 'object' ? JSON.stringify(v) : v)).join('; ') };
-  }
-  if (typeof obj !== 'object') return { [prefix || 'value']: obj };
-  const out = {};
-  for (const [k, v] of Object.entries(obj)) {
-    const key = prefix ? `${prefix}.${k}` : k;
-    if (v != null && typeof v === 'object' && !Array.isArray(v)) {
-      Object.assign(out, flattenForCsv(v, key));
-    } else if (Array.isArray(v)) {
-      const primitives = v.every((x) => x == null || typeof x !== 'object');
-      out[key] = primitives ? v.join('; ') : v.map((x) => (x != null && typeof x === 'object' ? JSON.stringify(x) : x)).join('; ');
-    } else {
-      out[key] = v;
-    }
-  }
-  return out;
-}
-
-/** Common keys where API responses nest arrays (e.g. { taskLists: [...] }, { items: [...] }) */
-const ARRAY_KEYS = ['data', 'items', 'taskLists', 'tasks', 'files', 'messages', 'results', 'records', 'entries', 'list'];
-
-/** Extract array from parsed response - handles nested shapes from MCP/API tools */
-function extractArrayForCsv(parsed) {
-  if (Array.isArray(parsed)) return parsed;
-  if (!parsed || typeof parsed !== 'object') return [parsed];
-  for (const key of ARRAY_KEYS) {
-    const arr = parsed[key];
-    if (Array.isArray(arr) && arr.length > 0) return arr;
-  }
-  return [parsed];
-}
-
-/** Convert array of objects to CSV string (flattens nested objects so cells are primitives, not JSON) */
-function jsonToCsv(data) {
-  if (!Array.isArray(data) || data.length === 0) return '';
-  const flattened = data.map((row) => (row && typeof row === 'object' ? flattenForCsv(row) : { value: row }));
-  const allKeys = new Set();
-  for (const row of flattened) {
-    Object.keys(row).forEach((k) => allKeys.add(k));
-  }
-  const headers = Array.from(allKeys);
-  const lines = [headers.map(escapeCsvValue).join(',')];
-  for (const row of flattened) {
-    const values = headers.map((h) => escapeCsvValue(row[h]));
-    lines.push(values.join(','));
-  }
-  return lines.join('\n');
+  return `${safeBase}_${suffix}.json`;
 }
 
 /** Extract string content from tool output (handles ToolMessage, content_and_artifact tuple, content blocks) */
@@ -132,13 +68,12 @@ function createRunToolAndSaveTool() {
       }
       // Params may be at top level (LangChain validated input) or in params.args (ToolNode invokeParams)
       const p =
-        params.toolName != null || params.tool_name != null || params.format != null
+        params.toolName != null || params.tool_name != null
           ? params
           : params.args ?? {};
       // Accept toolName, tool_name, or name (some LLMs use snake_case)
       let toolName = p.toolName ?? p.tool_name ?? p.name ?? rawInput?.toolName ?? rawInput?.tool_name;
       const args = p.args ?? {};
-      const format = p.format ?? 'json';
       const filename = p.filename;
 
       if (!toolName || typeof toolName !== 'string') {
@@ -184,25 +119,12 @@ function createRunToolAndSaveTool() {
         const content = extractContent(output);
 
         let fileContent;
-        const effectiveFormat = format === 'csv' ? 'csv' : 'json';
-
-        if (effectiveFormat === 'csv') {
-          let parsed;
-          try {
-            parsed = typeof content === 'string' ? JSON.parse(content) : content;
-          } catch {
-            parsed = [{ output: content }];
-          }
-          const arr = extractArrayForCsv(parsed);
-          fileContent = jsonToCsv(arr);
-        } else {
-          try {
-            const parsed = typeof content === 'string' ? JSON.parse(content) : content;
-            fileContent = JSON.stringify(parsed, null, 2);
-          } catch {
-            fileContent =
-              typeof content === 'string' ? content : JSON.stringify({ output: content });
-          }
+        try {
+          const parsed = typeof content === 'string' ? JSON.parse(content) : content;
+          fileContent = JSON.stringify(parsed, null, 2);
+        } catch {
+          fileContent =
+            typeof content === 'string' ? content : JSON.stringify({ output: content });
         }
 
         const buffer = Buffer.from(fileContent, 'utf8');
@@ -213,7 +135,7 @@ function createRunToolAndSaveTool() {
           ];
         }
 
-        const name = buildFilename(filename, effectiveFormat, toolName);
+        const name = buildFilename(filename, toolName);
 
         const artifact = {
           session_id: sessionId,
@@ -221,7 +143,7 @@ function createRunToolAndSaveTool() {
         };
 
         return [
-          `Saved ${effectiveFormat.toUpperCase()} output to ${name}.`,
+          `Saved JSON output to ${name}.`,
           artifact,
         ];
       } catch (error) {
@@ -235,7 +157,7 @@ function createRunToolAndSaveTool() {
     {
       name: 'run_tool_and_save',
       description:
-        'Run any available tool with given arguments and save the output to a file. Use when the user wants to export data (e.g. CRM contacts, Gmail search results, Google Tasks) to a file without the raw data passing through the model. Output format can be JSON or CSV. Filename gets a timestamp suffix automatically.',
+        'Run any available tool with given arguments and save the output to a JSON file. Use when the user wants to export data (e.g. CRM contacts, Gmail search results, Google Tasks) to a file without the raw data passing through the model. Filename gets a timestamp suffix automatically.',
       schema: {
         type: 'object',
         properties: {
@@ -247,11 +169,6 @@ function createRunToolAndSaveTool() {
           args: {
             type: 'object',
             description: 'Arguments to pass to the tool. Schema depends on the tool.',
-          },
-          format: {
-            type: 'string',
-            enum: ['json', 'csv'],
-            description: 'Output format: "json" (default) or "csv". CSV works best for array-of-objects data.',
           },
           filename: {
             type: 'string',
