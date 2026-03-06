@@ -863,6 +863,17 @@ export type TStartupConfig = {
   >;
   mcpPlaceholder?: string;
   conversationImportMaxFileSize?: number;
+  /** Runtime feature flags (DB overrides). Default true when unset. */
+  featureFlags?: {
+    summarizeEnabled?: boolean;
+    toolsMenuEnabled?: boolean;
+    forkEnabled?: boolean;
+    regenerateEnabled?: boolean;
+    feedbackEnabled?: boolean;
+    copyEnabled?: boolean;
+    editEnabled?: boolean;
+    continueEnabled?: boolean;
+  };
 };
 
 export enum OCRStrategy {

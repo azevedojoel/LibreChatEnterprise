@@ -529,10 +529,11 @@ export function parseEphemeralAgentId(agentId: string): ParsedEphemeralAgentId |
 
 /**
  * Checks if an agent ID represents an ephemeral (non-saved) agent.
- * Real agent IDs always start with "agent_", so anything else is ephemeral.
+ * Persisted agents: agent_* (user-created) and system-* (system agents from librechat.yaml).
  */
 export function isEphemeralAgentId(agentId: string | null | undefined): boolean {
-  return !agentId?.startsWith('agent_');
+  if (!agentId) return true;
+  return !agentId.startsWith('agent_') && !agentId.startsWith('system-');
 }
 
 /**

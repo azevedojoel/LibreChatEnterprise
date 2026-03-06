@@ -1,7 +1,7 @@
 import { useState, memo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as Select from '@ariakit/react/select';
-import { Building2, FileText, LogOut, Users } from 'lucide-react';
+import { Bot, Building2, FileText, LogOut, Users } from 'lucide-react';
 import { SystemRoles } from 'librechat-data-provider';
 import { LinkIcon, GearIcon, DropdownMenuSeparator, Avatar } from '@librechat/client';
 import { MyFilesModal } from '~/components/Chat/Input/Files/MyFilesModal';
@@ -79,6 +79,14 @@ function AccountSettings() {
             >
               <Building2 className="icon-md" aria-hidden="true" />
               {localize('com_nav_workspaces')}
+            </Select.SelectItem>
+            <Select.SelectItem
+              value=""
+              onClick={() => navigate('/d/agents')}
+              className="select-item text-sm"
+            >
+              <Bot className="icon-md" aria-hidden="true" />
+              {localize('com_sidepanel_agent_builder')}
             </Select.SelectItem>
           </>
         )}

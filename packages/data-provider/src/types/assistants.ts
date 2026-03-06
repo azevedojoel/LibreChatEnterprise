@@ -95,6 +95,7 @@ export enum Tools {
   human_remove_from_workspace = 'human_remove_from_workspace',
   /* Sys Admin tools */
   sys_admin_help = 'sys_admin_help',
+  sys_admin_search = 'sys_admin_search',
   sys_admin_list_users = 'sys_admin_list_users',
   sys_admin_get_user = 'sys_admin_get_user',
   sys_admin_create_user = 'sys_admin_create_user',
@@ -130,7 +131,16 @@ export enum Tools {
   sys_admin_revert_agent_version = 'sys_admin_revert_agent_version',
   sys_admin_seed_system_agents = 'sys_admin_seed_system_agents',
   sys_admin_tail_logs = 'sys_admin_tail_logs',
+  sys_admin_search_event_logs = 'sys_admin_search_event_logs',
   sys_admin_list_env = 'sys_admin_list_env',
+  sys_admin_list_all_tools = 'sys_admin_list_all_tools',
+  sys_admin_create_tool_override = 'sys_admin_create_tool_override',
+  sys_admin_get_tool_override = 'sys_admin_get_tool_override',
+  sys_admin_update_tool_override = 'sys_admin_update_tool_override',
+  sys_admin_delete_tool_override = 'sys_admin_delete_tool_override',
+  sys_admin_list_tool_overrides = 'sys_admin_list_tool_overrides',
+  sys_admin_list_feature_flags = 'sys_admin_list_feature_flags',
+  sys_admin_set_feature_flag = 'sys_admin_set_feature_flag',
 }
 
 /**
