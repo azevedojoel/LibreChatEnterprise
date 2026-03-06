@@ -173,6 +173,8 @@ function formatEmailHtml(contentParts, capturedOAuthUrls = [], options = {}) {
   /* Content card - agent content first, then OAuth button(s) centered below */
   const contentBlocks = [];
 
+  const skipThinking = options.forTelegram === true;
+
   for (const part of contentParts) {
     if (!part) continue;
 
@@ -182,8 +184,14 @@ function formatEmailHtml(contentParts, capturedOAuthUrls = [], options = {}) {
         const html = markdownToEmailHtml(text.trim());
         if (html) contentBlocks.push(html);
       }
-    } else if (part.type === 'reasoning' || part.type === 'think') {
-      const reasoning = part.text ?? part.think ?? part.content ?? '';
+    } else if (
+      !skipThinking &&
+      (part.type === 'reasoning' ||
+        part.type === 'think' ||
+        part.type === 'thinking' ||
+        part.type === 'redacted_thinking')
+    ) {
+      const reasoning = part.text ?? part.think ?? part.thinking ?? part.content ?? '';
       const str = typeof reasoning === 'string' ? reasoning : JSON.stringify(reasoning);
       if (str.trim()) {
         contentBlocks.push(`
@@ -264,8 +272,8 @@ ${contentBlocks.join('\n')}
   </tr>
 </table>`);
 
-  /* In reply to (user message reference at bottom) */
-  const userMessage = options.userMessage;
+  /* In reply to (user message reference at bottom) - skipped for Telegram */
+  const userMessage = options.forTelegram ? null : options.userMessage;
   if (userMessage && typeof userMessage === 'string' && userMessage.trim()) {
     const preview = userMessage.trim();
     const maxLen = 400;
@@ -334,14 +342,22 @@ function formatEmailText(contentParts, capturedOAuthUrls = [], options = {}) {
     }
   }
 
+  const skipThinking = options.forTelegram === true;
+
   for (const part of contentParts) {
     if (!part) continue;
 
     if ((part.type === 'text' || part.type === ContentTypes.TEXT) && part.text) {
       const text = typeof part.text === 'string' ? part.text : part.text?.value ?? '';
       if (text.trim()) parts.push(text.trim());
-    } else if (part.type === 'reasoning' || part.type === 'think') {
-      const reasoning = part.text ?? part.think ?? part.content ?? '';
+    } else if (
+      !skipThinking &&
+      (part.type === 'reasoning' ||
+        part.type === 'think' ||
+        part.type === 'thinking' ||
+        part.type === 'redacted_thinking')
+    ) {
+      const reasoning = part.text ?? part.think ?? part.thinking ?? part.content ?? '';
       const str = typeof reasoning === 'string' ? reasoning : JSON.stringify(reasoning);
       if (str.trim()) parts.push(`--- ${str.trim().slice(0, 300)}${str.length > 300 ? '...' : ''} ---`);
     } else if ((part.type === 'tool_call' || part.type === ContentTypes.TOOL_CALL) && part.tool_call) {
@@ -380,7 +396,7 @@ function formatEmailText(contentParts, capturedOAuthUrls = [], options = {}) {
     parts.push(`Files referenced: ${fileList}`);
   }
 
-  const userMessage = options.userMessage;
+  const userMessage = options.forTelegram ? null : options.userMessage;
   if (userMessage && typeof userMessage === 'string' && userMessage.trim()) {
     const preview = userMessage.trim();
     const maxLen = 400;
@@ -533,10 +549,14 @@ function buildToolApprovalSubject({ toolName, argsSummary }, options = {}) {
  * @param {string} params.approvalUrl
  * @param {Object} [options]
  * @param {string} [options.appName]
+ * @param {boolean} [options.forTelegram] - When true, uses friendly wording (no "tool", "Details" instead of "Arguments"). URL is always shown for safety.
+ * @param {boolean} [options.useInlineButton] - When forTelegram and true, says "Tap the button below" in addition to showing URL
  * @returns {{ html: string, text: string }}
  */
 function formatToolApprovalEmail({ toolName, argsSummary, approvalUrl }, options = {}) {
   const appName = options.appName || process.env.APP_TITLE || 'Daily Thread';
+  const forTelegram = options.forTelegram === true;
+  const useInlineButton = options.useInlineButton === true;
   const safeUrl = escapeHtml(approvalUrl || '#');
   const displayName = getToolDisplayName(toolName || 'Tool');
   const bubbles = parseArgsToBubbles(argsSummary || '');
@@ -598,11 +618,24 @@ function formatToolApprovalEmail({ toolName, argsSummary, approvalUrl }, options
       ? ''
       : bubbles.map(({ key, value }) => `${key}: ${value}`).join('\n');
 
-  const text = `Your agent requested approval for a destructive action.
+  let linkInstruction;
+  if (forTelegram) {
+    const urlLine = approvalUrl ? `\n${approvalUrl}` : '';
+    linkInstruction = useInlineButton
+      ? `Tap the button below or open this link to approve or deny (sign in first if needed):${urlLine}`
+      : `Click this link to approve or deny (sign in first if needed):${urlLine}`;
+  } else {
+    linkInstruction = `Click this link to approve or deny (sign in first if needed):\n${approvalUrl || '(link not available)'}`;
+  }
 
-Tool: ${displayName}
-${argsText ? `Arguments:\n${argsText}\n\n` : ''}Click this link to approve or deny (sign in first if needed):
-${approvalUrl || '(link not available)'}
+  const intro = forTelegram ? 'Your agent needs your approval to proceed.' : 'Your agent requested approval for a destructive action.';
+  const actionLine = forTelegram ? displayName : `Tool: ${displayName}`;
+  const detailsLabel = forTelegram ? 'Details' : 'Arguments';
+
+  const text = `${intro}
+
+${actionLine}
+${argsText ? `${detailsLabel}:\n${argsText}\n\n` : ''}${linkInstruction}
 
 This link expires in 1 hour.`;
 
