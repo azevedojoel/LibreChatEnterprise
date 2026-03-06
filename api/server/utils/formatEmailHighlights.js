@@ -135,7 +135,9 @@ function markdownToEmailHtml(md) {
  * Supports appName/agentName branding in header/footer.
  * @param {Array} contentParts - Ordered content from response.content
  * @param {string[]} [capturedOAuthUrls=[]] - OAuth URLs to include at top
- * @param {Object} [options={}] - Optional { appName, agentName, userMessage, fileNames }
+ * @param {Object} [options={}] - Optional { appName, agentName, userMessage, fileNames, standalone, scheduleName }
+ * @param {boolean} [options.standalone] - When true, use minimal footer (— AppName) instead of reply prompt
+ * @param {string} [options.scheduleName] - When standalone, show "From your scheduled job: [name]"
  * @returns {string} HTML string
  */
 function formatEmailHtml(contentParts, capturedOAuthUrls = [], options = {}) {
@@ -152,6 +154,21 @@ function formatEmailHtml(contentParts, capturedOAuthUrls = [], options = {}) {
     <td style="font-size: 13px; color: ${STYLES.textMuted};">${escapeHtml(appName)}</td>
   </tr>
 </table>`);
+
+  /* Context block (standalone emails): agent name, scheduled job */
+  const contextLines = [];
+  if (options.standalone && options.agentName && typeof options.agentName === 'string' && options.agentName.trim()) {
+    contextLines.push(`Sent by ${escapeHtml(options.agentName.trim())}`);
+  }
+  if (options.standalone && options.scheduleName && typeof options.scheduleName === 'string' && options.scheduleName.trim()) {
+    contextLines.push(`From your scheduled job: ${escapeHtml(options.scheduleName.trim())}`);
+  }
+  if (contextLines.length > 0) {
+    parts.push(`
+<div style="margin-bottom: 20px; padding: 12px 16px; background: ${STYLES.pillBg}; border-radius: 6px; font-size: 13px; color: ${STYLES.textMuted};">
+  ${contextLines.join('<br>')}
+</div>`);
+  }
 
   /* Content card - agent content first, then OAuth button(s) centered below */
   const contentBlocks = [];
@@ -235,11 +252,14 @@ ${contentBlocks.join('\n')}
   }
 
   /* Footer */
+  const footerText = options.standalone
+    ? `— ${escapeHtml(appName)}`
+    : `Reply to this email to continue the conversation. — ${escapeHtml(appName)}`;
   parts.push(`
 <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid ${STYLES.border};">
   <tr>
     <td style="font-size: 12px; color: ${STYLES.textMuted};">
-      Reply to this email to continue the conversation. — ${escapeHtml(appName)}
+      ${footerText}
     </td>
   </tr>
 </table>`);
@@ -291,7 +311,7 @@ ${parts.join('\n')}
  * Format ordered content parts as plain text.
  * @param {Array} contentParts - Ordered content from response.content
  * @param {string[]} [capturedOAuthUrls=[]] - OAuth URLs to include at top
- * @param {Object} [options={}] - Optional { userMessage, fileNames }
+ * @param {Object} [options={}] - Optional { userMessage, fileNames, standalone, agentName, scheduleName }
  * @returns {string} Plain text string
  */
 function formatEmailText(contentParts, capturedOAuthUrls = [], options = {}) {
@@ -299,6 +319,20 @@ function formatEmailText(contentParts, capturedOAuthUrls = [], options = {}) {
   const uniqueUrls = [...new Set(capturedOAuthUrls)];
 
   const parts = [];
+
+  /* Context (standalone emails): agent name, scheduled job */
+  if (options.standalone) {
+    const contextLines = [];
+    if (options.agentName && typeof options.agentName === 'string' && options.agentName.trim()) {
+      contextLines.push(`Sent by ${options.agentName.trim()}`);
+    }
+    if (options.scheduleName && typeof options.scheduleName === 'string' && options.scheduleName.trim()) {
+      contextLines.push(`From your scheduled job: ${options.scheduleName.trim()}`);
+    }
+    if (contextLines.length > 0) {
+      parts.push(contextLines.join('\n'));
+    }
+  }
 
   for (const part of contentParts) {
     if (!part) continue;

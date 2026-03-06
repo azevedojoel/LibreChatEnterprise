@@ -357,6 +357,10 @@ const loadTools = async ({
     dalle: imageGenOptions,
     'stable-diffusion': imageGenOptions,
     gemini_image_gen: imageGenOptions,
+    send_user_email: {
+      agentName: agent?.name ?? null,
+      scheduleName: options.req?.body?.scheduledRunContext?.scheduleName ?? null,
+    },
   };
 
   /** @type {Record<string, string>} */

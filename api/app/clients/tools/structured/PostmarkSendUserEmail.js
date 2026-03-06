@@ -49,6 +49,8 @@ class PostmarkSendUserEmail extends Tool {
     this.defaultFrom =
       fields.POSTMARK_FROM ?? fields.EMAIL_FROM ?? this.getDefaultFrom();
     this.userId = fields.userId;
+    this.agentName = fields.agentName ?? null;
+    this.scheduleName = fields.scheduleName ?? null;
   }
 
   getApiKey() {
@@ -83,7 +85,12 @@ class PostmarkSendUserEmail extends Tool {
 
       const contentParts = [{ type: 'text', text: body || '' }];
       const appName = process.env.APP_TITLE || 'LibreChat';
-      const { html, text } = formatEmailContent(contentParts, [], { appName });
+      const { html, text } = formatEmailContent(contentParts, [], {
+        appName,
+        standalone: true,
+        agentName: this.agentName,
+        scheduleName: this.scheduleName,
+      });
 
       const payload = {
         From: fromAddress,

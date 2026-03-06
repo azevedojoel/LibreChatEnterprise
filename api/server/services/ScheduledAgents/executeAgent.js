@@ -123,6 +123,7 @@ async function executeScheduledAgent({
       ...(userProjectId && { userProjectId }),
       scheduledRunContext: {
         emailOnComplete: schedule.emailOnComplete !== false,
+        scheduleName: schedule?.name ?? null,
       },
       ...(Array.isArray(selectedTools) && { ephemeralAgent: { tools: selectedTools } }),
     };
