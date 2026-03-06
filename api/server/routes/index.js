@@ -33,6 +33,7 @@ const user = require('./user');
 const mcp = require('./mcp');
 const crm = require('./crm');
 const userProjects = require('./userProjects');
+const notifications = require('./notifications');
 
 module.exports = {
   mcp,
@@ -70,4 +71,5 @@ module.exports = {
   scheduledAgents,
   crm,
   userProjects,
+  notifications,
 };

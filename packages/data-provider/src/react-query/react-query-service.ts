@@ -137,9 +137,15 @@ export const useClearConversationsMutation = (): UseMutationResult<unknown> => {
   });
 };
 
-export const useClearCRMDataMutation = (): UseMutationResult<
-  { deleted: { activities: number; deals: number; contacts: number; organizations: number; pipelines: number } }
-> => {
+export const useClearCRMDataMutation = (): UseMutationResult<{
+  deleted: {
+    activities: number;
+    deals: number;
+    contacts: number;
+    organizations: number;
+    pipelines: number;
+  };
+}> => {
   const queryClient = useQueryClient();
   return useMutation(() => dataService.clearCRMData(), {
     onSuccess: () => {
@@ -928,5 +934,50 @@ export const useGetWorkspaceMeQuery = (
   }>([QueryKeys.workspaceMe], () => dataService.getWorkspaceMe(), {
     refetchOnWindowFocus: false,
     ...config,
+  });
+};
+
+/* Notifications */
+
+export const useGetNotificationsQuery = (
+  params?: t.TNotificationsListParams,
+  config?: UseQueryOptions<t.TNotificationsListResponse>,
+): QueryObserverResult<t.TNotificationsListResponse> => {
+  return useQuery<t.TNotificationsListResponse>(
+    [QueryKeys.notifications, params?.limit, params?.cursor, params?.unreadOnly],
+    () => dataService.getNotifications(params),
+    {
+      refetchInterval: 30_000,
+      refetchIntervalInBackground: false,
+      ...config,
+    },
+  );
+};
+
+export const useMarkNotificationReadMutation = (): UseMutationResult<
+  t.TNotification,
+  unknown,
+  string,
+  unknown
+> => {
+  const queryClient = useQueryClient();
+  return useMutation((id: string) => dataService.markNotificationRead(id), {
+    onSuccess: () => {
+      queryClient.invalidateQueries([QueryKeys.notifications]);
+    },
+  });
+};
+
+export const useMarkAllNotificationsReadMutation = (): UseMutationResult<
+  { updated: number },
+  unknown,
+  void,
+  unknown
+> => {
+  const queryClient = useQueryClient();
+  return useMutation(() => dataService.markAllNotificationsRead(), {
+    onSuccess: () => {
+      queryClient.invalidateQueries([QueryKeys.notifications]);
+    },
   });
 };

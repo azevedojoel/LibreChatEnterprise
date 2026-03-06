@@ -431,6 +431,14 @@ export const memoryPreferences = () => `${memories()}/preferences`;
 export const userProjects = () => `${BASE_URL}/api/user-projects`;
 export const userProjectById = (id: string) => `${userProjects()}/${encodeURIComponent(id)}`;
 
+/* Notifications */
+export const notifications = (params?: { limit?: number; cursor?: string; unreadOnly?: boolean }) => {
+  const query = buildQuery(params || {});
+  return `${BASE_URL}/api/notifications${query}`;
+};
+export const notificationRead = (id: string) => `${BASE_URL}/api/notifications/${id}/read`;
+export const notificationReadAll = () => `${BASE_URL}/api/notifications/read-all`;
+
 export const searchPrincipals = (params: q.PrincipalSearchParams) => {
   const { q: query, limit, types } = params;
   let url = `${BASE_URL}/api/permissions/search-principals?q=${encodeURIComponent(query)}`;

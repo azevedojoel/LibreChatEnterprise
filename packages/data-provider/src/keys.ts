@@ -79,6 +79,8 @@ export enum QueryKeys {
   adminWorkspace = 'adminWorkspace',
   adminWorkspaceMembers = 'adminWorkspaceMembers',
   workspaceMe = 'workspaceMe',
+  /* Notifications */
+  notifications = 'notifications',
 }
 
 // Dynamic query keys that require parameters

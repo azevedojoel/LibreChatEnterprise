@@ -564,6 +564,24 @@ export const deleteUserProject = (id: string): Promise<{ deleted: boolean }> => 
   return request.delete(endpoints.userProjectById(id));
 };
 
+/* Notifications */
+
+export const getNotifications = (params?: {
+  limit?: number;
+  cursor?: string;
+  unreadOnly?: boolean;
+}): Promise<t.TNotificationsListResponse> => {
+  return request.get(endpoints.notifications(params));
+};
+
+export const markNotificationRead = (id: string): Promise<t.TNotification> => {
+  return request.patch(endpoints.notificationRead(id));
+};
+
+export const markAllNotificationsRead = (): Promise<{ updated: number }> => {
+  return request.patch(endpoints.notificationReadAll());
+};
+
 export const revertAgentVersion = ({
   agent_id,
   version_index,

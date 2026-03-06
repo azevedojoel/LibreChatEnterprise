@@ -719,3 +719,31 @@ export type TBalanceResponse = {
   lastRefill?: Date;
   refillAmount?: number;
 };
+
+/* Notifications */
+export type TNotificationType = 'workspace_message' | 'tool_approval' | 'human_notify' | 'scheduled_run_complete';
+
+export type TNotification = {
+  _id: string;
+  userId: string;
+  type: TNotificationType;
+  title: string;
+  body: string;
+  link?: string;
+  readAt?: string | null;
+  createdAt?: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type TNotificationsListParams = {
+  limit?: number;
+  cursor?: string;
+  unreadOnly?: boolean;
+};
+
+export type TNotificationsListResponse = {
+  notifications: TNotification[];
+  nextCursor: string | null;
+  hasMore: boolean;
+  unreadCount: number;
+};

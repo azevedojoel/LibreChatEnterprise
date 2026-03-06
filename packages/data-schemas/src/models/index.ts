@@ -41,6 +41,7 @@ import { createToolApprovalRecordModel } from './toolApprovalRecord';
 import { createUserProjectModel } from './userProject';
 import { createProjectLogModel } from './projectLog';
 import { createProjectContextSectionModel } from './projectContextSection';
+import { createNotificationModel } from './notification';
 
 /**
  * Creates all database models for all collections
@@ -90,5 +91,6 @@ export function createModels(mongoose: typeof import('mongoose')) {
     UserProject: createUserProjectModel(mongoose),
     ProjectLog: createProjectLogModel(mongoose),
     ProjectContextSection: createProjectContextSectionModel(mongoose),
+    Notification: createNotificationModel(mongoose),
   };
 }
