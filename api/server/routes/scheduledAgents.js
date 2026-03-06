@@ -10,11 +10,12 @@ const {
   getRun,
   cancelRun,
 } = require('~/server/controllers/scheduledAgents');
-const requireJwtAuth = require('~/server/middleware/requireJwtAuth');
+const { requireJwtAuth, requireTermsAccepted } = require('~/server/middleware');
 
 const router = express.Router();
 
 router.use(requireJwtAuth);
+router.use(requireTermsAccepted());
 router.use(checkAgentAccess);
 
 /** Runs must be defined before :id to avoid "runs" being captured as id */

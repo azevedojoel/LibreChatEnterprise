@@ -13,13 +13,18 @@ const {
   getConvo,
 } = require('~/models');
 const { findAllArtifacts, replaceArtifactContent } = require('~/server/services/Artifacts/update');
-const { requireJwtAuth, validateMessageReq } = require('~/server/middleware');
+const {
+  requireJwtAuth,
+  requireTermsAccepted,
+  validateMessageReq,
+} = require('~/server/middleware');
 const { getConvosQueried } = require('~/models/Conversation');
 const { Message, UserProject, User } = require('~/db/models');
 const { createNotification } = require('~/server/services/NotificationService');
 
 const router = express.Router();
 router.use(requireJwtAuth);
+router.use(requireTermsAccepted());
 
 /**
  * Creates notifications for workspace members when a message is posted to a workspace project conversation.

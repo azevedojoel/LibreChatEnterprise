@@ -4,7 +4,7 @@
  *
  * For each workspace without an Inbound project:
  * - Create a UserProject with name "Inbound", isInbound: true
- * - Add email-rules section with template
+ * - Add inbound-context section with template
  *
  * Run with: node config/migrate-inbound-projects.js
  * Dry run (default): node config/migrate-inbound-projects.js --dry-run

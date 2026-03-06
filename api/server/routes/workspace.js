@@ -13,6 +13,7 @@ const router = express.Router();
 router.get(
   '/me',
   middleware.requireJwtAuth,
+  middleware.requireTermsAccepted(),
   async (req, res) => {
     try {
       const user = await findUser({ _id: req.user?.id }, 'workspace_id');
@@ -42,6 +43,7 @@ router.get(
 router.get(
   '/me/members',
   middleware.requireJwtAuth,
+  middleware.requireTermsAccepted(),
   async (req, res) => {
     try {
       const user = await findUser({ _id: req.user?.id }, 'workspace_id');

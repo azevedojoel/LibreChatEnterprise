@@ -8,7 +8,7 @@ const {
   deleteMemory,
   setMemory,
 } = require('~/models');
-const { requireJwtAuth, configMiddleware } = require('~/server/middleware');
+const { requireJwtAuth, requireTermsAccepted, configMiddleware } = require('~/server/middleware');
 const { getRoleByName } = require('~/models/Role');
 
 const router = express.Router();
@@ -42,6 +42,7 @@ const checkMemoryOptOut = generateCheckAccess({
 });
 
 router.use(requireJwtAuth);
+router.use(requireTermsAccepted());
 
 /**
  * GET /memories

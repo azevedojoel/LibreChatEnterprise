@@ -395,7 +395,8 @@ function createProjectManagementTools({ userId, conversationId, req } = {}) {
 
   tools.project_archive = new (class extends Tool {
     name = 'project_archive';
-    description = 'Archive a project (soft delete). Required: projectId. Owner or workspace admin only.';
+    description =
+      'Archive a project (soft delete). Required: projectId. Owner or workspace admin only. Inbound (system) projects cannot be archived.';
     schema = {
       type: 'object',
       properties: {
@@ -410,6 +411,10 @@ function createProjectManagementTools({ userId, conversationId, req } = {}) {
       const { projectId } = args || {};
       if (!projectId) return toJson({ error: 'projectId is required' });
       try {
+        const project = await getUserProject(uid, projectId);
+        if (project?.isInbound) {
+          return toJson({ error: 'Inbound project cannot be archived (system project)' });
+        }
         const archived = await archiveUserProject(uid, projectId);
         if (!archived) {
           return toJson({ error: 'Project not found or access denied' });

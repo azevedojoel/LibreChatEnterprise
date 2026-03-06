@@ -17,6 +17,7 @@ const { forkConversation, duplicateConversation } = require('~/server/utils/impo
 const { storage, importFileFilter } = require('~/server/routes/files/multer');
 const { deleteAllSharedLinks, deleteConvoSharedLink } = require('~/models');
 const requireJwtAuth = require('~/server/middleware/requireJwtAuth');
+const { requireTermsAccepted } = require('~/server/middleware');
 const { importConversations } = require('~/server/utils/import');
 const { deleteToolCalls } = require('~/models/ToolCall');
 const getLogStores = require('~/cache/getLogStores');
@@ -28,6 +29,7 @@ const assistantClients = {
 
 const router = express.Router();
 router.use(requireJwtAuth);
+router.use(requireTermsAccepted());
 
 router.get('/', async (req, res) => {
   const limit = parseInt(req.query.limit, 10) || 25;

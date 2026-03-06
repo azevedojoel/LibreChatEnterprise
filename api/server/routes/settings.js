@@ -3,11 +3,11 @@ const {
   updateFavoritesController,
   getFavoritesController,
 } = require('~/server/controllers/FavoritesController');
-const { requireJwtAuth } = require('~/server/middleware');
+const { requireJwtAuth, requireTermsAccepted } = require('~/server/middleware');
 
 const router = express.Router();
 
-router.get('/favorites', requireJwtAuth, getFavoritesController);
-router.post('/favorites', requireJwtAuth, updateFavoritesController);
+router.get('/favorites', requireJwtAuth, requireTermsAccepted(), getFavoritesController);
+router.post('/favorites', requireJwtAuth, requireTermsAccepted(), updateFavoritesController);
 
 module.exports = router;

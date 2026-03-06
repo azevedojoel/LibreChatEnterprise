@@ -8,7 +8,13 @@ const {
   getResourceRoles,
   searchPrincipals,
 } = require('~/server/controllers/PermissionsController');
-const { requireJwtAuth, checkBan, uaParser, canAccessResource } = require('~/server/middleware');
+const {
+  requireJwtAuth,
+  requireTermsAccepted,
+  checkBan,
+  uaParser,
+  canAccessResource,
+} = require('~/server/middleware');
 const { checkPeoplePickerAccess } = require('~/server/middleware/checkPeoplePickerAccess');
 const { checkSharePublicAccess } = require('~/server/middleware/checkSharePublicAccess');
 const { findMCPServerByObjectId } = require('~/models');
@@ -17,6 +23,7 @@ const router = express.Router();
 
 // Apply common middleware
 router.use(requireJwtAuth);
+router.use(requireTermsAccepted());
 router.use(checkBan);
 router.use(uaParser);
 

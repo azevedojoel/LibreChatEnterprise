@@ -2,10 +2,11 @@ const express = require('express');
 const mongoose = require('mongoose');
 const { Notification } = require('~/db/models');
 const { logger } = require('@librechat/data-schemas');
-const requireJwtAuth = require('~/server/middleware/requireJwtAuth');
+const { requireJwtAuth, requireTermsAccepted } = require('~/server/middleware');
 
 const router = express.Router();
 router.use(requireJwtAuth);
+router.use(requireTermsAccepted());
 
 /**
  * GET /api/notifications

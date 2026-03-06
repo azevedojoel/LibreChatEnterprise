@@ -614,7 +614,7 @@ This project is shared with your workspace. All workspace members can view and u
               inboundBlurb = `
 ## Inbound project
 
-This is the Inbound project for your workspace. It stores email routing rules in the email-rules section. When inbound emails arrive, the agent runs with this project first, reads the rules, and can use project_switch to route to the matched target project.
+This is the Inbound project for your workspace. All inbound email to this workspace is processed with this project's context. Work with the AI here to define the context and instructions that handle incoming email. You can add sections, update them, and the AI can modify context as needed.
 `;
             }
 
@@ -644,7 +644,7 @@ ${sharedSection}
 **Management (work even without a project):**
 - project_create: Create a project. Required: name. Optional: description, tags[], sharedWithWorkspace (workspace admin only), templateProjectId. If sharedWithWorkspace and you are not admin, use human_notify_human.
 - project_list: List projects. Optional: limit, cursor, status (active|archived|all)
-- project_archive: Archive a project. Required: projectId
+- project_archive: Archive a project. Required: projectId. Inbound (system) projects cannot be archived.
 - project_update_metadata: Update name, description, tags. Required: projectId. ownerId: workspace admin only (shared projects).
 - project_switch: Assign project to this conversation. Required: projectId (from project_list). Pass null to clear.`;
             sharedRunContextParts.unshift(projectPrompt);

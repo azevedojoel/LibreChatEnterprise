@@ -2,10 +2,11 @@ const crypto = require('crypto');
 const express = require('express');
 const { logger } = require('@librechat/data-schemas');
 const { getPresets, savePreset, deletePresets } = require('~/models');
-const requireJwtAuth = require('~/server/middleware/requireJwtAuth');
+const { requireJwtAuth, requireTermsAccepted } = require('~/server/middleware');
 
 const router = express.Router();
 router.use(requireJwtAuth);
+router.use(requireTermsAccepted());
 
 router.get('/', async (req, res) => {
   const presets = (await getPresets(req.user.id)).map((preset) => preset);

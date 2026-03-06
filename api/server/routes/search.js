@@ -1,11 +1,12 @@
 const express = require('express');
 const { MeiliSearch } = require('meilisearch');
 const { isEnabled } = require('@librechat/api');
-const requireJwtAuth = require('~/server/middleware/requireJwtAuth');
+const { requireJwtAuth, requireTermsAccepted } = require('~/server/middleware');
 
 const router = express.Router();
 
 router.use(requireJwtAuth);
+router.use(requireTermsAccepted());
 
 router.get('/enable', async function (req, res) {
   if (!isEnabled(process.env.SEARCH)) {

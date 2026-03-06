@@ -8,10 +8,11 @@ const {
   deleteUserProject,
   archiveUserProject,
 } = require('~/models/UserProject');
-const requireJwtAuth = require('~/server/middleware/requireJwtAuth');
+const { requireJwtAuth, requireTermsAccepted } = require('~/server/middleware');
 
 const router = express.Router();
 router.use(requireJwtAuth);
+router.use(requireTermsAccepted());
 
 /**
  * GET /api/user-projects

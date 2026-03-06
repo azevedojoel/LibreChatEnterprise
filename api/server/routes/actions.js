@@ -13,7 +13,7 @@ const {
   OAUTH_SESSION_COOKIE,
 } = require('@librechat/api');
 const { findToken, updateToken, createToken } = require('~/models');
-const { requireJwtAuth } = require('~/server/middleware');
+const { requireJwtAuth, requireTermsAccepted } = require('~/server/middleware');
 const { getFlowStateManager } = require('~/config');
 const { getLogStores } = require('~/cache');
 
@@ -27,7 +27,12 @@ const OAUTH_CSRF_COOKIE_PATH = '/api/actions';
  *
  * @route POST /actions/:action_id/oauth/bind
  */
-router.post('/:action_id/oauth/bind', requireJwtAuth, setOAuthSession, async (req, res) => {
+router.post(
+  '/:action_id/oauth/bind',
+  requireJwtAuth,
+  requireTermsAccepted(),
+  setOAuthSession,
+  async (req, res) => {
   try {
     const { action_id } = req.params;
     const user = req.user;

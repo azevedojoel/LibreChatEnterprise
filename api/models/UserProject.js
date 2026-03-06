@@ -177,15 +177,9 @@ const createUserProject = async (
   return { project: result };
 };
 
-const INBOUND_PROJECT_EMAIL_RULES_TEMPLATE = `# Email routing rules
+const INBOUND_PROJECT_EMAIL_RULES_TEMPLATE = `# Inbound email context
 
-Match sender or subject to route to a project. Use project_switch to assign the conversation.
-
-## Examples
-
-From: brad.eye@cenegenicsjax.com → Project: John Smith
-From: @cenegenicsjax.com → Search CRM for sender, assign to their project
-Subject contains: "Martinez" → Project: Martinez Family`;
+Work with the AI to define context and instructions for handling incoming email to this workspace. Add whatever sections and content you need. The AI can update this context as you refine how inbound emails should be handled.`;
 
 /**
  * Create the Inbound project for a workspace. Used for email routing rules.
@@ -201,7 +195,7 @@ const createInboundProjectForWorkspace = async (workspaceId, createdBy) => {
   const project = await UserProject.create({
     user: createdBy,
     name: 'Inbound',
-    description: 'Email routing rules for inbound emails. Edit the email-rules section to configure routing.',
+    description: 'Context for inbound emails. Work with the AI to define how incoming email should be handled.',
     tags: ['inbound', 'email'],
     status: 'active',
     ownerId: createdByObjId,
@@ -213,8 +207,8 @@ const createInboundProjectForWorkspace = async (workspaceId, createdBy) => {
   await patchSections(projectId, createdBy, {
     sections: [
       {
-        sectionId: 'email-rules',
-        title: 'Email routing rules',
+        sectionId: 'inbound-context',
+        title: 'Inbound email context',
         content: INBOUND_PROJECT_EMAIL_RULES_TEMPLATE,
       },
     ],

@@ -13,6 +13,7 @@ const {
   configMiddleware,
   canDeleteAccount,
   requireJwtAuth,
+  requireTermsAccepted,
 } = require('~/server/middleware');
 
 const settings = require('./settings');
@@ -23,8 +24,20 @@ router.use('/settings', settings);
 router.get('/', requireJwtAuth, getUserController);
 router.get('/terms', requireJwtAuth, getTermsStatusController);
 router.post('/terms/accept', requireJwtAuth, acceptTermsController);
-router.post('/plugins', requireJwtAuth, updateUserPluginsController);
-router.delete('/delete', requireJwtAuth, canDeleteAccount, configMiddleware, deleteUserController);
+router.post(
+  '/plugins',
+  requireJwtAuth,
+  requireTermsAccepted(),
+  updateUserPluginsController,
+);
+router.delete(
+  '/delete',
+  requireJwtAuth,
+  requireTermsAccepted(),
+  canDeleteAccount,
+  configMiddleware,
+  deleteUserController,
+);
 router.post('/verify', verifyEmailController);
 router.post('/verify/resend', verifyEmailLimiter, resendVerificationController);
 

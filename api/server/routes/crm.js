@@ -6,7 +6,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const { logger } = require('@librechat/data-schemas');
 const { SystemRoles } = require('librechat-data-provider');
-const { requireJwtAuth } = require('~/server/middleware');
+const { requireJwtAuth, requireTermsAccepted } = require('~/server/middleware');
 const { getProjectById, listProjects, createProject } = require('~/models/Project');
 const { findUser } = require('~/models');
 const {
@@ -99,6 +99,7 @@ const requireProjectAccess = async (req, res, next) => {
 };
 
 router.use(requireJwtAuth);
+router.use(requireTermsAccepted());
 
 // ========== Clear my CRM data (Data Controls) ==========
 router.delete('/my-data', async (req, res) => {

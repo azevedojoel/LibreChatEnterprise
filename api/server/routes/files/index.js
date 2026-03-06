@@ -3,6 +3,7 @@ const {
   createFileLimiters,
   configMiddleware,
   requireJwtAuth,
+  requireTermsAccepted,
   uaParser,
   checkBan,
 } = require('~/server/middleware');
@@ -18,6 +19,7 @@ const speech = require('./speech');
 const initialize = async () => {
   const router = express.Router();
   router.use(requireJwtAuth);
+  router.use(requireTermsAccepted());
   router.use(configMiddleware);
   router.use(checkBan);
   router.use(uaParser);

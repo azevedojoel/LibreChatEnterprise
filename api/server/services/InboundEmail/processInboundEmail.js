@@ -230,7 +230,7 @@ async function processInboundEmail(payload) {
 
   const capturedOAuthUrls = [];
 
-  /** Resolve Inbound project for workspace flow - run starts with email-rules context */
+  /** Resolve Inbound project for workspace flow - run starts with inbound project context */
   let inboundProjectId = null;
   if (isWorkspaceFlow && workspace) {
     const { UserProject } = require('~/db/models');

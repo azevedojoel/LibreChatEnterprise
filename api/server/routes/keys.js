@@ -1,10 +1,10 @@
 const express = require('express');
 const { updateUserKey, deleteUserKey, getUserKeyExpiry } = require('~/models');
-const { requireJwtAuth } = require('~/server/middleware');
+const { requireJwtAuth, requireTermsAccepted } = require('~/server/middleware');
 
 const router = express.Router();
 
-router.put('/', requireJwtAuth, async (req, res) => {
+router.put('/', requireJwtAuth, requireTermsAccepted(), async (req, res) => {
   if (req.body == null || typeof req.body !== 'object') {
     return res.status(400).send({ error: 'Invalid request body.' });
   }
@@ -13,13 +13,13 @@ router.put('/', requireJwtAuth, async (req, res) => {
   res.status(201).send();
 });
 
-router.delete('/:name', requireJwtAuth, async (req, res) => {
+router.delete('/:name', requireJwtAuth, requireTermsAccepted(), async (req, res) => {
   const { name } = req.params;
   await deleteUserKey({ userId: req.user.id, name });
   res.status(204).send();
 });
 
-router.delete('/', requireJwtAuth, async (req, res) => {
+router.delete('/', requireJwtAuth, requireTermsAccepted(), async (req, res) => {
   const { all } = req.query;
 
   if (all !== 'true') {
@@ -31,7 +31,7 @@ router.delete('/', requireJwtAuth, async (req, res) => {
   res.status(204).send();
 });
 
-router.get('/', requireJwtAuth, async (req, res) => {
+router.get('/', requireJwtAuth, requireTermsAccepted(), async (req, res) => {
   const { name } = req.query;
   const response = await getUserKeyExpiry({ userId: req.user.id, name });
   res.status(200).send(response);

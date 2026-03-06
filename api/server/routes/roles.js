@@ -14,11 +14,12 @@ const {
   presetsPermissionsSchema,
   endpointsMenuPermissionsSchema,
 } = require('librechat-data-provider');
-const { checkAdmin, requireJwtAuth } = require('~/server/middleware');
+const { checkAdmin, requireJwtAuth, requireTermsAccepted } = require('~/server/middleware');
 const { updateRoleByName, getRoleByName } = require('~/models/Role');
 
 const router = express.Router();
 router.use(requireJwtAuth);
+router.use(requireTermsAccepted());
 
 /**
  * Permission configuration mapping

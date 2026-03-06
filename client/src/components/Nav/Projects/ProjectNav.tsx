@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QueryKeys } from 'librechat-data-provider';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, FolderIcon, PlusIcon, Search, Share2, Trash2, X } from 'lucide-react';
+import { ChevronDown, FolderIcon, Mail, PlusIcon, Search, Share2, Trash2, X } from 'lucide-react';
 import { useRecoilState } from 'recoil';
 import { Button, CircleHelpIcon, OGDialog, OGDialogTemplate, TooltipAnchor, useToastContext } from '@librechat/client';
 import type { TUserProject } from 'librechat-data-provider';
@@ -267,7 +267,7 @@ export default function ProjectNav() {
                       </div>
                     )}
                     {personal.map((project: TUserProject) => {
-                      const canDelete = project.owner === user?.id;
+                      const canDelete = project.owner === user?.id && !project.isInbound;
                       return (
                         <div
                           key={project._id}
@@ -312,7 +312,7 @@ export default function ProjectNav() {
                       {localize('com_ui_workspace_projects')}
                     </div>
                     {workspaceProjects.map((project: TUserProject) => {
-                      const canDelete = !!workspaceMeData?.isAdmin;
+                      const canDelete = !!workspaceMeData?.isAdmin && !project.isInbound;
                       return (
                         <div
                           key={project._id}
@@ -327,8 +327,17 @@ export default function ProjectNav() {
                                 : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary',
                             )}
                           >
-                            <FolderIcon className="size-3.5 shrink-0 opacity-60" />
+                            {project.isInbound ? (
+                              <Mail className="size-3.5 shrink-0 opacity-60" />
+                            ) : (
+                              <FolderIcon className="size-3.5 shrink-0 opacity-60" />
+                            )}
                             <span className="truncate flex-1">{project.name}</span>
+                            {project.isInbound && (
+                              <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium bg-surface-secondary text-text-secondary">
+                                Inbound
+                              </span>
+                            )}
                             <Share2 className="size-3.5 shrink-0 opacity-60 text-text-secondary" aria-hidden />
                           </button>
                           {canDelete && (

@@ -34,6 +34,7 @@ const {
   canAccessPromptGroupResource,
   canAccessPromptViaGroup,
   requireJwtAuth,
+  requireTermsAccepted,
 } = require('~/server/middleware');
 const {
   findPubliclyAccessibleResources,
@@ -66,6 +67,7 @@ const checkGlobalPromptShare = generateCheckAccess({
 });
 
 router.use(requireJwtAuth);
+router.use(requireTermsAccepted());
 router.use(checkPromptAccess);
 
 /**

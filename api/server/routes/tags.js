@@ -9,7 +9,7 @@ const {
   deleteConversationTag,
   getConversationTags,
 } = require('~/models/ConversationTag');
-const { requireJwtAuth } = require('~/server/middleware');
+const { requireJwtAuth, requireTermsAccepted } = require('~/server/middleware');
 const { getRoleByName } = require('~/models/Role');
 
 const router = express.Router();
@@ -21,6 +21,7 @@ const checkBookmarkAccess = generateCheckAccess({
 });
 
 router.use(requireJwtAuth);
+router.use(requireTermsAccepted());
 router.use(checkBookmarkAccess);
 
 /**
