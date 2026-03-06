@@ -200,8 +200,15 @@ export default function ToolCall({
   const setPendingMCPOAuth = useSetRecoilState(store.pendingMCPOAuthAtom);
   const expandedToolCalls = useRecoilValue(store.expandedToolCallsAtom);
   const setExpandedToolCalls = useSetRecoilState(store.expandedToolCallsAtom);
-  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting, waitingForApprover, approverName } =
-    useToolApproval(toolCallId, output ?? '');
+  const {
+    pendingMatches,
+    approvalStatus,
+    handleApprove,
+    handleDeny,
+    approvalSubmitting,
+    waitingForApprover,
+    approverName,
+  } = useToolApproval(toolCallId, output ?? '');
   const { data: startupConfig } = useGetStartupConfig();
 
   const expandedKey =
@@ -209,9 +216,7 @@ export default function ToolCall({
       ? `${conversationId}:${messageId}:${toolCallId}`
       : null;
   const [localShowInfo, setLocalShowInfo] = useState(false);
-  const showInfo = expandedKey
-    ? expandedToolCalls.has(expandedKey)
-    : localShowInfo;
+  const showInfo = expandedKey ? expandedToolCalls.has(expandedKey) : localShowInfo;
 
   const toggleShowInfo = useCallback(() => {
     if (expandedKey) {
@@ -345,10 +350,7 @@ export default function ToolCall({
     name === Constants.TOOL_SEARCH ||
     (typeof name === 'string' && name.startsWith('tool_search_mcp_'));
   const hasInfo = useMemo(
-    () =>
-      (args?.length ?? 0) > 0 ||
-      (output?.length ?? 0) > 0 ||
-      isToolSearch,
+    () => (args?.length ?? 0) > 0 || (output?.length ?? 0) > 0 || isToolSearch,
     [args, output, isToolSearch],
   );
   const hasOutput = output != null && output !== '';
@@ -362,7 +364,9 @@ export default function ToolCall({
       !hasOutput &&
       hasInfo
     ) {
-      setExpandedToolCalls((prev) => (prev.has(expandedKey) ? prev : new Set(prev).add(expandedKey)));
+      setExpandedToolCalls((prev) =>
+        prev.has(expandedKey) ? prev : new Set(prev).add(expandedKey),
+      );
     }
   }, [expandedKey, function_name, isSubmitting, hasOutput, hasInfo, setExpandedToolCalls]);
 
@@ -383,8 +387,7 @@ export default function ToolCall({
     enabled: !!(mcpServerName || auth),
   });
   const isServerConnected =
-    !!resolvedServerName &&
-    connectionStatus?.[resolvedServerName]?.connectionState === 'connected';
+    !!resolvedServerName && connectionStatus?.[resolvedServerName]?.connectionState === 'connected';
 
   const hasArgs =
     (typeof _args === 'string' && _args.trim() !== '') ||
@@ -424,11 +427,7 @@ export default function ToolCall({
   // Set it when we render a tool that has auth and no output (still pending).
   // Only auto-show during active submission; skip for historical messages to avoid repeated prompts.
   // Skip when server is already connected (MCP) to avoid overlay after user completed OAuth.
-  const needsAuth =
-    (resolvedServerName || actionId) &&
-    auth &&
-    !hasOutput &&
-    !isServerConnected;
+  const needsAuth = (resolvedServerName || actionId) && auth && !hasOutput && !isServerConnected;
   useEffect(() => {
     if (!showAuthButton || !needsAuth) {
       // Clear overlay if this tool was the one that set it (e.g. tool completed, hasOutput became true)
@@ -487,10 +486,7 @@ export default function ToolCall({
   const cancelled = isToolSearch ? false : wouldBeCancelled;
   // When cancelled, use displayProgress=1 so we show "Cancelled" state (no spinner)
   const displayProgress =
-    hasOutput ||
-    (isToolSearch && wouldBeCancelled) ||
-    toolSearchCompletedFallback ||
-    cancelled
+    hasOutput || (isToolSearch && wouldBeCancelled) || toolSearchCompletedFallback || cancelled
       ? 1
       : progress;
 
@@ -568,7 +564,10 @@ export default function ToolCall({
         if (typeof pathVal === 'string') {
           filename = pathVal.split(/[/\\]/).pop() ?? pathVal;
         }
-        if (typeof inputParsed.start_line === 'number' && typeof inputParsed.end_line === 'number') {
+        if (
+          typeof inputParsed.start_line === 'number' &&
+          typeof inputParsed.end_line === 'number'
+        ) {
           lineRange = ` · ${inputParsed.start_line}–${inputParsed.end_line}`;
         } else if (typeof inputParsed.start_line === 'number') {
           lineRange = ` · ${inputParsed.start_line}`;
@@ -585,7 +584,10 @@ export default function ToolCall({
       try {
         const parsed = JSON.parse(output) as { file?: string; summary?: string; error?: string };
         if (parsed.error) {
-          return { resultsCount: undefined, summaryText: parsed.file ? `${parsed.file}` : displayName };
+          return {
+            resultsCount: undefined,
+            summaryText: parsed.file ? `${parsed.file}` : displayName,
+          };
         }
         const file = parsed.file ?? '';
         const summary = parsed.summary ?? '';
@@ -595,7 +597,8 @@ export default function ToolCall({
         // fall through
       }
     }
-    const base = labelWithPattern || humanizedDisplayName || localize('com_assistants_running_action');
+    const base =
+      labelWithPattern || humanizedDisplayName || localize('com_assistants_running_action');
     if (!output || typeof output !== 'string') {
       return { resultsCount: undefined, summaryText: base };
     }
@@ -637,7 +640,11 @@ export default function ToolCall({
     if (cancelled) {
       return localize('com_ui_cancelled');
     }
-    if (function_name === Tools.search_user_files || function_name === Tools.workspace_glob_files || isTasksTool) {
+    if (
+      function_name === Tools.search_user_files ||
+      function_name === Tools.workspace_glob_files ||
+      isTasksTool
+    ) {
       return labelWithPattern;
     }
     if (domain != null && domain && domain.length !== Constants.ENCODED_DOMAIN_LENGTH) {
@@ -723,7 +730,11 @@ export default function ToolCall({
               isSubmitting={approvalSubmitting}
               toolName={name}
               resolved={
-                approvalStatus === 'approved' ? 'approved' : approvalStatus === 'denied' ? 'denied' : undefined
+                approvalStatus === 'approved'
+                  ? 'approved'
+                  : approvalStatus === 'denied'
+                    ? 'denied'
+                    : undefined
               }
               waitingForApprover={waitingForApprover}
               approverName={approverName}
