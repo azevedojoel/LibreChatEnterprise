@@ -64,6 +64,14 @@ const namespaces = {
     CacheKeys.MCP_OAUTH_CONFIRM,
     Time.FIVE_MINUTES,
   ),
+  [CacheKeys.TELEGRAM_CONNECT_TOKENS]: standardCache(
+    CacheKeys.TELEGRAM_CONNECT_TOKENS,
+    Time.TEN_MINUTES,
+  ),
+  [CacheKeys.TELEGRAM_PROCESSED_UPDATES]: standardCache(
+    CacheKeys.TELEGRAM_PROCESSED_UPDATES,
+    Time.ONE_DAY,
+  ),
 };
 
 /**
