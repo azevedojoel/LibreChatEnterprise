@@ -384,12 +384,12 @@ export const sendUserEmailSchema: ExtendedJsonSchema = {
     },
     body: {
       type: 'string',
-      description: 'Plain text body of the email.',
+      description: 'Body of the email. Supports markdown (headers, lists, code blocks, links).',
     },
     html_body: {
       type: 'string',
       description:
-        'Optional HTML body. If provided, the email will be sent as multipart with both plain text and HTML.',
+        'Deprecated. Ignored when formatting is applied. HTML and plain text are generated from body.',
     },
     from: {
       type: 'string',

@@ -2,6 +2,7 @@ const { Tool } = require('@langchain/core/tools');
 const { getEnvironmentVariable } = require('@langchain/core/utils/env');
 const fetch = require('node-fetch');
 const { getUserById } = require('~/models');
+const { formatEmailContent } = require('~/server/utils/formatEmailHighlights');
 
 const postmarkSendUserEmailSchema = {
   type: 'object',
@@ -12,12 +13,12 @@ const postmarkSendUserEmailSchema = {
     },
     body: {
       type: 'string',
-      description: 'Plain text body of the email.',
+      description: 'Body of the email. Supports markdown (headers, lists, code blocks, links).',
     },
     html_body: {
       type: 'string',
       description:
-        'Optional HTML body. If provided, the email will be sent as multipart with both plain text and HTML.',
+        'Deprecated. Ignored when formatting is applied. HTML and plain text are generated from body.',
     },
     from: {
       type: 'string',
@@ -32,7 +33,7 @@ class PostmarkSendUserEmail extends Tool {
   name = 'send_user_email';
   description =
     'Send an email to the current user via Postmark. The email is always sent to the logged-in user\'s address. ' +
-    'Provide subject and body. Optionally include HTML body. Do NOT ask for or include a recipient—the system uses the user\'s account email automatically.';
+    'Provide subject and body (markdown supported). Do NOT ask for or include a recipient—the system uses the user\'s account email automatically.';
 
   schema = postmarkSendUserEmailSchema;
 
@@ -68,7 +69,7 @@ class PostmarkSendUserEmail extends Tool {
 
   async _call(args) {
     try {
-      const { subject, body, html_body, from } = args;
+      const { subject, body, from } = args;
       const fromAddress = from || this.defaultFrom;
 
       if (!this.userId) {
@@ -80,15 +81,17 @@ class PostmarkSendUserEmail extends Tool {
         return 'Error: User has no email address on file.';
       }
 
+      const contentParts = [{ type: 'text', text: body || '' }];
+      const appName = process.env.APP_TITLE || 'LibreChat';
+      const { html, text } = formatEmailContent(contentParts, [], { appName });
+
       const payload = {
         From: fromAddress,
         To: user.email,
         Subject: subject,
-        TextBody: body,
+        TextBody: text || '(No content)',
+        HtmlBody: html || null,
       };
-      if (html_body) {
-        payload.HtmlBody = html_body;
-      }
 
       const res = await fetch('https://api.postmarkapp.com/email', {
         method: 'POST',
