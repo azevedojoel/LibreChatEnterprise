@@ -29,6 +29,7 @@ import { EModelEndpoint, Tools, AgentCapabilities } from 'librechat-data-provide
 import type { TMessage, TConversation } from 'librechat-data-provider';
 import { useAvailableToolsQuery } from '~/data-provider';
 import { cn } from '~/utils';
+import { getToolDisplayName as getToolDisplayNameFromUtils } from '~/utils/toolDisplayNames';
 
 interface MessageToolsIconsProps {
   message: TMessage | undefined;
@@ -140,9 +141,9 @@ function getToolDisplayName(
     [Tools.create_brainstorm_doc]: 'Brainstorm Doc',
   };
   if (toolId.startsWith('sys_admin_')) {
-    return labels[toolId] ?? 'Sys Admin';
+    return labels[toolId] ?? getToolDisplayNameFromUtils(toolId);
   }
-  return labels[toolId] ?? toolId;
+  return labels[toolId] ?? getToolDisplayNameFromUtils(toolId) ?? toolId;
 }
 
 export default function MessageToolsIcons({ message, conversation, isLast = true }: MessageToolsIconsProps) {

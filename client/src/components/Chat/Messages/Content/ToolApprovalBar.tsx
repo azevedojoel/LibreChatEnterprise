@@ -16,6 +16,8 @@ type ToolApprovalBarProps = {
   /** When true, approval is routed to another user; hide Approve/Deny, show waiting message */
   waitingForApprover?: boolean;
   approverName?: string | null;
+  /** When false, hide the expand/collapse button. Default true. */
+  showExpandButton?: boolean;
 };
 
 export default function ToolApprovalBar({
@@ -28,14 +30,17 @@ export default function ToolApprovalBar({
   resolved,
   waitingForApprover,
   approverName,
+  showExpandButton = true,
 }: ToolApprovalBarProps) {
   const localize = useLocalize();
   const label = toolName
     ? getToolDisplayName(toolName)
     : localize('com_ui_tool_approval_required') || 'Tool approval required';
   const waitingLabel = approverName
-    ? `Waiting for ${approverName} to approve.`
-    : 'Waiting for approval. The approver will receive an email.';
+    ? localize('com_ui_tool_waiting_for_approver', { approverName }) ||
+      `Waiting for ${approverName} to approve.`
+    : localize('com_ui_tool_waiting_for_approval_email') ||
+      'Waiting for approval. The approver will receive an email.';
 
   return (
     <div className="flex min-h-7 flex-wrap items-center gap-x-3 gap-y-2 py-0.5">
@@ -80,15 +85,17 @@ export default function ToolApprovalBar({
           </Button>
         </div>
       )}
-      <button
-        type="button"
-        onClick={onToggleExpand}
-        className="text-xs text-text-secondary hover:text-text-primary"
-      >
-        {isExpanded
-          ? localize('com_ui_collapse') || 'Collapse'
-          : localize('com_ui_expand') || 'Expand'}
-      </button>
+      {showExpandButton && (
+        <button
+          type="button"
+          onClick={onToggleExpand}
+          className="text-xs text-text-secondary hover:text-text-primary"
+        >
+          {isExpanded
+            ? localize('com_ui_collapse') || 'Collapse'
+            : localize('com_ui_expand') || 'Expand'}
+        </button>
+      )}
     </div>
   );
 }

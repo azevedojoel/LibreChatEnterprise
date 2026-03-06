@@ -2,6 +2,7 @@ import React, { useState, useMemo, memo } from 'react';
 import { useRecoilState } from 'recoil';
 import type { TConversation, TMessage, TFeedback } from 'librechat-data-provider';
 import { EditIcon, Clipboard, CheckMark, ContinueIcon, RegenerateIcon } from '@librechat/client';
+import { useGetStartupConfig } from '~/data-provider';
 import { useGenerationsByLatest, useLocalize } from '~/hooks';
 import { Fork } from '~/components/Conversations';
 import SummarizeButton from './SummarizeButton';
@@ -126,6 +127,15 @@ const HoverButtons = ({
   handleFeedback,
 }: THoverButtons) => {
   const localize = useLocalize();
+  const { data: startupConfig } = useGetStartupConfig();
+  const summarizeEnabled = startupConfig?.featureFlags?.summarizeEnabled !== false;
+  const toolsMenuEnabled = startupConfig?.featureFlags?.toolsMenuEnabled !== false;
+  const forkEnabled = startupConfig?.featureFlags?.forkEnabled !== false;
+  const regenerateFlagEnabled = startupConfig?.featureFlags?.regenerateEnabled !== false;
+  const feedbackEnabled = startupConfig?.featureFlags?.['feedbackEnabled'] !== false;
+  const copyEnabled = startupConfig?.featureFlags?.['copyEnabled'] !== false;
+  const editEnabled = startupConfig?.featureFlags?.['editEnabled'] !== false;
+  const continueEnabled = startupConfig?.featureFlags?.['continueEnabled'] !== false;
   const [isCopied, setIsCopied] = useState(false);
   const [TextToSpeech] = useRecoilState<boolean>(store.textToSpeech);
 
@@ -165,7 +175,7 @@ const HoverButtons = ({
   if (error === true) {
     return (
       <div className="visible flex justify-center self-end lg:justify-start">
-        {regenerateEnabled && (
+        {regenerateEnabled && regenerateFlagEnabled && (
           <HoverButton
             onClick={regenerate}
             title={localize('com_ui_regenerate')}
@@ -207,22 +217,24 @@ const HoverButtons = ({
         />
       )}
 
-      {/* Copy Button */}
-      <HoverButton
-        onClick={handleCopy}
-        title={
-          isCopied ? localize('com_ui_copied_to_clipboard') : localize('com_ui_copy_to_clipboard')
-        }
-        icon={isCopied ? <CheckMark className="h-[18px] w-[18px]" /> : <Clipboard size="19" />}
-        isLast={isLast}
-        className={cn(
-          'ml-0 flex items-center gap-1.5 text-xs',
-          isSubmitting && isCreatedByUser ? 'md:opacity-0 md:group-hover:opacity-100' : '',
-        )}
-      />
+      {/* Copy Button - gated by feature flag (default true when unset) */}
+      {copyEnabled && (
+        <HoverButton
+          onClick={handleCopy}
+          title={
+            isCopied ? localize('com_ui_copied_to_clipboard') : localize('com_ui_copy_to_clipboard')
+          }
+          icon={isCopied ? <CheckMark className="h-[18px] w-[18px]" /> : <Clipboard size="19" />}
+          isLast={isLast}
+          className={cn(
+            'ml-0 flex items-center gap-1.5 text-xs',
+            isSubmitting && isCreatedByUser ? 'md:opacity-0 md:group-hover:opacity-100' : '',
+          )}
+        />
+      )}
 
-      {/* Edit Button - only for user messages */}
-      {isEditableEndpoint && isCreatedByUser && (
+      {/* Edit Button - only for user messages, gated by feature flag (default true when unset) */}
+      {editEnabled && isEditableEndpoint && isCreatedByUser && (
         <HoverButton
           id={`edit-${message.messageId}`}
           onClick={onEdit}
@@ -236,31 +248,35 @@ const HoverButtons = ({
         />
       )}
 
-      {/* Fork Button */}
-      <Fork
-        messageId={message.messageId}
-        conversationId={conversation.conversationId}
-        forkingSupported={forkingSupported}
-        latestMessageId={latestMessage?.messageId}
-        isLast={isLast}
-      />
+      {/* Fork Button - gated by feature flag (default true when unset) */}
+      {forkEnabled && (
+        <Fork
+          messageId={message.messageId}
+          conversationId={conversation.conversationId}
+          forkingSupported={forkingSupported}
+          latestMessageId={latestMessage?.messageId}
+          isLast={isLast}
+        />
+      )}
 
-      {/* Summarize Button */}
-      <SummarizeButton
-        messageId={message.messageId}
-        conversationId={conversation.conversationId}
-        parentMessageId={message.parentMessageId}
-        isLast={isLast}
-        isSubmitting={isSubmitting}
-      />
+      {/* Summarize Button - gated by feature flag (default true when unset) */}
+      {summarizeEnabled && (
+        <SummarizeButton
+          messageId={message.messageId}
+          conversationId={conversation.conversationId}
+          parentMessageId={message.parentMessageId}
+          isLast={isLast}
+          isSubmitting={isSubmitting}
+        />
+      )}
 
-      {/* Feedback Buttons */}
-      {!isCreatedByUser && handleFeedback != null && (
+      {/* Feedback Buttons - gated by feature flag (default true when unset) */}
+      {feedbackEnabled && !isCreatedByUser && handleFeedback != null && (
         <Feedback handleFeedback={handleFeedback} feedback={message.feedback} isLast={isLast} />
       )}
 
-      {/* Regenerate Button */}
-      {regenerateEnabled && (
+      {/* Regenerate Button - gated by feature flag (default true when unset) */}
+      {regenerateEnabled && regenerateFlagEnabled && (
         <HoverButton
           onClick={regenerate}
           title={localize('com_ui_regenerate')}
@@ -270,10 +286,13 @@ const HoverButtons = ({
         />
       )}
 
-      <MessageToolsIcons message={message} conversation={conversation} isLast={isLast} />
+      {/* Tools Menu - gated by feature flag (default true when unset) */}
+      {toolsMenuEnabled && (
+        <MessageToolsIcons message={message} conversation={conversation} isLast={isLast} />
+      )}
 
-      {/* Continue Button */}
-      {continueSupported && (
+      {/* Continue Button - gated by feature flag (default true when unset) */}
+      {continueSupported && continueEnabled && (
         <HoverButton
           onClick={(e) => e && handleContinue(e)}
           title={localize('com_ui_continue')}

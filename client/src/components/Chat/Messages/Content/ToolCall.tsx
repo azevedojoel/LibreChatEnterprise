@@ -9,174 +9,6 @@ import {
 } from 'librechat-data-provider';
 import store from '~/store';
 
-/** Friendly display names for built-in tools */
-const TOOL_DISPLAY_NAMES: Partial<Record<string, string>> = {
-  [Tools.search_user_files]: 'Grepped',
-  [Tools.workspace_glob_files]: 'Globbed',
-  [Tools.workspace_read_file]: 'Read File',
-  [Tools.workspace_edit_file]: 'Edit File',
-  [Tools.workspace_create_file]: 'Create File',
-  [Tools.workspace_delete_file]: 'Delete File',
-  [Tools.workspace_list_files]: 'List Files',
-  [Tools.workspace_send_file_to_user]: 'Send File to User',
-  [Tools.workspace_pull_file]: 'Pull File to Workspace',
-  [Tools.list_my_files]: 'List My Files',
-  [Tools.create_pdf]: 'Create Document',
-  [Tools.run_tool_and_save]: 'Export to File',
-  [Tools.generate_code]: 'Generate Code',
-  [Tools.install_dependencies]: 'Install Dependencies',
-  [Tools.lint]: 'Lint',
-  [Tools.run_program]: 'Run Program',
-  [Tools.workspace_status]: 'Workspace Status',
-  [Tools.workspace_init]: 'Workspace Init',
-  [Tools.reset_workspace]: 'Reset Workspace',
-  [Tools.update_todo]: 'Update Todo',
-  [Tools.create_plan]: 'Create Plan',
-  [Tools.create_brainstorm_doc]: 'Brainstorm Doc',
-  [Tools.file_search]: 'Searched My Files',
-  [Constants.TOOL_SEARCH]: 'Discovery',
-  // CRM tools
-  'crm_list_pipelines': 'List Pipelines',
-  'crm_create_pipeline': 'Create Pipeline',
-  'crm_update_pipeline': 'Update Pipeline',
-  'crm_soft_delete_pipeline': 'Delete Pipeline',
-  'crm_create_contact': 'Create Contact',
-  'crm_update_contact': 'Update Contact',
-  'crm_get_contact': 'Get Contact',
-  'crm_list_contacts': 'List Contacts',
-  'crm_soft_delete_contact': 'Delete Contact',
-  'crm_create_organization': 'Create Organization',
-  'crm_get_organization': 'Get Organization',
-  'crm_list_organizations': 'List Organizations',
-  'crm_soft_delete_organization': 'Delete Organization',
-  'crm_create_deal': 'Create Deal',
-  'crm_update_deal': 'Update Deal',
-  'crm_list_deals': 'List Deals',
-  'crm_soft_delete_deal': 'Delete Deal',
-  'crm_log_activity': 'Log Activity',
-  'crm_list_activities': 'List Activities',
-  // Google Workspace MCP tools (underscore notation)
-  'tasks_listTaskLists': 'Listing Google Task Lists',
-  'tasks_getTaskList': 'Getting Google Task List',
-  'tasks_createTaskList': 'Creating Google Task List',
-  'tasks_updateTaskList': 'Updating Google Task List',
-  'tasks_deleteTaskList': 'Deleting Google Task List',
-  'tasks_listTasks': 'Listing Google Tasks',
-  'tasks_getTask': 'Getting Google Task',
-  'tasks_createTask': 'Creating Google Task',
-  'tasks_updateTask': 'Updating Google Task',
-  'tasks_deleteTask': 'Deleting Google Task',
-  'tasks_clearCompletedTasks': 'Clearing Completed Google Tasks',
-  'tasks_moveTask': 'Moving Google Task',
-  // Google Drive
-  'drive_search': 'Searched Google Drive',
-  'drive_createFolder': 'Created folder',
-  // Gmail
-  'gmail_search': 'Searched Gmail',
-  'gmail_get': 'Retrieved email',
-  'gmail_send': 'Sent email',
-  'gmail_sendDraft': 'Sent draft',
-  'send_user_email': 'Sent email',
-  'gmail_createDraft': 'Created draft',
-  'gmail_downloadAttachment': 'Downloaded attachment',
-  'gmail_modify': 'Modified email labels',
-  'gmail_batchModify': 'Batch modified emails',
-  'gmail_listLabels': 'Listed Gmail labels',
-  'gmail_createLabel': 'Created Gmail label',
-  // Google Docs
-  'docs_create': 'Creating Google Doc',
-  'docs_insertText': 'Inserted text in Doc',
-  'docs_find': 'Searched Google Docs',
-  'docs_move': 'Moved Doc',
-  'docs_getText': 'Retrieved Doc content',
-  'docs_appendText': 'Appended text to Doc',
-  'docs_replaceText': 'Replaced text in Doc',
-  'docs_extractIdFromUrl': 'Extracted Doc ID',
-  // Google Slides
-  'slides_getText': 'Retrieved Slides content',
-  'slides_find': 'Searched Google Slides',
-  'slides_getMetadata': 'Retrieved Slides metadata',
-  'slides_getImages': 'Downloaded Slides images',
-  'slides_getSlideThumbnail': 'Downloaded slide thumbnail',
-  // Google Sheets
-  'sheets_getText': 'Retrieved Sheets content',
-  'sheets_getRange': 'Retrieved Sheets range',
-  'sheets_find': 'Searched Google Sheets',
-  'sheets_getMetadata': 'Retrieved Sheets metadata',
-  // Google Drive (additional)
-  'drive_findFolder': 'Found folder',
-  'drive_downloadFile': 'Downloaded to My Files',
-  // Google Auth
-  'auth_clear': 'Cleared authentication',
-  'auth_refreshToken': 'Refreshed token',
-  // Google Time
-  'time_getCurrentDate': 'Retrieved current date',
-  'time_getCurrentTime': 'Retrieved current time',
-  'time_getTimeZone': 'Retrieved timezone',
-  // Google People
-  'people_getUserProfile': 'Retrieved user profile',
-  'people_getMe': 'Retrieved my profile',
-  'people_getUserRelations': 'Retrieved user relations',
-  // Google Calendar MCP tools
-  calendar_list: 'Listed calendars',
-  calendar_listEvents: 'Listed events',
-  calendar_createEvent: 'Created event',
-  calendar_getEvent: 'Retrieved event',
-  calendar_updateEvent: 'Updated event',
-  calendar_deleteEvent: 'Deleted event',
-  calendar_respondToEvent: 'Responded to event',
-  calendar_findFreeTime: 'Found free time',
-  // Microsoft 365 Calendar tools
-  'list-calendar-events': 'Listed events',
-  'get-calendar-view': 'Listed calendar view',
-  'get-specific-calendar-view': 'Listed calendar view',
-  'list-calendar-event-instances': 'Listed event instances',
-  'list-specific-calendar-events': 'Listed events',
-  'get-calendar-event': 'Retrieved event',
-  'get-specific-calendar-event': 'Retrieved event',
-  'create-calendar-event': 'Created event',
-  'create-specific-calendar-event': 'Created event',
-  'update-calendar-event': 'Updated event',
-  'update-specific-calendar-event': 'Updated event',
-  // Microsoft To Do MCP tools (hyphen notation)
-  'list-todo-tasks': 'Listed To Do tasks',
-  'list-todo-task-lists': 'Listed To Do lists',
-  'create-todo-task': 'Creating To Do task',
-  'update-todo-task': 'Updating To Do task',
-  'delete-todo-task': 'Deleting To Do task',
-  // Project tools
-  project_section_update: 'Update Project Section',
-  project_section_delete: 'Delete Project Section',
-  project_section_patch: 'Batch Update Project Sections',
-  project_log: 'Append to Changelog',
-  project_log_tail: 'Recent Changelog Entries',
-  project_log_search: 'Search Changelog',
-  project_log_range: 'Changelog by Date Range',
-  [Tools.project_create]: 'Create Project',
-  [Tools.project_list]: 'List Projects',
-  [Tools.project_archive]: 'Archive Project',
-  [Tools.project_update_metadata]: 'Update Project Metadata',
-  [Tools.project_switch]: 'Switch to Project',
-  // Scheduler tools
-  [Tools.list_schedules]: 'List Schedules',
-  [Tools.list_user_projects]: 'List Projects',
-  [Tools.create_schedule]: 'Create Schedule',
-  [Tools.update_schedule]: 'Update Schedule',
-  [Tools.delete_schedule]: 'Delete Schedule',
-  [Tools.run_schedule]: 'Run Schedule Now',
-  [Tools.list_runs]: 'List Run History',
-  [Tools.get_run]: 'Get Run Details',
-  // Human tools
-  [Tools.human_list_workspace_members]: 'List Workspace Members',
-  [Tools.human_routing_rules_list]: 'List Routing Rules',
-  [Tools.human_routing_rules_set]: 'Set Routing Rule',
-  [Tools.human_routing_rules_delete]: 'Delete Routing Rule',
-  [Tools.human_notify_human]: 'Notify Team Member',
-  [Tools.human_await_response]: 'Request Approval',
-  [Tools.human_invite_to_workspace]: 'Invite to Workspace',
-  [Tools.human_remove_from_workspace]: 'Remove from Workspace',
-};
-
 /** Icons for project tools */
 const PROJECT_TOOL_ICONS: Partial<Record<string, React.ComponentType<{ className?: string }>>> = {
   [Tools.project_section_update]: FileEdit,
@@ -395,9 +227,10 @@ export default function ToolCall({
   }, [expandedKey, setExpandedToolCalls]);
 
   const interfaceConfig = startupConfig?.interface as
-    | { toolCallSpacing?: 'normal' | 'compact' }
+    | { toolCallSpacing?: 'normal' | 'compact'; toolCallDetails?: boolean }
     | undefined;
   const isCompactSpacing = interfaceConfig?.toolCallSpacing === 'compact';
+  const toolCallDetailsEnabled = interfaceConfig?.toolCallDetails !== false;
   const contentRef = useRef<HTMLDivElement>(null);
   const [contentHeight, setContentHeight] = useState<number | undefined>(0);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -429,12 +262,8 @@ export default function ToolCall({
     };
   }, [name]);
 
-  const displayName = useMemo(
-    () => (function_name && TOOL_DISPLAY_NAMES[function_name]) ?? function_name ?? '',
-    [function_name],
-  );
-
-  const humanizedDisplayName = useMemo(() => getToolDisplayName(name), [name]);
+  const displayName = useMemo(() => (name ? getToolDisplayName(name) : ''), [name]);
+  const humanizedDisplayName = displayName;
 
   const lintData = useMemo(() => {
     if (function_name !== Tools.lint || !output?.trim().startsWith('{')) {
@@ -898,6 +727,7 @@ export default function ToolCall({
               }
               waitingForApprover={waitingForApprover}
               approverName={approverName}
+              showExpandButton={toolCallDetailsEnabled}
             />
           </div>
         ) : useToolResultLayout ? (
@@ -915,10 +745,10 @@ export default function ToolCall({
             onToggle={toggleShowInfo}
             isLoading={isSubmitting && !hasOutput}
             error={cancelled || (function_name === Tools.lint && !!lintData?.hasErrors)}
-            hasExpandableContent={hasInfo}
+            hasExpandableContent={hasInfo && toolCallDetailsEnabled}
             minExpandHeight={120}
           >
-            {hasInfo && (
+            {hasInfo && toolCallDetailsEnabled && (
               <ToolCallInfo
                 key="tool-call-info"
                 input={args ?? ''}
@@ -963,7 +793,7 @@ export default function ToolCall({
             }}
           >
             <div ref={contentRef}>
-              {showInfo && hasInfo && (
+              {showInfo && hasInfo && toolCallDetailsEnabled && (
                 <ToolCallInfo
                   key="tool-call-info"
                   input={args ?? ''}
