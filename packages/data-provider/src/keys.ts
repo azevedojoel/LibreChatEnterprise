@@ -72,6 +72,8 @@ export enum QueryKeys {
   /* User Projects (personal workspaces) */
   userProjects = 'userProjects',
   userProject = 'userProject',
+  userProjectSections = 'userProjectSections',
+  userProjectLog = 'userProjectLog',
   /* Admin Users */
   adminUsers = 'adminUsers',
   adminUser = 'adminUser',

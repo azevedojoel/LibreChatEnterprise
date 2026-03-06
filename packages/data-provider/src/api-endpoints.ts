@@ -415,6 +415,33 @@ export const adminWorkspaceInvite = (id: string) => `${adminWorkspace(id)}/invit
 export const adminWorkspaceRemoveMember = (id: string, userId: string) =>
   `${adminWorkspace(id)}/members/${userId}`;
 
+/* Admin Usage */
+export const adminUsage = (params?: {
+  userId?: string;
+  conversationId?: string;
+  model?: string;
+  tokenType?: string;
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+  page?: number;
+}) => {
+  const query = buildQuery(params || {});
+  return `${BASE_URL}/api/admin/usage${query}`;
+};
+export const adminUsageAggregate = (params?: {
+  userId?: string;
+  startDate?: string;
+  endDate?: string;
+}) => {
+  const query = buildQuery(params || {});
+  return `${BASE_URL}/api/admin/usage/aggregate${query}`;
+};
+export const adminUserBalance = (userId: string, params?: { includeTransactions?: boolean }) => {
+  const query = buildQuery(params || {});
+  return `${BASE_URL}/api/admin/users/${userId}/balance${query}`;
+};
+
 export const workspaceMe = () => `${BASE_URL}/api/workspace/me`;
 export const workspaceMeMembers = () => `${BASE_URL}/api/workspace/me/members`;
 
@@ -430,6 +457,12 @@ export const memoryPreferences = () => `${memories()}/preferences`;
 /* User Projects */
 export const userProjects = () => `${BASE_URL}/api/user-projects`;
 export const userProjectById = (id: string) => `${userProjects()}/${encodeURIComponent(id)}`;
+export const userProjectSections = (id: string) =>
+  `${userProjectById(id)}/sections`;
+export const userProjectLog = (id: string, limit?: number) => {
+  const url = `${userProjectById(id)}/log`;
+  return limit != null ? `${url}?limit=${limit}` : url;
+};
 
 /* Notifications */
 export const notifications = (params?: { limit?: number; cursor?: string; unreadOnly?: boolean }) => {

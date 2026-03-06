@@ -31,6 +31,8 @@ import type {
   SharedLinksResponse,
   TUserProject,
   TUserProjectsListResponse,
+  TProjectSectionsResponse,
+  TProjectLogResponse,
 } from 'librechat-data-provider';
 import type { ConversationCursorData } from '~/utils/convos';
 import { findConversationInInfinite } from '~/utils';
@@ -186,6 +188,59 @@ export const useUserProjectQuery = (
     () => (id ? dataService.getUserProject(id) : Promise.reject(new Error('No project ID'))),
     {
       enabled: !!id,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      ...config,
+    },
+  );
+};
+
+export const useProjectSectionsQuery = (
+  projectId: string | null | undefined,
+  config?: UseQueryOptions<TProjectSectionsResponse>,
+): QueryObserverResult<TProjectSectionsResponse> => {
+  return useQuery<TProjectSectionsResponse>(
+    [QueryKeys.userProjectSections, projectId],
+    () =>
+      projectId
+        ? dataService.getProjectSections(projectId)
+        : Promise.reject(new Error('No project ID')),
+    {
+      enabled: !!projectId,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      ...config,
+    },
+  );
+};
+
+export const useProjectLogQuery = (
+  projectId: string | null | undefined,
+  limit?: number,
+  config?: UseQueryOptions<TProjectLogResponse>,
+): QueryObserverResult<TProjectLogResponse> => {
+  return useQuery<TProjectLogResponse>(
+    [QueryKeys.userProjectLog, projectId, limit],
+    () =>
+      projectId
+        ? dataService.getProjectLog(projectId, limit)
+        : Promise.reject(new Error('No project ID')),
+    {
+      enabled: !!projectId,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      ...config,
+    },
+  );
+};
+
+export const useGetWorkspaceMeMembersQuery = (
+  config?: UseQueryOptions<{ members: Array<{ _id: string; id: string; email: string; name?: string; username?: string; role?: string }> }>,
+) => {
+  return useQuery(
+    ['workspaceMeMembers'],
+    () => dataService.getWorkspaceMeMembers(),
+    {
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
       ...config,

@@ -8,6 +8,8 @@ const {
   deleteUserProject,
   archiveUserProject,
 } = require('~/models/UserProject');
+const { getSections } = require('~/server/services/UserProject/projectContextSectionService');
+const { tail } = require('~/server/services/UserProject/projectLogService');
 const { requireJwtAuth, requireTermsAccepted } = require('~/server/middleware');
 
 const router = express.Router();
@@ -83,6 +85,43 @@ router.get('/:id', async (req, res) => {
   } catch (error) {
     logger.error('[userProjects] Error getting project', error);
     res.status(500).json({ error: 'Error fetching project' });
+  }
+});
+
+/**
+ * GET /api/user-projects/:id/sections
+ * Get project context sections
+ */
+router.get('/:id/sections', async (req, res) => {
+  try {
+    const project = await getUserProject(req.user.id, req.params.id);
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    const sections = await getSections(req.params.id, req.user.id);
+    res.status(200).json({ sections });
+  } catch (error) {
+    logger.error('[userProjects] Error getting project sections', error);
+    res.status(500).json({ error: 'Error fetching project sections' });
+  }
+});
+
+/**
+ * GET /api/user-projects/:id/log
+ * Get project log entries (query: limit, default 10, max 50)
+ */
+router.get('/:id/log', async (req, res) => {
+  try {
+    const project = await getUserProject(req.user.id, req.params.id);
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    const limit = Math.min(Math.max(1, parseInt(req.query.limit, 10) || 10), 50);
+    const entries = await tail(req.params.id, req.user.id, limit);
+    res.status(200).json({ entries });
+  } catch (error) {
+    logger.error('[userProjects] Error getting project log', error);
+    res.status(500).json({ error: 'Error fetching project log' });
   }
 });
 

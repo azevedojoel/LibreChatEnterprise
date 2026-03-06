@@ -564,6 +564,17 @@ export const deleteUserProject = (id: string): Promise<{ deleted: boolean }> => 
   return request.delete(endpoints.userProjectById(id));
 };
 
+export const getProjectSections = (id: string): Promise<t.TProjectSectionsResponse> => {
+  return request.get(endpoints.userProjectSections(id));
+};
+
+export const getProjectLog = (
+  id: string,
+  limit?: number,
+): Promise<t.TProjectLogResponse> => {
+  return request.get(endpoints.userProjectLog(id, limit));
+};
+
 /* Notifications */
 
 export const getNotifications = (params?: {
@@ -1363,6 +1374,65 @@ export const removeAdminWorkspaceMember = (
   userId: string,
 ): Promise<{ message: string }> =>
   request.delete(endpoints.adminWorkspaceRemoveMember(id, userId));
+
+/* Admin Usage */
+export const getAdminUsage = (params?: {
+  userId?: string;
+  conversationId?: string;
+  model?: string;
+  tokenType?: string;
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+  page?: number;
+}): Promise<{
+  transactions: Array<{
+    id: string;
+    user: string;
+    conversationId?: string;
+    tokenType: string;
+    model?: string;
+    rawAmount?: number;
+    tokenValue?: number;
+    inputTokens?: number;
+    writeTokens?: number;
+    readTokens?: number;
+    createdAt?: string;
+  }>;
+  total: number;
+  page: number;
+  limit: number;
+}> => request.get(endpoints.adminUsage(params));
+
+export const getAdminUsageAggregate = (params?: {
+  userId?: string;
+  startDate?: string;
+  endDate?: string;
+}): Promise<{
+  aggregated: Array<{
+    userId: string;
+    totalRawAmount: number;
+    totalTokenValue: number;
+    transactionCount: number;
+  }>;
+}> => request.get(endpoints.adminUsageAggregate(params));
+
+export const getAdminUserBalance = (
+  userId: string,
+  params?: { includeTransactions?: boolean },
+): Promise<{
+  userId: string;
+  tokenCredits: number;
+  recentTransactions?: Array<{
+    id: string;
+    conversationId?: string;
+    tokenType: string;
+    model?: string;
+    rawAmount?: number;
+    tokenValue?: number;
+    createdAt?: string;
+  }>;
+}> => request.get(endpoints.adminUserBalance(userId, params));
 
 export const getWorkspaceMe = (): Promise<{
   workspace: { id: string; name: string; slug: string } | null;
