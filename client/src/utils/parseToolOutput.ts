@@ -468,3 +468,48 @@ export function parseGmailSendOutput(output: string | null | undefined): GmailSe
     return trimmed ? { error: trimmed } : null;
   }
 }
+
+export type SendUserEmailOutput = {
+  success?: boolean;
+  messageId?: string;
+  submittedAt?: string;
+  to?: string;
+  error?: string;
+};
+
+export function parseSendUserEmailOutput(
+  output: string | null | undefined,
+): SendUserEmailOutput | null {
+  const text = extractText(output);
+  if (!text) return null;
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  try {
+    if (trimmed.startsWith('{')) {
+      const parsed = JSON.parse(trimmed) as {
+        success?: boolean;
+        messageId?: string;
+        submittedAt?: string;
+        to?: string;
+        error?: string;
+      };
+      if (!parsed || typeof parsed !== 'object') return null;
+      if (parsed.error) return { error: parsed.error };
+      if (typeof parsed.success === 'boolean' && parsed.success) {
+        return {
+          success: parsed.success,
+          messageId: parsed.messageId,
+          submittedAt: parsed.submittedAt,
+          to: parsed.to,
+        };
+      }
+      return null;
+    }
+    if (trimmed.toLowerCase().startsWith('error:')) {
+      return { error: trimmed.replace(/^error:\s*/i, '') };
+    }
+    return trimmed ? { error: trimmed } : null;
+  } catch {
+    return trimmed ? { error: trimmed } : null;
+  }
+}
