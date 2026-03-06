@@ -13,6 +13,7 @@ const abortRegistry = require('./abortRegistry');
 const { resolveScheduledPrompt } = require('./resolvePrompt');
 const { formatEmailContent } = require('~/server/utils/formatEmailHighlights');
 const { sendInboundReply } = require('~/server/services/sendInboundReply');
+const { createNotification } = require('~/server/services/NotificationService');
 
 /**
  * Execute a scheduled agent run.
@@ -45,6 +46,7 @@ async function executeScheduledAgent({
 
   let scheduledRunDoc = null;
   let resolvedPrompt = null;
+  let schedule = null;
 
   try {
     if (existingRunId) {
@@ -78,7 +80,7 @@ async function executeScheduledAgent({
       throw new Error(`User ${userId} does not have permission to use agent ${agentId}`);
     }
 
-    const schedule = await ScheduledPrompt.findById(scheduleId)
+    schedule = await ScheduledPrompt.findById(scheduleId)
       .select('name prompt emailOnComplete')
       .lean();
     if (!schedule) {
@@ -122,9 +124,8 @@ async function executeScheduledAgent({
       scheduledRunContext: {
         emailOnComplete: schedule.emailOnComplete !== false,
       },
+      ...(Array.isArray(selectedTools) && { ephemeralAgent: { tools: selectedTools } }),
     };
-    // Headless runs (scheduled agents) always include all agent tools - do not pass
-    // ephemeralAgent.tools to restrict. This ensures scheduled runs have full tool access.
     const mockReq = {
       user: { id: userId, role: user.role },
       config: appConfig,
@@ -300,6 +301,20 @@ async function executeScheduledAgent({
       GenerationJobManager.completeJob(streamId);
     }
 
+    try {
+      await createNotification({
+        userId,
+        type: 'scheduled_run_complete',
+        title: `${schedule?.name ?? 'Scheduled run'} completed`,
+        body: 'Your scheduled agent run finished successfully.',
+        link: `/c/${conversationId}`,
+        metadata: { scheduleId, conversationId, runId: runDocId, status: 'success' },
+      });
+      logger.info(`[ScheduledAgents] Notification created: userId=${userId} schedule=${scheduleId}`);
+    } catch (notifErr) {
+      logger.warn('[ScheduledAgents] createNotification failed:', notifErr?.message || notifErr);
+    }
+
     logger.info(`[ScheduledAgents] Run completed: schedule=${scheduleId} conv=${conversationId}`);
 
     return { success: true, conversationId };
@@ -356,6 +371,20 @@ async function executeScheduledAgent({
         lastRunStatus: 'failed',
       },
     }).catch(() => {});
+
+    try {
+      await createNotification({
+        userId,
+        type: 'scheduled_run_complete',
+        title: `${schedule?.name ?? 'Scheduled run'} failed`,
+        body: errorMessage,
+        link: `/c/${conversationId}`,
+        metadata: { scheduleId, conversationId, runId: existingRunId, status: 'failed' },
+      });
+      logger.info(`[ScheduledAgents] Failure notification created: userId=${userId} schedule=${scheduleId}`);
+    } catch (notifErr) {
+      logger.warn('[ScheduledAgents] createNotification failed:', notifErr?.message || notifErr);
+    }
 
     return { success: false, error: errorMessage };
   } finally {

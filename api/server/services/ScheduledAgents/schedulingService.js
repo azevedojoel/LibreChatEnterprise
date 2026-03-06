@@ -47,13 +47,16 @@ function isCronFrequencyValidationEnabled() {
 /**
  * Validate runAt for one-off schedules. Returns error message or null if valid.
  * @param {string|Date} runAt
+ * @param {boolean} [isUpdate=false] - When true, skip "must be in the future" check.
+ *   Allows editing existing schedules (e.g. to correct metadata). Note: a past runAt
+ *   will never trigger a run; use for historical record-keeping only.
  * @returns {string|null}
  */
-function validateRunAt(runAt) {
+function validateRunAt(runAt, isUpdate = false) {
   if (runAt == null) return 'runAt is required for one-off schedules';
   const d = new Date(runAt);
   if (Number.isNaN(d.getTime())) return 'runAt must be a valid date (ISO string or date)';
-  if (d.getTime() <= Date.now()) return 'runAt must be in the future';
+  if (!isUpdate && d.getTime() <= Date.now()) return 'runAt must be in the future';
   return null;
 }
 
@@ -260,7 +263,7 @@ async function updateScheduleForUser(userId, scheduleId, updates) {
   }
   if (runAt != null) {
     if (effectiveScheduleType === 'one-off') {
-      const runAtError = validateRunAt(runAt);
+      const runAtError = validateRunAt(runAt, true);
       if (runAtError) throw new Error(runAtError);
       schedule.runAt = new Date(runAt);
     } else {
