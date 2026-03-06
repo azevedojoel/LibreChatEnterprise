@@ -27,6 +27,7 @@ const {
   Group,
   Token,
   User,
+  TelegramLink,
 } = require('~/db/models');
 const { updateUserPluginAuth, deleteUserPluginAuth } = require('~/server/services/PluginService');
 const { verifyEmail, resendVerificationEmail } = require('~/server/services/AuthService');
@@ -247,6 +248,7 @@ const deleteUserController = async (req, res) => {
       logger.error('[deleteUserController] Error deleting user convos, likely no convos', error);
     }
     await deleteUserPluginAuth(user.id, null, true); // delete user plugin auth
+    await TelegramLink.deleteMany({ userId: user.id }); // delete user Telegram links
     await deleteUserById(user.id); // delete user
     await deleteAllSharedLinks(user.id); // delete user shared links
     await deleteUserFiles(req); // delete user files

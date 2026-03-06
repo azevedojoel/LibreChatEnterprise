@@ -10,6 +10,7 @@ const {
   createToken,
   deleteTokens,
 } = require('~/models');
+const { TelegramLink } = require('~/db/models');
 const { createInvite } = require('~/models/inviteUser');
 const { getAppConfig } = require('~/server/services/Config');
 const { checkEmailConfig } = require('@librechat/api');
@@ -301,6 +302,7 @@ const deleteUser = async (req, res) => {
       return res.status(403).json({ message: 'You cannot delete your own account' });
     }
 
+    await TelegramLink.deleteMany({ userId });
     const result = await deleteUserById(userId);
 
     if (result.deletedCount === 0) {
