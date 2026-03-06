@@ -372,6 +372,11 @@ endpoints:
       - sys_admin  # Admin-only: user/workspace management, token usage
     inboundEmailAddress: inbound.postmarkapp.com  # Postmark inbound domain for routing
     inboundEmailDisplayDomain: dailythread.ai  # Domain shown to users (token@dailythread.ai)
+    telegramBotUsername: dailythread_bot  # Bot username for connect link (t.me/dailythread_bot?start=...)
+    inboundTelegramEnabled: true  # Enable Telegram inbound (user-scoped connect + chat)
+    inboundInstructions:
+      telegram: |
+        You are communicating via Telegram. Keep responses concise and conversational. Avoid long blocks of text; use short paragraphs. No need to sign off formally.
     systemAgents:
       - id: system-general
         name: Ellis
