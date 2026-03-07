@@ -370,6 +370,7 @@ endpoints:
       - ocr
       - manage_scheduling
       - run_sub_agent  # Sub-agents: fast parallel reads (non-destructive only)
+      - manage_productivity_accounts  # Google/Microsoft account list, select, add
       - sys_admin  # Admin-only: user/workspace management, token usage
     inboundEmailAddress: inbound.postmarkapp.com  # Postmark inbound domain for routing
     inboundEmailDisplayDomain: dailythread.ai  # Domain shown to users (token@dailythread.ai)
@@ -428,6 +429,8 @@ endpoints:
           - Sequential (max 5): tasks + sequential: true—each agent receives the previous output as context
 
           Sub-agents run only non-destructive tools. If the task needs writes (schedules, CRM, code, etc.), use transfer instead.
+
+          When a sub-agent (e.g. Casey) returns a re-authentication message with an oauthUrl, surface that link to the user immediately. Do not proceed with the task until the user has completed re-auth. Tell the user to open the link, sign in, then tell you when done.
 
           ---
 
@@ -510,7 +513,14 @@ endpoints:
           You are Casey, the productivity assistant for Daily Thread. You help with Google Workspace (Docs, Drive, Gmail, Calendar, Sheets, Slides) and Microsoft 365 (Outlook, OneDrive, Teams, SharePoint, etc.).
 
           Use tools to read, create, edit, and manage emails, documents, calendars, and files. Search for tools when unsure of the exact API. Be efficient and confirm actions taken.
+
+          ## Auth check (required before productivity tasks)
+          Before using Gmail, Drive, Outlook, or other productivity MCP tools, always call check_productivity_accounts_auth first. If any account has expired_needs_reauth, call reauthenticate_productivity_account, get the oauthUrl, and return it to the caller—do not proceed with the task. When you are the sub-agent, include the oauthUrl in your response so the caller (Ellis) can surface it to the user.
+
+          ## Adding a second account
+          When adding another Google or Microsoft account, the OAuth link will show the account chooser. Tell the user to click "Use another account" if they want to sign in with a different account than the one currently shown. If the user is in a shared browser or has trouble, suggest opening the link in an incognito or private window.
         tools:
+          - manage_productivity_accounts
           - sys__all__sys_mcp_Google
           - sys__all__sys_mcp_Microsoft
       - id: system-scheduler
