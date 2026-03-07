@@ -59,6 +59,7 @@ import CRMCard from './CRMCard';
 import CRMLogActivity from './CRMLogActivity';
 import CRMDelete from './CRMDelete';
 import ToolCall from './ToolCall';
+import RunSubAgentToolCall from './RunSubAgentToolCall';
 import ImageGen from './ImageGen';
 import Image from './Image';
 
@@ -1000,6 +1001,18 @@ const Part = memo(
             attachments={attachments}
           />
         );
+      } else if (isToolCall && toolCall.name === Tools.run_sub_agent) {
+        return (
+          <RunSubAgentToolCall
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            attachments={attachments}
+          />
+        );
       } else if (isToolCall) {
         return (
           <ToolCall
@@ -1087,6 +1100,19 @@ const Part = memo(
         if (funcName === Tools.create_pdf) {
           return (
             <CreatePdf
+              args={toolCall.function.arguments ?? ''}
+              output={toolCall.function.output ?? ''}
+              initialProgress={toolCall.progress ?? 0.1}
+              isSubmitting={isSubmitting}
+              isLast={isLast}
+              toolCallId={toolCall.id}
+              attachments={attachments}
+            />
+          );
+        }
+        if (funcName === Tools.run_sub_agent) {
+          return (
+            <RunSubAgentToolCall
               args={toolCall.function.arguments ?? ''}
               output={toolCall.function.output ?? ''}
               initialProgress={toolCall.progress ?? 0.1}

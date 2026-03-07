@@ -10,6 +10,8 @@ type MessageContext = {
   isSubmitting?: boolean;
   /** Whether this is the latest message in the conversation */
   isLatestMessage?: boolean;
+  /** Parent agent/assistant name (e.g. for subagent tree display) */
+  agentName?: string;
 };
 
 export const MessageContext = createContext<MessageContext>({} as MessageContext);

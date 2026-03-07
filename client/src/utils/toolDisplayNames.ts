@@ -239,3 +239,36 @@ export function getToolDisplayName(rawName: string): string {
 
   return humanizeToolName(functionName);
 }
+
+/** Tree-friendly tool labels (lowercase, past tense) for subagent detail view */
+const TOOL_TREE_NAMES: Record<string, string> = {
+  [Tools.web_search]: 'searched web',
+  [Tools.file_search]: 'searched files',
+  [Tools.search_user_files]: 'searched files',
+  [Tools.workspace_glob_files]: 'searched files',
+  [Tools.workspace_read_file]: 'read file',
+  [Tools.workspace_edit_file]: 'edited file',
+  [Tools.workspace_create_file]: 'created file',
+  [Tools.workspace_delete_file]: 'deleted file',
+  [Tools.workspace_list_files]: 'listed files',
+  [Tools.workspace_pull_file]: 'pulled file',
+  [Tools.execute_code]: 'ran code',
+  [Tools.create_pdf]: 'created document',
+  [Constants.TOOL_SEARCH]: 'discovery',
+};
+
+/**
+ * Get tree-friendly display name for a tool (lowercase, past tense).
+ * Falls back to getToolDisplayName lowercased when not in TOOL_TREE_NAMES.
+ */
+export function getToolTreeDisplayName(rawName: string): string {
+  if (!rawName || typeof rawName !== 'string') return 'tool';
+  const mcpDelimiter = Constants.mcp_delimiter || '_mcp_';
+  const functionName = rawName.includes(mcpDelimiter)
+    ? rawName.split(mcpDelimiter)[0] || rawName
+    : rawName;
+  const exact = TOOL_TREE_NAMES[functionName];
+  if (exact) return exact;
+  const fallback = getToolDisplayName(functionName);
+  return fallback.toLowerCase();
+}

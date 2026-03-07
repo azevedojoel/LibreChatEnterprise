@@ -32,6 +32,8 @@ type ContentPartsProps = {
     | ((value: number) => void | React.Dispatch<React.SetStateAction<number>>)
     | null
     | undefined;
+  /** Parent agent/assistant name for subagent tree display */
+  agentName?: string;
 };
 
 /**
@@ -54,6 +56,7 @@ const ContentParts = memo(function ContentParts({
   conversationId,
   isCreatedByUser,
   isLatestMessage,
+  agentName,
 }: ContentPartsProps) {
   const attachmentMap = useMemo(() => mapAttachments(attachments ?? []), [attachments]);
   const effectiveIsSubmitting = isLatestMessage ? isSubmitting : false;
@@ -104,6 +107,7 @@ const ContentParts = memo(function ContentParts({
             nextType: content?.[idx + 1]?.type,
             isSubmitting: effectiveIsSubmitting,
             isLatestMessage,
+            agentName,
           }}
         >
           <Part
@@ -129,6 +133,7 @@ const ContentParts = memo(function ContentParts({
       isLast,
       isLatestMessage,
       messageId,
+      agentName,
     ],
   );
 
