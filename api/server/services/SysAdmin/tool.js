@@ -138,7 +138,7 @@ const CAPABILITY_DESCRIPTIONS = {
   [AgentCapabilities.ocr]: 'OCR from images',
   [AgentCapabilities.create_pdf]: 'Create documents',
   [AgentCapabilities.manage_scheduling]: 'Manage scheduled agent runs',
-  [AgentCapabilities.run_sub_agent]: 'Run other agents inline with a prompt',
+  [AgentCapabilities.run_sub_agent]: 'Run sub-agents (fast parallel reads)',
   [AgentCapabilities.human_in_the_loop]: 'Human approval and handoff',
   [AgentCapabilities.inbound_email]: 'Receive email',
   [AgentCapabilities.sys_admin]: 'Sys Admin tools (admin only)',

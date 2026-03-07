@@ -178,7 +178,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
       if (req.body?.subAgentRun) {
         return {
           approved: false,
-          errorMessage: 'Destructive tools are not allowed in sub-agent runs.',
+          errorMessage: 'Sub-agents run only non-destructive tools. Use transfer for writes.',
         };
       }
       const conversationId = metadata?.thread_id;

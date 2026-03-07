@@ -4,13 +4,31 @@ const { Tools } = require('librechat-data-provider');
 const { GenerationJobManager } = require('@librechat/api');
 const { executeSubAgent } = require('./executeSubAgent');
 
-/** Maximum number of sub-agent tasks per run_sub_agent call. Prevents resource exhaustion. */
+/** Maximum number of sub-agent tasks per run_sub_agent call (parallel mode). Prevents resource exhaustion. */
 const MAX_SUB_AGENT_TASKS = 2;
+/** Maximum tasks when sequential: true. One-at-a-time is less resource-intensive. */
+const MAX_SUB_AGENT_TASKS_SEQUENTIAL = 5;
+/** Max prompt length for sub-agent (must match executeSubAgent). Truncate context when chaining. */
+const MAX_SUB_AGENT_PROMPT_LENGTH = 32 * 1024;
+
+/** Prefix for previous agent output when chaining sequentially. */
+const SEQUENTIAL_CONTEXT_PREFIX = `--- Context from previous agent ---
+
+`;
+
+const SEQUENTIAL_CONTEXT_SUFFIX = `
+
+--- Your task ---
+
+`;
+/** Buffer for truncation suffix when context exceeds limit */
+const TRUNCATION_SUFFIX = '\n\n... (truncated for length)';
 
 /**
  * Create the run_sub_agent tool. Reads parentStreamId, toolCallId, userId from config at invoke time.
  * Rejects if already inside a sub-agent run (nested subagents not allowed).
- * Supports single run (agentId+prompt) or parallel runs (tasks array, max 2 tasks).
+ * Supports single run (agentId+prompt), parallel runs (tasks array, max 2), or sequential runs (tasks + sequential: true, max 5).
+ * When sequential, each agent receives the previous agent's output as context.
  * Note: req must remain the same object for the duration of the run (used for nested sub-agent check).
  *
  * @param {Object} [opts]
@@ -29,7 +47,8 @@ function createRunSubAgentTool(opts = {}) {
         });
       }
 
-      const { agentId, prompt, selectedTools, tasks: rawTasks } = rawInput ?? {};
+      const { agentId, prompt, selectedTools, tasks: rawTasks, sequential, projectId } = rawInput ?? {};
+      const isSequential = sequential === true;
 
       let tasks;
       if (Array.isArray(rawTasks) && rawTasks.length > 0) {
@@ -61,10 +80,11 @@ function createRunSubAgentTool(opts = {}) {
         });
       }
 
-      if (tasks.length > MAX_SUB_AGENT_TASKS) {
+      const maxTasks = isSequential ? MAX_SUB_AGENT_TASKS_SEQUENTIAL : MAX_SUB_AGENT_TASKS;
+      if (tasks.length > maxTasks) {
         return JSON.stringify({
           success: false,
-          error: `Maximum ${MAX_SUB_AGENT_TASKS} sub-agent tasks per call. You provided ${tasks.length}.`,
+          error: `Maximum ${maxTasks} sub-agent tasks per call${isSequential ? ' (sequential mode)' : ''}. You provided ${tasks.length}.`,
         });
       }
 
@@ -80,40 +100,88 @@ function createRunSubAgentTool(opts = {}) {
         });
       }
 
+      const resolvedProjectId =
+        projectId && String(projectId).trim() ? String(projectId).trim() : null;
+
       const taskConfigs = tasks.map((t, i) => ({
         agentId: String(t.agentId),
         prompt: String(t.prompt).trim(),
         selectedTools: t.selectedTools,
         subAgentStreamId: v4(),
         taskIndex: i,
+        projectId: resolvedProjectId,
       }));
 
       try {
-        for (const tc of taskConfigs) {
-          await GenerationJobManager.emitChunk(parentStreamId, {
-            event: 'sub_agent_started',
-            toolCallId,
-            subAgentStreamId: tc.subAgentStreamId,
-            agentId: tc.agentId,
-            prompt: tc.prompt.slice(0, 200),
-            taskIndex: tc.taskIndex,
-          });
-        }
-
-        const results = await Promise.all(
-          taskConfigs.map((tc) =>
-            executeSubAgent({
+        let results;
+        if (isSequential && taskConfigs.length > 1) {
+          results = [];
+          let previousOutput = '';
+          for (let i = 0; i < taskConfigs.length; i++) {
+            const tc = taskConfigs[i];
+            await GenerationJobManager.emitChunk(parentStreamId, {
+              event: 'sub_agent_started',
+              toolCallId,
+              subAgentStreamId: tc.subAgentStreamId,
               agentId: tc.agentId,
-              prompt: tc.prompt,
+              prompt: tc.prompt.slice(0, 200),
+              taskIndex: tc.taskIndex,
+            });
+            let effectivePrompt;
+            if (i === 0) {
+              effectivePrompt = tc.prompt;
+            } else {
+              const fixedLen = SEQUENTIAL_CONTEXT_PREFIX.length + SEQUENTIAL_CONTEXT_SUFFIX.length + tc.prompt.length;
+              const maxContextLen = Math.max(0, MAX_SUB_AGENT_PROMPT_LENGTH - fixedLen - TRUNCATION_SUFFIX.length);
+              const context = previousOutput.length <= maxContextLen
+                ? previousOutput
+                : previousOutput.slice(0, maxContextLen) + TRUNCATION_SUFFIX;
+              effectivePrompt = SEQUENTIAL_CONTEXT_PREFIX + context + SEQUENTIAL_CONTEXT_SUFFIX + tc.prompt;
+            }
+            const r = await executeSubAgent({
+              agentId: tc.agentId,
+              prompt: effectivePrompt,
               userId: String(userId),
               subAgentStreamId: tc.subAgentStreamId,
               parentStreamId,
               toolCallId,
               selectedTools: tc.selectedTools,
+              projectId: tc.projectId,
               signal: config?.signal,
-            }),
-          ),
-        );
+            });
+            results.push(r);
+            if (!r.success) {
+              break;
+            }
+            previousOutput = r.output ?? '';
+          }
+        } else {
+          for (const tc of taskConfigs) {
+            await GenerationJobManager.emitChunk(parentStreamId, {
+              event: 'sub_agent_started',
+              toolCallId,
+              subAgentStreamId: tc.subAgentStreamId,
+              agentId: tc.agentId,
+              prompt: tc.prompt.slice(0, 200),
+              taskIndex: tc.taskIndex,
+            });
+          }
+          results = await Promise.all(
+            taskConfigs.map((tc) =>
+              executeSubAgent({
+                agentId: tc.agentId,
+                prompt: tc.prompt,
+                userId: String(userId),
+                subAgentStreamId: tc.subAgentStreamId,
+                parentStreamId,
+                toolCallId,
+                selectedTools: tc.selectedTools,
+                projectId: tc.projectId,
+                signal: config?.signal,
+              }),
+            ),
+          );
+        }
 
         if (taskConfigs.length === 1) {
           const r = results[0];
@@ -141,7 +209,7 @@ function createRunSubAgentTool(opts = {}) {
     {
       name: Tools.run_sub_agent,
       description:
-        `Run one or more sub-agents with prompts. REQUIRED: Call list_agents first to get valid agent IDs. Pass agentId+prompt for a single run, or tasks array (max ${MAX_SUB_AGENT_TASKS} tasks) to run multiple agents in parallel. Blocks until the sub-agent(s) complete. Returns final text output. Destructive tools are not allowed in sub-agent runs.`,
+        `Sub-agents: fast parallel or sequential reads. Run one or more sub-agents with prompts. REQUIRED: Call list_agents first to get valid agent IDs. Pass agentId+prompt for a single run, or tasks array (max ${MAX_SUB_AGENT_TASKS} parallel, max ${MAX_SUB_AGENT_TASKS_SEQUENTIAL} sequential). Pass sequential: true with multiple tasks to chain agents—each receives the previous output as context. Use for research, analysis, lookups. Destructive tools are stripped—sub-agents run only non-destructive tools. If you need writes, use transfer instead.`,
       schema: {
         type: 'object',
         properties: {
@@ -170,7 +238,17 @@ function createRunSubAgentTool(opts = {}) {
               },
               required: ['agentId', 'prompt'],
             },
-            description: `Run multiple agents in parallel (max ${MAX_SUB_AGENT_TASKS}). Use instead of agentId+prompt for batch.`,
+            description: `Run multiple agents in parallel (max ${MAX_SUB_AGENT_TASKS}) or sequentially (max ${MAX_SUB_AGENT_TASKS_SEQUENTIAL}). Use instead of agentId+prompt for batch.`,
+          },
+          sequential: {
+            type: 'boolean',
+            description:
+              'When true with multiple tasks, run sequentially—each agent receives previous output as context. Default false (parallel).',
+          },
+          projectId: {
+            type: 'string',
+            description:
+              'Optional UserProject ID to run the sub-agent with project context. Use list_user_projects to fetch available projects (includes personal and workspace-shared). Use _id as projectId.',
           },
         },
         required: [],

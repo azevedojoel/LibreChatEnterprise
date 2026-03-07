@@ -56,7 +56,11 @@ function createSchedulingTools({ userId, agentId: currentAgentId, schedulerTarge
       try {
         const { projects, nextCursor } = await listUserProjects(userId, { limit });
         return JSON.stringify({
-          projects: projects.map((p) => ({ _id: p._id?.toString?.() ?? p._id, name: p.name })),
+          projects: projects.map((p) => ({
+            _id: p._id?.toString?.() ?? p._id,
+            name: p.name,
+            shared: !!p.shared,
+          })),
           nextCursor,
         });
       } catch (err) {
@@ -66,7 +70,7 @@ function createSchedulingTools({ userId, agentId: currentAgentId, schedulerTarge
     {
       name: Tools.list_user_projects,
       description:
-        "List the user's projects. Use this when the user wants to associate a schedule with a project or mentions a project by name. Returns projects with _id and name. Use _id as userProjectId in create_schedule or update_schedule.",
+        "List the user's projects (personal and workspace-shared). Use when associating a schedule with a project or when run_sub_agent needs project context. Returns _id, name, shared (true for workspace projects). Use _id as userProjectId or projectId.",
       schema: {
         type: 'object',
         properties: {

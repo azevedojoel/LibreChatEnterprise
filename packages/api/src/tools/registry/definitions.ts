@@ -1741,7 +1741,7 @@ const getRunDefinition: ToolRegistryDefinition = {
 const runSubAgentDefinition: ToolRegistryDefinition = {
   name: 'run_sub_agent',
   description:
-    'Run one or more sub-agents with prompts. REQUIRED: Call list_agents first to get valid agent IDs. Pass agentId+prompt for a single run, or tasks array (max 2 tasks) to run multiple agents in parallel. Blocks until the sub-agent(s) complete. Returns final text output. Destructive tools are not allowed in sub-agent runs.',
+    'Sub-agents: fast parallel or sequential reads. Run one or more sub-agents with prompts. REQUIRED: Call list_agents first to get valid agent IDs. Pass sequential: true with multiple tasks to chain agents—each receives the previous output as context. Use for research, analysis, lookups. Destructive tools are stripped—sub-agents run only non-destructive tools. If you need writes, use transfer instead.',
   schema: {
     type: 'object',
     properties: {
@@ -1770,7 +1770,17 @@ const runSubAgentDefinition: ToolRegistryDefinition = {
           },
           required: ['agentId', 'prompt'],
         },
-        description: 'Run multiple agents in parallel (max 2). Use instead of agentId+prompt for batch.',
+        description: 'Run multiple agents in parallel (max 2) or sequentially (max 5). Use instead of agentId+prompt for batch.',
+      },
+      sequential: {
+        type: 'boolean',
+        description:
+          'When true with multiple tasks, run sequentially—each agent receives previous output as context. Default false (parallel).',
+      },
+      projectId: {
+        type: 'string',
+        description:
+          'Optional UserProject ID to run the sub-agent with project context. Use list_user_projects to fetch available projects (includes personal and workspace-shared). Use _id as projectId.',
       },
     },
     required: [],
@@ -1781,7 +1791,7 @@ const runSubAgentDefinition: ToolRegistryDefinition = {
 const listAgentsDefinition: ToolRegistryDefinition = {
   name: 'list_agents',
   description:
-    'List agents you can run. REQUIRED before run_sub_agent—you must call this first to get valid agent IDs. Returns id, name, description for each. Use the agentId from this response when calling run_sub_agent.',
+    'List agents you can run. REQUIRED before run_sub_agent—you must call this first to get valid agent IDs. Returns id, name, description for each. Use with run_sub_agent for fast parallel reads.',
   schema: {
     type: 'object',
     properties: {

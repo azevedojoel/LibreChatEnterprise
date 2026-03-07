@@ -726,10 +726,18 @@ async function loadToolDefinitionsWrapper({
   ) {
     toolsToFilter = [...new Set([...toolsToFilter, Tools.run_sub_agent, Tools.list_agents])];
   }
+  /** Inject list_user_projects when run_sub_agent is enabled (for projectId in run_sub_agent) */
+  if (toolsToFilter.includes(AgentCapabilities.run_sub_agent)) {
+    toolsToFilter = [...new Set([...toolsToFilter, Tools.list_user_projects])];
+  }
 
   if (req?.body?.subAgentRun) {
     toolsToFilter = toolsToFilter.filter(
       (t) => t !== Tools.run_sub_agent && t !== Tools.list_agents,
+    );
+    // Strip destructive tools — sub-agents run only non-destructive (reads)
+    toolsToFilter = toolsToFilter.filter(
+      (t) => typeof t !== 'string' || !isDestructiveTool(t),
     );
   }
 
@@ -931,7 +939,6 @@ async function loadToolDefinitionsWrapper({
     }
     if (
       tool === Tools.list_schedules ||
-      tool === Tools.list_user_projects ||
       tool === Tools.create_schedule ||
       tool === Tools.update_schedule ||
       tool === Tools.delete_schedule ||
@@ -941,6 +948,13 @@ async function loadToolDefinitionsWrapper({
     ) {
       if (appConfig?.interfaceConfig?.scheduledAgents === false) return false;
       return checkCapability(AgentCapabilities.manage_scheduling);
+    }
+    if (tool === Tools.list_user_projects) {
+      if (appConfig?.interfaceConfig?.scheduledAgents === false) return false;
+      return (
+        checkCapability(AgentCapabilities.manage_scheduling) ||
+        checkCapability(AgentCapabilities.run_sub_agent)
+      );
     }
     if (tool === Tools.run_sub_agent || tool === Tools.list_agents) {
       return (
@@ -1377,7 +1391,7 @@ async function loadToolDefinitionsWrapper({
 
   if (filteredTools.includes(Tools.run_sub_agent) || filteredTools.includes(Tools.list_agents)) {
     toolContextMap[Tools.run_sub_agent] =
-      'REQUIRED: You MUST call list_agents first before run_sub_agent. The agentId must come from the list_agents response—never guess, invent, or ask the user for agent IDs. Pass agentId+prompt for a single run, or a tasks array to run multiple agents in parallel.';
+      'REQUIRED: Call list_agents first before run_sub_agent. Sub-agents: fast parallel or sequential reads—use for research, analysis, lookups. Pass sequential: true with multiple tasks to chain agents—each receives the previous output as context. Optional projectId: use list_user_projects to fetch projects (personal and workspace-shared), pass _id as projectId for project-scoped tools. Destructive tools are stripped. If the task needs writes (schedules, CRM, code execution, etc.), use transfer instead.';
   }
 
   const hasCoderWorkflowTools =
@@ -1524,10 +1538,17 @@ async function loadAgentTools({
   ) {
     toolsToFilter = [...new Set([...toolsToFilter, Tools.run_sub_agent, Tools.list_agents])];
   }
+  if (toolsToFilter.includes(AgentCapabilities.run_sub_agent)) {
+    toolsToFilter = [...new Set([...toolsToFilter, Tools.list_user_projects])];
+  }
 
   if (req?.body?.subAgentRun) {
     toolsToFilter = toolsToFilter.filter(
       (t) => t !== Tools.run_sub_agent && t !== Tools.list_agents,
+    );
+    // Strip destructive tools — sub-agents run only non-destructive (reads)
+    toolsToFilter = toolsToFilter.filter(
+      (t) => typeof t !== 'string' || !isDestructiveTool(t),
     );
   }
 
@@ -1734,7 +1755,6 @@ async function loadAgentTools({
       return checkCapability(AgentCapabilities.execute_code);
     } else if (
       tool === Tools.list_schedules ||
-      tool === Tools.list_user_projects ||
       tool === Tools.create_schedule ||
       tool === Tools.update_schedule ||
       tool === Tools.delete_schedule ||
@@ -1744,6 +1764,12 @@ async function loadAgentTools({
     ) {
       if (appConfig?.interfaceConfig?.scheduledAgents === false) return false;
       return checkCapability(AgentCapabilities.manage_scheduling);
+    } else if (tool === Tools.list_user_projects) {
+      if (appConfig?.interfaceConfig?.scheduledAgents === false) return false;
+      return (
+        checkCapability(AgentCapabilities.manage_scheduling) ||
+        checkCapability(AgentCapabilities.run_sub_agent)
+      );
     } else if (tool === Tools.run_sub_agent || tool === Tools.list_agents) {
       return (
         checkCapability(AgentCapabilities.manage_scheduling) ||

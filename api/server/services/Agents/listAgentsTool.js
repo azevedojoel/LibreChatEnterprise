@@ -50,7 +50,7 @@ function createListAgentsTool(opts = {}) {
     {
       name: Tools.list_agents,
       description:
-        'List agents you can run. REQUIRED before run_sub_agent—you must call this first to get valid agent IDs. Returns id, name, description for each. Use the agentId from this response when calling run_sub_agent.',
+        'List agents you can run. REQUIRED before run_sub_agent—you must call this first to get valid agent IDs. Returns id, name, description for each. Use with run_sub_agent for fast parallel or sequential reads.',
       schema: {
         type: 'object',
         properties: {
