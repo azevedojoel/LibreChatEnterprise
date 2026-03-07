@@ -250,6 +250,7 @@ export const defaultAgentFormValues = {
   [Tools.create_pdf]: false,
   manage_scheduling: false,
   run_sub_agent: false,
+  manage_productivity_accounts: false,
   sys_admin: false,
   schedulerTargetAgentIds: [],
   category: 'general',

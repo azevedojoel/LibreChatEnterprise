@@ -354,15 +354,25 @@ export const useReinitializeMCPServerMutation = (): UseMutationResult<
     oauthUrl?: string;
   },
   unknown,
-  string,
+  string | { serverName: string; addAccount?: boolean },
   unknown
 > => {
   const queryClient = useQueryClient();
-  return useMutation((serverName: string) => dataService.reinitializeMCPServer(serverName), {
-    onSuccess: () => {
-      queryClient.invalidateQueries([QueryKeys.mcpTools]);
+  return useMutation(
+    (arg: string | { serverName: string; addAccount?: boolean }) => {
+      const serverName = typeof arg === 'string' ? arg : arg.serverName;
+      const addAccount = typeof arg === 'string' ? undefined : arg.addAccount;
+      return dataService.reinitializeMCPServer(serverName, { addAccount });
     },
-  });
+    {
+      onSuccess: (_data, variables) => {
+        queryClient.invalidateQueries([QueryKeys.mcpTools]);
+        const serverName = typeof variables === 'string' ? variables : variables.serverName;
+        queryClient.invalidateQueries([QueryKeys.mcpAccounts, serverName]);
+        queryClient.invalidateQueries([QueryKeys.mcpConnectionStatus]);
+      },
+    },
+  );
 };
 
 export const useCancelMCPOAuthMutation = (): UseMutationResult<
@@ -377,6 +387,39 @@ export const useCancelMCPOAuthMutation = (): UseMutationResult<
       queryClient.invalidateQueries([QueryKeys.mcpConnectionStatus]);
     },
   });
+};
+
+export const useMCPAccountsQuery = (
+  serverName: string,
+  config?: UseQueryOptions<dataService.MCPAccountsResponse>,
+): QueryObserverResult<dataService.MCPAccountsResponse> => {
+  return useQuery<dataService.MCPAccountsResponse>({
+    queryKey: [QueryKeys.mcpAccounts, serverName],
+    queryFn: () => dataService.getMCPAccounts(serverName),
+    refetchOnWindowFocus: false,
+    staleTime: 30000,
+    enabled: !!serverName,
+    ...config,
+  });
+};
+
+export const useSetMCPActiveAccountMutation = (): UseMutationResult<
+  { success: boolean; serverName: string; accountId: string },
+  unknown,
+  { serverName: string; accountId: string },
+  unknown
+> => {
+  const queryClient = useQueryClient();
+  return useMutation(
+    ({ serverName, accountId }: { serverName: string; accountId: string }) =>
+      dataService.setMCPActiveAccount(serverName, accountId),
+    {
+      onSuccess: (_data) => {
+        queryClient.invalidateQueries([QueryKeys.mcpAccounts, _data.serverName]);
+        queryClient.invalidateQueries([QueryKeys.mcpConnectionStatus]);
+      },
+    },
+  );
 };
 
 export const useGetCustomConfigSpeechQuery = (
