@@ -17,6 +17,9 @@ const TOOL_DISPLAY_NAMES = {
   list_my_files: 'List My Files',
   create_pdf: 'Create Document',
   run_tool_and_save: 'Export to File',
+  web_search: 'Web Search',
+  run_sub_agent: 'Run Sub-Agent',
+  list_agents: 'List Agents',
   [Constants.TOOL_SEARCH]: 'Discovery',
   // Google Workspace MCP tools (underscore notation)
   tasks_listTaskLists: 'Fetch Task Lists',

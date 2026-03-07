@@ -12,6 +12,7 @@ const DESTRUCTIVE_TOOLS = new Set([
   Tools.create_schedule,
   Tools.update_schedule,
   Tools.run_schedule,
+  Tools.run_sub_agent,
   Tools.project_create,
   Tools.crm_update_contact,
   Tools.crm_update_deal,

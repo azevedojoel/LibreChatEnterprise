@@ -471,6 +471,8 @@ const nativeTools = new Set([
   Tools.run_schedule,
   Tools.list_runs,
   Tools.get_run,
+  Tools.run_sub_agent,
+  Tools.list_agents,
   Tools.project_section_update,
   Tools.project_section_delete,
   Tools.project_section_patch,
@@ -717,6 +719,20 @@ async function loadToolDefinitionsWrapper({
     toolsToFilter = [...new Set([...toolsToFilter, ...schedulingTools])];
   }
 
+  /** Inject run_sub_agent and list_agents when run_sub_agent or manage_scheduling capability is enabled */
+  if (
+    toolsToFilter.includes(AgentCapabilities.run_sub_agent) ||
+    toolsToFilter.includes(AgentCapabilities.manage_scheduling)
+  ) {
+    toolsToFilter = [...new Set([...toolsToFilter, Tools.run_sub_agent, Tools.list_agents])];
+  }
+
+  if (req?.body?.subAgentRun) {
+    toolsToFilter = toolsToFilter.filter(
+      (t) => t !== Tools.run_sub_agent && t !== Tools.list_agents,
+    );
+  }
+
   /** Inject human tools when human_in_the_loop capability is enabled */
   if (toolsToFilter.includes(AgentCapabilities.human_in_the_loop)) {
     const humanTools = [
@@ -925,6 +941,12 @@ async function loadToolDefinitionsWrapper({
     ) {
       if (appConfig?.interfaceConfig?.scheduledAgents === false) return false;
       return checkCapability(AgentCapabilities.manage_scheduling);
+    }
+    if (tool === Tools.run_sub_agent || tool === Tools.list_agents) {
+      return (
+        checkCapability(AgentCapabilities.manage_scheduling) ||
+        checkCapability(AgentCapabilities.run_sub_agent)
+      );
     }
     if (tool === Tools.create_pdf) {
       if (isPersistentAgent) {
@@ -1317,7 +1339,9 @@ async function loadToolDefinitionsWrapper({
     filteredTools.includes(Tools.delete_schedule) ||
     filteredTools.includes(Tools.run_schedule) ||
     filteredTools.includes(Tools.list_runs) ||
-    filteredTools.includes(Tools.get_run);
+    filteredTools.includes(Tools.get_run) ||
+    filteredTools.includes(Tools.run_sub_agent) ||
+    filteredTools.includes(Tools.list_agents);
 
   if (hasSchedulingTools) {
     const parts = [SCHEDULER_DEFAULT_INSTRUCTIONS];
@@ -1349,6 +1373,11 @@ async function loadToolDefinitionsWrapper({
       logger.error('[loadToolDefinitionsWrapper] Error building scheduler prompt context:', error);
     }
     toolContextMap[Tools.create_schedule] = parts.filter(Boolean).join('\n\n');
+  }
+
+  if (filteredTools.includes(Tools.run_sub_agent) || filteredTools.includes(Tools.list_agents)) {
+    toolContextMap[Tools.run_sub_agent] =
+      'REQUIRED: You MUST call list_agents first before run_sub_agent. The agentId must come from the list_agents response—never guess, invent, or ask the user for agent IDs. Pass agentId+prompt for a single run, or a tasks array to run multiple agents in parallel.';
   }
 
   const hasCoderWorkflowTools =
@@ -1487,6 +1516,19 @@ async function loadAgentTools({
       Tools.get_run,
     ];
     toolsToFilter = [...new Set([...toolsToFilter, ...schedulingTools])];
+  }
+
+  if (
+    toolsToFilter.includes(AgentCapabilities.run_sub_agent) ||
+    toolsToFilter.includes(AgentCapabilities.manage_scheduling)
+  ) {
+    toolsToFilter = [...new Set([...toolsToFilter, Tools.run_sub_agent, Tools.list_agents])];
+  }
+
+  if (req?.body?.subAgentRun) {
+    toolsToFilter = toolsToFilter.filter(
+      (t) => t !== Tools.run_sub_agent && t !== Tools.list_agents,
+    );
   }
 
   if (toolsToFilter.includes(AgentCapabilities.human_in_the_loop)) {
@@ -1702,6 +1744,11 @@ async function loadAgentTools({
     ) {
       if (appConfig?.interfaceConfig?.scheduledAgents === false) return false;
       return checkCapability(AgentCapabilities.manage_scheduling);
+    } else if (tool === Tools.run_sub_agent || tool === Tools.list_agents) {
+      return (
+        checkCapability(AgentCapabilities.manage_scheduling) ||
+        checkCapability(AgentCapabilities.run_sub_agent)
+      );
     } else if (tool === Tools.create_pdf) {
       if (isPersistentAgent) {
         if (ephemeralAgent?.create_pdf === false) return false;

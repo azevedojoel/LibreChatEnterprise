@@ -957,6 +957,10 @@ class BaseClient {
       throw new Error('User mismatch.');
     }
 
+    if (this.options?.req?.body?.subAgentRun) {
+      return { message: {}, conversation: {} };
+    }
+
     const hasAddedConvo = this.options?.req?.body?.addedConvo != null;
     const savedMessage = await saveMessage(
       this.options?.req,
@@ -1024,6 +1028,9 @@ class BaseClient {
    * @param {Partial<TMessage>} message
    */
   async updateMessageInDatabase(message) {
+    if (this.options?.req?.body?.subAgentRun) {
+      return;
+    }
     await updateMessage(this.options.req, message);
   }
 

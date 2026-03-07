@@ -175,6 +175,12 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
     isDestructiveTool,
     checkRequiresApproval,
     requestToolConfirmation: async (toolCall, metadata) => {
+      if (req.body?.subAgentRun) {
+        return {
+          approved: false,
+          errorMessage: 'Destructive tools are not allowed in sub-agent runs.',
+        };
+      }
       const conversationId = metadata?.thread_id;
       const runId = metadata?.run_id;
       const conversationOwnerId = metadata?.user_id;

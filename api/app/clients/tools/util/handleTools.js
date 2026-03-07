@@ -63,6 +63,8 @@ const { createInstallDependenciesTool } = require('~/server/services/InstallDepe
 const { createLintTool } = require('~/server/services/Lint');
 const { createRunProgramTool } = require('~/server/services/RunProgram');
 const { createSchedulingTools } = require('~/server/services/ScheduledAgents/schedulingTools');
+const { createRunSubAgentTool } = require('~/server/services/SubAgent/subAgentTool');
+const { createListAgentsTool } = require('~/server/services/Agents/listAgentsTool');
 const {
   buildSchedulerTargetContext,
   buildSchedulerPromptContext,
@@ -565,6 +567,14 @@ const loadTools = async ({
       continue;
     } else if (tool === Tools.create_brainstorm_doc) {
       requestedTools[tool] = async () => createBrainstormDocTool();
+      continue;
+    } else if (tool === Tools.run_sub_agent) {
+      requestedTools[tool] = async () =>
+        createRunSubAgentTool({ req: options.req });
+      continue;
+    } else if (tool === Tools.list_agents) {
+      requestedTools[tool] = async () =>
+        createListAgentsTool({ req: options.req });
       continue;
     } else if (
       tool === Tools.list_schedules ||
