@@ -59,11 +59,11 @@ export interface ToolExecuteOptions {
     toolName: string,
     context: { agentId?: string; userId?: string },
   ) => Promise<boolean>;
-  /** Request user confirmation for destructive tools. Returns { approved } - if false, tool is not executed */
+  /** Request user confirmation for destructive tools. Returns { approved } - if false, tool is not executed. Optional errorMessage overrides the default "User denied execution." when approved is false. */
   requestToolConfirmation?: (
     toolCall: ToolCallRequest,
     metadata: Record<string, unknown>,
-  ) => Promise<{ approved: boolean }>;
+  ) => Promise<{ approved: boolean; errorMessage?: string }>;
   /** Callback when a tool call fails. Used for EventLog auditing. */
   onToolFailure?: (params: {
     toolName: string;
@@ -186,13 +186,13 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
                 : isDestructiveTool?.(tc.name) ?? false;
               if (requiresApproval && requestToolConfirmation) {
                 const metadataRecord = (metadata ?? {}) as Record<string, unknown>;
-                const { approved } = await requestToolConfirmation(tc, metadataRecord);
+                const { approved, errorMessage } = await requestToolConfirmation(tc, metadataRecord);
                 if (!approved) {
                   return {
                     toolCallId: tc.id,
                     status: 'error' as const,
                     content: '',
-                    errorMessage: 'User denied execution.',
+                    errorMessage: errorMessage ?? 'User denied execution.',
                   };
                 }
               }

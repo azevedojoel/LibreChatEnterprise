@@ -189,6 +189,7 @@ export enum AgentCapabilities {
   ocr = 'ocr',
   create_pdf = 'create_pdf',
   manage_scheduling = 'manage_scheduling',
+  run_sub_agent = 'run_sub_agent',
   human_in_the_loop = 'human_in_the_loop',
   inbound_email = 'inbound_email',
   sys_admin = 'sys_admin',
@@ -281,6 +282,7 @@ export const defaultAgentCapabilities = [
   AgentCapabilities.chain,
   AgentCapabilities.ocr,
   AgentCapabilities.manage_scheduling,
+  AgentCapabilities.run_sub_agent,
 ];
 
 export const agentsEndpointSchema = baseEndpointSchema

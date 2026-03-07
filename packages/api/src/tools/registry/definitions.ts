@@ -1738,6 +1738,70 @@ const getRunDefinition: ToolRegistryDefinition = {
   toolType: 'builtin',
 };
 
+const runSubAgentDefinition: ToolRegistryDefinition = {
+  name: 'run_sub_agent',
+  description:
+    'Run one or more sub-agents with prompts. REQUIRED: Call list_agents first to get valid agent IDs. Pass agentId+prompt for a single run, or tasks array (max 2 tasks) to run multiple agents in parallel. Blocks until the sub-agent(s) complete. Returns final text output. Destructive tools are not allowed in sub-agent runs.',
+  schema: {
+    type: 'object',
+    properties: {
+      agentId: {
+        type: 'string',
+        description: 'Agent ID from list_agents (REQUIRED: call list_agents first). Use for single run.',
+      },
+      prompt: { type: 'string', description: 'Prompt to send to the sub-agent (single run)' },
+      selectedTools: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Optional: restrict sub-agent to these tools (null = all, [] = none)',
+      },
+      tasks: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            agentId: { type: 'string', description: 'Agent ID from list_agents' },
+            prompt: { type: 'string', description: 'Prompt to send to the sub-agent' },
+            selectedTools: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Optional: restrict sub-agent to these tools',
+            },
+          },
+          required: ['agentId', 'prompt'],
+        },
+        description: 'Run multiple agents in parallel (max 2). Use instead of agentId+prompt for batch.',
+      },
+    },
+    required: [],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const listAgentsDefinition: ToolRegistryDefinition = {
+  name: 'list_agents',
+  description:
+    'List agents you can run. REQUIRED before run_sub_agent—you must call this first to get valid agent IDs. Returns id, name, description for each. Use the agentId from this response when calling run_sub_agent.',
+  schema: {
+    type: 'object',
+    properties: {
+      search: { type: 'string', description: 'Filter by name or description' },
+      limit: { type: 'number', description: 'Max results (default 25, max 50)' },
+      after: { type: 'string', description: 'Pagination cursor from previous response' },
+      category: { type: 'string', description: 'Filter by category' },
+      promoted: {
+        oneOf: [
+          { type: 'boolean' },
+          { type: 'string', enum: ['0', '1'] },
+        ],
+        description: 'Filter promoted agents (true/1) or non-promoted (false/0)',
+      },
+    },
+    required: [],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
 /** CRM tools - native builtin tools (no MCP) */
 const crmListPipelinesDefinition: ToolRegistryDefinition = {
   name: 'crm_list_pipelines',
@@ -1993,6 +2057,8 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
   run_schedule: runScheduleDefinition,
   list_runs: listRunsDefinition,
   get_run: getRunDefinition,
+  run_sub_agent: runSubAgentDefinition,
+  list_agents: listAgentsDefinition,
   crm_list_pipelines: crmListPipelinesDefinition,
   crm_create_pipeline: crmCreatePipelineDefinition,
   crm_update_pipeline: crmUpdatePipelineDefinition,
@@ -2733,16 +2799,20 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
         model: { type: 'string', description: 'Model name' },
         instructions: { type: 'string', description: 'System instructions' },
         tools: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Tool IDs (e.g. file_search, web_search)',
+          oneOf: [
+            { type: 'array', items: { type: 'string' }, description: 'Tool IDs' },
+            { type: 'string', description: 'JSON string of tool ID array, e.g. \'["project_create","run_sub_agent"]\'' },
+          ],
+          description: 'Tool IDs. Pass as array or JSON string.',
         },
         description: { type: 'string', description: 'Agent description' },
         category: { type: 'string', description: 'Category (e.g. general)' },
         edges: {
-          type: 'array',
-          items: { type: 'object' },
-          description: 'Handoff edges',
+          oneOf: [
+            { type: 'array', items: { type: 'object' }, description: 'Handoff edges' },
+            { type: 'string', description: 'JSON string of edges array' },
+          ],
+          description: 'Handoff edges. Pass as array or JSON string.',
         },
       },
       required: ['name', 'provider', 'model'],
@@ -2752,35 +2822,45 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
   sys_admin_update_agent: {
     name: 'sys_admin_update_agent',
     description:
-      'Update an agent. Required: agentId. Optional: name, instructions, tools, model, provider, description, category, edges, inbound_instructions (object: telegram, email, etc. -> instruction string for that channel).',
+      'Update an agent. Required: agentId or agent_id. Optional: name, instructions, tools, model, provider, description, category, edges, inbound_instructions (object: telegram, email, etc. -> instruction string for that channel).',
     schema: {
       type: 'object',
       properties: {
-        agentId: { type: 'string', description: 'Agent ID to update' },
+        agentId: { type: 'string', description: 'Agent ID to update (camelCase)' },
+        agent_id: { type: 'string', description: 'Alias for agentId (snake_case)' },
         name: { type: 'string', description: 'Agent name' },
         instructions: { type: 'string', description: 'System instructions' },
         tools: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Tool IDs',
+          oneOf: [
+            { type: 'array', items: { type: 'string' }, description: 'Tool IDs' },
+            { type: 'string', description: 'JSON string of tool ID array, e.g. \'["project_create","run_sub_agent"]\'' },
+          ],
+          description: 'Tool IDs. Pass as array or JSON string.',
         },
         model: { type: 'string', description: 'Model name' },
         provider: { type: 'string', description: 'Provider' },
         description: { type: 'string', description: 'Agent description' },
         category: { type: 'string', description: 'Category' },
         edges: {
-          type: 'array',
-          items: { type: 'object' },
-          description: 'Handoff edges',
+          oneOf: [
+            { type: 'array', items: { type: 'object' }, description: 'Handoff edges' },
+            { type: 'string', description: 'JSON string of edges array' },
+          ],
+          description: 'Handoff edges. Pass as array or JSON string.',
         },
         inbound_instructions: {
-          type: 'object',
-          additionalProperties: { type: 'string' },
+          oneOf: [
+            { type: 'object', additionalProperties: { type: 'string' }, description: 'Per-channel instructions' },
+            { type: 'string', description: 'JSON string of inbound_instructions object' },
+          ],
           description:
-            'Per-channel instructions when run comes from that inbound source. Keys: telegram, email, etc. Values: instruction string.',
+            'Per-channel instructions when run comes from that inbound source. Keys: telegram, email, etc. Values: instruction string. Pass as object or JSON string.',
         },
       },
-      required: ['agentId'],
+      anyOf: [
+        { required: ['agentId'] },
+        { required: ['agent_id'] },
+      ],
     } as ExtendedJsonSchema,
     toolType: 'builtin',
   },
