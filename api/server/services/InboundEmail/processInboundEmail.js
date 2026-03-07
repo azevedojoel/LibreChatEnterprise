@@ -110,6 +110,7 @@ async function processInboundEmail(payload) {
 
   let targetUser = null;
   let isWorkspaceFlow = false;
+  let isExternalSender = false;
   let workspaceSlug = null;
 
   // Try workspace lookup first (slug from To address, e.g. companyx@domain)
@@ -119,10 +120,30 @@ async function processInboundEmail(payload) {
       { email: senderEmail },
       '_id role email workspace_id',
     );
-    if (senderUserByEmail && senderUserByEmail.workspace_id?.toString() === workspace._id.toString()) {
+    const isWorkspaceMember =
+      senderUserByEmail?.workspace_id?.toString() === workspace._id.toString();
+    if (isWorkspaceMember) {
       targetUser = senderUserByEmail;
       isWorkspaceFlow = true;
       workspaceSlug = workspace.slug;
+    } else {
+      // External sender - use workspace creator, no reply
+      const creatorUser = await findUser(
+        { _id: workspace.createdBy },
+        '_id role email workspace_id',
+      );
+      if (creatorUser) {
+        targetUser = creatorUser;
+        isWorkspaceFlow = true;
+        isExternalSender = true;
+        workspaceSlug = workspace.slug;
+      } else {
+        logger.warn('[InboundEmail] External sender for workspace but creator not found', {
+          from: senderEmail,
+          workspaceSlug: workspace.slug,
+          createdBy: workspace.createdBy,
+        });
+      }
     }
   }
 
@@ -276,6 +297,7 @@ async function processInboundEmail(payload) {
     endpointType: EModelEndpoint.agents,
     files: requestFiles,
     ...(inboundProjectId && { userProjectId: inboundProjectId }),
+    ...(isExternalSender && { _inboundExternalSender: true }),
   };
 
   const syntheticReq = {
@@ -288,6 +310,7 @@ async function processInboundEmail(payload) {
     },
     config: appConfig,
     body,
+    ...(isExternalSender && { _inboundExternalSender: true }),
   };
 
   /** Pre-create conversation with inbound project so it exists before the agent run */
@@ -343,39 +366,41 @@ async function processInboundEmail(payload) {
     syntheticReq._headlessOAuthUrls = capturedOAuthUrls;
     /** Tracks MCP servers we've already captured a URL for (deduplicates per-server) */
     syntheticReq._headlessOAuthServers = new Set();
-    /** When set, sends approval email for destructive tools (headless flow) */
-    syntheticReq._headlessSendApprovalEmail = async ({
-      toolName,
-      argsSummary,
-      approvalUrl,
-      conversationId: auditConversationId,
-      runId: auditRunId,
-      toolCallId: auditToolCallId,
-      userId: auditUserId,
-    }) => {
-      const appName = process.env.APP_TITLE || 'Daily Thread';
-      const { html, text } = formatToolApprovalEmail(
-        { toolName, argsSummary, approvalUrl },
-        { appName },
-      );
-      const subject = buildToolApprovalSubject({ toolName, argsSummary }, { appName });
-      await sendInboundReply({
-        to: fromEmail,
-        subject,
-        body: text,
-        html,
-        auditContext: {
-          userId: auditUserId ?? senderUserId,
-          agentId: agent?.id,
-          agentName: agent?.name,
-          conversationId: auditConversationId ?? conversationId,
-          runId: auditRunId,
-          toolCallId: auditToolCallId,
-          toolName,
-          source: 'tool_approval',
-        },
-      });
-    };
+    /** When set, sends approval email for destructive tools (headless flow). Skip for external senders. */
+    if (!isExternalSender) {
+      syntheticReq._headlessSendApprovalEmail = async ({
+        toolName,
+        argsSummary,
+        approvalUrl,
+        conversationId: auditConversationId,
+        runId: auditRunId,
+        toolCallId: auditToolCallId,
+        userId: auditUserId,
+      }) => {
+        const appName = process.env.APP_TITLE || 'Daily Thread';
+        const { html, text } = formatToolApprovalEmail(
+          { toolName, argsSummary, approvalUrl },
+          { appName },
+        );
+        const subject = buildToolApprovalSubject({ toolName, argsSummary }, { appName });
+        await sendInboundReply({
+          to: fromEmail,
+          subject,
+          body: text,
+          html,
+          auditContext: {
+            userId: auditUserId ?? senderUserId,
+            agentId: agent?.id,
+            agentName: agent?.name,
+            conversationId: auditConversationId ?? conversationId,
+            runId: auditRunId,
+            toolCallId: auditToolCallId,
+            toolName,
+            source: 'tool_approval',
+          },
+        });
+      };
+    }
 
     const result = await initializeClient({
       req: syntheticReq,
@@ -456,27 +481,31 @@ async function processInboundEmail(payload) {
     emailHtmlBody = errorHtml;
   }
 
-  // Send reply first so user receives it even if persistence hangs or fails
-  logger.info(
-    `[InboundEmail] Sending reply to=${fromEmail} bodyLength=${emailBody?.length ?? 0}`,
-  );
-  const sendResult = await sendInboundReply({
-    to: fromEmail,
-    subject: replySubject,
-    body: emailBody || '(No response content)',
-    html: emailHtmlBody,
-    replyTo,
-    auditContext: {
-      userId: senderUserId,
-      agentId: agent?.id,
-      agentName: agent?.name,
-      conversationId,
-      source: 'inbound_reply',
-    },
-  });
-  logger.info(`[InboundEmail] Reply sent success=${sendResult.success}`);
-  if (!sendResult.success) {
-    logger.error('[InboundEmail] Failed to send reply:', sendResult.error);
+  // Send reply first so user receives it even if persistence hangs or fails (skip for external senders)
+  if (!isExternalSender) {
+    logger.info(
+      `[InboundEmail] Sending reply to=${fromEmail} bodyLength=${emailBody?.length ?? 0}`,
+    );
+    const sendResult = await sendInboundReply({
+      to: fromEmail,
+      subject: replySubject,
+      body: emailBody || '(No response content)',
+      html: emailHtmlBody,
+      replyTo,
+      auditContext: {
+        userId: senderUserId,
+        agentId: agent?.id,
+        agentName: agent?.name,
+        conversationId,
+        source: 'inbound_reply',
+      },
+    });
+    logger.info(`[InboundEmail] Reply sent success=${sendResult.success}`);
+    if (!sendResult.success) {
+      logger.error('[InboundEmail] Failed to send reply:', sendResult.error);
+    }
+  } else {
+    logger.info('[InboundEmail] External sender - no reply sent', { from: fromEmail });
   }
 
   // Persistence after send (non-blocking; failures logged but reply already sent)
@@ -501,9 +530,10 @@ async function processInboundEmail(payload) {
     );
 
     logger.info('[InboundEmail] Step: updating conversation tags');
+    const tagsToAdd = isExternalSender ? ['inbound_email', 'inbound_email_external'] : ['inbound_email'];
     await Conversation.updateOne(
       { conversationId, user: senderUserId },
-      { $addToSet: { tags: 'inbound_email' } },
+      { $addToSet: { tags: { $each: tagsToAdd } } },
     );
     logger.info('[InboundEmail] Step: persistence complete');
   } catch (persistErr) {

@@ -575,6 +575,14 @@ You are running in a headless scheduled agent run. No user is present in the cha
       }
     }
 
+    /** Inbound external sender - email from non-workspace member; headless, no reply */
+    if (this.options.req?._inboundExternalSender) {
+      const externalSenderPrompt = `# Inbound external sender
+
+You are processing an inbound email from an external sender (not a workspace member). Do NOT send them an email or reply. Process the request using the Inbound project context. Results are for internal use only.`;
+      sharedRunContextParts.push(externalSenderPrompt);
+    }
+
     /** Project context - curated context doc, always injected when conversation has a project */
     const conversationId = this.conversationId + '';
     const userId = this.user ?? this.options.req?.user?.id;
