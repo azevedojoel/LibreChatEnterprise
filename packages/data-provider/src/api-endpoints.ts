@@ -172,6 +172,10 @@ export const plugins = () => `${BASE_URL}/api/plugins`;
 
 export const mcpReinitialize = (serverName: string) =>
   `${BASE_URL}/api/mcp/${serverName}/reinitialize`;
+export const mcpAccounts = (serverName: string) =>
+  `${BASE_URL}/api/mcp/${serverName}/accounts`;
+export const mcpAccountsActive = (serverName: string) =>
+  `${BASE_URL}/api/mcp/${serverName}/accounts/active`;
 export const mcpConnectionStatus = () => `${BASE_URL}/api/mcp/connection/status`;
 export const mcpServerConnectionStatus = (serverName: string) =>
   `${BASE_URL}/api/mcp/connection/status/${serverName}`;

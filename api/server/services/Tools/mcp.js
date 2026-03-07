@@ -1,6 +1,6 @@
 const { logger } = require('@librechat/data-schemas');
 const { CacheKeys, Constants } = require('librechat-data-provider');
-const { findToken, createToken, updateToken, deleteTokens, findUser } = require('~/models');
+const { findToken, findTokens, createToken, updateToken, deleteTokens, findUser } = require('~/models');
 const { updateMCPServerTools } = require('~/server/services/Config');
 const { getMCPManager, getFlowStateManager } = require('~/config');
 const { getLogStores } = require('~/cache');
@@ -31,6 +31,7 @@ async function reinitMCPServer({
   returnOnOAuth = true,
   oauthStart: _oauthStart,
   flowManager: _flowManager,
+  addAccount = false,
 }) {
   /** @type {MCPConnection | null} */
   let connection = null;
@@ -53,7 +54,7 @@ async function reinitMCPServer({
     }
     const flowManager = _flowManager ?? getFlowStateManager(getLogStores(CacheKeys.FLOWS));
     const mcpManager = getMCPManager();
-    const tokenMethods = { findToken, updateToken, createToken, deleteTokens };
+    const tokenMethods = { findToken, findTokens, updateToken, createToken, deleteTokens };
 
     const oauthStart =
       _oauthStart ??
@@ -75,6 +76,7 @@ async function reinitMCPServer({
         returnOnOAuth,
         customUserVars,
         connectionTimeout,
+        addAccount,
       });
 
       logger.info(`[MCP Reinitialize] Successfully established connection for ${serverName}`);
@@ -121,6 +123,7 @@ async function reinitMCPServer({
             oauthStart,
             customUserVars,
             connectionTimeout,
+            addAccount,
           });
 
           if (discoveryResult.tools && discoveryResult.tools.length > 0) {

@@ -64,6 +64,10 @@ const namespaces = {
     CacheKeys.MCP_OAUTH_CONFIRM,
     Time.FIVE_MINUTES,
   ),
+  [CacheKeys.OAUTH_CONNECT]: standardCache(
+    CacheKeys.OAUTH_CONNECT,
+    Time.THIRTY_MINUTES,
+  ),
   [CacheKeys.TELEGRAM_CONNECT_TOKENS]: standardCache(
     CacheKeys.TELEGRAM_CONNECT_TOKENS,
     Time.TEN_MINUTES,

@@ -1588,6 +1588,141 @@ const runToolAndSaveDefinition: ToolRegistryDefinition = {
   responseFormat: 'content_and_artifact',
 };
 
+/** Productivity account tools - multi-account Google/Microsoft */
+const listProductivityAccountsDefinition: ToolRegistryDefinition = {
+  name: 'list_productivity_accounts',
+  description:
+    'List connected Google and Microsoft accounts. Use provider: "google", "microsoft", or "all" (default). Returns { google: [{ accountId }], microsoft: [{ accountId }] }. Use accountId with select_productivity_account to switch.',
+  schema: {
+    type: 'object',
+    properties: {
+      provider: {
+        type: 'string',
+        enum: ['google', 'microsoft', 'all'],
+        description: 'Filter by provider (default: all)',
+      },
+    },
+    required: [],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const getActiveProductivityAccountDefinition: ToolRegistryDefinition = {
+  name: 'get_active_productivity_account',
+  description:
+    'Get the currently active account for a provider. Required: provider ("google" or "microsoft"). Returns { provider, accountId } or accountId null if not set.',
+  schema: {
+    type: 'object',
+    properties: {
+      provider: {
+        type: 'string',
+        enum: ['google', 'microsoft'],
+        description: 'Provider to get active account for',
+      },
+    },
+    required: ['provider'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const selectProductivityAccountDefinition: ToolRegistryDefinition = {
+  name: 'select_productivity_account',
+  description:
+    'Set the active account for subsequent Google or Microsoft tool calls. Required: provider ("google" or "microsoft"), accountId (from list_productivity_accounts). All Gmail, Drive, Outlook, OneDrive, etc. calls will use this account until switched.',
+  schema: {
+    type: 'object',
+    properties: {
+      provider: {
+        type: 'string',
+        enum: ['google', 'microsoft'],
+        description: 'Provider to set active account for',
+      },
+      accountId: {
+        type: 'string',
+        description: 'Account ID (e.g. email or "default") from list_productivity_accounts',
+      },
+    },
+    required: ['provider', 'accountId'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const addProductivityAccountDefinition: ToolRegistryDefinition = {
+  name: 'add_productivity_account',
+  description:
+    'Add a new Google or Microsoft account. Initiates OAuth—returns an oauthUrl for the user to open and sign in. The account is saved only after the user completes sign-in. Use when the user wants to connect another Google or Microsoft account. Required: provider ("google" or "microsoft"). Returns oauthUrl and instructions. Tell the user to open the link, sign in, then tell you when done so you can list accounts and switch to the new one.',
+  schema: {
+    type: 'object',
+    properties: {
+      provider: {
+        type: 'string',
+        enum: ['google', 'microsoft'],
+        description: 'Provider to add account for',
+      },
+    },
+    required: ['provider'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const removeProductivityAccountDefinition: ToolRegistryDefinition = {
+  name: 'remove_productivity_account',
+  description:
+    'Remove a connected Google or Microsoft account. Required: provider ("google" or "microsoft"), accountId (from list_productivity_accounts). The account will be disconnected and tokens deleted. If it was the active account, another account will be selected.',
+  schema: {
+    type: 'object',
+    properties: {
+      provider: {
+        type: 'string',
+        enum: ['google', 'microsoft'],
+        description: 'Provider to remove account for',
+      },
+      accountId: {
+        type: 'string',
+        description: 'Account ID (e.g. email or "default") from list_productivity_accounts',
+      },
+    },
+    required: ['provider', 'accountId'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const checkProductivityAccountsAuthDefinition: ToolRegistryDefinition = {
+  name: 'check_productivity_accounts_auth',
+  description:
+    'Check whether Google and Microsoft accounts need refresh or re-authentication. Use before Gmail, Drive, Outlook, etc. Returns per-account status: ok (valid), expired_refreshable (system will auto-refresh on next use), expired_needs_reauth (use reauthenticate_productivity_account), not_connected (no accounts). Provider: "google", "microsoft", or "all" (default).',
+  schema: {
+    type: 'object',
+    properties: {
+      provider: {
+        type: 'string',
+        enum: ['google', 'microsoft', 'all'],
+        description: 'Filter by provider (default: all)',
+      },
+    },
+    required: [],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
+const reauthenticateProductivityAccountDefinition: ToolRegistryDefinition = {
+  name: 'reauthenticate_productivity_account',
+  description:
+    'Re-authenticate an existing Google or Microsoft account when tokens are expired or revoked. Initiates OAuth and returns oauthUrl for the user to open and sign in. Use after check_productivity_accounts_auth returns expired_needs_reauth, or when MCP calls fail with auth errors. Required: provider ("google" or "microsoft").',
+  schema: {
+    type: 'object',
+    properties: {
+      provider: {
+        type: 'string',
+        enum: ['google', 'microsoft'],
+        description: 'Provider to re-authenticate',
+      },
+    },
+    required: ['provider'],
+  } as ExtendedJsonSchema,
+  toolType: 'builtin',
+};
+
 /** Scheduling tools - used when agent has manage_scheduling capability */
 const listSchedulesDefinition: ToolRegistryDefinition = {
   name: 'list_schedules',
@@ -2059,6 +2194,13 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
   list_my_files: listMyFilesDefinition,
   create_pdf: createPdfDefinition,
   run_tool_and_save: runToolAndSaveDefinition,
+  list_productivity_accounts: listProductivityAccountsDefinition,
+  get_active_productivity_account: getActiveProductivityAccountDefinition,
+  select_productivity_account: selectProductivityAccountDefinition,
+  add_productivity_account: addProductivityAccountDefinition,
+  remove_productivity_account: removeProductivityAccountDefinition,
+  check_productivity_accounts_auth: checkProductivityAccountsAuthDefinition,
+  reauthenticate_productivity_account: reauthenticateProductivityAccountDefinition,
   list_schedules: listSchedulesDefinition,
   list_user_projects: listUserProjectsDefinition,
   create_schedule: createScheduleDefinition,

@@ -87,6 +87,8 @@ const DESTRUCTIVE_TOOLS = new Set([
   'reply-to-chat-message',
   'send-channel-message',
   'reply-to-group-thread',
+  Tools.add_productivity_account,
+  Tools.remove_productivity_account,
   // Alex - blocks until target member approves
   Tools.human_await_response,
   // Sys Admin - mutating/destructive (require approval)

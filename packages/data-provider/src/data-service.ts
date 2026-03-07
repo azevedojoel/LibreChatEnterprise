@@ -190,9 +190,24 @@ export const updateUserPlugins = (payload: t.TUpdateUserPlugins) => {
   return request.post(endpoints.userPlugins(), payload);
 };
 
-export const reinitializeMCPServer = (serverName: string) => {
-  return request.post(endpoints.mcpReinitialize(serverName));
+export const reinitializeMCPServer = (serverName: string, options?: { addAccount?: boolean }) => {
+  return request.post(endpoints.mcpReinitialize(serverName), {
+    add_account: options?.addAccount === true,
+  });
 };
+
+export interface MCPAccountsResponse {
+  success: boolean;
+  serverName: string;
+  accounts: { accountId: string }[];
+  activeAccountId: string | null;
+}
+
+export const getMCPAccounts = (serverName: string): Promise<MCPAccountsResponse> =>
+  request.get(endpoints.mcpAccounts(serverName));
+
+export const setMCPActiveAccount = (serverName: string, accountId: string) =>
+  request.post(endpoints.mcpAccountsActive(serverName), { accountId });
 
 export const bindMCPOAuth = (serverName: string): Promise<{ success: boolean }> => {
   return request.post(endpoints.mcpOAuthBind(serverName));

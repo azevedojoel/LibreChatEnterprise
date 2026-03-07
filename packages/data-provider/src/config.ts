@@ -193,6 +193,7 @@ export enum AgentCapabilities {
   human_in_the_loop = 'human_in_the_loop',
   inbound_email = 'inbound_email',
   sys_admin = 'sys_admin',
+  manage_productivity_accounts = 'manage_productivity_accounts',
 }
 
 export const defaultAssistantsVersion = {
@@ -1536,6 +1537,10 @@ export enum CacheKeys {
    * Key for MCP OAuth confirm tokens (short-lived, for post-callback confirmation).
    */
   MCP_OAUTH_CONFIRM = 'MCP_OAUTH_CONFIRM',
+  /**
+   * Key for OAuth connect short codes (shortCode -> oauthUrl, 15-30 min TTL, for /connect/:code redirect).
+   */
+  OAUTH_CONNECT = 'OAUTH_CONNECT',
   /**
    * Key for Telegram connect tokens (single-use, 5-10 min TTL, for linking chatId to userId).
    */

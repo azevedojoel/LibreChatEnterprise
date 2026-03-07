@@ -63,6 +63,7 @@ const { createInstallDependenciesTool } = require('~/server/services/InstallDepe
 const { createLintTool } = require('~/server/services/Lint');
 const { createRunProgramTool } = require('~/server/services/RunProgram');
 const { createSchedulingTools } = require('~/server/services/ScheduledAgents/schedulingTools');
+const { createProductivityAccountTools } = require('~/server/services/ProductivityAccounts/productivityAccountTools');
 const { createRunSubAgentTool } = require('~/server/services/SubAgent/subAgentTool');
 const { createListAgentsTool } = require('~/server/services/Agents/listAgentsTool');
 const {
@@ -575,6 +576,21 @@ const loadTools = async ({
     } else if (tool === Tools.list_agents) {
       requestedTools[tool] = async () =>
         createListAgentsTool({ req: options.req });
+      continue;
+    } else if (
+      tool === Tools.list_productivity_accounts ||
+      tool === Tools.get_active_productivity_account ||
+      tool === Tools.select_productivity_account ||
+      tool === Tools.add_productivity_account ||
+      tool === Tools.remove_productivity_account ||
+      tool === Tools.check_productivity_accounts_auth ||
+      tool === Tools.reauthenticate_productivity_account
+    ) {
+      const productivityAccountTools = createProductivityAccountTools({
+        userId: user,
+        user: createSafeUser(options.req?.user ?? user),
+      });
+      requestedTools[tool] = async () => productivityAccountTools[tool];
       continue;
     } else if (
       tool === Tools.list_schedules ||

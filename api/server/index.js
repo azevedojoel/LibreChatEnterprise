@@ -18,6 +18,7 @@ const {
   initializeFileStorage,
   GenerationJobManager,
   createStreamServices,
+  getBasePath,
 } = require('@librechat/api');
 const { CacheKeys } = require('librechat-data-provider');
 const getLogStores = require('~/cache/getLogStores');
@@ -104,6 +105,25 @@ const startServer = async () => {
   }
 
   app.get('/health', (_req, res) => res.status(200).send('OK'));
+
+  /* OAuth connect redirect - short code lookup, redirects to OAuth URL (before static cache) */
+  const connectPath = `${getBasePath() || ''}/connect/:code`.replace(/\/+/g, '/') || '/connect/:code';
+  app.get(connectPath, async (req, res) => {
+    const { code } = req.params;
+    if (!code || typeof code !== 'string') {
+      return res.status(404).send('Not found');
+    }
+    try {
+      const oauthConnectCache = getLogStores(CacheKeys.OAUTH_CONNECT);
+      const entry = await oauthConnectCache.get(code);
+      if (!entry?.oauthUrl) {
+        return res.status(404).send('Not found');
+      }
+      return res.redirect(302, entry.oauthUrl);
+    } catch {
+      return res.status(404).send('Not found');
+    }
+  });
 
   /* Inbound email webhook - must be before express.json() to preserve raw body for signature verification */
   const inboundEmailRoutes = require('./routes/inboundEmail');

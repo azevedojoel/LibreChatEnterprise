@@ -36,6 +36,13 @@ export enum Tools {
   list_my_files = 'list_my_files',
   create_pdf = 'create_pdf',
   run_tool_and_save = 'run_tool_and_save',
+  list_productivity_accounts = 'list_productivity_accounts',
+  get_active_productivity_account = 'get_active_productivity_account',
+  select_productivity_account = 'select_productivity_account',
+  add_productivity_account = 'add_productivity_account',
+  remove_productivity_account = 'remove_productivity_account',
+  check_productivity_accounts_auth = 'check_productivity_accounts_auth',
+  reauthenticate_productivity_account = 'reauthenticate_productivity_account',
   list_schedules = 'list_schedules',
   create_schedule = 'create_schedule',
   update_schedule = 'update_schedule',
@@ -183,6 +190,19 @@ export const SCHEDULING_TOOLS: Tools[] = [
   Tools.run_schedule,
   Tools.list_runs,
   Tools.get_run,
+];
+
+/**
+ * Tools injected when manage_productivity_accounts capability is enabled.
+ */
+export const PRODUCTIVITY_ACCOUNT_TOOLS: Tools[] = [
+  Tools.list_productivity_accounts,
+  Tools.get_active_productivity_account,
+  Tools.select_productivity_account,
+  Tools.add_productivity_account,
+  Tools.remove_productivity_account,
+  Tools.check_productivity_accounts_auth,
+  Tools.reauthenticate_productivity_account,
 ];
 
 export enum EToolResources {

@@ -473,6 +473,13 @@ const nativeTools = new Set([
   Tools.get_run,
   Tools.run_sub_agent,
   Tools.list_agents,
+  Tools.list_productivity_accounts,
+  Tools.get_active_productivity_account,
+  Tools.select_productivity_account,
+  Tools.add_productivity_account,
+  Tools.remove_productivity_account,
+  Tools.check_productivity_accounts_auth,
+  Tools.reauthenticate_productivity_account,
   Tools.project_section_update,
   Tools.project_section_delete,
   Tools.project_section_patch,
@@ -731,6 +738,20 @@ async function loadToolDefinitionsWrapper({
     toolsToFilter = [...new Set([...toolsToFilter, Tools.list_user_projects])];
   }
 
+  /** Inject productivity account tools when manage_productivity_accounts capability is enabled */
+  if (toolsToFilter.includes(AgentCapabilities.manage_productivity_accounts)) {
+    const productivityAccountTools = [
+      Tools.list_productivity_accounts,
+      Tools.get_active_productivity_account,
+      Tools.select_productivity_account,
+      Tools.add_productivity_account,
+      Tools.remove_productivity_account,
+      Tools.check_productivity_accounts_auth,
+      Tools.reauthenticate_productivity_account,
+    ];
+    toolsToFilter = [...new Set([...toolsToFilter, ...productivityAccountTools])];
+  }
+
   if (req?.body?.subAgentRun) {
     toolsToFilter = toolsToFilter.filter(
       (t) => t !== Tools.run_sub_agent && t !== Tools.list_agents,
@@ -903,6 +924,9 @@ async function loadToolDefinitionsWrapper({
       if (appConfig?.interfaceConfig?.scheduledAgents === false) return false;
       return checkCapability(AgentCapabilities.manage_scheduling);
     }
+    if (tool === AgentCapabilities.manage_productivity_accounts) {
+      return checkCapability(AgentCapabilities.manage_productivity_accounts);
+    }
     if (tool === AgentCapabilities.human_in_the_loop) {
       return false;
     }
@@ -961,6 +985,21 @@ async function loadToolDefinitionsWrapper({
         checkCapability(AgentCapabilities.manage_scheduling) ||
         checkCapability(AgentCapabilities.run_sub_agent)
       );
+    }
+    if (
+      tool === Tools.list_productivity_accounts ||
+      tool === Tools.get_active_productivity_account ||
+      tool === Tools.select_productivity_account ||
+      tool === Tools.add_productivity_account ||
+      tool === Tools.remove_productivity_account
+    ) {
+      return checkCapability(AgentCapabilities.manage_productivity_accounts);
+    }
+    if (
+      tool === Tools.check_productivity_accounts_auth ||
+      tool === Tools.reauthenticate_productivity_account
+    ) {
+      return checkCapability(AgentCapabilities.manage_productivity_accounts);
     }
     if (tool === Tools.create_pdf) {
       if (isPersistentAgent) {
@@ -1542,6 +1581,20 @@ async function loadAgentTools({
     toolsToFilter = [...new Set([...toolsToFilter, Tools.list_user_projects])];
   }
 
+  /** Inject productivity account tools when manage_productivity_accounts capability is enabled */
+  if (toolsToFilter.includes(AgentCapabilities.manage_productivity_accounts)) {
+    const productivityAccountTools = [
+      Tools.list_productivity_accounts,
+      Tools.get_active_productivity_account,
+      Tools.select_productivity_account,
+      Tools.add_productivity_account,
+      Tools.remove_productivity_account,
+      Tools.check_productivity_accounts_auth,
+      Tools.reauthenticate_productivity_account,
+    ];
+    toolsToFilter = [...new Set([...toolsToFilter, ...productivityAccountTools])];
+  }
+
   if (req?.body?.subAgentRun) {
     toolsToFilter = toolsToFilter.filter(
       (t) => t !== Tools.run_sub_agent && t !== Tools.list_agents,
@@ -1708,6 +1761,8 @@ async function loadAgentTools({
     } else if (tool === AgentCapabilities.manage_scheduling) {
       if (appConfig?.interfaceConfig?.scheduledAgents === false) return false;
       return checkCapability(AgentCapabilities.manage_scheduling);
+    } else if (tool === AgentCapabilities.manage_productivity_accounts) {
+      return checkCapability(AgentCapabilities.manage_productivity_accounts);
     } else if (tool === AgentCapabilities.human_in_the_loop) {
       return false;
     } else if (tool === AgentCapabilities.sys_admin) {
@@ -1775,6 +1830,16 @@ async function loadAgentTools({
         checkCapability(AgentCapabilities.manage_scheduling) ||
         checkCapability(AgentCapabilities.run_sub_agent)
       );
+    } else if (
+      tool === Tools.list_productivity_accounts ||
+      tool === Tools.get_active_productivity_account ||
+      tool === Tools.select_productivity_account ||
+      tool === Tools.add_productivity_account ||
+      tool === Tools.remove_productivity_account ||
+      tool === Tools.check_productivity_accounts_auth ||
+      tool === Tools.reauthenticate_productivity_account
+    ) {
+      return checkCapability(AgentCapabilities.manage_productivity_accounts);
     } else if (tool === Tools.create_pdf) {
       if (isPersistentAgent) {
         if (ephemeralAgent?.create_pdf === false) return false;
