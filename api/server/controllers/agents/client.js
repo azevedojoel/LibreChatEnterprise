@@ -1314,10 +1314,18 @@ ${sharedSection}
           // 2. Of type tool_call
           // 3. Have tool_call_ids property
           // 4. Of type agent_return (preserves "Returned from X" in multi-agent flows)
+          // 5. Of type think/reasoning (preserves Claude/Anthropic thinking blocks, o1/o3 reasoning)
+          const isThinkOrReasoning =
+            part.type === ContentTypes.THINK ||
+            (typeof part.type === 'string' &&
+              (part.type === 'thinking' ||
+                part.type === 'reasoning_content' ||
+                part.type.startsWith('reasoning')));
           return (
             index >= this.contentParts.length - 1 ||
             part.type === ContentTypes.TOOL_CALL ||
             part.type === ContentTypes.AGENT_RETURN ||
+            isThinkOrReasoning ||
             part.tool_call_ids
           );
         });
