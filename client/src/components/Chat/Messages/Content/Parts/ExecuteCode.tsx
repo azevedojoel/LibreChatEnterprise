@@ -4,11 +4,10 @@ import { TerminalSquareIcon, FileDown } from 'lucide-react';
 import { Tools, type TAttachment } from 'librechat-data-provider';
 import MarkdownLite from '~/components/Chat/Messages/Content/MarkdownLite';
 import ToolResultContainer from '~/components/Chat/Messages/Content/ToolResultContainer';
-import ToolApprovalBar from '~/components/Chat/Messages/Content/ToolApprovalBar';
+import ToolApprovalContainer from '~/components/Chat/Messages/Content/ToolApprovalContainer';
 import { useProgress, useLocalize, useToolApproval } from '~/hooks';
 import { AttachmentGroup } from './Attachment';
 import Stdout from './Stdout';
-import { cn } from '~/utils';
 import store from '~/store';
 
 interface ParsedArgs {
@@ -64,93 +63,26 @@ export default function ExecuteCode({
   toolName?: string;
 }) {
   const localize = useLocalize();
-  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting, waitingForApprover, approverName } =
+  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting, waitingForApprover, approverName, denialReason } =
     useToolApproval(toolCallId, output);
 
   const hasOutput = output.length > 0;
   const outputRef = useRef<string>(output);
   const outputContainerRef = useRef<HTMLDivElement>(null);
-  const codeContentRef = useRef<HTMLDivElement>(null);
-  const [isAnimating, setIsAnimating] = useState(false);
   const showAnalysisCode = useRecoilValue(store.showCode);
   const [showCode, setShowCode] = useState(showAnalysisCode);
-  const [contentHeight, setContentHeight] = useState<number | undefined>(0);
-
-  const prevShowCodeRef = useRef<boolean>(showCode);
   const { lang = 'py', code } = useParseArgs(args) ?? ({} as ParsedArgs);
   const progress = useProgress(initialProgress);
 
   useEffect(() => {
     if (output !== outputRef.current) {
       outputRef.current = output;
-
-      if (showCode && codeContentRef.current) {
-        setTimeout(() => {
-          if (codeContentRef.current) {
-            const newHeight = codeContentRef.current.scrollHeight;
-            setContentHeight(newHeight);
-          }
-        }, 10);
-      }
-
-      if (outputContainerRef.current && isSubmitting) {
-        outputContainerRef.current.scrollTop = outputContainerRef.current.scrollHeight;
-      }
-    }
-  }, [output, showCode, isSubmitting]);
-
-  useEffect(() => {
-    if (showCode !== prevShowCodeRef.current) {
-      prevShowCodeRef.current = showCode;
-
-      if (showCode && codeContentRef.current) {
-        setIsAnimating(true);
-        requestAnimationFrame(() => {
-          if (codeContentRef.current) {
-            const height = codeContentRef.current.scrollHeight;
-            setContentHeight(height);
-          }
-
-          const timer = setTimeout(() => {
-            setIsAnimating(false);
-          }, 500);
-
-          return () => clearTimeout(timer);
-        });
-      } else if (!showCode) {
-        setIsAnimating(true);
-        setContentHeight(0);
-
-        const timer = setTimeout(() => {
-          setIsAnimating(false);
-        }, 500);
-
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [showCode]);
-
-  useEffect(() => {
-    if (!codeContentRef.current) {
-      return;
     }
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      if (showCode && !isAnimating) {
-        for (const entry of entries) {
-          if (entry.target === codeContentRef.current) {
-            setContentHeight(entry.contentRect.height);
-          }
-        }
-      }
-    });
-
-    resizeObserver.observe(codeContentRef.current);
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, [showCode, isAnimating]);
+    if (outputContainerRef.current && isSubmitting) {
+      outputContainerRef.current.scrollTop = outputContainerRef.current.scrollHeight;
+    }
+  }, [output, isSubmitting]);
 
   const cancelled = !isSubmitting && progress < 1;
   const showApprovalBar = approvalStatus !== null;
@@ -193,85 +125,22 @@ export default function ExecuteCode({
   if (showApprovalBar) {
     return (
       <>
-        <div className="relative flex shrink-0 items-center gap-2.5 my-3 min-h-8">
-          <ToolApprovalBar
-            onApprove={handleApprove}
-            onDeny={handleDeny}
-            onToggleExpand={() => setShowCode((prev) => !prev)}
-            isExpanded={showCode}
-            isSubmitting={approvalSubmitting}
-            toolName="execute_code"
-            resolved={approvalStatus === 'approved' ? 'approved' : approvalStatus === 'denied' ? 'denied' : undefined}
-            waitingForApprover={waitingForApprover}
-            approverName={approverName}
-          />
-        </div>
-        <div
-          className={cn('relative mb-2', showCode && 'mt-2')}
-          style={{
-            height: showCode ? contentHeight : 0,
-            overflow: 'hidden',
-            transition:
-              'height 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
-            opacity: showCode ? 1 : 0,
-            transformOrigin: 'top',
-            willChange: 'height, opacity',
-            perspective: '1000px',
-            backfaceVisibility: 'hidden',
-            WebkitFontSmoothing: 'subpixel-antialiased',
-          }}
+        <ToolApprovalContainer
+          onApprove={handleApprove}
+          onDeny={handleDeny}
+          onToggleExpand={() => setShowCode((prev) => !prev)}
+          isExpanded={showCode}
+          isSubmitting={approvalSubmitting}
+          toolName="execute_code"
+          resolved={
+            approvalStatus === 'approved' ? 'approved' : approvalStatus === 'denied' ? 'denied' : undefined
+          }
+          waitingForApprover={waitingForApprover}
+          approverName={approverName}
+          denialReason={denialReason}
         >
-          <div
-            ref={codeContentRef}
-            className={cn(
-              'code-analyze-block mt-0.5 overflow-hidden rounded-xl bg-surface-primary',
-              showCode && 'shadow-lg',
-            )}
-            style={{
-              transform: showCode ? 'translateY(0) scale(1)' : 'translateY(-8px) scale(0.98)',
-              opacity: showCode ? 1 : 0,
-              transition:
-                'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
-            }}
-          >
-            {showCode && (
-              <div
-                style={{
-                  transform: showCode ? 'translateY(0)' : 'translateY(-4px)',
-                  opacity: showCode ? 1 : 0,
-                  transition:
-                    'transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
-                }}
-              >
-                <MarkdownLite
-                  content={code ? `\`\`\`${lang}\n${code}\n\`\`\`` : ''}
-                  codeExecution={false}
-                  showCodeToggle
-                />
-              </div>
-            )}
-            {hasOutput && (
-              <div
-                ref={outputContainerRef}
-                className={cn(
-                  'bg-surface-tertiary max-h-96 overflow-y-auto p-4 text-xs',
-                  showCode ? 'border-t border-surface-primary-contrast' : '',
-                )}
-                style={{
-                  transform: showCode ? 'translateY(0)' : 'translateY(-6px)',
-                  opacity: showCode ? 1 : 0,
-                  transition:
-                    'transform 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.05s, opacity 0.45s cubic-bezier(0.19, 1, 0.22, 1) 0.05s',
-                  boxShadow: showCode ? '0 -1px 0 rgba(0,0,0,0.05)' : 'none',
-                }}
-              >
-                <div className="prose">
-                  <Stdout output={output} />
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+          {codeContent}
+        </ToolApprovalContainer>
         {attachments && attachments.length > 0 && <AttachmentGroup attachments={attachments} />}
       </>
     );

@@ -84,6 +84,7 @@ describe('createToolExecuteHandler - destructive tool confirmation', () => {
         status: 'error',
         content: '',
         errorMessage: 'User denied execution.',
+        isUserDenial: true,
       },
     ]);
     expect(mockTool.invoke).not.toHaveBeenCalled();

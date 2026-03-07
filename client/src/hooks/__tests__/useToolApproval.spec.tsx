@@ -263,6 +263,38 @@ describe('useToolApproval', () => {
       messageId: 'msg-1',
       toolCallId: 'tool-1',
       approved: false,
+      reason: undefined,
+    });
+  });
+
+  it('handleDeny passes reason to mutateAsync when provided', async () => {
+    mockMutateAsync.mockResolvedValue({ success: true });
+
+    const { result } = renderHook(() => useToolApproval('tool-1'), {
+      wrapper: createWrapper({
+        pendingToolConfirmation: {
+          'tool-1': {
+            conversationId: 'conv-1',
+            runId: 'msg-1',
+            toolCallId: 'tool-1',
+            toolName: 'execute_code',
+            argsSummary: '',
+          },
+        },
+      }),
+    });
+
+    await act(async () => {
+      await result.current.handleDeny('Not safe to run');
+    });
+
+    expect(mockMutateAsync).toHaveBeenCalledWith({
+      conversationId: 'conv-1',
+      runId: 'msg-1',
+      messageId: 'msg-1',
+      toolCallId: 'tool-1',
+      approved: false,
+      reason: 'Not safe to run',
     });
   });
 

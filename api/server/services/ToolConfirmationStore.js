@@ -60,7 +60,12 @@ async function register({ conversationId, runId, toolCallId, userId, toolName, a
       memoryMap.delete(compositeKey);
       try {
         const data = JSON.parse(message);
-        resolvePromise({ approved: data.approved === true });
+        const approved = data.approved === true;
+        const errorMessage =
+          !approved && (data.errorMessage || data.reason)
+            ? String(data.errorMessage || data.reason).trim() || undefined
+            : undefined;
+        resolvePromise({ approved, errorMessage });
       } catch (err) {
         logger.error('[ToolConfirmationStore] Failed to parse pub/sub message:', err);
         resolvePromise({ approved: false });
@@ -110,9 +115,10 @@ async function register({ conversationId, runId, toolCallId, userId, toolName, a
  * @param {string} params.toolCallId
  * @param {boolean} params.approved
  * @param {string} params.userId
+ * @param {string} [params.reason] - Optional reason when denied; passed to model as errorMessage
  * @returns {Promise<{ success: boolean, payload?: { toolName: string, argsSummary: string }, error?: 'expired' | 'unauthorized' }>}
  */
-async function submit({ conversationId, runId, toolCallId, approved, userId }) {
+async function submit({ conversationId, runId, toolCallId, approved, userId, reason }) {
   const compositeKey = key(conversationId, runId, toolCallId);
 
   if (!cacheConfig.USE_REDIS || !ioredisClient) {
@@ -128,7 +134,9 @@ async function submit({ conversationId, runId, toolCallId, approved, userId }) {
       : { toolName: '', argsSummary: '' };
     memoryMap.delete(compositeKey);
     if (entry.resolve) {
-      entry.resolve({ approved });
+      const errorMessage =
+        !approved && reason && String(reason).trim() ? String(reason).trim() : undefined;
+      entry.resolve({ approved, errorMessage });
     }
     return { success: true, payload };
   }
@@ -155,7 +163,11 @@ async function submit({ conversationId, runId, toolCallId, approved, userId }) {
     payload.status = approved ? 'approved' : 'denied';
     await ioredisClient.set(compositeKey, JSON.stringify(payload), 'EX', 60); // Short TTL after resolve
 
-    await ioredisClient.publish(compositeKey, JSON.stringify({ approved }));
+    const publishPayload = { approved };
+    if (!approved && reason && String(reason).trim()) {
+      publishPayload.errorMessage = String(reason).trim();
+    }
+    await ioredisClient.publish(compositeKey, JSON.stringify(publishPayload));
 
     return { success: true, payload: auditPayload };
   } catch (err) {

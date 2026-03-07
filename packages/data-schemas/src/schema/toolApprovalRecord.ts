@@ -43,6 +43,10 @@ const toolApprovalRecordSchema = new Schema<IToolApprovalRecord>(
       type: Date,
       required: true,
     },
+    denialReason: {
+      type: String,
+      default: '',
+    },
   },
   { timestamps: true },
 );

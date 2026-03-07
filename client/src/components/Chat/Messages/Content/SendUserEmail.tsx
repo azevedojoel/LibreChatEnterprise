@@ -6,8 +6,7 @@ import { useMessageContext } from '~/Providers';
 import { useProgress, useToolApproval } from '~/hooks';
 import { parseSendUserEmailOutput } from '~/utils/parseToolOutput';
 import ToolResultContainer from './ToolResultContainer';
-import ToolApprovalBar from './ToolApprovalBar';
-import { cn } from '~/utils';
+import ToolApprovalContainer from './ToolApprovalContainer';
 
 type SendUserEmailProps = {
   args: string | Record<string, unknown>;
@@ -64,7 +63,7 @@ export default function SendUserEmail({
   const setExpandedToolCalls = useSetRecoilState(store.expandedToolCallsAtom);
   const [localExpanded, setLocalExpanded] = useState(false);
 
-  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting } =
+  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting, denialReason } =
     useToolApproval(toolCallId, output ?? '');
 
   const expandedKey =
@@ -118,42 +117,32 @@ export default function SendUserEmail({
 
   if (showApprovalBar && isPending) {
     return (
-      <div className="my-2 flex flex-col gap-2">
-        <ToolApprovalBar
-          onApprove={handleApprove}
-          onDeny={handleDeny}
-          onToggleExpand={toggleExpand}
-          isExpanded={isExpanded}
-          isSubmitting={approvalSubmitting}
-          toolName={toolName}
-        />
-        <div
-          className={cn(
-            'overflow-hidden rounded-lg border border-border-light bg-surface-secondary transition-all duration-300',
-            isExpanded ? 'max-h-[400px]' : 'max-h-0',
+      <ToolApprovalContainer
+        onApprove={handleApprove}
+        onDeny={handleDeny}
+        onToggleExpand={toggleExpand}
+        isExpanded={isExpanded}
+        isSubmitting={approvalSubmitting}
+        toolName={toolName}
+      >
+        <div className="space-y-2 text-sm">
+          <p className="text-text-secondary">
+            <span className="font-medium">To:</span> (current user)
+          </p>
+          {subject && (
+            <p className="text-text-secondary">
+              <span className="font-medium">Subject:</span> {subject}
+            </p>
           )}
-        >
-          <div className="max-h-[396px] overflow-y-auto border-t border-border-light px-4 py-3">
-            <div className="space-y-2 text-sm">
-              <p className="text-text-secondary">
-                <span className="font-medium">To:</span> (current user)
-              </p>
-              {subject && (
-                <p className="text-text-secondary">
-                  <span className="font-medium">Subject:</span> {subject}
-                </p>
-              )}
-              {parsedArgs.body && (
-                <p className="mt-2 max-h-48 overflow-y-auto rounded bg-surface-tertiary p-2 text-xs text-text-primary">
-                  {parsedArgs.body.length > 500
-                    ? `${parsedArgs.body.slice(0, 500)}...`
-                    : parsedArgs.body}
-                </p>
-              )}
-            </div>
-          </div>
+          {parsedArgs.body && (
+            <p className="mt-2 max-h-48 overflow-y-auto rounded bg-surface-tertiary p-2 text-xs text-text-primary">
+              {parsedArgs.body.length > 500
+                ? `${parsedArgs.body.slice(0, 500)}...`
+                : parsedArgs.body}
+            </p>
+          )}
         </div>
-      </div>
+      </ToolApprovalContainer>
     );
   }
 
@@ -167,6 +156,7 @@ export default function SendUserEmail({
       error={hasError}
       hasExpandableContent={!!parsedArgs.subject || !!parsedArgs.body || hasOutput}
       minExpandHeight={120}
+      denialReason={denialReason}
     >
       {outputError ? (
         <p className="text-sm text-red-500">{outputError}</p>

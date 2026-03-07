@@ -428,8 +428,15 @@ router.get('/chat/tool-confirmation/pending', async (req, res) => {
  * @body Inline flow: { conversationId, messageId, toolCallId, approved: boolean }
  */
 router.post('/chat/tool-confirmation', async (req, res) => {
-  const { id: token, conversationId, messageId, toolCallId, approved, runId: runIdFromBody } =
-    req.body;
+  const {
+    id: token,
+    conversationId,
+    messageId,
+    toolCallId,
+    approved,
+    runId: runIdFromBody,
+    reason,
+  } = req.body;
   const userId = req.user?.id;
 
   if (!userId || typeof approved !== 'boolean') {
@@ -492,6 +499,7 @@ router.post('/chat/tool-confirmation', async (req, res) => {
     toolCallId: resolvedToolCallId,
     approved,
     userId,
+    reason: !approved && reason && typeof reason === 'string' ? reason : undefined,
   });
 
   logger.debug('[ToolConfirmation] Submit result', {
@@ -547,19 +555,23 @@ router.post('/chat/tool-confirmation', async (req, res) => {
     try {
       const { ToolApprovalRecord } = require('~/db/models');
       const resolvedAt = new Date();
+      const denialReasonValue =
+        !approved && reason && typeof reason === 'string' ? String(reason).trim() || undefined : undefined;
+      const update = {
+        userId,
+        toolName: tokenLink.toolName || '',
+        argsSummary: tokenLink.argsSummary || '',
+        status: approved ? 'approved' : 'denied',
+        resolvedAt,
+      };
+      if (denialReasonValue) update.denialReason = denialReasonValue;
       await ToolApprovalRecord.findOneAndUpdate(
         {
           conversationId: tokenLink.conversationId,
           runId: tokenLink.runId,
           toolCallId: tokenLink.toolCallId,
         },
-        {
-          userId,
-          toolName: tokenLink.toolName || '',
-          argsSummary: tokenLink.argsSummary || '',
-          status: approved ? 'approved' : 'denied',
-          resolvedAt,
-        },
+        update,
         { upsert: true, new: true },
       );
     } catch (auditErr) {
@@ -571,15 +583,19 @@ router.post('/chat/tool-confirmation', async (req, res) => {
       const { ToolApprovalRecord } = require('~/db/models');
       const payload = result.payload || { toolName: '', argsSummary: '' };
       const resolvedAt = new Date();
+      const denialReasonValue =
+        !approved && reason && typeof reason === 'string' ? String(reason).trim() || undefined : undefined;
+      const update = {
+        userId,
+        toolName: payload.toolName,
+        argsSummary: payload.argsSummary || '',
+        status: approved ? 'approved' : 'denied',
+        resolvedAt,
+      };
+      if (denialReasonValue) update.denialReason = denialReasonValue;
       await ToolApprovalRecord.findOneAndUpdate(
         { conversationId: resolvedConversationId, runId, toolCallId: resolvedToolCallId },
-        {
-          userId,
-          toolName: payload.toolName,
-          argsSummary: payload.argsSummary || '',
-          status: approved ? 'approved' : 'denied',
-          resolvedAt,
-        },
+        update,
         { upsert: true, new: true },
       );
     } catch (auditErr) {

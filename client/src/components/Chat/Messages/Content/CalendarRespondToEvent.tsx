@@ -6,8 +6,7 @@ import { useMessageContext } from '~/Providers';
 import { useProgress, useToolApproval } from '~/hooks';
 import { parseCalendarRespondOutput } from '~/utils/parseToolOutput';
 import ToolResultContainer from './ToolResultContainer';
-import ToolApprovalBar from './ToolApprovalBar';
-import { cn } from '~/utils';
+import ToolApprovalContainer from './ToolApprovalContainer';
 
 const CALENDAR_ICON = '/assets/google.svg';
 
@@ -55,7 +54,7 @@ export default function CalendarRespondToEvent({
   const setExpandedToolCalls = useSetRecoilState(store.expandedToolCallsAtom);
   const [localExpanded, setLocalExpanded] = useState(false);
 
-  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting } =
+  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting, denialReason } =
     useToolApproval(toolCallId, output ?? '');
 
   const expandedKey =
@@ -106,40 +105,30 @@ export default function CalendarRespondToEvent({
 
   if (showApprovalBar && isPending) {
     return (
-      <div className="my-2 flex flex-col gap-2">
-        <ToolApprovalBar
-          onApprove={handleApprove}
-          onDeny={handleDeny}
-          onToggleExpand={toggleExpand}
-          isExpanded={isExpanded}
-          isSubmitting={approvalSubmitting}
-          toolName={toolName}
-        />
-        <div
-          className={cn(
-            'overflow-hidden rounded-lg border border-border-light bg-surface-secondary transition-all duration-300',
-            isExpanded ? 'max-h-[400px]' : 'max-h-0',
+      <ToolApprovalContainer
+        onApprove={handleApprove}
+        onDeny={handleDeny}
+        onToggleExpand={toggleExpand}
+        isExpanded={isExpanded}
+        isSubmitting={approvalSubmitting}
+        toolName={toolName}
+      >
+        <div className="space-y-2 text-sm">
+          {Object.entries(parsedArgs).map(([k, v]) =>
+            v != null && v !== '' ? (
+              <div key={k}>
+                <span className="text-text-secondary">{k}: </span>
+                <span className="font-medium text-text-primary">
+                  {typeof v === 'object' ? JSON.stringify(v) : String(v)}
+                </span>
+              </div>
+            ) : null,
           )}
-        >
-          <div className="max-h-[396px] overflow-y-auto border-t border-border-light px-3 py-2">
-            <div className="space-y-2 text-sm">
-              {Object.entries(parsedArgs).map(([k, v]) =>
-                v != null && v !== '' ? (
-                  <div key={k}>
-                    <span className="text-text-secondary">{k}: </span>
-                    <span className="font-medium text-text-primary">
-                      {typeof v === 'object' ? JSON.stringify(v) : String(v)}
-                    </span>
-                  </div>
-                ) : null,
-              )}
-              {Object.keys(parsedArgs).length === 0 && (
-                <p className="text-text-secondary">Responding to event</p>
-              )}
-            </div>
-          </div>
+          {Object.keys(parsedArgs).length === 0 && (
+            <p className="text-text-secondary">Responding to event</p>
+          )}
         </div>
-      </div>
+      </ToolApprovalContainer>
     );
   }
 
@@ -152,6 +141,7 @@ export default function CalendarRespondToEvent({
       isLoading={isLoading}
       error={hasError}
       hasExpandableContent={hasOutput}
+      denialReason={denialReason}
     >
       {outputError ? (
         <p className="text-sm text-red-500">{outputError}</p>

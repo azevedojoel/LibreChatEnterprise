@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Button } from '@librechat/client';
+import { Button, Textarea } from '@librechat/client';
 import { QueryKeys, Tools } from 'librechat-data-provider';
 import { ShieldAlert, CheckCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { useLocalize } from '~/hooks';
@@ -69,6 +69,7 @@ export default function ToolApprovalPage() {
   const [submitting, setSubmitting] = useState(false);
   const [resolved, setResolved] = useState<'approved' | 'denied' | null>(null);
   const [messagesExpanded, setMessagesExpanded] = useState(true);
+  const [denyReason, setDenyReason] = useState('');
 
   useEffect(() => {
     if (!isAuthenticated || !id) {
@@ -128,7 +129,11 @@ export default function ToolApprovalPage() {
     if (!pending) return;
     setSubmitting(true);
     try {
-      const result = await submitToolConfirmation({ id, approved: false });
+      const result = await submitToolConfirmation({
+        id,
+        approved: false,
+        reason: denyReason?.trim() || undefined,
+      });
       if (result.success) {
         setResolved('denied');
       } else {
@@ -139,7 +144,7 @@ export default function ToolApprovalPage() {
     } finally {
       setSubmitting(false);
     }
-  }, [id, pending]);
+  }, [id, pending, denyReason]);
 
   if (!isAuthenticated) {
     return null;
@@ -325,23 +330,44 @@ export default function ToolApprovalPage() {
           );
         })()}
         {error && <p className="text-sm text-red-500">{error}</p>}
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-          <Button
-            variant="default"
-            className="min-h-[44px] min-w-[44px]"
-            onClick={handleApprove}
-            disabled={submitting}
-          >
-            {localize('com_ui_approve') || 'Approve'}
-          </Button>
-          <Button
-            variant="outline"
-            className="min-h-[44px] min-w-[44px]"
-            onClick={handleDeny}
-            disabled={submitting}
-          >
-            {localize('com_ui_deny') || 'Deny'}
-          </Button>
+        <div className="flex flex-col gap-3">
+          <div>
+            <label
+              htmlFor="tool-denial-reason"
+              className="mb-1 block text-sm font-medium text-text-secondary"
+            >
+              {localize('com_ui_tool_denial_reason_label') || 'Reason for denial (optional)'}
+            </label>
+            <Textarea
+              id="tool-denial-reason"
+              value={denyReason}
+              onChange={(e) => setDenyReason(e.target.value)}
+              placeholder={
+                localize('com_ui_tool_denial_reason_placeholder') ||
+                'Explain why you are denying this request. The agent will see this reason.'
+              }
+              className="min-h-[80px] w-full resize-none"
+              disabled={submitting}
+            />
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <Button
+              variant="default"
+              className="min-h-[44px] min-w-[44px]"
+              onClick={handleApprove}
+              disabled={submitting}
+            >
+              {localize('com_ui_approve') || 'Approve'}
+            </Button>
+            <Button
+              variant="outline"
+              className="min-h-[44px] min-w-[44px]"
+              onClick={handleDeny}
+              disabled={submitting}
+            >
+              {localize('com_ui_deny') || 'Deny'}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

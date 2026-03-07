@@ -160,7 +160,37 @@ describe('ToolConfirmationStore', () => {
         success: true,
         payload: { toolName: 'execute_code', argsSummary: '' },
       });
-      expect(resolved).toEqual({ approved: false });
+      expect(resolved).toMatchObject({ approved: false });
+    });
+
+    it('submit with approved: false and reason includes errorMessage in resolve', async () => {
+      const store = loadStore();
+      const params = {
+        conversationId: 'conv-deny-reason',
+        runId: 'run-deny-reason',
+        toolCallId: 'tool-deny-reason',
+        userId: 'user-deny-reason',
+        toolName: 'execute_code',
+        argsSummary: '',
+      };
+
+      const { promise } = await store.register(params);
+
+      const result = await store.submit({
+        ...params,
+        approved: false,
+        reason: 'Not safe to run this code',
+      });
+
+      const resolved = await promise;
+      expect(result).toEqual({
+        success: true,
+        payload: { toolName: 'execute_code', argsSummary: '' },
+      });
+      expect(resolved).toEqual({
+        approved: false,
+        errorMessage: 'Not safe to run this code',
+      });
     });
 
     it('getPending returns payload when entry exists', async () => {
@@ -331,6 +361,51 @@ describe('ToolConfirmationStore', () => {
       const pending = await store.getPending('conv-null', 'run-null', 'tool-null');
 
       expect(pending).toBeNull();
+    });
+
+    it('submit with approved: false and reason publishes errorMessage and resolves with it', async () => {
+      const store = loadStore(true);
+
+      const params = {
+        conversationId: 'conv-deny-reason',
+        runId: 'run-deny-reason',
+        toolCallId: 'tool-deny-reason',
+        userId: 'user-deny-reason',
+        toolName: 'execute_code',
+        argsSummary: '',
+      };
+
+      const { promise } = await store.register(params);
+
+      mockIoredisClient.get.mockResolvedValue(
+        JSON.stringify({
+          userId: params.userId,
+          toolName: params.toolName,
+          argsSummary: params.argsSummary,
+          status: 'pending',
+        }),
+      );
+
+      const submitPromise = store.submit({
+        ...params,
+        approved: false,
+        reason: 'Security concern',
+      });
+
+      const [result, resolved] = await Promise.all([submitPromise, promise]);
+
+      expect(result).toEqual({
+        success: true,
+        payload: { toolName: 'execute_code', argsSummary: '' },
+      });
+      expect(resolved).toEqual({
+        approved: false,
+        errorMessage: 'Security concern',
+      });
+      expect(mockIoredisClient.publish).toHaveBeenCalledWith(
+        expect.any(String),
+        JSON.stringify({ approved: false, errorMessage: 'Security concern' }),
+      );
     });
   });
 });

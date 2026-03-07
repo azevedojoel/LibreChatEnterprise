@@ -3,6 +3,7 @@ import { Spinner } from '@librechat/client';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import CancelledIcon from './CancelledIcon';
 import FinishedIcon from './FinishedIcon';
+import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
 
 type ToolResultContainerProps = {
@@ -18,6 +19,8 @@ type ToolResultContainerProps = {
   minExpandHeight?: number;
   /** Actions shown in the header row (always visible). Use for primary actions like "Open in Artifact". */
   headerActions?: React.ReactNode;
+  /** When tool was denied, the user's reason (from tool output). Shown as "Reason: {denialReason}" */
+  denialReason?: string | null;
   children?: React.ReactNode;
 };
 
@@ -32,8 +35,10 @@ export default function ToolResultContainer({
   hasExpandableContent = true,
   minExpandHeight,
   headerActions,
+  denialReason,
   children,
 }: ToolResultContainerProps) {
+  const localize = useLocalize();
   const contentRef = useRef<HTMLDivElement>(null);
   const [contentHeight, setContentHeight] = useState<number>(0);
 
@@ -78,7 +83,9 @@ export default function ToolResultContainer({
     return <FinishedIcon />;
   };
 
-  const canExpand = hasExpandableContent && (resultsCount != null ? resultsCount > 0 : true);
+  const canExpand =
+    (hasExpandableContent || !!denialReason) &&
+    (resultsCount != null ? resultsCount > 0 : true);
 
   return (
     <div
@@ -131,6 +138,12 @@ export default function ToolResultContainer({
           ref={contentRef}
           className="max-h-[600px] overflow-y-auto border-t border-border-light px-3 py-2"
         >
+          {denialReason && (
+            <p className="mb-2 text-sm text-text-secondary">
+              {localize('com_ui_tool_denial_reason_display') || "User's reason:"}{' '}
+              <span className="text-text-primary">{denialReason}</span>
+            </p>
+          )}
           {children}
         </div>
       </div>

@@ -210,6 +210,7 @@ export default function ToolCall({
     approvalSubmitting,
     waitingForApprover,
     approverName,
+    denialReason,
   } = useToolApproval(toolCallId, output ?? '');
   const { data: startupConfig } = useGetStartupConfig();
 
@@ -760,6 +761,7 @@ export default function ToolCall({
             error={cancelled || (function_name === Tools.lint && !!lintData?.hasErrors)}
             hasExpandableContent={hasInfo && toolCallDetailsEnabled}
             minExpandHeight={120}
+            denialReason={denialReason}
           >
             {hasInfo && toolCallDetailsEnabled && (
               <ToolCallInfo

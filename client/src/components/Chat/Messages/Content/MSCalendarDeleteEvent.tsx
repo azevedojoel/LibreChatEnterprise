@@ -5,8 +5,7 @@ import { useMessageContext } from '~/Providers';
 import { useProgress, useToolApproval } from '~/hooks';
 import { parseMSCalendarDeleteOutput } from '~/utils/parseToolOutput';
 import ToolResultContainer from './ToolResultContainer';
-import ToolApprovalBar from './ToolApprovalBar';
-import { cn } from '~/utils';
+import ToolApprovalContainer from './ToolApprovalContainer';
 
 const MS_CALENDAR_ICON = '/assets/microsoft.svg';
 
@@ -34,7 +33,7 @@ export default function MSCalendarDeleteEvent({
   const setExpandedToolCalls = useSetRecoilState(store.expandedToolCallsAtom);
   const [localExpanded, setLocalExpanded] = useState(false);
 
-  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting } =
+  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting, denialReason } =
     useToolApproval(toolCallId, output ?? '');
 
   const expandedKey =
@@ -79,26 +78,16 @@ export default function MSCalendarDeleteEvent({
 
   if (showApprovalBar && isPending) {
     return (
-      <div className="my-2 flex flex-col gap-2">
-        <ToolApprovalBar
-          onApprove={handleApprove}
-          onDeny={handleDeny}
-          onToggleExpand={toggleExpand}
-          isExpanded={isExpanded}
-          isSubmitting={approvalSubmitting}
-          toolName={toolName}
-        />
-        <div
-          className={cn(
-            'overflow-hidden rounded-lg border border-border-light bg-surface-secondary transition-all duration-300',
-            isExpanded ? 'max-h-[200px]' : 'max-h-0',
-          )}
-        >
-          <div className="overflow-y-auto border-t border-border-light px-4 py-3">
-            <p className="text-sm text-text-secondary">Deleting event from calendar.</p>
-          </div>
-        </div>
-      </div>
+      <ToolApprovalContainer
+        onApprove={handleApprove}
+        onDeny={handleDeny}
+        onToggleExpand={toggleExpand}
+        isExpanded={isExpanded}
+        isSubmitting={approvalSubmitting}
+        toolName={toolName}
+      >
+        <p className="text-sm text-text-secondary">Deleting event from calendar.</p>
+      </ToolApprovalContainer>
     );
   }
 
@@ -113,6 +102,7 @@ export default function MSCalendarDeleteEvent({
       isLoading={isLoading}
       error={hasError}
       hasExpandableContent={hasOutput}
+      denialReason={denialReason}
     >
       {outputError ? (
         <p className="text-sm text-red-500">{outputError}</p>

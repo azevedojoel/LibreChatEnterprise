@@ -22,7 +22,7 @@ import { useAgentsMapContext } from '~/Providers';
 import store from '~/store';
 import { useSubAgentStream } from '~/hooks/SubAgent/useSubAgentStream';
 import { useAbortStreamMutation } from '~/data-provider/SSE/mutations';
-import ToolApprovalBar from './ToolApprovalBar';
+import ToolApprovalContainer from './ToolApprovalContainer';
 import { AttachmentGroup } from './Parts/Attachment';
 import { cn, getToolTreeDisplayName } from '~/utils';
 import type { TranslationKeys } from '~/hooks';
@@ -346,19 +346,17 @@ export default function RunSubAgentToolCall({
 
   if (showApprovalBar && isPending) {
     return (
-      <div className="my-2 flex flex-col gap-3 rounded-lg">
-        <ToolApprovalBar
-          onApprove={handleApprove}
-          onDeny={handleDeny}
-          onToggleExpand={() => {}}
-          isExpanded={false}
-          isSubmitting={approvalSubmitting}
-          toolName={Tools.run_sub_agent}
-          waitingForApprover={waitingForApprover}
-          approverName={approverName}
-          showExpandButton={false}
-        />
-      </div>
+      <ToolApprovalContainer
+        onApprove={handleApprove}
+        onDeny={handleDeny}
+        onToggleExpand={() => {}}
+        isExpanded={false}
+        isSubmitting={approvalSubmitting}
+        toolName={Tools.run_sub_agent}
+        waitingForApprover={waitingForApprover}
+        approverName={approverName}
+        showExpandButton={false}
+      />
     );
   }
 

@@ -6,7 +6,7 @@ import { useMessageContext } from '~/Providers';
 import { useProgress, useToolApproval } from '~/hooks';
 import { formatDate } from '~/utils';
 import ToolResultContainer from './ToolResultContainer';
-import ToolApprovalBar from './ToolApprovalBar';
+import ToolApprovalContainer from './ToolApprovalContainer';
 import { cn } from '~/utils';
 
 const GOOGLE_TASKS_ICON = '/assets/google.svg';
@@ -88,7 +88,7 @@ export default function GoogleTaskUpdate({
   const setExpandedToolCalls = useSetRecoilState(store.expandedToolCallsAtom);
   const [localExpanded, setLocalExpanded] = useState(false);
 
-  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting } =
+  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting, denialReason } =
     useToolApproval(toolCallId, output ?? '');
 
   const expandedKey =
@@ -145,49 +145,39 @@ export default function GoogleTaskUpdate({
 
   if (showApprovalBar && isPending) {
     return (
-      <div className="my-2 flex flex-col gap-2">
-        <ToolApprovalBar
-          onApprove={handleApprove}
-          onDeny={handleDeny}
-          onToggleExpand={toggleExpand}
-          isExpanded={isExpanded}
-          isSubmitting={approvalSubmitting}
-          toolName="tasks_updateTask"
-        />
-        <div
-          className={cn(
-            'overflow-hidden rounded-lg border border-border-light bg-surface-secondary transition-all duration-300',
-            isExpanded ? 'max-h-[400px]' : 'max-h-0',
-          )}
-        >
-          <div className="max-h-[396px] overflow-y-auto border-t border-border-light px-3 py-2">
-            <div className="space-y-2 text-sm">
-              {parsedArgs.title && (
-                <div>
-                  <span className="text-text-secondary">Title: </span>
-                  <span className="font-medium text-text-primary">{parsedArgs.title}</span>
-                </div>
-              )}
-              {parsedArgs.notes && (
-                <p className="line-clamp-2 text-text-secondary">{parsedArgs.notes}</p>
-              )}
-              {parsedArgs.status && (
-                <p className="text-xs text-text-secondary">
-                  Status: {parsedArgs.status === 'completed' ? 'Done' : 'To do'}
-                </p>
-              )}
-              {parsedArgs.due && (
-                <p className="text-xs text-text-secondary">
-                  Due: {formatDate(parsedArgs.due)}
-                </p>
-              )}
-              {!hasChanges && (
-                <p className="text-text-secondary">No changes specified</p>
-              )}
+      <ToolApprovalContainer
+        onApprove={handleApprove}
+        onDeny={handleDeny}
+        onToggleExpand={toggleExpand}
+        isExpanded={isExpanded}
+        isSubmitting={approvalSubmitting}
+        toolName="tasks_updateTask"
+      >
+        <div className="space-y-2 text-sm">
+          {parsedArgs.title && (
+            <div>
+              <span className="text-text-secondary">Title: </span>
+              <span className="font-medium text-text-primary">{parsedArgs.title}</span>
             </div>
-          </div>
+          )}
+          {parsedArgs.notes && (
+            <p className="line-clamp-2 text-text-secondary">{parsedArgs.notes}</p>
+          )}
+          {parsedArgs.status && (
+            <p className="text-xs text-text-secondary">
+              Status: {parsedArgs.status === 'completed' ? 'Done' : 'To do'}
+            </p>
+          )}
+          {parsedArgs.due && (
+            <p className="text-xs text-text-secondary">
+              Due: {formatDate(parsedArgs.due)}
+            </p>
+          )}
+          {!hasChanges && (
+            <p className="text-text-secondary">No changes specified</p>
+          )}
         </div>
-      </div>
+      </ToolApprovalContainer>
     );
   }
 
@@ -201,6 +191,7 @@ export default function GoogleTaskUpdate({
       error={hasError}
       hasExpandableContent={hasExpandableContent || hasOutput}
       minExpandHeight={140}
+      denialReason={denialReason}
     >
       {outputError ? (
         <p className="text-sm text-red-500">{outputError}</p>

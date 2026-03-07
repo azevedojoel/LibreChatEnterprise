@@ -6,8 +6,7 @@ import { useMessageContext } from '~/Providers';
 import { useLocalize, useProgress, useToolApproval } from '~/hooks';
 import { parseDriveCreateFolderOutput } from '~/utils/parseToolOutput';
 import ToolResultContainer from './ToolResultContainer';
-import ToolApprovalBar from './ToolApprovalBar';
-import { cn } from '~/utils';
+import ToolApprovalContainer from './ToolApprovalContainer';
 
 const DRIVE_ICON = '/assets/google_drive.svg';
 
@@ -56,7 +55,7 @@ export default function DriveCreateFolder({
   const setExpandedToolCalls = useSetRecoilState(store.expandedToolCallsAtom);
   const [localExpanded, setLocalExpanded] = useState(false);
 
-  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting } =
+  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting, denialReason } =
     useToolApproval(toolCallId, output ?? '');
 
   const expandedKey =
@@ -112,35 +111,25 @@ export default function DriveCreateFolder({
 
   if (showApprovalBar && isPending) {
     return (
-      <div className="my-2 flex flex-col gap-2">
-        <ToolApprovalBar
-          onApprove={handleApprove}
-          onDeny={handleDeny}
-          onToggleExpand={toggleExpand}
-          isExpanded={isExpanded}
-          isSubmitting={approvalSubmitting}
-          toolName={toolName}
-        />
-        <div
-          className={cn(
-            'overflow-hidden rounded-lg border border-border-light bg-surface-secondary transition-all duration-300',
-            isExpanded ? 'max-h-[300px]' : 'max-h-0',
+      <ToolApprovalContainer
+        onApprove={handleApprove}
+        onDeny={handleDeny}
+        onToggleExpand={toggleExpand}
+        isExpanded={isExpanded}
+        isSubmitting={approvalSubmitting}
+        toolName={toolName}
+      >
+        <div className="space-y-2 text-sm">
+          <p className="text-text-secondary">
+            <span className="font-medium">Folder name:</span> {folderName}
+          </p>
+          {parsedArgs.parentId && (
+            <p className="text-xs text-text-secondary">
+              <span className="font-medium">Parent ID:</span> {parsedArgs.parentId}
+            </p>
           )}
-        >
-          <div className="max-h-[296px] overflow-y-auto border-t border-border-light px-4 py-3">
-            <div className="space-y-2 text-sm">
-              <p className="text-text-secondary">
-                <span className="font-medium">Folder name:</span> {folderName}
-              </p>
-              {parsedArgs.parentId && (
-                <p className="text-xs text-text-secondary">
-                  <span className="font-medium">Parent ID:</span> {parsedArgs.parentId}
-                </p>
-              )}
-            </div>
-          </div>
         </div>
-      </div>
+      </ToolApprovalContainer>
     );
   }
 
@@ -154,6 +143,7 @@ export default function DriveCreateFolder({
       error={hasError}
       hasExpandableContent={!!parsedArgs.name || !!parsedOutput?.id || hasOutput}
       minExpandHeight={80}
+      denialReason={denialReason}
     >
       {outputError ? (
         <p className="text-sm text-red-500">{outputError}</p>

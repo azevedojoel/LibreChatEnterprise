@@ -7,9 +7,8 @@ import { useProgress, useToolApproval } from '~/hooks';
 import { formatDate } from '~/utils';
 import { parseCalendarEventOutput } from '~/utils/parseToolOutput';
 import ToolResultContainer from './ToolResultContainer';
-import ToolApprovalBar from './ToolApprovalBar';
+import ToolApprovalContainer from './ToolApprovalContainer';
 import { EventPreviewDetails, type EventPreviewArgs } from './EventPreviewDetails';
-import { cn } from '~/utils';
 
 const CALENDAR_ICON = '/assets/google.svg';
 
@@ -55,7 +54,7 @@ export default function CalendarUpdateEvent({
   const setExpandedToolCalls = useSetRecoilState(store.expandedToolCallsAtom);
   const [localExpanded, setLocalExpanded] = useState(false);
 
-  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting } =
+  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting, denialReason } =
     useToolApproval(toolCallId, output ?? '');
 
   const expandedKey =
@@ -106,26 +105,16 @@ export default function CalendarUpdateEvent({
 
   if (showApprovalBar && isPending) {
     return (
-      <div className="my-2 flex flex-col gap-2">
-        <ToolApprovalBar
-          onApprove={handleApprove}
-          onDeny={handleDeny}
-          onToggleExpand={toggleExpand}
-          isExpanded={isExpanded}
-          isSubmitting={approvalSubmitting}
-          toolName={toolName}
-        />
-        <div
-          className={cn(
-            'overflow-hidden rounded-lg border border-border-light bg-surface-secondary transition-all duration-300',
-            isExpanded ? 'max-h-[600px]' : 'max-h-0',
-          )}
-        >
-          <div className="max-h-[596px] overflow-y-auto border-t border-border-light px-4 py-3">
-            <EventPreviewDetails args={parsedArgs} />
-          </div>
-        </div>
-      </div>
+      <ToolApprovalContainer
+        onApprove={handleApprove}
+        onDeny={handleDeny}
+        onToggleExpand={toggleExpand}
+        isExpanded={isExpanded}
+        isSubmitting={approvalSubmitting}
+        toolName={toolName}
+      >
+        <EventPreviewDetails args={parsedArgs} />
+      </ToolApprovalContainer>
     );
   }
 
@@ -139,6 +128,7 @@ export default function CalendarUpdateEvent({
       error={hasError}
       hasExpandableContent={!!event || hasOutput}
       minExpandHeight={120}
+      denialReason={denialReason}
     >
       {outputError ? (
         <p className="text-sm text-red-500">{outputError}</p>

@@ -50,6 +50,8 @@ export interface SubmitToolConfirmationParams {
   runId?: string;
   toolCallId?: string;
   approved: boolean;
+  /** Optional reason when denied; passed to model as errorMessage */
+  reason?: string;
 }
 
 export interface PendingToolConfirmationResponse {

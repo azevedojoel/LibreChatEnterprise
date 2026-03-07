@@ -7,7 +7,7 @@ import { useProgress, useToolApproval } from '~/hooks';
 import useOpenInArtifact from '~/hooks/Artifacts/useOpenInArtifact';
 import { useLocalize } from '~/hooks';
 import ToolResultContainer from './ToolResultContainer';
-import ToolApprovalBar from './ToolApprovalBar';
+import ToolApprovalContainer from './ToolApprovalContainer';
 import MarkdownLite from './MarkdownLite';
 import { cn } from '~/utils';
 
@@ -128,7 +128,7 @@ export default function DocsCreate({
   const setExpandedToolCalls = useSetRecoilState(store.expandedToolCallsAtom);
   const [localExpanded, setLocalExpanded] = useState(false);
 
-  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting } =
+  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting, denialReason } =
     useToolApproval(toolCallId, output ?? '');
   const openInArtifact = useOpenInArtifact();
   const localize = useLocalize();
@@ -188,39 +188,29 @@ export default function DocsCreate({
 
   if (showApprovalBar && isPending) {
     return (
-      <div className="my-2 flex flex-col gap-2">
-        <ToolApprovalBar
-          onApprove={handleApprove}
-          onDeny={handleDeny}
-          onToggleExpand={toggleExpand}
-          isExpanded={isExpanded}
-          isSubmitting={approvalSubmitting}
-          toolName="docs_create"
-        />
-        <div
-          className={cn(
-            'overflow-hidden rounded-lg border border-border-light bg-surface-secondary transition-all duration-300',
-            isExpanded ? 'max-h-[400px]' : 'max-h-0',
-          )}
-        >
-          <div className="max-h-[396px] overflow-y-auto border-t border-border-light px-3 py-2">
-            {hasMarkdown ? (
-              <>
-                <p className="mb-2 text-xs font-medium text-text-secondary">
-                  Preview of content to be created:
-                </p>
-                <div className="prose prose-sm dark:prose-invert max-w-none text-text-primary">
-                  <MarkdownLite content={parsedArgs.markdown ?? ''} codeExecution={false} />
-                </div>
-              </>
-            ) : (
-              <p className="text-sm text-text-secondary">
-                {parsedArgs.title ? `Creating blank document: "${parsedArgs.title}"` : 'Creating document'}
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
+      <ToolApprovalContainer
+        onApprove={handleApprove}
+        onDeny={handleDeny}
+        onToggleExpand={toggleExpand}
+        isExpanded={isExpanded}
+        isSubmitting={approvalSubmitting}
+        toolName="docs_create"
+      >
+        {hasMarkdown ? (
+          <>
+            <p className="mb-2 text-xs font-medium text-text-secondary">
+              Preview of content to be created:
+            </p>
+            <div className="prose prose-sm dark:prose-invert max-w-none text-text-primary">
+              <MarkdownLite content={parsedArgs.markdown ?? ''} codeExecution={false} />
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-text-secondary">
+            {parsedArgs.title ? `Creating blank document: "${parsedArgs.title}"` : 'Creating document'}
+          </p>
+        )}
+      </ToolApprovalContainer>
     );
   }
 
@@ -244,6 +234,7 @@ export default function DocsCreate({
       error={hasError}
       hasExpandableContent={hasExpandableContent || hasOutput}
       minExpandHeight={140}
+      denialReason={denialReason}
     >
       {outputError ? (
         <p className="text-sm text-red-500">{outputError}</p>

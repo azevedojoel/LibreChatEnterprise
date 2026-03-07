@@ -6,8 +6,7 @@ import { useMessageContext } from '~/Providers';
 import { useLocalize, useProgress, useToolApproval } from '~/hooks';
 import { parseGmailSendOutput } from '~/utils/parseToolOutput';
 import ToolResultContainer from './ToolResultContainer';
-import ToolApprovalBar from './ToolApprovalBar';
-import { cn } from '~/utils';
+import ToolApprovalContainer from './ToolApprovalContainer';
 
 const GMAIL_ICON = '/assets/google_gmail.svg';
 
@@ -48,7 +47,7 @@ export default function GmailSendDraft({
   const setExpandedToolCalls = useSetRecoilState(store.expandedToolCallsAtom);
   const [localExpanded, setLocalExpanded] = useState(false);
 
-  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting } =
+  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting, denialReason } =
     useToolApproval(toolCallId, output ?? '');
 
   const expandedKey =
@@ -105,30 +104,20 @@ export default function GmailSendDraft({
 
   if (showApprovalBar && isPending) {
     return (
-      <div className="my-2 flex flex-col gap-2">
-        <ToolApprovalBar
-          onApprove={handleApprove}
-          onDeny={handleDeny}
-          onToggleExpand={toggleExpand}
-          isExpanded={isExpanded}
-          isSubmitting={approvalSubmitting}
-          toolName={toolName}
-        />
-        <div
-          className={cn(
-            'overflow-hidden rounded-lg border border-border-light bg-surface-secondary transition-all duration-300',
-            isExpanded ? 'max-h-[200px]' : 'max-h-0',
-          )}
-        >
-          <div className="max-h-[196px] overflow-y-auto border-t border-border-light px-4 py-3">
-            <div className="space-y-2 text-sm">
-              <p className="text-text-secondary">
-                Sending draft{parsedArgs.draftId ? ` (ID: ${parsedArgs.draftId})` : ''}
-              </p>
-            </div>
-          </div>
+      <ToolApprovalContainer
+        onApprove={handleApprove}
+        onDeny={handleDeny}
+        onToggleExpand={toggleExpand}
+        isExpanded={isExpanded}
+        isSubmitting={approvalSubmitting}
+        toolName={toolName}
+      >
+        <div className="space-y-2 text-sm">
+          <p className="text-text-secondary">
+            Sending draft{parsedArgs.draftId ? ` (ID: ${parsedArgs.draftId})` : ''}
+          </p>
         </div>
-      </div>
+      </ToolApprovalContainer>
     );
   }
 
@@ -142,6 +131,7 @@ export default function GmailSendDraft({
       error={hasError}
       hasExpandableContent={!!parsedOutput?.id || !!parsedOutput?.threadId || hasOutput}
       minExpandHeight={80}
+      denialReason={denialReason}
     >
       {outputError ? (
         <p className="text-sm text-red-500">{outputError}</p>

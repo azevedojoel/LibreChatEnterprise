@@ -115,39 +115,41 @@ export function useToolApproval(toolCallId?: string, output?: string) {
     }
   }, [conversationId, messageId, toolCallId, pending?.runId, submitMutation, setPendingToolConfirmation, setResolvedToolApprovals, showToast, localize]);
 
-  const handleDeny = useCallback(async () => {
-    if (!conversationId || !toolCallId) return;
-    if (!pending?.runId && !messageId) return;
-    setApprovalSubmitting(true);
-    try {
-      const result = await submitMutation.mutateAsync({
-        conversationId,
-        runId: pending?.runId,
-        messageId,
-        toolCallId,
-        approved: false,
-      });
-      if (result.success) {
-        const key = getResolvedKey(
+  const handleDeny = useCallback(
+    async (reason?: string) => {
+      if (!conversationId || !toolCallId) return;
+      if (!pending?.runId && !messageId) return;
+      setApprovalSubmitting(true);
+      try {
+        const result = await submitMutation.mutateAsync({
           conversationId,
-          pending?.runId ?? messageId,
+          runId: pending?.runId,
+          messageId,
           toolCallId,
-        );
-        if (key) {
-          setResolvedToolApprovals((prev) => ({ ...prev, [key]: 'denied' }));
+          approved: false,
+          reason: reason?.trim() || undefined,
+        });
+        if (result.success) {
+          const key = getResolvedKey(
+            conversationId,
+            pending?.runId ?? messageId,
+            toolCallId,
+          );
+          if (key) {
+            setResolvedToolApprovals((prev) => ({ ...prev, [key]: 'denied' }));
+          }
+          setPendingToolConfirmation((prev) => {
+            const next = { ...prev };
+            delete next[toolCallId];
+            return next;
+          });
+        } else {
+          showToast({
+            message: localize('com_ui_tool_approval_submit_error') || 'Failed to submit approval. Please try again.',
+            status: 'error',
+          });
         }
-        setPendingToolConfirmation((prev) => {
-          const next = { ...prev };
-          delete next[toolCallId];
-          return next;
-        });
-      } else {
-        showToast({
-          message: localize('com_ui_tool_approval_submit_error') || 'Failed to submit approval. Please try again.',
-          status: 'error',
-        });
-      }
-    } catch {
+      } catch {
       showToast({
         message: localize('com_ui_tool_approval_submit_error') || 'Failed to submit approval. Please try again.',
         status: 'error',
@@ -155,7 +157,25 @@ export function useToolApproval(toolCallId?: string, output?: string) {
     } finally {
       setApprovalSubmitting(false);
     }
-  }, [conversationId, messageId, toolCallId, pending?.runId, submitMutation, setPendingToolConfirmation, setResolvedToolApprovals, showToast, localize]);
+  },
+    [conversationId, messageId, toolCallId, pending?.runId, submitMutation, setPendingToolConfirmation, setResolvedToolApprovals, showToast, localize],
+  );
+
+  const denialReason = (() => {
+    if (approvalStatus !== 'denied' || !output?.trim()) return null;
+    const t = output.trim();
+    const reasonMatch = t.match(/User's reason:\s*(.+?)(?:\n|$)/s);
+    if (reasonMatch) {
+      const r = reasonMatch[1].trim();
+      return r || null;
+    }
+    const errMatch = t.match(/^Error:\s*(.+?)(?:\n|$)/s);
+    if (errMatch) {
+      const r = errMatch[1].trim();
+      return r === 'User denied execution.' ? null : r;
+    }
+    return t.includes('User denied execution') ? null : t;
+  })();
 
   return {
     pendingMatches,
@@ -165,5 +185,6 @@ export function useToolApproval(toolCallId?: string, output?: string) {
     approvalSubmitting,
     waitingForApprover: pending?.waitingForApprover ?? false,
     approverName: pending?.approverName ?? null,
+    denialReason,
   };
 }

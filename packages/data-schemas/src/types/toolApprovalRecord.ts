@@ -11,6 +11,8 @@ export interface IToolApprovalRecord extends Document {
   argsSummary: string;
   status: ToolApprovalRecordStatus;
   resolvedAt: Date;
+  /** User-provided reason when status is 'denied' (for audit/compliance) */
+  denialReason?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }

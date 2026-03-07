@@ -5,7 +5,7 @@ import store from '~/store';
 import { useMessageContext } from '~/Providers';
 import { useProgress, useToolApproval } from '~/hooks';
 import ToolResultContainer from './ToolResultContainer';
-import ToolApprovalBar from './ToolApprovalBar';
+import ToolApprovalContainer from './ToolApprovalContainer';
 import { cn } from '~/utils';
 
 const GOOGLE_TASKS_ICON = '/assets/google.svg';
@@ -79,7 +79,7 @@ export default function GoogleTaskListUpdate({
   const setExpandedToolCalls = useSetRecoilState(store.expandedToolCallsAtom);
   const [localExpanded, setLocalExpanded] = useState(false);
 
-  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting } =
+  const { pendingMatches, approvalStatus, handleApprove, handleDeny, approvalSubmitting, denialReason } =
     useToolApproval(toolCallId, output ?? '');
 
   const expandedKey =
@@ -133,26 +133,16 @@ export default function GoogleTaskListUpdate({
 
   if (showApprovalBar && isPending) {
     return (
-      <div className="my-2 flex flex-col gap-2">
-        <ToolApprovalBar
-          onApprove={handleApprove}
-          onDeny={handleDeny}
-          onToggleExpand={toggleExpand}
-          isExpanded={isExpanded}
-          isSubmitting={approvalSubmitting}
-          toolName="tasks_updateTaskList"
-        />
-        <div
-          className={cn(
-            'overflow-hidden rounded-lg border border-border-light bg-surface-secondary transition-all duration-300',
-            isExpanded ? 'max-h-[400px]' : 'max-h-0',
-          )}
-        >
-          <div className="max-h-[396px] overflow-y-auto border-t border-border-light px-3 py-2">
-            <p className="text-sm font-medium text-text-primary">{title}</p>
-          </div>
-        </div>
-      </div>
+      <ToolApprovalContainer
+        onApprove={handleApprove}
+        onDeny={handleDeny}
+        onToggleExpand={toggleExpand}
+        isExpanded={isExpanded}
+        isSubmitting={approvalSubmitting}
+        toolName="tasks_updateTaskList"
+      >
+        <p className="text-sm font-medium text-text-primary">{title}</p>
+      </ToolApprovalContainer>
     );
   }
 
@@ -166,6 +156,7 @@ export default function GoogleTaskListUpdate({
       error={hasError}
       hasExpandableContent={hasOutput}
       minExpandHeight={140}
+      denialReason={denialReason}
     >
       {outputError ? (
         <p className="text-sm text-red-500">{outputError}</p>

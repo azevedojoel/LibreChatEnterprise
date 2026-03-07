@@ -594,6 +594,38 @@ describe('Tool Confirmation API Routes', () => {
         });
       });
 
+      it('should pass reason to submit when approved: false with reason in body', async () => {
+        mockSearchConversation.mockResolvedValue({
+          user: 'test-user-123',
+        });
+        mockToolConfirmationStore.submit.mockResolvedValue({
+          success: true,
+          payload: { toolName: 'execute_code', argsSummary: '' },
+        });
+        mockToolApprovalRecord.findOneAndUpdate.mockResolvedValue({});
+
+        const response = await request(app)
+          .post('/api/agents/chat/tool-confirmation')
+          .send({
+            conversationId: 'conv-1',
+            messageId: 'msg-1',
+            toolCallId: 'tool-1',
+            approved: false,
+            reason: 'Not safe to execute',
+          });
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ success: true });
+        expect(mockToolConfirmationStore.submit).toHaveBeenCalledWith({
+          conversationId: 'conv-1',
+          runId: 'msg-1',
+          toolCallId: 'tool-1',
+          approved: false,
+          userId: 'test-user-123',
+          reason: 'Not safe to execute',
+        });
+      });
+
       it('should return 200 when audit persistence fails (audit failure does not affect response)', async () => {
         mockSearchConversation.mockResolvedValue({
           user: 'test-user-123',

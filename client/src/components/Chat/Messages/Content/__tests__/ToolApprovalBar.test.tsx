@@ -12,6 +12,10 @@ jest.mock('~/hooks', () => ({
       com_ui_collapse: 'Collapse',
       com_ui_tool_approved: 'Approved',
       com_ui_tool_denied: 'Denied',
+      com_ui_tool_denial_reason_label: 'Reason for denial (optional)',
+      com_ui_tool_denial_reason_placeholder: 'Explain why...',
+      com_ui_confirm_denial: 'Confirm denial',
+      com_ui_cancel: 'Cancel',
     };
     return translations[key] || key;
   },
@@ -61,12 +65,35 @@ describe('ToolApprovalBar', () => {
     expect(mockOnApprove).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onDeny when Deny button is clicked', () => {
+  it('opens deny dialog when Deny button is clicked', () => {
     render(<ToolApprovalBar {...defaultProps} />);
 
     fireEvent.click(screen.getByText('Deny'));
 
+    expect(screen.getByText('Reason for denial (optional)')).toBeInTheDocument();
+    expect(screen.getByText('Confirm denial')).toBeInTheDocument();
+  });
+
+  it('calls onDeny with reason when Confirm denial is clicked after entering reason', () => {
+    render(<ToolApprovalBar {...defaultProps} />);
+
+    fireEvent.click(screen.getByText('Deny'));
+    const textarea = screen.getByPlaceholderText('Explain why...');
+    fireEvent.change(textarea, { target: { value: 'Not safe' } });
+    fireEvent.click(screen.getByText('Confirm denial'));
+
     expect(mockOnDeny).toHaveBeenCalledTimes(1);
+    expect(mockOnDeny).toHaveBeenCalledWith('Not safe');
+  });
+
+  it('calls onDeny with undefined when Confirm denial is clicked without reason', () => {
+    render(<ToolApprovalBar {...defaultProps} />);
+
+    fireEvent.click(screen.getByText('Deny'));
+    fireEvent.click(screen.getByText('Confirm denial'));
+
+    expect(mockOnDeny).toHaveBeenCalledTimes(1);
+    expect(mockOnDeny).toHaveBeenCalledWith(undefined);
   });
 
   it('calls onToggleExpand when expand/collapse button is clicked', () => {

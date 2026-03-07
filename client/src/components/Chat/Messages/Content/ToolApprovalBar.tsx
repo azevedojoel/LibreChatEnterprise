@@ -1,11 +1,20 @@
-import { Button } from '@librechat/client';
+import { useState } from 'react';
+import {
+  Button,
+  OGDialog,
+  OGDialogContent,
+  OGDialogTitle,
+  OGDialogHeader,
+  Textarea,
+} from '@librechat/client';
 import { CheckCircle, ShieldAlert, XCircle } from 'lucide-react';
 import { useLocalize } from '~/hooks';
 import { getToolDisplayName } from '~/utils';
 
 type ToolApprovalBarProps = {
   onApprove: () => void;
-  onDeny: () => void;
+  /** Called with optional reason when user confirms denial */
+  onDeny: (reason?: string) => void;
   onToggleExpand: () => void;
   isExpanded: boolean;
   isSubmitting: boolean;
@@ -33,6 +42,26 @@ export default function ToolApprovalBar({
   showExpandButton = true,
 }: ToolApprovalBarProps) {
   const localize = useLocalize();
+  const [denyDialogOpen, setDenyDialogOpen] = useState(false);
+  const [denyReason, setDenyReason] = useState('');
+
+  const handleDenyClick = () => {
+    setDenyReason('');
+    setDenyDialogOpen(true);
+  };
+
+  const handleConfirmDeny = () => {
+    const reason = denyReason?.trim() || undefined;
+    setDenyDialogOpen(false);
+    setDenyReason('');
+    onDeny(reason);
+  };
+
+  const handleCancelDeny = () => {
+    setDenyDialogOpen(false);
+    setDenyReason('');
+  };
+
   const label = toolName
     ? getToolDisplayName(toolName)
     : localize('com_ui_tool_approval_required') || 'Tool approval required';
@@ -78,13 +107,47 @@ export default function ToolApprovalBar({
             variant="outline"
             size="sm"
             className="h-7 px-2 text-xs"
-            onClick={onDeny}
+            onClick={handleDenyClick}
             disabled={isSubmitting}
           >
             {localize('com_ui_deny') || 'Deny'}
           </Button>
         </div>
       )}
+      <OGDialog open={denyDialogOpen} onOpenChange={(open) => !open && handleCancelDeny()}>
+        <OGDialogContent className="w-full max-w-md border-border-medium bg-surface-primary text-text-primary">
+          <OGDialogHeader className="border-b border-border-medium sm:p-3">
+            <OGDialogTitle>
+              {localize('com_ui_tool_denial_reason_label') || 'Reason for denial (optional)'}
+            </OGDialogTitle>
+          </OGDialogHeader>
+          <div className="flex flex-col gap-3 p-4">
+            <Textarea
+              value={denyReason}
+              onChange={(e) => setDenyReason(e.target.value)}
+              placeholder={
+                localize('com_ui_tool_denial_reason_placeholder') ||
+                'Explain why you are denying this request. The agent will see this reason.'
+              }
+              className="min-h-[80px] resize-none"
+              disabled={isSubmitting}
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={handleCancelDeny} disabled={isSubmitting}>
+                {localize('com_ui_cancel') || 'Cancel'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleConfirmDeny}
+                disabled={isSubmitting}
+              >
+                {localize('com_ui_confirm_denial') || 'Confirm denial'}
+              </Button>
+            </div>
+          </div>
+        </OGDialogContent>
+      </OGDialog>
       {showExpandButton && (
         <button
           type="button"

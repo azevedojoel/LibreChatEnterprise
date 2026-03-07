@@ -188,11 +188,13 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
                 const metadataRecord = (metadata ?? {}) as Record<string, unknown>;
                 const { approved, errorMessage } = await requestToolConfirmation(tc, metadataRecord);
                 if (!approved) {
+                  const msg = errorMessage ?? 'User denied execution.';
                   return {
                     toolCallId: tc.id,
                     status: 'error' as const,
                     content: '',
-                    errorMessage: errorMessage ?? 'User denied execution.',
+                    errorMessage: msg,
+                    isUserDenial: true,
                   };
                 }
               }
