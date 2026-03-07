@@ -6,7 +6,7 @@ import type { MCPOAuthTokens, OAuthMetadata } from '~/mcp/oauth';
 import type { FlowStateManager } from '~/flow/manager';
 import type { FlowMetadata } from '~/flow/types';
 import type * as t from './types';
-import { MCPTokenStorage, MCPOAuthHandler } from '~/mcp/oauth';
+import { MCPTokenStorage, MCPActiveAccountStorage, MCPOAuthHandler } from '~/mcp/oauth';
 import { sanitizeUrlForLogging } from './utils';
 import { withTimeout } from '~/utils/promise';
 import { MCPConnection } from './connection';
@@ -122,6 +122,7 @@ export class MCPConnectionFactory {
   protected readonly oauthEnd?: () => Promise<void>;
   protected readonly returnOnOAuth?: boolean;
   protected readonly connectionTimeout?: number;
+  protected readonly addAccount?: boolean;
 
   /** Creates a new MCP connection with optional OAuth support */
   static async create(
@@ -169,7 +170,17 @@ export class MCPConnectionFactory {
     let oauthUrl: string | null = null;
     let oauthRequired = false;
 
-    const oauthTokens = this.useOAuth ? await this.getOAuthTokens() : null;
+    // When addAccount is true for multi-account servers, skip existing tokens to force
+    // a new OAuth flow so the user can add another account (e.g. second Google account).
+    const skipTokenLookup =
+      this.addAccount === true && this.isMultiAccountServer();
+    const oauthTokens =
+      this.useOAuth && !skipTokenLookup ? await this.getOAuthTokens() : null;
+    if (skipTokenLookup) {
+      logger.info(
+        `[${this.serverName}] [Discovery] addAccount=true: skipping token lookup to force add-account OAuth flow`,
+      );
+    }
     const connection = new MCPConnection({
       serverName: this.serverName,
       serverConfig: this.serverConfig,
@@ -239,11 +250,23 @@ export class MCPConnectionFactory {
             this.userId!,
             this.serverConfig.oauth_headers ?? {},
             this.serverConfig.oauth,
+            this.addAccount,
           );
         // Delete any existing flow so we store fresh metadata (code verifier must match new auth)
         await this.flowManager!.deleteFlow(flowId, 'mcp_oauth');
         // Do not pass signal - OAuth flow must persist until callback; request abort would delete it
-        this.flowManager!.createFlow(flowId, 'mcp_oauth', flowMetadata, undefined).catch(() => {});
+        // createFlow persists flow state (including codeVerifier) then blocks on monitorFlow.
+        // Use Promise.race so we return oauthUrl after persist (~400ms) without blocking on user completion.
+        const createFlowPromise = this.flowManager!.createFlow(
+          flowId,
+          'mcp_oauth',
+          flowMetadata,
+          undefined,
+        );
+        await Promise.race([
+          createFlowPromise,
+          new Promise((resolve) => setTimeout(resolve, 400)),
+        ]).catch(() => {});
         oauthUrl = authorizationUrl;
         await this.oauthStart(authorizationUrl);
         logger.info(
@@ -353,6 +376,7 @@ export class MCPConnectionFactory {
       this.oauthStart = oauth.oauthStart;
       this.oauthEnd = oauth.oauthEnd;
       this.returnOnOAuth = oauth.returnOnOAuth;
+      this.addAccount = oauth.addAccount;
     }
   }
 
@@ -379,31 +403,62 @@ export class MCPConnectionFactory {
   protected async createConnection(): Promise<MCPConnection> {
     let oauthTokens: MCPOAuthTokens | null = null;
     if (this.useOAuth) {
-      // Pre-flight: if access token exists but is expired, require re-auth immediately (don't try refresh)
-      const accessTokenData = this.tokenMethods?.findToken
-        ? await this.tokenMethods.findToken({
+      // When addAccount is true for multi-account servers, skip existing tokens to force
+      // a new OAuth flow so the user can add another account (e.g. second Google account).
+      const skipTokenLookup =
+        this.addAccount === true && this.isMultiAccountServer();
+
+      if (!skipTokenLookup) {
+        // Pre-flight: if access token exists but is expired, require re-auth immediately (don't try refresh)
+        let accessTokenData = this.tokenMethods?.findToken
+          ? await this.tokenMethods.findToken({
+              userId: this.userId!,
+              type: 'mcp_oauth',
+              identifier: `mcp:${this.serverName}`,
+            })
+          : null;
+        if (
+          !accessTokenData &&
+          this.isMultiAccountServer() &&
+          this.tokenMethods?.findToken
+        ) {
+          const activeAccount = await MCPActiveAccountStorage.getActiveAccount({
             userId: this.userId!,
-            identifier: `mcp:${this.serverName}`,
-          })
-        : null;
-      const isExpired =
-        accessTokenData?.expiresAt && new Date() >= new Date(accessTokenData.expiresAt);
-      if (isExpired) {
-        logger.info(`${this.logPrefix} Access token expired, requiring re-authentication`);
-        const flowId = MCPOAuthHandler.generateFlowId(this.userId!, this.serverName);
-        await this.flowManager?.deleteFlow?.(flowId, 'mcp_get_tokens');
-        // oauthTokens stays null - will trigger handleOAuthRequired branch
+            serverName: this.serverName,
+            findToken: this.tokenMethods.findToken,
+          });
+          if (activeAccount && activeAccount !== 'default') {
+            accessTokenData = await this.tokenMethods.findToken({
+              userId: this.userId!,
+              type: 'mcp_oauth',
+              identifier: `mcp:${this.serverName}:${activeAccount}`,
+            });
+          }
+        }
+        const isExpired =
+          accessTokenData?.expiresAt && new Date() >= new Date(accessTokenData.expiresAt);
+        if (isExpired) {
+          logger.info(`${this.logPrefix} Access token expired, requiring re-authentication`);
+          const flowId = MCPOAuthHandler.generateFlowId(this.userId!, this.serverName);
+          await this.flowManager?.deleteFlow?.(flowId, 'mcp_get_tokens');
+          // oauthTokens stays null - will trigger handleOAuthRequired branch
+        } else {
+          oauthTokens = await this.getOAuthTokens();
+        }
       } else {
-        oauthTokens = await this.getOAuthTokens();
+        logger.info(`[${this.serverName}] addAccount=true: skipping token lookup to force add-account OAuth flow`);
       }
     }
 
-    // Stdio: no 401 trigger - run OAuth proactively when tokens missing
+    // Stdio: no 401 trigger - run OAuth proactively when tokens missing.
+    // Skip when addAccount: we want to create connection, let it fail, emit oauthRequired,
+    // and initiate add-account OAuth (return URL) instead of waiting for completion.
     if (
       this.useOAuth &&
       !oauthTokens &&
       this.isStdioConfig() &&
-      this.hasPreConfiguredOAuth()
+      this.hasPreConfiguredOAuth() &&
+      !this.addAccount
     ) {
       const result = await this.handleOAuthRequired();
       if (result?.tokens) {
@@ -431,6 +486,20 @@ export class MCPConnectionFactory {
           'OAuth flow initiated - return early',
         );
       }
+    }
+
+    // When addAccount and no tokens, initiate OAuth immediately and throw so reinitMCPServer
+    // catches and runs discoverServerTools (which will also get oauthUrl). Prevents creating
+    // a connection that might "succeed" before auth fails, which would return "already authenticated".
+    if (
+      this.useOAuth &&
+      !oauthTokens &&
+      this.addAccount === true &&
+      this.isStdioConfig() &&
+      this.hasPreConfiguredOAuth()
+    ) {
+      await this.handleOAuthRequired();
+      throw new Error('OAuth flow initiated - return early');
     }
 
     // Inject OAuth token into stdio config env/args when present
@@ -465,6 +534,11 @@ export class MCPConnectionFactory {
     }
   }
 
+  private isMultiAccountServer(): boolean {
+    const name = this.serverName.toLowerCase();
+    return name === 'google' || name === 'microsoft';
+  }
+
   /** Retrieves existing OAuth tokens from storage or returns null */
   protected async getOAuthTokens(): Promise<MCPOAuthTokens | null> {
     if (!this.tokenMethods?.findToken) return null;
@@ -475,6 +549,24 @@ export class MCPConnectionFactory {
         flowId,
         'mcp_get_tokens',
         async () => {
+          if (this.isMultiAccountServer() && this.tokenMethods?.findTokens) {
+            const activeAccount = await MCPActiveAccountStorage.getActiveAccount({
+              userId: this.userId!,
+              serverName: this.serverName,
+              findToken: this.tokenMethods.findToken,
+            });
+            const accountId = activeAccount || undefined;
+            const tokensForAccount = await MCPTokenStorage.getTokensForAccount({
+              userId: this.userId!,
+              serverName: this.serverName,
+              accountId: accountId ?? 'default',
+              findToken: this.tokenMethods.findToken,
+              createToken: this.tokenMethods.createToken,
+              updateToken: this.tokenMethods.updateToken,
+              refreshTokens: this.createRefreshTokensFunction(),
+            });
+            if (tokensForAccount) return tokensForAccount;
+          }
           return await MCPTokenStorage.getTokens({
             userId: this.userId!,
             serverName: this.serverName,
@@ -553,6 +645,7 @@ export class MCPConnectionFactory {
             this.userId!,
             config?.oauth_headers ?? {},
             config?.oauth,
+            this.addAccount,
           );
 
           if (existingFlow) {
@@ -754,6 +847,7 @@ export class MCPConnectionFactory {
         this.userId!,
         this.serverConfig.oauth_headers ?? {},
         this.serverConfig.oauth,
+        this.addAccount,
       );
 
       /**
