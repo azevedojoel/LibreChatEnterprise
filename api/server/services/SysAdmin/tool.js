@@ -138,6 +138,7 @@ const CAPABILITY_DESCRIPTIONS = {
   [AgentCapabilities.ocr]: 'OCR from images',
   [AgentCapabilities.create_pdf]: 'Create documents',
   [AgentCapabilities.manage_scheduling]: 'Manage scheduled agent runs',
+  [AgentCapabilities.run_sub_agent]: 'Run other agents inline with a prompt',
   [AgentCapabilities.human_in_the_loop]: 'Human approval and handoff',
   [AgentCapabilities.inbound_email]: 'Receive email',
   [AgentCapabilities.sys_admin]: 'Sys Admin tools (admin only)',
@@ -150,6 +151,16 @@ const createTokenHash = () => {
 };
 
 const toJson = (obj) => (typeof obj === 'string' ? obj : JSON.stringify(obj ?? null));
+
+/** Parse JSON-string params (LLM sometimes passes arrays/objects as strings). */
+function parseIfString(val, fallback) {
+  if (typeof val !== 'string') return val;
+  try {
+    return JSON.parse(val);
+  } catch {
+    return fallback;
+  }
+}
 
 /**
  * @param {Object} params
@@ -1815,7 +1826,10 @@ function createSysAdminTools({ userId, userRole }) {
       const err = requireAdmin();
       if (err) return toJson(err);
       try {
-        const validatedData = agentCreateSchema.parse(rawInput || {});
+        const raw = rawInput || {};
+        raw.tools = parseIfString(raw.tools, []);
+        raw.edges = parseIfString(raw.edges, undefined);
+        const validatedData = agentCreateSchema.parse(raw);
         const { tools = [], ...agentData } = removeNullishValues(validatedData);
         if (agentData.model_parameters && typeof agentData.model_parameters === 'object') {
           agentData.model_parameters = removeNullishValues(agentData.model_parameters, true);
@@ -1877,10 +1891,20 @@ function createSysAdminTools({ userId, userRole }) {
           provider: { type: 'string' },
           model: { type: 'string' },
           instructions: { type: 'string' },
-          tools: { type: 'array', items: { type: 'string' } },
+          tools: {
+            oneOf: [
+              { type: 'array', items: { type: 'string' } },
+              { type: 'string' },
+            ],
+          },
           description: { type: 'string' },
           category: { type: 'string' },
-          edges: { type: 'array', items: { type: 'object' } },
+          edges: {
+            oneOf: [
+              { type: 'array', items: { type: 'object' } },
+              { type: 'string' },
+            ],
+          },
         },
         required: ['name', 'provider', 'model'],
       },
@@ -1891,8 +1915,13 @@ function createSysAdminTools({ userId, userRole }) {
     async (rawInput) => {
       const err = requireAdmin();
       if (err) return toJson(err);
-      const { agentId, ...updates } = rawInput || {};
+      const raw = rawInput || {};
+      const agentId = raw.agentId ?? raw.agent_id;
+      const { agentId: _a, agent_id: _b, ...updates } = raw;
       if (!agentId) return toJson({ error: 'agentId is required' });
+      updates.tools = parseIfString(updates.tools, undefined);
+      updates.edges = parseIfString(updates.edges, undefined);
+      updates.inbound_instructions = parseIfString(updates.inbound_instructions, undefined);
       try {
         const agent = await getAgent({ id: agentId });
         if (!agent) return toJson({ error: 'Agent not found' });
@@ -1925,22 +1954,35 @@ function createSysAdminTools({ userId, userRole }) {
       schema: {
         type: 'object',
         properties: {
-          agentId: { type: 'string' },
+          agentId: { type: 'string', description: 'Agent ID to update (camelCase)' },
+          agent_id: { type: 'string', description: 'Alias for agentId (snake_case)' },
           name: { type: 'string' },
           instructions: { type: 'string' },
-          tools: { type: 'array', items: { type: 'string' } },
+          tools: {
+            oneOf: [
+              { type: 'array', items: { type: 'string' } },
+              { type: 'string' },
+            ],
+          },
           model: { type: 'string' },
           provider: { type: 'string' },
           description: { type: 'string' },
           category: { type: 'string' },
-          edges: { type: 'array', items: { type: 'object' } },
+          edges: {
+            oneOf: [
+              { type: 'array', items: { type: 'object' } },
+              { type: 'string' },
+            ],
+          },
           inbound_instructions: {
-            type: 'object',
-            additionalProperties: { type: 'string' },
+            oneOf: [
+              { type: 'object', additionalProperties: { type: 'string' } },
+              { type: 'string' },
+            ],
             description: 'Per-channel instructions (e.g. telegram, email) when run comes from that inbound source.',
           },
         },
-        required: ['agentId'],
+        required: [],
       },
     },
   );
