@@ -355,6 +355,7 @@ export class MCPOAuthHandler {
 
   /**
    * Initiates the OAuth flow for an MCP server
+   * @param addAccount - When true, adds a new account instead of replacing (multi-account)
    */
   static async initiateOAuthFlow(
     serverName: string,
@@ -362,6 +363,7 @@ export class MCPOAuthHandler {
     userId: string,
     oauthHeaders: Record<string, string>,
     config?: MCPOptions['oauth'],
+    addAccount?: boolean,
   ): Promise<{ authorizationUrl: string; flowId: string; flowMetadata: MCPOAuthFlowMetadata }> {
     logger.debug(
       `[MCPOAuth] initiateOAuthFlow called for ${serverName} with URL: ${sanitizeUrlForLogging(serverUrl)}`,
@@ -369,6 +371,8 @@ export class MCPOAuthHandler {
 
     const flowId = this.generateFlowId(userId, serverName);
     const state = this.generateState();
+    const isMultiAccountAdd =
+      addAccount === true && ['Google', 'Microsoft'].includes(serverName);
 
     logger.debug(`[MCPOAuth] Generated flowId: ${flowId}, state: ${state}`);
 
@@ -484,6 +488,9 @@ export class MCPOAuthHandler {
               }
             }
           }
+          if (isMultiAccountAdd) {
+            params.append('prompt', 'select_account');
+          }
           // Use %20 for spaces - URLSearchParams uses + by default, some providers require %20
           const query = params.toString().replace(/\+/g, '%20');
           const fullAuthUrl = `${config.authorization_url!}?${query}`;
@@ -496,6 +503,7 @@ export class MCPOAuthHandler {
             codeVerifier: undefined,
             clientInfo,
             metadata,
+            ...(addAccount === true && { addAccount: true }),
           };
           logger.debug(
             `[MCPOAuth][${serverName}] Built auth URL without PKCE: ${sanitizeUrlForLogging(fullAuthUrl)}`,
@@ -532,6 +540,9 @@ export class MCPOAuthHandler {
             `[MCPOAuth] Added additional_auth_params: ${Object.keys(additionalParams).join(', ')}`,
           );
         }
+        if (isMultiAccountAdd) {
+          authorizationUrl.searchParams.set('prompt', 'select_account');
+        }
 
         const flowMetadata: MCPOAuthFlowMetadata = {
           serverName,
@@ -541,6 +552,7 @@ export class MCPOAuthHandler {
           codeVerifier,
           clientInfo,
           metadata,
+          ...(addAccount === true && { addAccount: true }),
         };
 
         logger.debug(
@@ -615,6 +627,7 @@ export class MCPOAuthHandler {
           clientInfo,
           metadata,
           resourceMetadata,
+          ...(addAccount === true && { addAccount: true }),
         };
 
         logger.info(
@@ -700,6 +713,9 @@ export class MCPOAuthHandler {
             `[MCPOAuth] Added additional_auth_params: ${Object.keys(discoveryAdditionalParams).join(', ')}`,
           );
         }
+        if (isMultiAccountAdd) {
+          authorizationUrl.searchParams.set('prompt', 'select_account');
+        }
 
         if (resourceMetadata?.resource != null && resourceMetadata.resource) {
           authorizationUrl.searchParams.set('resource', resourceMetadata.resource);
@@ -726,6 +742,7 @@ export class MCPOAuthHandler {
         clientInfo,
         metadata,
         resourceMetadata,
+        ...(addAccount === true && { addAccount: true }),
       };
 
       const fullAuthUrl = authorizationUrl.toString();

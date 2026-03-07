@@ -13,6 +13,8 @@ interface StoreTokensParams {
   findToken?: TokenMethods['findToken'];
   clientInfo?: OAuthClientInformation;
   metadata?: OAuthMetadata;
+  /** Optional: Account ID for multi-account (e.g. email). When set, uses mcp:serverName:accountId */
+  accountId?: string;
   /** Optional: Pass existing token state to avoid duplicate DB calls */
   existingTokens?: {
     accessToken?: IToken | null;
@@ -56,11 +58,12 @@ export class MCPTokenStorage {
     clientInfo,
     existingTokens,
     metadata,
+    accountId,
   }: StoreTokensParams): Promise<void> {
     const logPrefix = this.getLogPrefix(userId, serverName);
 
     try {
-      const identifier = `mcp:${serverName}`;
+      const identifier = accountId ? `mcp:${serverName}:${accountId}` : `mcp:${serverName}`;
 
       // Encrypt and store access token
       const encryptedAccessToken = await encryptEnvelope(tokens.access_token);
@@ -236,177 +239,13 @@ export class MCPTokenStorage {
   }
 
   /**
-   * Retrieves OAuth tokens for an MCP server
+   * Retrieves OAuth tokens for an MCP server (legacy single-account).
    */
-  static async getTokens({
-    userId,
-    serverName,
-    findToken,
-    createToken,
-    updateToken,
-    refreshTokens,
-  }: GetTokensParams): Promise<MCPOAuthTokens | null> {
-    const logPrefix = this.getLogPrefix(userId, serverName);
-
-    try {
-      const identifier = `mcp:${serverName}`;
-
-      // Get access token
-      const accessTokenData = await findToken({
-        userId,
-        type: 'mcp_oauth',
-        identifier,
-      });
-
-      /** Check if access token is missing or expired */
-      const isMissing = !accessTokenData;
-      const isExpired = accessTokenData?.expiresAt && new Date() >= accessTokenData.expiresAt;
-
-      if (isMissing || isExpired) {
-        logger.info(`${logPrefix} Access token ${isMissing ? 'missing' : 'expired'}`);
-
-        /** Refresh data if we have a refresh token and refresh function */
-        const refreshTokenData = await findToken({
-          userId,
-          type: 'mcp_oauth_refresh',
-          identifier: `${identifier}:refresh`,
-        });
-
-        if (!refreshTokenData) {
-          logger.info(
-            `${logPrefix} Access token ${isMissing ? 'missing' : 'expired'} and no refresh token available`,
-          );
-          return null;
-        }
-
-        if (!refreshTokens) {
-          logger.warn(
-            `${logPrefix} Access token ${isMissing ? 'missing' : 'expired'}, refresh token available but no \`refreshTokens\` provided`,
-          );
-          return null;
-        }
-
-        if (!createToken) {
-          logger.warn(
-            `${logPrefix} Access token ${isMissing ? 'missing' : 'expired'}, refresh token available but no \`createToken\` function provided`,
-          );
-          return null;
-        }
-
-        try {
-          logger.info(`${logPrefix} Attempting to refresh token`);
-          const decryptedRefreshToken = await decryptUniversal(refreshTokenData.token);
-
-          /** Client information if available */
-          let clientInfo;
-          let clientInfoData;
-          try {
-            clientInfoData = await findToken({
-              userId,
-              type: 'mcp_oauth_client',
-              identifier: `${identifier}:client`,
-            });
-            if (clientInfoData) {
-              const decryptedClientInfo = await decryptUniversal(clientInfoData.token);
-              clientInfo = JSON.parse(decryptedClientInfo);
-              logger.debug(`${logPrefix} Retrieved client info:`, {
-                client_id: clientInfo.client_id,
-                has_client_secret: !!clientInfo.client_secret,
-              });
-            }
-          } catch {
-            logger.debug(`${logPrefix} No client info found`);
-          }
-
-          const metadata = {
-            userId,
-            serverName,
-            identifier,
-            clientInfo,
-          };
-
-          const newTokens = await refreshTokens(decryptedRefreshToken, metadata);
-
-          logger.debug(`${logPrefix} Refresh completed`, {
-            has_new_access_token: !!newTokens.access_token,
-            has_new_refresh_token: !!newTokens.refresh_token,
-            refresh_token_will_be_rotated: !!newTokens.refresh_token,
-            expires_at: newTokens.expires_at,
-          });
-
-          // Store the refreshed tokens (handles both create and update)
-          // Pass existing token state to avoid duplicate DB calls
-          await this.storeTokens({
-            userId,
-            serverName,
-            tokens: newTokens,
-            createToken,
-            updateToken,
-            findToken,
-            clientInfo,
-            existingTokens: {
-              accessToken: accessTokenData, // We know this is expired/missing
-              refreshToken: refreshTokenData, // We already have this
-              clientInfoToken: clientInfoData, // We already looked this up
-            },
-          });
-
-          logger.info(`${logPrefix} Successfully refreshed and stored OAuth tokens`);
-          return newTokens;
-        } catch (refreshError) {
-          logger.error(`${logPrefix} Failed to refresh tokens`, refreshError);
-          const errorMessage =
-            refreshError instanceof Error ? refreshError.message : String(refreshError);
-          // Unrecoverable: new OAuth won't help (wrong client id, invalid config, etc.)
-          if (
-            /BAD_CLIENT_ID|invalid_client|unauthorized_client|invalid_request.*client/i.test(
-              errorMessage,
-            )
-          ) {
-            throw new Error(
-              `OAuth token refresh failed: ${errorMessage}. Integration may need to be reconfigured.`,
-            );
-          }
-          return null;
-        }
-      }
-
-      // If we reach here, access token should exist and be valid
-      if (!accessTokenData) {
-        return null;
-      }
-
-      const decryptedAccessToken = await decryptUniversal(accessTokenData.token);
-
-      /** Get refresh token if available */
-      const refreshTokenData = await findToken({
-        userId,
-        type: 'mcp_oauth_refresh',
-        identifier: `${identifier}:refresh`,
-      });
-
-      const tokens: MCPOAuthTokens = {
-        access_token: decryptedAccessToken,
-        token_type: 'Bearer',
-        obtained_at: accessTokenData.createdAt.getTime(),
-        expires_at: accessTokenData.expiresAt?.getTime(),
-      };
-
-      if (refreshTokenData) {
-        tokens.refresh_token = await decryptUniversal(refreshTokenData.token);
-      }
-
-      logger.debug(`${logPrefix} Loaded existing OAuth tokens from storage`);
-      return tokens;
-    } catch (error) {
-      logger.error(`${logPrefix} Failed to retrieve tokens`, error);
-      // Rethrow unrecoverable errors (e.g. BAD_CLIENT_ID) so caller can surface to user
-      const msg = error instanceof Error ? error.message : String(error);
-      if (msg.includes('Integration may need to be reconfigured')) {
-        throw error;
-      }
-      return null;
-    }
+  static async getTokens(params: GetTokensParams): Promise<MCPOAuthTokens | null> {
+    return this.getTokensWithIdentifier({
+      ...params,
+      identifier: `mcp:${params.serverName}`,
+    });
   }
 
   static async getClientInfoAndMetadata({
@@ -489,5 +328,225 @@ export class MCPTokenStorage {
       type: 'mcp_oauth_refresh',
       identifier: `${identifier}:refresh`,
     });
+  }
+
+  /**
+   * Lists all connected accounts for a server (multi-account support).
+   * Returns accountId extracted from identifier (mcp:serverName:accountId or 'default' for legacy).
+   */
+  static async listAccountsForServer({
+    userId,
+    serverName,
+    findTokens,
+  }: {
+    userId: string;
+    serverName: string;
+    findTokens: TokenMethods['findTokens'];
+  }): Promise<{ accountId: string }[]> {
+    const prefix = `mcp:${serverName}`;
+    const tokens = await findTokens({
+      userId,
+      type: 'mcp_oauth',
+      identifierPrefix: prefix,
+    });
+    const accounts: { accountId: string }[] = [];
+    const seen = new Set<string>();
+    for (const t of tokens) {
+      const id = t.identifier ?? '';
+      if (!id.startsWith(prefix) || id === `${prefix}:refresh` || id === `${prefix}:client` || id === `${prefix}:active`) {
+        continue;
+      }
+      const accountId = id === prefix ? 'default' : id.slice(prefix.length + 1);
+      if (!seen.has(accountId)) {
+        seen.add(accountId);
+        accounts.push({ accountId });
+      }
+    }
+    return accounts;
+  }
+
+  /**
+   * Retrieves OAuth tokens for a specific account. Supports legacy (accountId='default' or unset)
+   * and multi-account (accountId = email).
+   */
+  static async getTokensForAccount({
+    userId,
+    serverName,
+    accountId,
+    findToken,
+    createToken,
+    updateToken,
+    refreshTokens,
+  }: GetTokensParams & { accountId?: string | null }): Promise<MCPOAuthTokens | null> {
+    const effectiveIdentifier =
+      accountId && accountId !== 'default' ? `mcp:${serverName}:${accountId}` : `mcp:${serverName}`;
+    return this.getTokensWithIdentifier({
+      userId,
+      serverName,
+      identifier: effectiveIdentifier,
+      findToken,
+      createToken,
+      updateToken,
+      refreshTokens,
+    });
+  }
+
+  /**
+   * Internal: get tokens by explicit identifier (used by getTokens and getTokensForAccount).
+   */
+  private static async getTokensWithIdentifier({
+    userId,
+    serverName,
+    identifier,
+    findToken,
+    createToken,
+    updateToken,
+    refreshTokens,
+  }: GetTokensParams & { identifier: string }): Promise<MCPOAuthTokens | null> {
+    const logPrefix = this.getLogPrefix(userId, serverName);
+
+    try {
+      const accessTokenData = await findToken({
+        userId,
+        type: 'mcp_oauth',
+        identifier,
+      });
+
+      const isMissing = !accessTokenData;
+      const isExpired = accessTokenData?.expiresAt && new Date() >= accessTokenData.expiresAt;
+
+      if (isMissing || isExpired) {
+        logger.info(`${logPrefix} Access token ${isMissing ? 'missing' : 'expired'}`);
+
+        const refreshTokenData = await findToken({
+          userId,
+          type: 'mcp_oauth_refresh',
+          identifier: `${identifier}:refresh`,
+        });
+
+        if (!refreshTokenData) {
+          logger.info(
+            `${logPrefix} Access token ${isMissing ? 'missing' : 'expired'} and no refresh token available`,
+          );
+          return null;
+        }
+
+        if (!refreshTokens || !createToken) {
+          logger.warn(
+            `${logPrefix} Access token ${isMissing ? 'missing' : 'expired'}, refresh token available but refresh/create not provided`,
+          );
+          return null;
+        }
+
+        try {
+          logger.info(`${logPrefix} Attempting to refresh token`);
+          const decryptedRefreshToken = await decryptUniversal(refreshTokenData.token);
+
+          let clientInfo;
+          let clientInfoData;
+          try {
+            clientInfoData = await findToken({
+              userId,
+              type: 'mcp_oauth_client',
+              identifier: `${identifier}:client`,
+            });
+            if (clientInfoData) {
+              const decryptedClientInfo = await decryptUniversal(clientInfoData.token);
+              clientInfo = JSON.parse(decryptedClientInfo);
+            }
+          } catch {
+            logger.debug(`${logPrefix} No client info found`);
+          }
+
+          const metadata = { userId, serverName, identifier, clientInfo };
+          const newTokens = await refreshTokens(decryptedRefreshToken, metadata);
+
+          const accountIdPart = identifier.split(':').slice(2).join(':');
+          await this.storeTokens({
+            userId,
+            serverName,
+            tokens: newTokens,
+            createToken,
+            updateToken,
+            findToken,
+            clientInfo,
+            accountId: accountIdPart || undefined,
+            existingTokens: {
+              accessToken: accessTokenData,
+              refreshToken: refreshTokenData,
+              clientInfoToken: clientInfoData,
+            },
+          });
+
+          logger.info(`${logPrefix} Successfully refreshed and stored OAuth tokens`);
+          return newTokens;
+        } catch (refreshError) {
+          logger.error(`${logPrefix} Failed to refresh tokens`, refreshError);
+          const errorMessage =
+            refreshError instanceof Error ? refreshError.message : String(refreshError);
+          if (
+            /BAD_CLIENT_ID|invalid_client|unauthorized_client|invalid_request.*client/i.test(
+              errorMessage,
+            )
+          ) {
+            throw new Error(
+              `OAuth token refresh failed: ${errorMessage}. Integration may need to be reconfigured.`,
+            );
+          }
+          return null;
+        }
+      }
+
+      if (!accessTokenData) return null;
+
+      const decryptedAccessToken = await decryptUniversal(accessTokenData.token);
+      const refreshTokenData = await findToken({
+        userId,
+        type: 'mcp_oauth_refresh',
+        identifier: `${identifier}:refresh`,
+      });
+
+      const tokens: MCPOAuthTokens = {
+        access_token: decryptedAccessToken,
+        token_type: 'Bearer',
+        obtained_at: accessTokenData.createdAt.getTime(),
+        expires_at: accessTokenData.expiresAt?.getTime(),
+      };
+
+      if (refreshTokenData) {
+        tokens.refresh_token = await decryptUniversal(refreshTokenData.token);
+      }
+
+      logger.debug(`${logPrefix} Loaded existing OAuth tokens from storage`);
+      return tokens;
+    } catch (error) {
+      logger.error(`${logPrefix} Failed to retrieve tokens`, error);
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes('Integration may need to be reconfigured')) {
+        throw error;
+      }
+      return null;
+    }
+  }
+
+  /**
+   * Deletes all tokens for a specific account (multi-account remove).
+   */
+  static async deleteAccountTokens({
+    userId,
+    serverName,
+    accountId,
+    deleteToken,
+  }: {
+    userId: string;
+    serverName: string;
+    accountId: string;
+    deleteToken: (filter: { userId: string; type: string; identifier: string }) => Promise<void>;
+  }): Promise<void> {
+    const baseIdentifier = accountId === 'default' ? `mcp:${serverName}` : `mcp:${serverName}:${accountId}`;
+
+    await deleteToken({ userId, type: 'mcp_oauth_client', identifier: `${baseIdentifier}:client` });
+    await deleteToken({ userId, type: 'mcp_oauth', identifier: baseIdentifier });
+    await deleteToken({ userId, type: 'mcp_oauth_refresh', identifier: `${baseIdentifier}:refresh` });
   }
 }

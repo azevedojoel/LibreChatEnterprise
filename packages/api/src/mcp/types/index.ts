@@ -181,6 +181,8 @@ export interface OAuthConnectionOptions {
   oauthEnd?: () => Promise<void>;
   returnOnOAuth?: boolean;
   connectionTimeout?: number;
+  /** When true, adds a new account instead of replacing (multi-account) */
+  addAccount?: boolean;
 }
 
 export interface ToolDiscoveryOptions {
@@ -193,6 +195,8 @@ export interface ToolDiscoveryOptions {
   customUserVars?: Record<string, string>;
   requestBody?: RequestBody;
   connectionTimeout?: number;
+  /** When true, adds a new account instead of replacing (multi-account) */
+  addAccount?: boolean;
 }
 
 export interface ToolDiscoveryResult {

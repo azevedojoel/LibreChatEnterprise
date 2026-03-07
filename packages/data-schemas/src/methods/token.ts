@@ -2,6 +2,10 @@ import type { QueryOptions } from 'mongoose';
 import { IToken, TokenCreateData, TokenQuery, TokenUpdateData, TokenDeleteResult } from '~/types';
 import logger from '~/config/winston';
 
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // Factory function that takes mongoose instance and returns the methods
 export function createTokenMethods(mongoose: typeof import('mongoose')) {
   /**
@@ -60,6 +64,9 @@ export function createTokenMethods(mongoose: typeof import('mongoose')) {
       if (query.userId !== undefined) {
         conditions.push({ userId: query.userId });
       }
+      if (query.type !== undefined) {
+        conditions.push({ type: query.type });
+      }
       if (query.token !== undefined) {
         conditions.push({ token: query.token });
       }
@@ -98,6 +105,9 @@ export function createTokenMethods(mongoose: typeof import('mongoose')) {
       if (query.userId) {
         conditions.push({ userId: query.userId });
       }
+      if (query.type) {
+        conditions.push({ type: query.type });
+      }
       if (query.token) {
         conditions.push({ token: query.token });
       }
@@ -106,6 +116,9 @@ export function createTokenMethods(mongoose: typeof import('mongoose')) {
       }
       if (query.identifier) {
         conditions.push({ identifier: query.identifier });
+      }
+      if (query.identifierPrefix) {
+        conditions.push({ identifier: new RegExp(`^${escapeRegex(query.identifierPrefix)}`) });
       }
 
       const token = await Token.findOne({ $and: conditions }, null, options).lean();
@@ -117,9 +130,46 @@ export function createTokenMethods(mongoose: typeof import('mongoose')) {
     }
   }
 
+  /**
+   * Finds all Token documents matching the query. Supports identifierPrefix for
+   * listing tokens by prefix (e.g. mcp:Google: for all Google accounts).
+   */
+  async function findTokens(query: TokenQuery, options?: QueryOptions): Promise<IToken[]> {
+    try {
+      const Token = mongoose.models.Token;
+      const conditions: Record<string, unknown>[] = [];
+
+      if (query.userId) {
+        conditions.push({ userId: query.userId });
+      }
+      if (query.type) {
+        conditions.push({ type: query.type });
+      }
+      if (query.token) {
+        conditions.push({ token: query.token });
+      }
+      if (query.email) {
+        conditions.push({ email: query.email.trim().toLowerCase() });
+      }
+      if (query.identifier) {
+        conditions.push({ identifier: query.identifier });
+      }
+      if (query.identifierPrefix) {
+        conditions.push({ identifier: new RegExp(`^${escapeRegex(query.identifierPrefix)}`) });
+      }
+
+      const tokens = await Token.find({ $and: conditions }, null, options).lean();
+      return tokens as IToken[];
+    } catch (error) {
+      logger.debug('An error occurred while finding tokens:', error);
+      throw error;
+    }
+  }
+
   // Return all methods
   return {
     findToken,
+    findTokens,
     createToken,
     updateToken,
     deleteTokens,

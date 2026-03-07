@@ -88,6 +88,8 @@ export interface MCPOAuthFlowMetadata extends FlowMetadata {
   clientInfo?: OAuthClientInformation;
   metadata?: OAuthMetadata;
   resourceMetadata?: OAuthProtectedResourceMetadata;
+  /** When true, add as new account (multi-account) instead of replacing */
+  addAccount?: boolean;
 }
 
 export interface MCPOAuthTokens extends OAuthTokens {

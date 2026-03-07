@@ -12,6 +12,8 @@ const {
   createSafeUser,
   MCPOAuthHandler,
   MCPTokenStorage,
+  MCPActiveAccountStorage,
+  fetchOAuthUserEmail,
   processMCPEnv,
   setOAuthSession,
   setOAuthSessionCookie,
@@ -44,7 +46,8 @@ const {
   requireTermsAccepted,
   canAccessMCPServerResource,
 } = require('~/server/middleware');
-const { findToken, updateToken, createToken, deleteTokens } = require('~/models');
+const { findToken, findTokens, updateToken, createToken, deleteTokens } = require('~/models');
+const { decryptUniversal } = require('@librechat/data-schemas');
 const { getUserPluginAuthValue } = require('~/server/services/PluginService');
 const { updateMCPServerTools } = require('~/server/services/Config/mcp');
 const { reinitMCPServer } = require('~/server/services/Tools/mcp');
@@ -247,7 +250,7 @@ router.get(
   async (req, res) => {
   try {
     const { serverName } = req.params;
-    const { userId, flowId } = req.query;
+    const { userId, flowId, add_account } = req.query;
     const user = req.user;
 
     // Verify the userId matches the authenticated user
@@ -255,7 +258,7 @@ router.get(
       return res.status(403).json({ error: 'User mismatch' });
     }
 
-    logger.debug('[MCP OAuth] Initiate request', { serverName, userId, flowId });
+    logger.debug('[MCP OAuth] Initiate request', { serverName, userId, flowId, add_account });
 
     const flowsCache = getLogStores(CacheKeys.FLOWS);
     const flowManager = getFlowStateManager(flowsCache);
@@ -273,14 +276,20 @@ router.get(
       return res.status(400).json({ error: 'Invalid flow state' });
     }
 
+    const addAccount = add_account === 'true' || add_account === true;
     const oauthHeaders = await getOAuthHeaders(serverName, userId);
-    const { authorizationUrl, flowId: oauthFlowId } = await MCPOAuthHandler.initiateOAuthFlow(
-      serverName,
-      serverUrl,
-      userId,
-      oauthHeaders,
-      oauthConfig,
-    );
+    const { authorizationUrl, flowId: oauthFlowId, flowMetadata } =
+      await MCPOAuthHandler.initiateOAuthFlow(
+        serverName,
+        serverUrl,
+        userId,
+        oauthHeaders,
+        oauthConfig,
+        addAccount,
+      );
+
+    /** Persist flow with codeVerifier so callback can exchange the code */
+    await flowManager.createFlow(oauthFlowId, 'mcp_oauth', flowMetadata);
 
     logOAuthAudit({
       event: OAuthAuditEvents.MCP_OAUTH_INITIATE,
@@ -419,6 +428,64 @@ router.get('/:serverName/oauth/callback', async (req, res) => {
     /** Persist tokens immediately so reconnection uses fresh credentials */
     if (flowState?.userId && tokens) {
       try {
+        const accountId = await fetchOAuthUserEmail(serverName, tokens.access_token);
+        const addAccount = flowState.metadata?.addAccount === true;
+
+        /** When adding a new account, prevent duplicates (same email already connected) */
+        if (addAccount) {
+          const existingAccounts = await MCPTokenStorage.listAccountsForServer({
+            userId: flowState.userId,
+            serverName,
+            findTokens,
+          });
+          const normalizedNew = (accountId || '').toLowerCase().trim();
+          for (const { accountId: existingId } of existingAccounts) {
+            const normalizedExisting = (existingId || '').toLowerCase().trim();
+            if (normalizedExisting === normalizedNew) {
+              logger.info('[MCP OAuth] Duplicate account rejected', {
+                serverName,
+                userId: flowState.userId,
+                accountId: normalizedNew,
+              });
+              return res.redirect(
+                `${basePath}/oauth/error?error=duplicate_account`,
+              );
+            }
+            /** Resolve legacy "default" account to email for comparison */
+            if (existingId === 'default' && normalizedNew !== 'default') {
+              try {
+                const accessTokenData = await findToken({
+                  userId: flowState.userId,
+                  type: 'mcp_oauth',
+                  identifier: `mcp:${serverName}`,
+                });
+                if (accessTokenData?.token) {
+                  const accessToken = await decryptUniversal(accessTokenData.token);
+                  if (accessToken) {
+                    const defaultEmail = await fetchOAuthUserEmail(serverName, accessToken);
+                    const normalizedDefault = (defaultEmail || '').toLowerCase().trim();
+                    if (normalizedDefault !== 'default' && normalizedDefault === normalizedNew) {
+                      logger.info('[MCP OAuth] Duplicate account rejected (matches default)', {
+                        serverName,
+                        userId: flowState.userId,
+                        accountId: normalizedNew,
+                      });
+                      return res.redirect(
+                        `${basePath}/oauth/error?error=duplicate_account`,
+                      );
+                    }
+                  }
+                }
+              } catch (err) {
+                logger.debug(
+                  '[MCP OAuth] Could not resolve default account for duplicate check',
+                  err,
+                );
+              }
+            }
+          }
+        }
+
         await MCPTokenStorage.storeTokens({
           userId: flowState.userId,
           serverName,
@@ -428,11 +495,34 @@ router.get('/:serverName/oauth/callback', async (req, res) => {
           findToken,
           clientInfo: flowState.clientInfo,
           metadata: flowState.metadata,
+          accountId: accountId === 'default' ? undefined : accountId,
         });
         logger.debug('[MCP OAuth] Stored OAuth tokens prior to reconnection', {
           serverName,
           userId: flowState.userId,
+          accountId: accountId === 'default' ? '(legacy)' : accountId,
         });
+
+        /** Set active account: first connect, add_account, or legacy default */
+        const effectiveAccountId = accountId === 'default' ? undefined : accountId;
+        const accountIdForActive = effectiveAccountId || 'default';
+        const existingAccounts = await MCPTokenStorage.listAccountsForServer({
+          userId: flowState.userId,
+          serverName,
+          findTokens,
+        });
+        const isFirst = existingAccounts.length <= 1;
+        const shouldSetActive = isFirst || addAccount;
+        if (shouldSetActive) {
+          await MCPActiveAccountStorage.setActiveAccount({
+            userId: flowState.userId,
+            serverName,
+            accountId: accountIdForActive,
+            createToken,
+            updateToken,
+            findToken,
+          });
+        }
       } catch (error) {
         logger.error('[MCP OAuth] Failed to store OAuth tokens after callback', error);
         throw error;
@@ -685,13 +775,14 @@ router.post(
   async (req, res) => {
   try {
     const { serverName } = req.params;
+    const addAccount = req.body?.add_account === true || req.query?.add_account === 'true';
     const user = createSafeUser(req.user);
 
     if (!user.id) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    logger.info(`[MCP Reinitialize] Reinitializing server: ${serverName}`);
+    logger.info(`[MCP Reinitialize] Reinitializing server: ${serverName}${addAccount ? ' (add account)' : ''}`);
 
     const mcpManager = getMCPManager();
     const serverConfig = await getMCPServersRegistry().getServerConfig(serverName, user.id);
@@ -720,6 +811,7 @@ router.post(
       user,
       serverName,
       userMCPAuthMap,
+      addAccount,
     });
 
     if (!result) {
@@ -745,6 +837,85 @@ router.post(
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+/** Multi-account: list connected accounts for Google/Microsoft */
+router.get(
+  '/:serverName/accounts',
+  requireJwtAuth,
+  requireTermsAccepted(),
+  async (req, res) => {
+    try {
+      const { serverName } = req.params;
+      const user = createSafeUser(req.user);
+
+      if (!user?.id) {
+        return res.status(401).json({ error: 'User not authenticated' });
+      }
+
+      const [accounts, activeAccount] = await Promise.all([
+        MCPTokenStorage.listAccountsForServer({
+          userId: user.id,
+          serverName,
+          findTokens,
+        }),
+        MCPActiveAccountStorage.getActiveAccount({
+          userId: user.id,
+          serverName,
+          findToken,
+        }),
+      ]);
+
+      return res.json({
+        success: true,
+        serverName,
+        accounts: accounts.map((a) => ({ accountId: a.accountId })),
+        activeAccountId: activeAccount || null,
+      });
+    } catch (error) {
+      logger.error('[MCP Accounts] Failed to list accounts', error);
+      return res.status(500).json({ error: 'Failed to list MCP accounts' });
+    }
+  },
+);
+
+/** Multi-account: set active account for Google/Microsoft */
+router.post(
+  '/:serverName/accounts/active',
+  requireJwtAuth,
+  requireTermsAccepted(),
+  async (req, res) => {
+    try {
+      const { serverName } = req.params;
+      const { accountId } = req.body || {};
+      const user = createSafeUser(req.user);
+
+      if (!user?.id) {
+        return res.status(401).json({ error: 'User not authenticated' });
+      }
+      if (!accountId || typeof accountId !== 'string') {
+        return res.status(400).json({ error: 'accountId is required' });
+      }
+
+      await MCPActiveAccountStorage.setActiveAccount({
+        userId: user.id,
+        serverName,
+        accountId: accountId.trim(),
+        createToken,
+        updateToken,
+        findToken,
+      });
+
+      return res.json({
+        success: true,
+        serverName,
+        accountId: accountId.trim(),
+      });
+    } catch (error) {
+      logger.error('[MCP Accounts] Failed to set active account', error);
+      return res.status(500).json({ error: 'Failed to set active MCP account' });
+    }
+  },
+);
 
 /**
  * Get connection status for all MCP servers

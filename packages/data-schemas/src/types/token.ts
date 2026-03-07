@@ -25,7 +25,10 @@ export interface TokenQuery {
   userId?: Types.ObjectId | string;
   token?: string;
   email?: string;
+  type?: string;
   identifier?: string;
+  /** When set, finds tokens whose identifier starts with this prefix (for multi-account listing) */
+  identifierPrefix?: string;
 }
 
 export interface TokenUpdateData {
