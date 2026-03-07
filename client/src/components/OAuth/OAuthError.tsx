@@ -40,6 +40,11 @@ export default function OAuthError() {
           localize('com_ui_oauth_error_csrf') ||
           'Security validation failed. Please try again.'
         );
+      case 'duplicate_account':
+        return (
+          localize('com_ui_oauth_error_duplicate_account') ||
+          'This account is already connected. Use list_productivity_accounts to see your connected accounts.'
+        );
       default:
         return localize('com_ui_oauth_error_generic') || error.replace(/_/g, ' ');
     }

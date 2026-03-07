@@ -318,10 +318,16 @@ export function useMCPServerManager({
   );
 
   const initializeServer = useCallback(
-    async (serverName: string, autoOpenOAuth: boolean = true) => {
+    async (
+      serverName: string,
+      autoOpenOAuth: boolean = true,
+      addAccount: boolean = false,
+    ) => {
       updateServerInitState(serverName, { isInitializing: true });
       try {
-        const response = await reinitializeMutation.mutateAsync(serverName);
+        const response = await reinitializeMutation.mutateAsync(
+          addAccount ? { serverName, addAccount: true } : serverName,
+        );
         if (!response.success) {
           showToast({
             message: localize('com_ui_mcp_init_failed', { 0: serverName }),

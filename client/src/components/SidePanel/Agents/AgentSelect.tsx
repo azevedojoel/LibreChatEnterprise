@@ -76,6 +76,7 @@ export default function AgentSelect({
         [AgentCapabilities.create_pdf]: false,
         [AgentCapabilities.manage_scheduling]: false,
         [AgentCapabilities.run_sub_agent]: false,
+        [AgentCapabilities.manage_productivity_accounts]: false,
         [AgentCapabilities.sys_admin]: false,
         [AgentCapabilities.end_after_tools]: false,
         [AgentCapabilities.hide_sequential_outputs]: false,
@@ -89,6 +90,16 @@ export default function AgentSelect({
         Tools.run_schedule,
         Tools.list_runs,
         Tools.get_run,
+      ]);
+
+      const productivityAccountToolSet = new Set([
+        Tools.list_productivity_accounts,
+        Tools.get_active_productivity_account,
+        Tools.select_productivity_account,
+        Tools.add_productivity_account,
+        Tools.remove_productivity_account,
+        Tools.check_productivity_accounts_auth,
+        Tools.reauthenticate_productivity_account,
       ]);
 
       const agentTools: string[] = [];
@@ -131,6 +142,13 @@ export default function AgentSelect({
           capabilities[AgentCapabilities.run_sub_agent] = true;
           if (!agentTools.includes(AgentCapabilities.run_sub_agent)) {
             agentTools.push(AgentCapabilities.run_sub_agent);
+          }
+          return;
+        }
+        if (productivityAccountToolSet.has(tool as Tools)) {
+          capabilities[AgentCapabilities.manage_productivity_accounts] = true;
+          if (!agentTools.includes(AgentCapabilities.manage_productivity_accounts)) {
+            agentTools.push(AgentCapabilities.manage_productivity_accounts);
           }
           return;
         }

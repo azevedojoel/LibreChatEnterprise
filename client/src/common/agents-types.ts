@@ -26,6 +26,7 @@ export type TAgentCapabilities = {
   [AgentCapabilities.create_pdf]?: boolean;
   [AgentCapabilities.manage_scheduling]?: boolean;
   [AgentCapabilities.run_sub_agent]?: boolean;
+  [AgentCapabilities.manage_productivity_accounts]?: boolean;
   [AgentCapabilities.sys_admin]?: boolean;
   [AgentCapabilities.end_after_tools]?: boolean;
   [AgentCapabilities.hide_sequential_outputs]?: boolean;

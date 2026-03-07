@@ -15,6 +15,7 @@ interface AgentCapabilitiesResult {
   programmaticToolsEnabled: boolean;
   manageSchedulingEnabled: boolean;
   runSubAgentEnabled: boolean;
+  manageProductivityAccountsEnabled: boolean;
   sysAdminEnabled: boolean;
   inboundEmailEnabled: boolean;
 }
@@ -87,6 +88,11 @@ export default function useAgentCapabilities(
     [capabilities],
   );
 
+  const manageProductivityAccountsEnabled = useMemo(
+    () => capabilities?.includes(AgentCapabilities.manage_productivity_accounts) ?? false,
+    [capabilities],
+  );
+
   const sysAdminEnabled = useMemo(
     () => capabilities?.includes(AgentCapabilities.sys_admin) ?? false,
     [capabilities],
@@ -111,6 +117,7 @@ export default function useAgentCapabilities(
     programmaticToolsEnabled,
     manageSchedulingEnabled,
     runSubAgentEnabled,
+    manageProductivityAccountsEnabled,
     sysAdminEnabled,
     inboundEmailEnabled,
   };

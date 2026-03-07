@@ -23,6 +23,7 @@ import GmailSearch from './GmailSearch';
 import GmailGet from './GmailGet';
 import GmailSend from './GmailSend';
 import GmailSendDraft from './GmailSendDraft';
+import AddProductivityAccount from './AddProductivityAccount';
 import SendUserEmail from './SendUserEmail';
 import DocsCreate from './DocsCreate';
 import DriveCreateFolder from './DriveCreateFolder';
@@ -338,6 +339,21 @@ const Part = memo(
             isLast={isLast}
             toolCallId={toolCall.id}
             toolName={toolCall.name}
+          />
+        );
+      } else if (
+        isToolCall &&
+        (toolCall.name === Tools.add_productivity_account ||
+          toolCall.name === Tools.reauthenticate_productivity_account)
+      ) {
+        return (
+          <AddProductivityAccount
+            args={toolCall.args ?? ''}
+            output={toolCall.output ?? ''}
+            isSubmitting={isSubmitting}
+            isLast={isLast}
+            toolCallId={toolCall.id}
+            name={toolCall.name}
           />
         );
       } else if (isToolCall && isToolMatch(toolCall.name, 'drive_createFolder')) {

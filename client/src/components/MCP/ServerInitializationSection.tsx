@@ -3,6 +3,7 @@ import { RefreshCw, Trash2 } from 'lucide-react';
 import { Button, Spinner } from '@librechat/client';
 import { useLocalize, useMCPServerManager, useMCPConnectionStatus } from '~/hooks';
 import OAuthLink from '~/components/OAuth/OAuthLink';
+import MCPAccountsSection from '~/components/MCP/MCPAccountsSection';
 
 interface ServerInitializationSectionProps {
   sidePanel?: boolean;
@@ -90,28 +91,33 @@ export default function ServerInitializationSection({
   );
 
   return (
-    <div className="flex items-center gap-2">
-      {requiresOAuth && isConnected && revokeOAuthForServer && (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        {requiresOAuth && isConnected && revokeOAuthForServer && (
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => revokeOAuthForServer(serverName)}
+            aria-label={localize('com_ui_revoke')}
+          >
+            <Trash2 className="h-4 w-4" />
+            {localize('com_ui_revoke')}
+          </Button>
+        )}
         <Button
-          size="sm"
-          variant="destructive"
-          onClick={() => revokeOAuthForServer(serverName)}
-          aria-label={localize('com_ui_revoke')}
+          variant={buttonVariant}
+          onClick={() => initializeServer(serverName, false)}
+          disabled={isServerInitializing}
+          size={sidePanel ? 'sm' : 'default'}
+          className="flex-1"
         >
-          <Trash2 className="h-4 w-4" />
-          {localize('com_ui_revoke')}
+          {icon}
+          {buttonText}
         </Button>
+      </div>
+      {isConnected && requiresOAuth && (
+        <MCPAccountsSection serverName={serverName} isConnected={isConnected} />
       )}
-      <Button
-        variant={buttonVariant}
-        onClick={() => initializeServer(serverName, false)}
-        disabled={isServerInitializing}
-        size={sidePanel ? 'sm' : 'default'}
-        className="flex-1"
-      >
-        {icon}
-        {buttonText}
-      </Button>
     </div>
   );
 }

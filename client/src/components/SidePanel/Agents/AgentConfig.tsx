@@ -27,6 +27,7 @@ import SearchForm from './Search/Form';
 import FileSearch from './FileSearch';
 import SchedulingCheckbox from './SchedulingCheckbox';
 import RunSubAgentCheckbox from './RunSubAgentCheckbox';
+import ProductivityAccountsCheckbox from './ProductivityAccountsCheckbox';
 import SysAdminCheckbox from './SysAdminCheckbox';
 import CreatePdfCheckbox from './CreatePdfCheckbox';
 import SchedulerTargetAgents from './SchedulerTargetAgents';
@@ -94,6 +95,7 @@ export default function AgentConfig() {
     createPdfEnabled,
     manageSchedulingEnabled,
     runSubAgentEnabled,
+    manageProductivityAccountsEnabled,
     sysAdminEnabled,
   } = useAgentCapabilities(agentsConfig?.capabilities);
 
@@ -336,6 +338,7 @@ export default function AgentConfig() {
               </>
             )}
             {runSubAgentEnabled && <RunSubAgentCheckbox />}
+            {manageProductivityAccountsEnabled && <ProductivityAccountsCheckbox />}
             {sysAdminEnabled && user?.role === SystemRoles.ADMIN && <SysAdminCheckbox />}
           </div>
         )}

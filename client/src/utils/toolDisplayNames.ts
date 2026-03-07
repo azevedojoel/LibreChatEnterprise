@@ -170,6 +170,9 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   project_archive: 'Archive Project',
   project_update_metadata: 'Update Project Metadata',
   project_switch: 'Switch to Project',
+  // Productivity account tools
+  [Tools.add_productivity_account]: 'Add Productivity Account',
+  [Tools.reauthenticate_productivity_account]: 'Reauthenticate Productivity Account',
   // Scheduler tools
   [Tools.list_schedules]: 'List Schedules',
   [Tools.list_user_projects]: 'List Projects',
