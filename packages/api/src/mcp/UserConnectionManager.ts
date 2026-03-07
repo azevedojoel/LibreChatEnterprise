@@ -45,6 +45,7 @@ export abstract class UserConnectionManager {
     signal,
     returnOnOAuth = false,
     connectionTimeout,
+    addAccount,
   }: {
     serverName: string;
     forceNew?: boolean;
@@ -131,6 +132,7 @@ export abstract class UserConnectionManager {
           returnOnOAuth: returnOnOAuth,
           requestBody: requestBody,
           connectionTimeout: connectionTimeout,
+          addAccount,
         },
       );
 

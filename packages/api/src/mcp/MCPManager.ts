@@ -130,6 +130,7 @@ export class MCPManager extends UserConnectionManager {
       customUserVars: args.customUserVars,
       requestBody: args.requestBody,
       connectionTimeout: args.connectionTimeout,
+      addAccount: args.addAccount,
     });
 
     return { tools: result.tools, oauthRequired: result.oauthRequired, oauthUrl: result.oauthUrl };
