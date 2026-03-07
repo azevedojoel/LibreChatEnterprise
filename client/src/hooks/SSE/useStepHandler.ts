@@ -31,6 +31,7 @@ const SCHEDULE_MUTATING_TOOLS = new Set([
   Tools.update_schedule,
   Tools.delete_schedule,
   Tools.run_schedule,
+  Tools.run_sub_agent,
 ]);
 const PROJECT_SWITCH_TOOL = 'project_switch';
 

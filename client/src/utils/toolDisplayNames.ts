@@ -16,6 +16,7 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   [Tools.run_tool_and_save]: 'Export to File',
   [Tools.execute_code]: 'Code Interpreter',
   [Tools.file_search]: 'Searched My Files',
+  [Tools.web_search]: 'Web Search',
   [Constants.TOOL_SEARCH]: 'Discovery',
   // CRM tools
   crm_list_pipelines: 'List Pipelines',
@@ -178,6 +179,8 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   [Tools.run_schedule]: 'Run Schedule Now',
   [Tools.list_runs]: 'List Run History',
   [Tools.get_run]: 'Get Run Details',
+  [Tools.run_sub_agent]: 'Run Sub-Agent',
+  [Tools.list_agents]: 'List Agents',
   // Coder tools
   [Tools.generate_code]: 'Generate Code',
   [Tools.install_dependencies]: 'Install Dependencies',

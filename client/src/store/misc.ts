@@ -104,6 +104,12 @@ export const pendingToolConfirmationAtom = atom<Record<string, PendingToolConfir
   default: {},
 });
 
+/** Map of toolCallId -> subAgentStreamId[] for run_sub_agent progress. Set when sub_agent_started is received. Supports multiple parallel sub-agents per tool call. */
+export const subAgentStreamByToolCallIdAtom = atom<Record<string, string[]>>({
+  key: 'subAgentStreamByToolCallId',
+  default: {},
+});
+
 /** Persisted expanded state for tool call JSON - survives navigation. Key: conversationId:messageId:toolCallId */
 export const expandedToolCallsAtom = atom<Set<string>>({
   key: 'expandedToolCalls',
@@ -133,6 +139,7 @@ export default {
   dismissedHelpHintsAtom,
   pendingMCPOAuthAtom,
   pendingToolConfirmationAtom,
+  subAgentStreamByToolCallIdAtom,
   expandedToolCallsAtom,
   resolvedToolApprovalsAtom,
 };

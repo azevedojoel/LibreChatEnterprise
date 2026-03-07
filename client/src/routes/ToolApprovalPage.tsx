@@ -16,6 +16,7 @@ const SCHEDULE_MUTATING_TOOLS = new Set([
   Tools.update_schedule,
   Tools.delete_schedule,
   Tools.run_schedule,
+  Tools.run_sub_agent,
 ]);
 
 /** Parse argsSummary JSON into key-value pairs for token bubbles. Falls back to raw display when truncated or invalid. */

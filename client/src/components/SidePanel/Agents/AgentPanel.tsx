@@ -471,6 +471,9 @@ export default function AgentPanel({ variant = 'panel' }: AgentPanelProps = {}) 
       if (data.sys_admin === true) {
         tools.push(AgentCapabilities.sys_admin);
       }
+      if (data.run_sub_agent === true) {
+        tools.push(AgentCapabilities.run_sub_agent);
+      }
       if (data.manage_scheduling === true) {
         tools.push(AgentCapabilities.manage_scheduling);
 

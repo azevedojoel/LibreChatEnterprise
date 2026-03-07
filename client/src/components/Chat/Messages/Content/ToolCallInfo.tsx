@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useRecoilValue } from 'recoil';
 import { Button } from '@librechat/client';
-import { CheckCircle, Circle, ExternalLink, Loader2 } from 'lucide-react';
+import store from '~/store';
+import { CheckCircle, ChevronDown, ChevronUp, Circle, ExternalLink, Loader2, XCircle } from 'lucide-react';
 import cronstrue from 'cronstrue';
 import { useLocalize, type TranslationKeys } from '~/hooks';
 import useOpenInArtifact from '~/hooks/Artifacts/useOpenInArtifact';
@@ -8,9 +10,13 @@ import { Tools } from 'librechat-data-provider';
 import { UIResourceRenderer } from '@mcp-ui/client';
 import UIResourceCarousel from './UIResourceCarousel';
 import { RunScheduleNowWidget } from './RunScheduleNowWidget';
+import { RunSubAgentProgress } from './RunSubAgentProgress';
 import MarkdownLite from './MarkdownLite';
 import { cn, humanizeToolName } from '~/utils';
+import { useAgentsMapContext } from '~/Providers';
 import type { TAttachment, UIResource } from 'librechat-data-provider';
+
+const SUB_AGENT_PROMPT_TRUNCATE_LENGTH = 300;
 
 const PROMPT_TRUNCATE_LENGTH = 200;
 
@@ -87,6 +93,8 @@ const SCHEDULER_TOOLS = new Set<string>([
   Tools.run_schedule,
   Tools.list_runs,
   Tools.get_run,
+  Tools.run_sub_agent,
+  Tools.list_agents,
 ]);
 
 const DIFF_TOOLS = new Set<string>([
@@ -140,6 +148,11 @@ type SchedulerInputPreview =
       enabled?: boolean;
       timezone?: string;
       userProjectId?: string;
+    }
+  | {
+      type: 'run_sub_agent';
+      agentId: string;
+      prompt: string;
     };
 
 function SchedulePreviewCard({
@@ -281,6 +294,236 @@ function SchedulePreviewCard({
       </div>
     </div>
   );
+}
+
+function SubAgentPreviewCard({
+  preview,
+  localize,
+}: {
+  preview:
+    | { type: 'run_sub_agent'; agentId: string; prompt: string }
+    | { type: 'run_sub_agent'; tasks: Array<{ agentId: string; prompt: string }> };
+  localize: (key: TranslationKeys | string, vars?: Record<string, unknown>) => string;
+}) {
+  const agentsMap = useAgentsMapContext();
+  const items =
+    'tasks' in preview && Array.isArray(preview.tasks)
+      ? preview.tasks
+      : 'agentId' in preview && preview.agentId && preview.prompt
+        ? [{ agentId: preview.agentId, prompt: preview.prompt }]
+        : [];
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      {items.map((item, idx) => (
+        <SubAgentPreviewRow
+          key={idx}
+          agentId={item.agentId}
+          prompt={item.prompt}
+          agentsMap={agentsMap}
+          localize={localize}
+        />
+      ))}
+    </div>
+  );
+}
+
+function SubAgentPreviewRow({
+  agentId,
+  prompt,
+  agentsMap,
+  localize,
+}: {
+  agentId: string;
+  prompt: string;
+  agentsMap: Record<string, { name?: string }> | undefined;
+  localize: (key: TranslationKeys | string, vars?: Record<string, unknown>) => string;
+}) {
+  const [promptExpanded, setPromptExpanded] = useState(false);
+  const agentName = agentsMap?.[agentId]?.name ?? agentId;
+  const isLongPrompt = prompt.length > SUB_AGENT_PROMPT_TRUNCATE_LENGTH;
+  const promptDisplay =
+    isLongPrompt && !promptExpanded
+      ? `${prompt.slice(0, SUB_AGENT_PROMPT_TRUNCATE_LENGTH)}…`
+      : prompt;
+
+  return (
+    <div className="rounded-lg border border-border-light bg-surface-tertiary p-3 text-sm">
+      <div className="space-y-2">
+        <div className="flex gap-2">
+          <span className="shrink-0 font-medium text-text-secondary">
+            {localize('com_sub_agent_working_with' as TranslationKeys, { 0: agentName })}
+          </span>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="shrink-0 font-medium text-text-secondary">
+            {localize('com_sub_agent_preview_prompt' as TranslationKeys)}:
+          </span>
+          <div className="min-w-0 break-words text-text-primary whitespace-pre-wrap">
+            {promptDisplay}
+          </div>
+          {isLongPrompt && (
+            <button
+              type="button"
+              onClick={() => setPromptExpanded((e) => !e)}
+              className="mt-1 self-start text-xs text-text-secondary hover:text-text-primary hover:underline"
+            >
+              {promptExpanded
+                ? localize('com_sub_agent_preview_show_less' as TranslationKeys)
+                : localize('com_sub_agent_preview_show_more' as TranslationKeys)}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RunSubAgentCompletedCard({
+  result,
+  agentsMap,
+  localize,
+}: {
+  result: { agentId: string; success: boolean; output?: string; error?: string };
+  agentsMap: Record<string, { name?: string }> | undefined;
+  localize: (key: TranslationKeys | string, vars?: Record<string, unknown>) => string;
+}) {
+  const agentName = agentsMap?.[result.agentId]?.name ?? result.agentId;
+  const summary = result.success
+    ? (result.output ?? localize('com_ui_no_response')).slice(0, 80) +
+      ((result.output?.length ?? 0) > 80 ? '…' : '')
+    : result.error ?? localize('com_ui_error');
+
+  return (
+    <div
+      className={cn(
+        'mt-1 space-y-1 rounded-lg border border-border-light px-2.5 py-1.5 text-xs bg-surface-secondary/60',
+      )}
+    >
+      <div className="flex items-center gap-2 text-text-secondary">
+        {result.success ? (
+          <CheckCircle className="h-3.5 w-3.5 shrink-0 text-green-500" aria-hidden="true" />
+        ) : (
+          <XCircle className="h-3.5 w-3.5 shrink-0 text-red-500" aria-hidden="true" />
+        )}
+        <span className="font-medium text-text-primary">
+          {localize('com_sub_agent_working_with' as TranslationKeys, { 0: agentName })}
+        </span>
+      </div>
+      <div className="truncate pl-5 text-text-tertiary" title={result.success ? result.output : result.error}>
+        {summary}
+      </div>
+    </div>
+  );
+}
+
+function SubAgentResultsBlock({
+  results,
+  singleOutput,
+  error,
+  agentsMap,
+  localize,
+}: {
+  results?: Array<{ agentId: string; success: boolean; output?: string; error?: string }>;
+  singleOutput?: string;
+  error?: string;
+  agentsMap: Record<string, { name?: string }> | undefined;
+  localize: (key: TranslationKeys | string, vars?: Record<string, unknown>) => string;
+}) {
+  const [outputExpanded, setOutputExpanded] = useState(false);
+
+  if (error) {
+    return (
+      <div className="rounded-lg bg-red-500/10 p-2 text-sm text-red-600 dark:text-red-950/20 dark:text-red-400">
+        {error}
+      </div>
+    );
+  }
+
+  if (Array.isArray(results) && results.length > 0) {
+    const summary = results
+      .map((r) => {
+        const name = agentsMap?.[r.agentId]?.name ?? r.agentId;
+        return r.success ? `${name}: ${(r.output ?? '').slice(0, 60)}…` : `${name}: Error`;
+      })
+      .join(' · ');
+    return (
+      <div className="rounded-lg border border-border-light bg-surface-tertiary overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setOutputExpanded((e) => !e)}
+          className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-surface-primary/30 transition-colors"
+        >
+          <span className="truncate text-text-secondary">{summary}</span>
+          {outputExpanded ? (
+            <ChevronUp className="h-4 w-4 shrink-0 text-text-tertiary" aria-hidden="true" />
+          ) : (
+            <ChevronDown className="h-4 w-4 shrink-0 text-text-tertiary" aria-hidden="true" />
+          )}
+        </button>
+        {outputExpanded && (
+          <div className="space-y-2 border-t border-border-light p-3">
+            {results.map((r, idx) => {
+              const agentName = agentsMap?.[r.agentId]?.name ?? r.agentId;
+              return (
+                <div
+                  key={idx}
+                  className="rounded-md border border-border-light bg-surface-primary/40 p-2.5 text-sm"
+                >
+                  <div className="mb-1.5 flex items-center gap-1.5 font-medium text-text-secondary">
+                    <CheckCircle
+                      className={r.success ? 'h-3.5 w-3.5 text-green-500' : 'hidden'}
+                      aria-hidden="true"
+                    />
+                    {!r.success && (
+                      <span className="h-3.5 w-3.5 rounded-full bg-red-500/20" aria-hidden="true" />
+                    )}
+                    {agentName}
+                  </div>
+                  {r.success ? (
+                    <div className="text-text-primary whitespace-pre-wrap">
+                      {r.output || localize('com_ui_no_response')}
+                    </div>
+                  ) : (
+                    <div className="text-red-600 dark:text-red-400">{r.error || localize('com_ui_error')}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (singleOutput != null) {
+    const preview = singleOutput.slice(0, 80) + (singleOutput.length > 80 ? '…' : '');
+    return (
+      <div className="rounded-lg border border-border-light bg-surface-tertiary overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setOutputExpanded((e) => !e)}
+          className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-surface-primary/30 transition-colors"
+        >
+          <span className="truncate text-text-secondary">{preview}</span>
+          {outputExpanded ? (
+            <ChevronUp className="h-4 w-4 shrink-0 text-text-tertiary" aria-hidden="true" />
+          ) : (
+            <ChevronDown className="h-4 w-4 shrink-0 text-text-tertiary" aria-hidden="true" />
+          )}
+        </button>
+        {outputExpanded && (
+          <div className="border-t border-border-light p-3 text-text-primary whitespace-pre-wrap text-sm">
+            {singleOutput || localize('com_ui_no_response')}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return null;
 }
 
 function SchedulerStatusBadge({ status }: { status: string }) {
@@ -452,6 +695,7 @@ export default function ToolCallInfo({
   displayName,
   pendingAuth,
   attachments,
+  toolCallId,
 }: {
   input: string;
   function_name: string;
@@ -460,8 +704,10 @@ export default function ToolCallInfo({
   domain?: string;
   pendingAuth?: boolean;
   attachments?: TAttachment[];
+  toolCallId?: string;
 }) {
   const localize = useLocalize();
+  const agentsMap = useAgentsMapContext();
   const formatText = (text: string) => {
     try {
       return JSON.stringify(JSON.parse(text), null, 2);
@@ -749,7 +995,10 @@ export default function ToolCallInfo({
   }, [function_name, output]);
 
   const schedulerData = useMemo(() => {
-    if (!function_name || !SCHEDULER_TOOLS.has(function_name) || !output) {
+    if (!function_name || !SCHEDULER_TOOLS.has(function_name)) {
+      return null;
+    }
+    if (!output && function_name !== Tools.run_sub_agent) {
       return null;
     }
     try {
@@ -791,6 +1040,20 @@ export default function ToolCallInfo({
         if (parsed?.error) return { error: parsed.error };
         return { run: parsed };
       }
+      if (function_name === Tools.run_sub_agent) {
+        if (!output) return null;
+        if (parsed?.error) return { error: parsed.error };
+        return {
+          success: parsed?.success,
+          output: parsed?.output,
+          results: Array.isArray(parsed?.results) ? parsed.results : undefined,
+        };
+      }
+      if (function_name === Tools.list_agents) {
+        if (parsed?.error) return { error: parsed.error };
+        const agents = Array.isArray(parsed?.data) ? parsed.data : [];
+        return { agents, has_more: parsed?.has_more, after: parsed?.after };
+      }
     } catch {
       // fall through to default JSON display
     }
@@ -826,6 +1089,13 @@ export default function ToolCallInfo({
         if (function_name === Tools.get_run && parsed?.runId) {
           return localize('com_scheduler_input_fetching' as TranslationKeys, { 0: parsed.runId });
         }
+        if (function_name === Tools.run_sub_agent) {
+          const agentId = parsed?.agentId ?? parsed?.tasks?.[0]?.agentId;
+          const agentName = agentId ? (agentsMap?.[agentId]?.name ?? agentId) : 'sub-agent';
+          return localize('com_scheduler_input_running_sub_agent' as TranslationKeys, {
+            0: agentName,
+          });
+        }
       } catch {
         // fall through
       }
@@ -839,12 +1109,17 @@ export default function ToolCallInfo({
     if (function_name === Tools.list_runs) {
       return localize('com_scheduler_input_listing_runs' as TranslationKeys);
     }
+    if (function_name === Tools.list_agents) {
+      return localize('com_scheduler_input_listing_agents' as TranslationKeys);
+    }
     return null;
-  }, [function_name, input, localize]);
+  }, [function_name, input, localize, agentsMap]);
 
   const schedulerInputPreviewData = useMemo(() => {
     if (
-      (function_name !== Tools.create_schedule && function_name !== Tools.update_schedule) ||
+      (function_name !== Tools.create_schedule &&
+        function_name !== Tools.update_schedule &&
+        function_name !== Tools.run_sub_agent) ||
       !input?.trim()
     ) {
       return null;
@@ -878,6 +1153,24 @@ export default function ToolCallInfo({
           timezone: parsed.timezone,
           userProjectId: parsed.userProjectId,
         };
+      }
+      if (function_name === Tools.run_sub_agent) {
+        const tasks = parsed?.tasks as Array<{ agentId?: string; prompt?: string }> | undefined;
+        if (Array.isArray(tasks) && tasks.length > 0) {
+          const valid = tasks.filter((t) => t?.agentId && t?.prompt);
+          if (valid.length > 0) {
+            return {
+              type: 'run_sub_agent' as const,
+              tasks: valid.map((t) => ({ agentId: String(t.agentId), prompt: String(t.prompt) })),
+            };
+          }
+        }
+        if (parsed?.agentId && parsed?.prompt) {
+          return {
+            type: 'run_sub_agent' as const,
+            agentId: parsed.agentId, prompt: parsed.prompt,
+          };
+        }
       }
     } catch {
       // fall through
@@ -1335,7 +1628,17 @@ export default function ToolCallInfo({
 
   const showSchedulerInput = schedulerInputSummary && !schedulerInputSummary.startsWith('com_');
   const hasSchedulerInputPreview = schedulerInputPreviewData != null;
+  const hasSubAgentInputPreview =
+    schedulerInputPreviewData != null && schedulerInputPreviewData.type === 'run_sub_agent';
+  const hasScheduleInputPreview =
+    hasSchedulerInputPreview && schedulerInputPreviewData!.type !== 'run_sub_agent';
   const isSchedulerToolWithCustomView = !!function_name && SCHEDULER_TOOLS.has(function_name);
+  const subAgentStreamByToolCallId = useRecoilValue(store.subAgentStreamByToolCallIdAtom);
+  const subAgentStreamIds: string[] = toolCallId
+    ? (Array.isArray(subAgentStreamByToolCallId[toolCallId])
+        ? subAgentStreamByToolCallId[toolCallId]
+        : [])
+    : [];
 
   if (isSchedulerToolWithCustomView) {
     let schedulerContent: React.ReactNode = null;
@@ -1345,7 +1648,115 @@ export default function ToolCallInfo({
       </div>
     );
 
-    if (schedulerData && 'error' in schedulerData) {
+    if (function_name === Tools.run_sub_agent) {
+      const subAgentData = schedulerData as
+        | {
+            success?: boolean;
+            output?: string;
+            error?: string;
+            results?: Array<{ agentId: string; success: boolean; output?: string; error?: string }>;
+          }
+        | undefined;
+      const hasResults =
+        subAgentData &&
+        ('output' in subAgentData || 'results' in subAgentData) &&
+        !subAgentData.error;
+      const results = Array.isArray(subAgentData?.results) ? subAgentData.results : [];
+      const singleOutput =
+        hasResults && subAgentData?.success && typeof subAgentData.output === 'string'
+          ? subAgentData.output
+          : undefined;
+      const singleRunAgentId =
+        hasSubAgentInputPreview && 'agentId' in schedulerInputPreviewData!
+          ? schedulerInputPreviewData!.agentId
+          : (() => {
+              try {
+                const parsed = typeof input === 'string' ? JSON.parse(input || '{}') : input;
+                return typeof parsed?.agentId === 'string' ? parsed.agentId : '';
+              } catch {
+                return '';
+              }
+            })();
+      const inputTasks =
+        hasSubAgentInputPreview && 'tasks' in schedulerInputPreviewData!
+          ? schedulerInputPreviewData!.tasks
+          : singleRunAgentId
+            ? [{ agentId: singleRunAgentId, prompt: '' }]
+            : [];
+
+      if (subAgentData?.error) {
+        schedulerContent = errorBlock(subAgentData.error);
+      } else {
+        const runCount = Math.max(subAgentStreamIds.length, results.length, singleOutput ? 1 : 0);
+        const runCards =
+          runCount > 0 ? (
+            <div className="space-y-2">
+              {Array.from({ length: runCount }, (_, idx) => {
+                const streamId = subAgentStreamIds[idx] ?? null;
+                const result = results[idx];
+                const isFromResult = !!result;
+                const isSingleRunWithOutput =
+                  !isFromResult && singleOutput && results.length === 0 && idx === 0;
+                const agentId =
+                  result?.agentId ??
+                  (isSingleRunWithOutput ? singleRunAgentId : inputTasks[idx]?.agentId ?? '');
+                const agentName = agentsMap?.[agentId]?.name ?? agentId;
+
+                return (
+                  <div
+                    key={streamId ?? `result-${idx}`}
+                    className="rounded-lg border border-border-light bg-surface-tertiary p-2.5"
+                  >
+                    {agentName && (
+                      <div className="mb-1.5 text-xs font-medium text-text-secondary">
+                        {localize('com_sub_agent_working_with' as TranslationKeys, { 0: agentName })}
+                      </div>
+                    )}
+                    {isFromResult ? (
+                      <RunSubAgentCompletedCard
+                        result={result}
+                        agentsMap={agentsMap}
+                        localize={localize}
+                      />
+                    ) : isSingleRunWithOutput ? (
+                      <RunSubAgentCompletedCard
+                        result={{
+                          agentId: singleRunAgentId,
+                          success: true,
+                          output: singleOutput,
+                        }}
+                        agentsMap={agentsMap}
+                        localize={localize}
+                      />
+                    ) : (
+                      <RunSubAgentProgress streamId={streamId} agentName={agentName || undefined} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : null;
+
+        const resultsBlock =
+          hasResults && (results.length > 0 || singleOutput) ? (
+            <div className="mt-2">
+              <SubAgentResultsBlock
+                results={results.length > 0 ? results : undefined}
+                singleOutput={singleOutput}
+                agentsMap={agentsMap}
+                localize={localize}
+              />
+            </div>
+          ) : null;
+
+        schedulerContent = (
+          <>
+            {runCards}
+            {resultsBlock}
+          </>
+        );
+      }
+    } else if (schedulerData && 'error' in schedulerData) {
       schedulerContent = errorBlock(schedulerData.error);
     } else if (schedulerData && 'schedules' in schedulerData) {
       const schedules = schedulerData.schedules as Array<{
@@ -1517,6 +1928,35 @@ export default function ToolCallInfo({
           </div>
         );
       }
+    } else if (schedulerData && 'agents' in schedulerData) {
+      const agents = schedulerData.agents as Array<{ id?: string; name?: string; description?: string }>;
+      const hasMore = schedulerData.has_more === true;
+      if (agents.length === 0) {
+        schedulerContent = (
+          <div className="text-sm text-text-secondary">No agents available</div>
+        );
+      } else {
+        schedulerContent = (
+          <div className="space-y-2">
+            {agents.map((a) => (
+              <div
+                key={a.id ?? ''}
+                className="rounded-lg border border-border-light bg-surface-tertiary p-2 text-xs"
+              >
+                <div className="font-medium text-text-primary">
+                  [{a.id ?? '—'}] {a.name ?? 'Unnamed'}
+                </div>
+                {a.description ? (
+                  <div className="mt-0.5 text-text-secondary">{a.description}</div>
+                ) : null}
+              </div>
+            ))}
+            {hasMore && (
+              <div className="text-text-tertiary text-xs">More agents available (use after cursor)</div>
+            )}
+          </div>
+        );
+      }
     } else if (schedulerData && 'run' in schedulerData) {
       const r = schedulerData.run as {
         status?: string;
@@ -1554,12 +1994,13 @@ export default function ToolCallInfo({
       }
     }
 
-    const previewOnly = hasSchedulerInputPreview && !schedulerContent;
+    const previewOnly =
+      (hasSubAgentInputPreview || hasScheduleInputPreview) && !schedulerContent;
 
     return (
       <div className="w-full p-2">
         <div style={{ opacity: 1 }} className="flex min-h-0 flex-col">
-          {hasSchedulerInputPreview ? (
+          {hasScheduleInputPreview ? (
             <div className={previewOnly ? 'min-w-0 flex-1' : 'mb-2'}>
               <SchedulePreviewCard
                 preview={schedulerInputPreviewData}
@@ -1573,7 +2014,13 @@ export default function ToolCallInfo({
             </div>
           ) : null}
           {schedulerContent && (
-            <div className={hasSchedulerInputPreview || showSchedulerInput ? 'mt-2' : ''}>
+            <div
+              className={
+                hasSubAgentInputPreview || hasScheduleInputPreview || showSchedulerInput
+                  ? 'mt-2'
+                  : ''
+              }
+            >
               {schedulerContent}
             </div>
           )}

@@ -102,6 +102,7 @@ export default function useResumableSSE(
 
   const setPendingToolConfirmation = useSetRecoilState(store.pendingToolConfirmationAtom);
   const setResolvedToolApprovals = useSetRecoilState(store.resolvedToolApprovalsAtom);
+  const setSubAgentStreamByToolCallId = useSetRecoilState(store.subAgentStreamByToolCallIdAtom);
 
   const {
     setMessages,
@@ -200,6 +201,7 @@ export default function useResumableSSE(
             );
             const closeAndCleanup = () => {
               clearStepMaps();
+              setSubAgentStreamByToolCallId({});
               removeActiveJob(currentStreamId);
               (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
               sse.close();
@@ -277,6 +279,25 @@ export default function useResumableSSE(
                 }));
               }
             }
+            return;
+          }
+
+          if (data.event === 'sub_agent_started' && data.toolCallId && data.subAgentStreamId) {
+            const tid = data.toolCallId as string;
+            const sid = data.subAgentStreamId as string;
+            const taskIndex = typeof data.taskIndex === 'number' ? data.taskIndex : undefined;
+            setSubAgentStreamByToolCallId((prev) => {
+              const existing = prev[tid] ?? [];
+              if (taskIndex !== undefined) {
+                const next = [...existing];
+                if (next.length <= taskIndex) {
+                  next.length = taskIndex + 1;
+                }
+                next[taskIndex] = sid;
+                return { ...prev, [tid]: next };
+              }
+              return { ...prev, [tid]: [...existing, sid] };
+            });
             return;
           }
 
@@ -630,6 +651,7 @@ export default function useResumableSSE(
       payload = removeNullishValues(payload) as TPayload;
 
       clearStepMaps();
+      setSubAgentStreamByToolCallId({});
 
       const url = payloadData.server;
 
@@ -681,7 +703,7 @@ export default function useResumableSSE(
       setIsSubmitting(false);
       return null;
     },
-    [clearStepMaps, errorHandler, setIsSubmitting],
+    [clearStepMaps, setSubAgentStreamByToolCallId, errorHandler, setIsSubmitting],
   );
 
   useEffect(() => {
@@ -763,6 +785,7 @@ export default function useResumableSSE(
       }
       // Clear handler maps to prevent memory leaks and stale state
       clearStepMaps();
+      setSubAgentStreamByToolCallId({});
       // Reset UI state on cleanup - useResumeOnLoad will restore if needed
       setIsSubmitting(false);
       setShowStopButton(false);

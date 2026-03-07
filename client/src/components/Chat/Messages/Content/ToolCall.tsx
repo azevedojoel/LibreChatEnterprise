@@ -63,6 +63,8 @@ const SCHEDULER_TOOL_ICONS: Partial<Record<string, React.ComponentType<{ classNa
   [Tools.run_schedule]: Play,
   [Tools.list_runs]: List,
   [Tools.get_run]: FileSearch,
+  [Tools.run_sub_agent]: Play,
+  [Tools.list_agents]: List,
 };
 
 /** Icons for Google Calendar and MS 365 Calendar tools */
@@ -769,6 +771,7 @@ export default function ToolCall({
                 displayName={labelWithPattern}
                 pendingAuth={authDomain.length > 0 && !cancelled && displayProgress < 1}
                 attachments={attachments}
+                toolCallId={toolCallId}
               />
             )}
           </ToolResultContainer>
@@ -814,6 +817,7 @@ export default function ToolCall({
                   displayName={labelWithPattern}
                   pendingAuth={authDomain.length > 0 && !cancelled && displayProgress < 1}
                   attachments={attachments}
+                  toolCallId={toolCallId}
                 />
               )}
             </div>

@@ -75,6 +75,7 @@ export default function AgentSelect({
         [AgentCapabilities.execute_code]: false,
         [AgentCapabilities.create_pdf]: false,
         [AgentCapabilities.manage_scheduling]: false,
+        [AgentCapabilities.run_sub_agent]: false,
         [AgentCapabilities.sys_admin]: false,
         [AgentCapabilities.end_after_tools]: false,
         [AgentCapabilities.hide_sequential_outputs]: false,
@@ -123,6 +124,13 @@ export default function AgentSelect({
           capabilities[AgentCapabilities.manage_scheduling] = true;
           if (!agentTools.includes(AgentCapabilities.manage_scheduling)) {
             agentTools.push(AgentCapabilities.manage_scheduling);
+          }
+          return;
+        }
+        if (tool === Tools.run_sub_agent || tool === Tools.list_agents) {
+          capabilities[AgentCapabilities.run_sub_agent] = true;
+          if (!agentTools.includes(AgentCapabilities.run_sub_agent)) {
+            agentTools.push(AgentCapabilities.run_sub_agent);
           }
           return;
         }
