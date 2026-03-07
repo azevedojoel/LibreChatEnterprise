@@ -369,6 +369,7 @@ endpoints:
       - chain
       - ocr
       - manage_scheduling
+      - run_sub_agent  # Run other agents inline with a prompt
       - sys_admin  # Admin-only: user/workspace management, token usage
     inboundEmailAddress: inbound.postmarkapp.com  # Postmark inbound domain for routing
     inboundEmailDisplayDomain: dailythread.ai  # Domain shown to users (token@dailythread.ai)
