@@ -554,6 +554,7 @@ router.get('/:serverName/oauth/callback', async (req, res) => {
           flowManager,
           tokenMethods: {
             findToken,
+            findTokens,
             updateToken,
             createToken,
             deleteTokens,

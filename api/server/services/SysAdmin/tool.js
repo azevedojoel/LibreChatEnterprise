@@ -344,7 +344,7 @@ function createSysAdminTools({ userId, userRole }) {
           {
             name: 'sys_admin_create_tool_override',
             purpose:
-              'Create tool override (description, schema, or requiresApproval). Optional agentId (per-agent), userId (per-user). requiresApproval: true=gate, false=ungate.',
+              'Create tool override (description, schema, or requiresApproval). Optional agentId (per-agent), userId (per-user). requiresApproval: true=gate, false=ungate. Example: { "toolId": "remove_productivity_account", "requiresApproval": false }',
           },
           {
             name: 'sys_admin_get_tool_override',
@@ -403,6 +403,7 @@ function createSysAdminTools({ userId, userRole }) {
           'List all tools with descriptions',
           'Create a tool override for file_search',
           'Ungate execute_code for agent X (no approval required)',
+          'Ungate remove_productivity_account (requiresApproval: false)',
           'Gate file_search for user X (require approval)',
           'List tool overrides for agent X',
           'List feature flags',
@@ -2543,7 +2544,13 @@ function createSysAdminTools({ userId, userRole }) {
             description:
               "Override the tool's JSON Schema. Pass as object or JSON string. Omit if not changing schema.",
           },
-          requiresApproval: { type: 'boolean', description: 'true=gate, false=ungate' },
+          requiresApproval: {
+            oneOf: [
+              { type: 'boolean', description: 'true=gate, false=ungate' },
+              { type: 'string', enum: ['true', 'false'], description: 'String form; converted to boolean' },
+            ],
+            description: 'true=gate, false=ungate approval',
+          },
         },
         required: ['toolId'],
       },
@@ -2660,7 +2667,13 @@ function createSysAdminTools({ userId, userRole }) {
             description:
               'New JSON Schema for the tool. Pass as object or JSON string. Omit if not changing schema.',
           },
-          requiresApproval: { type: 'boolean', description: 'true=gate, false=ungate' },
+          requiresApproval: {
+            oneOf: [
+              { type: 'boolean', description: 'true=gate, false=ungate' },
+              { type: 'string', enum: ['true', 'false'], description: 'String form; converted to boolean' },
+            ],
+            description: 'true=gate, false=ungate approval',
+          },
         },
         required: ['overrideId'],
       },
@@ -2704,15 +2717,24 @@ function createSysAdminTools({ userId, userRole }) {
     async (rawInput) => {
       const err = requireAdmin();
       if (err) return toJson(err);
-      const { toolId, agentId, userId, globalOnly, limit = 50, page = 1 } = rawInput || {};
+      const { toolId, agentId, userId, globalOnly, limit, page } = rawInput || {};
+      const globalOnlyVal =
+        globalOnly === true || globalOnly === 'true'
+          ? true
+          : globalOnly === false || globalOnly === 'false'
+            ? false
+            : undefined;
+      const limitNum =
+        typeof limit === 'number' ? limit : limit != null ? parseInt(limit, 10) : 50;
+      const pageNum = typeof page === 'number' ? page : page != null ? parseInt(page, 10) : 1;
       try {
         const result = await listOverrides({
           toolId,
           agentId,
           userId,
-          globalOnly,
-          limit,
-          page,
+          globalOnly: globalOnlyVal,
+          limit: limitNum,
+          page: pageNum,
         });
         return toJson(result);
       } catch (e) {
@@ -2730,9 +2752,21 @@ function createSysAdminTools({ userId, userRole }) {
           toolId: { type: 'string' },
           agentId: { type: 'string' },
           userId: { type: 'string' },
-          globalOnly: { type: 'boolean' },
-          limit: { type: 'number' },
-          page: { type: 'number' },
+          globalOnly: {
+            oneOf: [
+              { type: 'boolean' },
+              { type: 'string', enum: ['true', 'false'] },
+            ],
+            description: 'If true, only return global overrides',
+          },
+          limit: {
+            oneOf: [{ type: 'number' }, { type: 'string' }],
+            description: 'Max results (default 50)',
+          },
+          page: {
+            oneOf: [{ type: 'number' }, { type: 'string' }],
+            description: 'Page number (default 1)',
+          },
         },
         required: [],
       },

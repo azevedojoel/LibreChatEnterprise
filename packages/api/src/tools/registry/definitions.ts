@@ -3181,7 +3181,10 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
             "Override the tool's JSON Schema. Pass as object or JSON string. Omit if not changing schema.",
         },
         requiresApproval: {
-          type: 'boolean',
+          oneOf: [
+            { type: 'boolean', description: 'true=gate, false=ungate' },
+            { type: 'string', enum: ['true', 'false'], description: 'String form; converted to boolean' },
+          ],
           description: 'true=require approval (gate), false=no approval (ungate); overrides default',
         },
       },
@@ -3223,7 +3226,10 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
             'New JSON Schema for the tool. Pass as object or JSON string. Omit if not changing schema.',
         },
         requiresApproval: {
-          type: 'boolean',
+          oneOf: [
+            { type: 'boolean', description: 'true=gate, false=ungate' },
+            { type: 'string', enum: ['true', 'false'], description: 'String form; converted to boolean' },
+          ],
           description: 'true=gate, false=ungate approval',
         },
       },
@@ -3257,11 +3263,20 @@ const agentToolDefinitions: Record<string, ToolRegistryDefinition> = {
         agentId: { type: 'string', description: 'Filter by agent _id' },
         userId: { type: 'string', description: 'Filter by user _id' },
         globalOnly: {
-          type: 'boolean',
+          oneOf: [
+            { type: 'boolean' },
+            { type: 'string', enum: ['true', 'false'] },
+          ],
           description: 'If true, only return global overrides (agentId null)',
         },
-        limit: { type: 'number', description: 'Max results (default 50)' },
-        page: { type: 'number', description: 'Page number (default 1)' },
+        limit: {
+          oneOf: [{ type: 'number' }, { type: 'string' }],
+          description: 'Max results (default 50)',
+        },
+        page: {
+          oneOf: [{ type: 'number' }, { type: 'string' }],
+          description: 'Page number (default 1)',
+        },
       },
       required: [],
     } as ExtendedJsonSchema,
