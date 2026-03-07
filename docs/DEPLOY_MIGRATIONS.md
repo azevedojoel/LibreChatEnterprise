@@ -8,6 +8,7 @@ Run these migrations **before** deploying when upgrading to a version that inclu
 2. **migrate:workspace-tool-names** (if you have agents with workspace tools)
 3. **migrate:userproject-add-fields** (adds description, tags, status, ownerId to UserProject)
 4. **migrate:ellis-add-project-tools** (adds project tools to Ellis/system-general agent)
+5. **migrate:ellis-orchestrator-prompt** (updates Ellis instructions and adds run_sub_agent for orchestrator role)
 
 ```bash
 # UserProject fields (run first)
@@ -17,6 +18,10 @@ npm run migrate:userproject-add-fields
 # Ellis project tools (run second)
 npm run migrate:ellis-add-project-tools:dry-run
 npm run migrate:ellis-add-project-tools
+
+# Ellis orchestrator prompt (step 5 - for existing deployments)
+npm run migrate:ellis-orchestrator-prompt:dry-run
+npm run migrate:ellis-orchestrator-prompt
 ```
 
 ---

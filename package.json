@@ -105,6 +105,8 @@
     "migrate:userproject-add-fields": "node config/migrate-userproject-add-fields.js --execute",
     "migrate:ellis-add-project-tools:dry-run": "node config/migrate-ellis-add-project-tools.js",
     "migrate:ellis-add-project-tools": "node config/migrate-ellis-add-project-tools.js --execute",
+    "migrate:ellis-orchestrator-prompt:dry-run": "node config/migrate-ellis-orchestrator-prompt.js",
+    "migrate:ellis-orchestrator-prompt": "node config/migrate-ellis-orchestrator-prompt.js --execute",
     "migrate:prompt-permissions:batch": "node config/migrate-prompt-permissions.js --batch-size=50",
     "postinstall": "patch-package"
   },
