@@ -698,7 +698,7 @@ export default function mongoMeili(schema: Schema, options: MongoMeiliOptions): 
       return next();
     }
 
-    if (doc.unfinished) {
+    if (!doc || doc.unfinished) {
       return next();
     }
 
