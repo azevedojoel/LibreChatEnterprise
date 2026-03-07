@@ -99,7 +99,9 @@ export default function ProjectNav() {
 
   const { personal, workspace: workspaceProjects } = useMemo(() => {
     const personalList = projects.filter((p) => !p.shared && matchesFilter(p));
-    const workspaceList = projects.filter((p) => p.shared && matchesFilter(p));
+    const workspaceList = projects
+      .filter((p) => p.shared && matchesFilter(p))
+      .sort((a, b) => Number(b.isInbound) - Number(a.isInbound)); // Inbound first
     return { personal: personalList, workspace: workspaceList };
   }, [projects, matchesFilter]);
 
@@ -279,7 +281,7 @@ export default function ProjectNav() {
                               navigate('/c/project/' + project._id);
                             }}
                             className={cn(
-                              'flex flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm',
+                              'flex flex-1 min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm',
                               selectedProjectId === project._id
                                 ? 'bg-surface-hover text-text-primary'
                                 : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary',
@@ -328,7 +330,7 @@ export default function ProjectNav() {
                           <button
                             onClick={handleProjectClick}
                             className={cn(
-                              'flex flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm',
+                              'flex flex-1 min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm',
                               selectedProjectId === project._id
                                 ? 'bg-surface-hover text-text-primary'
                                 : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary',
